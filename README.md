@@ -1,12 +1,19 @@
 # Infinitely zoomable scatterplots.
 
-This is code for making scatterplots of indefinite resolution. There are two pieces of code;
-one is a python script that builds a tiled directory of files; the other is a javascript (ES6)
-library that displays these points in the browser and loads new points as the user zooms in to specific areas.
+This is code for making scatterplots of indefinite resolution. There
+are two pieces of code; one is a python script that builds a tiled
+directory of files; the other is a javascript (ES6) library that
+displays these points in the browser and loads new points as the user
+zooms in to specific areas.
 
-Ridiculously, you *must* use an old version of python (2.0) and a new version of Javascript (ES6) because I'm too <strikethrough>lazy</strikethrough> laser-focused on writing traditional works of history to make either one universal. Ideally the tiling would happen in javascript too, but python works fine.
+Ridiculously, you *must* use an old version of python (2.0) and a new
+version of Javascript (ES6) because I'm too lazy to fix up the python
+one, and because javascript build platforms wouold change several
+times before I got the ES6 to transpile. I usually just run `import
+scatterplot from 'deepscatter'` inside some other ES6 code.
 
-A description of some of the technology is in [Creating Data](http://creatingdata.us/techne/scatterplots/)
+A description of some of the technology is in
+[Creating Data](http://creatingdata.us/techne/scatterplots/)
 
 See examples:
 
@@ -26,14 +33,15 @@ python python/scatterTiler.py --file ~/projects/umap_underwood_scatter/out.tsv b
 
 # API
 
-This API description is incomplete. If you actually want to use this, file an issue.
+This API description is incomplete. If you actually want to use this and can't figure it out,
+feel free to file an issue.
 
 
 ## Object creation
 
 Creation is a two-step process.
 
-First, instantiate a handler that will build a canvas.
+First, instantiate a handler that will build a canvas. This is a synchronous function.
 
 ```js
 import Scatterplot from 'deepscatter';
@@ -49,7 +57,14 @@ document.documentElement.clientHeight, // height of the canvas.
 ## Plot through API
 
 Then, interface by calling the API with a series of objects. The first call currently
-tends to be very long. Later ones are shorter.
+tends to require a lot of parameters--I give a verbose one below. The first argument is
+the directory created by the python call.
+
+This returns a `Promise` that will load all require files before resolving the plot. Although there are
+*are* a number of methods attached to the scatterplot that can be called directly, things are
+handled best if you only call this one method.
+
+There's also a special method, `scatterplot.redraw()`, that can be called in an emergency.
 
 Most of these options have defaults, but I'll give an extensive one because I don't have an example set up yet.
 
