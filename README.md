@@ -2,10 +2,11 @@
 
 This is code for making scatterplots of indefinite resolution. There are two pieces of code;
 one is a python script that builds a tiled directory of files; the other is a javascript (ES6)
-library that can plot them through an API.
+library that displays these points in the browser and loads new points as the user zooms in to specific areas.
 
 Ridiculously, you *must* use an old version of python (2.0) and a new version of Javascript (ES6) because I'm too <strikethrough>lazy</strikethrough> laser-focused on writing traditional works of history to make either one universal. Ideally the tiling would happen in javascript too, but python works fine.
 
+A description of some of the technology is in [Creating Data](http://creatingdata.us/techne/scatterplots/)
 
 See examples:
 
@@ -127,3 +128,23 @@ The following regex will limit to single letter classes for R, S, and T, and all
 
 
 
+# Other notes
+
+There a few things for authoring that can only be done in the browser.
+
+Especially important is the zoom level.
+
+You can get a string telling you where are by typing into the console.
+
+```js
+scatterplot.where_am_i()
+```
+
+## Missing pieces.
+
+Almost all the code is there for indexes; this lets you zoom to any individual
+word without knowing where it is. I just haven't re-implemented it lately.
+
+```
+scatterplot.zoom_to_id('foo')
+```
