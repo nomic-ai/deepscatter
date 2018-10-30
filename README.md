@@ -7,8 +7,8 @@ displays these points in the browser and loads new points as the user
 zooms in to specific areas.
 
 Ridiculously, you *must* use an old version of python (2.0) and a new
-version of Javascript (ES6) because I'm too lazy to fix up the python
-one, and because javascript build platforms wouold change several
+version of Javascript (ES6). I'm too lazy to update the python
+one, and javascript build practices would probably change several
 times before I got the ES6 to transpile. I usually just run `import
 scatterplot from 'deepscatter'` inside some other ES6 code.
 
