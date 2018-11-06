@@ -386,17 +386,17 @@ class LineYielder(object):
             self.mainfile = open(argp.file)
         line = self.mainfile.readline()
         try:
-            self.headers = line.rstrip("\n").split("\t")
+            self.headers = line.rstrip("\n").rstrip("\r").split("\t")
         except TypeError:
             line = str(line)
-            self.headers = line.rstrip("\n").split("\t")
+            self.headers = line.rstrip("\n").rstrip("\r").split("\t")
         print(self.headers)
         if not "x" in self.headers or not "y" in self.headers:
             raise TypeError("You must include x and y as column names")
         print(self.headers)
         if argp.metadata is not None:
             self.metadata = open(argp.metadata)
-            metaheader = self.metadata.readline().rstrip("\n").split("\t")
+            metaheader = self.metadata.readline().rstrip("\n").rstrip("\r").split("\t")
             self.headers += metaheader
         self.headers += ["ix"]
             
@@ -413,7 +413,7 @@ class LineYielder(object):
         for i,line in enumerate(f1):
             if i == 0:
                 continue
-            point = line.rstrip('\n').split("\t")
+            point = line.rstrip('\n').rstrip("\r").split("\t")
             
             if self.argp.metadata is not None:
                 point += f2.readline().split("\t")

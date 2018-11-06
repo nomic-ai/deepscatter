@@ -1,0 +1,38 @@
+{
+  "name": "deepscatter",
+  "version": "1.0.0",
+  "description": "Build zoomable scatterplots with millions of points using D3",
+  "main": "index.js",
+  "scripts": {
+    "babel": "babel --presets es2015 index.js -o build/main.bundle.js",
+    "start": "http-server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CreatingData/deepscatter.git"
+  },
+  "keywords": [
+    "Data",
+    "Visualization",
+    "D3",
+    "Scatterplot"
+  ],
+  "author": "Ben Schmidt",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/CreatingData/deepscatter/issues"
+  },
+  "homepage": "https://github.com/CreatingData/deepscatter#readme",
+  "dependencies": {
+    "d3-array": "^1.2.4",
+    "d3-ease": "^1.0.5",
+    "d3-format": "^1.3.2",
+    "d3-quadtree": "github:bmschmidt/d3-quadtree",
+    "d3-scale": "^2.1.2"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-core": "^6.26.3",
+    "babel-preset-es2015": "^6.24.1"
+  }
+}

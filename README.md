@@ -155,11 +155,40 @@ You can get a string telling you where are by typing into the console.
 scatterplot.where_am_i()
 ```
 
-## Missing pieces.
+# To do
 
-Almost all the code is there for indexes; this lets you zoom to any individual
-word without knowing where it is. I just haven't re-implemented it lately.
+## Indices by id.
+
+Almost all the code is there for indexes, which can locate a point
+that hasn't been loaded using an alphabetical list. This lets you zoom
+to any individual word without knowing where it is. I just haven't
+re-implemented it lately.
 
 ```
 scatterplot.zoom_to_id('foo')
 ```
+
+## WebGL
+
+Probably this should (at least optionally) be in WebGL. It's nice to
+be able to control the plotting directly on data in Canvas, which is
+why I use it. Canvas is fine for navigation, but there might be visual
+advantages to pushing up towards 100,000 or 500,000 points. Above
+1,000,000 points, the problem starts to be not rendering but shipping
+data to the browser.
+
+## Images
+
+It would be pretty easy to have this draw images to the canvas as well as text and points.
+This could be useful for T-SNE exploration. That field is already fairly well served up to a few hundred thousand, so I haven't done it here.
+
+## ES Module
+
+This should be an ES6 module.
+
+## Responsive size setting
+
+Currently, you specify the point size and target zoom directly. This means that smaller
+screens have much higher overplotting than bigger ones. For mobile devices, it would probably
+be better to print some combination of fewer points and smaller points; how to balance those
+two goals is unclear.
