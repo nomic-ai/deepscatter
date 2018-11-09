@@ -46,7 +46,8 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
   };
 
   let scheme = 'light';
-        
+
+  let canvas; 
   function initialize_canvas() {
     const node = select(selector).node();
     canvas_element = select(selector).selectAll('canvas');
@@ -64,7 +65,11 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
         if (scheme === 'streets') return 'white';
       });
 
-    that.canvas(canvas_element);
+      that.canvas(canvas_element);
+      canvas = canvas_element
+              .node()
+              .getContext('2d');
+      return that;
   }
 
   let svg;
@@ -98,7 +103,7 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
 
   initialize_canvas();
 
-  const drawn = [];
+  const drawn = {point: [], label: []};
 
   const x_buffer = width < height ? 0 : ((width - height) / 2);
   const x_ = scaleLinear()
@@ -1309,9 +1314,6 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
                 .y(d => d.y);
             };
 
-            const canvas = canvas_element
-              .node()
-              .getContext('2d');
 
             // These will be recast by zoom
             x = x_;
@@ -1588,9 +1590,6 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
                 n_visible += 1;
 
                 let draw_as_point = true;
-                if (return_points) {
-                  drawn.push(d);
-                }
 
                 if (d.zoom <= transform.k * point_threshold * label_threshold
                   && label_field
@@ -1661,7 +1660,7 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
                   // One can also add to the quadtree even if conflicted; this "reserves the spot" for
                   // later so there aren't dependency chains.
                   // Turns out that I prefer the higher density.
-
+                    
                   if (!draw_as_point) {
                     drawnLabels.add({
                       x: d.cx, y: d.cy, corners, index: d.index,
@@ -1670,6 +1669,15 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
                     labels_to_draw.push([lab, font_size, d, canvas.fillStyle, width, corners]);
                     draw_as_point = false;
                   }
+
+                    
+                }
+                if (return_points) {
+                    if (draw_as_point) {
+                        drawn.point.push(d);
+                    } else {
+                        drawn.label.push(d);
+                    }
                 }
 
                 if (draw_as_point) {
@@ -1942,9 +1950,10 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
               //                .end()
               //                .classed("visible", false)
               }
-            };
-            updateData();
-          });
+            }
+              updateData();
+          })
+              
 
     return creationPromise;
   };
@@ -1998,22 +2007,36 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
   };
 
   that.drawSVG = function (r = 2, shape = 'circle') {
-    const points = that.redraw(true);
+      canvas.clearRect(0, 0, width, height);            
+    const { point, label } = that.redraw(true);
+      window.gah = point;
+      
+    const points = svg.selectAll(shape)
+      .data(point, d => d.ix);
 
-    const mapping = svg.selectAll(shape)
-      .data(points, d => d.ix);
+    points.exit().remove();
 
-    mapping.exit().remove();
-
-    const entrance = mapping.enter().append(shape);
-
-    const circles = mapping.merge(entrance);
-
+    const entrance = points.enter().append(shape);
+    const circles = points.merge(entrance);
     circles
       .attr('cx', d => x(d.x))
       .attr('cy', d => y(d.y))
-      .attr('fill', d => colors(d[colorize_by]))
+      .style('fill', d => colors(d[colorize_by]))
       .attr('r', r);
+
+    const labs = svg.selectAll("text")
+                   .data(label, d => d.ix);
+      
+    labs.exit().remove();
+
+    const lentrance = labs.enter().append("text");
+    const lcircles = labs.merge(lentrance);
+    lcircles
+      .attr('x', d => x(d.x))
+      .attr('y', d => y(d.y))
+      .style('fill', d => colors(d[colorize_by]))
+      .text(d => d[label_field]);
+    
   };
 
   return that;
