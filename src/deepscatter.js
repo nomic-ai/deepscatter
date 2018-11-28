@@ -1688,7 +1688,7 @@ export default function infinite_scatter(selector, width = 600, height = 400) {
                     r = max_r;
                   }
 
-                  if (r > 21.5) {
+                  if (r > 1021.5) {
                     canvas.moveTo(d.cx, d.cy);
                     canvas.beginPath();
                     canvas.arc(d.cx, d.cy, r, 0, 2 * Math.PI);
@@ -2072,7 +2072,7 @@ function parseRow(d, rz, key) {
     d.library = d.id.split('.')[0];
   }
 
-  if (d.title && d.htid) {
+  if (d.title && d.id) {
     const t = d.title;
     if (t.endsWith(' /')) {
       d.title = d.title.slice(0, -2);
