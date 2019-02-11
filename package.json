@@ -1,0 +1,63 @@
+{
+  "_from": "github:creatingdata/deepscatter",
+  "_id": "deepscatter@1.0.0",
+  "_inBundle": false,
+  "_location": "/deepscatter",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "git",
+    "raw": "deepscatter@github:creatingdata/deepscatter",
+    "name": "deepscatter",
+    "escapedName": "deepscatter",
+    "rawSpec": "github:creatingdata/deepscatter",
+    "saveSpec": "github:creatingdata/deepscatter",
+    "fetchSpec": null,
+    "gitCommittish": null
+  },
+  "_requiredBy": [
+    "/"
+  ],
+  "_resolved": "github:creatingdata/deepscatter#b9244fa5b3edb736405c24b8db66b101088909c3",
+  "_spec": "deepscatter@github:creatingdata/deepscatter",
+  "_where": "/home/bschmidt/scrollership",
+  "author": {
+    "name": "Ben Schmidt"
+  },
+  "bugs": {
+    "url": "https://github.com/CreatingData/deepscatter/issues"
+  },
+  "bundleDependencies": false,
+  "dependencies": {
+    "d3-array": "^1.2.4",
+    "d3-ease": "^1.0.5",
+    "d3-format": "^1.3.2",
+    "d3-quadtree": "github:bmschmidt/d3-quadtree",
+    "d3-scale": "^2.1.2"
+  },
+  "deprecated": false,
+  "description": "Build zoomable scatterplots with millions of points using D3",
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-core": "^6.26.3",
+    "babel-preset-es2015": "^6.24.1"
+  },
+  "homepage": "https://github.com/CreatingData/deepscatter#readme",
+  "keywords": [
+    "Data",
+    "Visualization",
+    "D3",
+    "Scatterplot"
+  ],
+  "license": "MIT",
+  "main": "index.js",
+  "name": "deepscatter",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CreatingData/deepscatter.git"
+  },
+  "scripts": {
+    "babel": "babel --presets es2015 index.js -o build/main.bundle.js",
+    "start": "http-server"
+  },
+  "version": "1.0.0"
+}
