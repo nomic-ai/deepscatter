@@ -5,9 +5,7 @@ const stringify = require('csv-stringify/lib/sync');
 // The purpose of this is to write out a bunch of CSV files without
 // requiring the entire set ever to be in memory.
 
-// The CSV files may hold raw image data for thumbnails.
-
-// Your memory **does** need to be able to hold a little data for each item.
+// The CSV files may hold raw image data for thumbnails, e.g. Probably worth really coding that up.
 
 FIN = "data/data1e6.csv"
 
