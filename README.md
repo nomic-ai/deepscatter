@@ -1,16 +1,21 @@
+
+# Principles
+
+1. This is a 2d library.
+2. The central zoom state is handled by d3-zoom.
+3. That zoom state can be used to render to webgl. Don't know webgl? You
+   should be able to use the zoom state to draw to canvas or svg layers using the
+   same zoom and underlying data, so that you can draw point with webgl
+   and then build a callout using d3-annotate.
+
 # Infinitely zoomable scatterplots.
 
 This is code for making scatterplots of indefinite resolution. There
-are two pieces of code; one is a python script that builds a tiled
+are two pieces of code; one is a script that builds a tiled
 directory of files; the other is a javascript (ES6) library that
 displays these points in the browser and loads new points as the user
 zooms in to specific areas.
 
-Ridiculously, you *must* use an old version of python (2.0) and a new
-version of Javascript (ES6). I'm too lazy to update the python
-one, and javascript build practices would probably change several
-times before I got the ES6 to transpile. I usually just run `import
-scatterplot from 'deepscatter'` inside some other ES6 code.
 
 A description of some of the technology is in
 [Creating Data](http://creatingdata.us/techne/scatterplots/)
@@ -24,11 +29,11 @@ See examples:
 
 # Creating tiles.
 
-This uses a python script to create csv data tiles (typically of around 1,000 points apiece) that
-are then served through javvascript.
+This uses a python script to create csv data tiles (typically of around 1,000 - 50,000 points apiece) that are then served through javascript.
 
 ```bash
-python python/scatterTiler.py --file ~/projects/umap_underwood_scatter/out.tsv build/data/scatter/hathi/ -t 1000
+node src/tiler.js --tile-size 20000 data/1e5.csv
+
 ```
 
 # API

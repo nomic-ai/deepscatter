@@ -21,7 +21,7 @@ Yeah, this library depends on bootstrap css to actually look OK.
 
 <script>
   
-scatterplot = deepScatter.default("#canvas", window.innerWidth * 0.8, window.innerHeight * 0.8)
+scatterplot = deepScatter.default({selector: "#canvas", source_url: "build"})
 
 scatterplot.plotAPI({
   "base_dir": "tiles",

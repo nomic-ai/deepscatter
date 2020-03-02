@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "babel": "babel --presets es2015 index.js -o build/main.bundle.js",
+    "watch": "webpack-dev-server",
+    "build": "webpack",    
     "start": "http-server"
   },
   "repository": {
@@ -29,7 +31,9 @@
     "d3-format": "^1.3.2",
     "d3-quadtree": "github:bmschmidt/d3-quadtree",
     "d3-scale": "^2.1.2",
-    "d3-tile": "^1.0.0"
+    "d3-tile": "^1.0.0",
+    "regl": "^1.3.13",
+    "string-hash": "^1.1.3"
   },
   "deprecated": false,
   "devDependencies": {
@@ -37,6 +41,10 @@
     "babel-core": "^6.26.3",
     "babel-preset-es2015": "^6.24.1",
     "csv-parser": "^2.3.2",
-    "csv-stringify": "^5.3.6"
+    "csv-stringify": "^5.3.6",
+    "webpack": "^4.41.6",
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.10.3",
+    "yargs": "^15.1.0"
   }
 }
