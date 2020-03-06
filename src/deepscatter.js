@@ -28,11 +28,22 @@ export default class Scatterplot {
     const { source_url, selector } = state;
     this._root = new Tile(source_url)
     this._renderer = new Renderer(selector, this._root)
+    
+    // I think probably this should be a primary level 
+    // creation to handle interactions independently 
+    // of any specific renderer?
+    this._zoom = this._renderer._zoom;
+  }
+
+  initialize() {
+    this._renderer.initialize()
   }
 
   plotAPI(state) {
+    console.log("Plotting", state)
+    this._renderer.update_prefs(state)
     console.log("Updating", state)
+    this._renderer.tick()
   }
-  
+    
 }
-

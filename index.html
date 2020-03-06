@@ -10,10 +10,16 @@
   </style>
 <script src='deepScatter.js'></script>
 <script src='https://d3js.org/d3.v5.min.js'></script>
+<div class=scrollership>
+  <div class=tale>
+    <h1 style="color:red">"Hi there"</h1>
+  <div>
+</div>
+
 <div id="deepscatter" style="position:fixed;top:0;left:0">
   <canvas id="canvas"></canvas>
   <canvas style="position:fixed;background:white;top:0;left:0" id="letters"></canvas>
-  </div>
+</div>
 
 <header>Wow this is ugly!</header>
 
@@ -22,24 +28,12 @@ Yeah, this library depends on bootstrap css to actually look OK.
 <script>
   d3.select("#canvas").attr("width", window.innerWidth).attr("height", window.innerHeight)
   scatterplot = new deepScatter.default({selector: "#deepscatter", source_url: "build"})
-
-scatterplot.plotAPI({
-  "base_dir": "build",
-  "colors": {"language":"","Classification":"","Subclassification":"","date":"","Principal Author":""},
-  "labels": ["Classification", "Subclassification","id","title","date","Principal Author", "language", "library"],
-  "point_size": 2,
-  "point_threshold": 10,
-  "label_threshold": 0,
-  "variable_point_size": false,
-  "filters": null,
-  "hide_uncolored": false,
-  "zoom": [1, 0, 0, 1000],
-  "colorize_by": "language",
-  "label_field": "title",
-  "scheme": "light",
-  "guides": ["legend", "color_legend", "label_legend", "filter_legend"]
-  }
-)
-
-</script>  
-
+  scatterplot.initialize()
+  scatterplot.plotAPI({
+    point_size: 3,
+    max_points: 20000,
+    label_threshold: 2,
+    
+    
+  })
+</script>

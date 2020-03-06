@@ -16,7 +16,6 @@ export default class Tile {
       this.scales = {};
     }
     this.key = key || "0/0/0";
-    
     this.codes = this.key.split("/").map(t => parseInt(t))
     this.min_ix = undefined;
     this.max_ix = undefined;
@@ -38,16 +37,34 @@ export default class Tile {
 
   }
 
+  smoothed_density_estimates(depth, width = 128, height = 128) {
+    // Not implemented.
+    // The idea is to use a Gaussian blur on 
+    
+    const n_pixels = width * height;
+     
+    
+    const rawValues = new Uint16Array(new ArrayBuffer(2 * width * height));
+    
+    for (let row of this.values()) {
+      // set the relevant pixel of count += 1
+    }
+    
+  }
+
   is_visible(max_ix, viewport_limits) {
-    // viewport_limits is in the webgl scale -1, 1
-    // Will typically be got by calling current_corners
+    // viewport_limits is in coordinate points.
+    // Will typically be got by calling current_corners.
+
+    // Top tile is always visible
+    if (!this.parent) {return true}
     if (this.min_ix == undefined || this.max_ix == undefined) {
       return false
     }
     if (this.min_ix > max_ix) {
       return false;
     }
-
+    return true;
     const c = this.corners()
 
     return (
@@ -86,11 +103,9 @@ export default class Tile {
         this._description = d3Json(`${this.url}/data_description.json`)
           .then(d => {
             this.limits = d.limits
-            const limits = d.limits
-            this.scales.x = scaleLinear().domain(limits[0]).range([-1, 1])
-
-            // Foreign x-y systems are assumed to go bottom to top, not top to bottom.
-            this.scales.y = scaleLinear().domain(limits[1]).range([-1, 1])
+            const limits = d.limits            
+            // The ranges are not set here; because that's
+            // for the interaction elements to understand.
             return d
           })
         return this._description
@@ -156,10 +171,8 @@ export default class Tile {
       .then(d => {
         d.forEach(e => {
           e._position = [
-//            +e.x,
-//            +e.y
-            this.scales.x(e.x),
-            this.scales.y(e.y)
+            +e.x,
+            +e.y
           ],
           e.ix = +e.ix
         })
@@ -182,13 +195,31 @@ export default class Tile {
   buffer() {
     return Promise.all([this.promise, this.dataTypes()])
       .then(([datalist, datatypes]) => {
-        if (!this._buffer) {
-          this._buffer = datalist.map(d => this.parse_datum(d, datatypes))
+        
+        if (this._buffer) {
+          return Promise.resolve(this._buffer);
         }
-        return this._buffer
+        
+        const columns = Object.keys(datatypes);
+
+        // One fewer than columns.length because
+        // we double count position, x, and y.
+        
+        // and over-allocate 4 floats for characters, etc.
+        const n_col = (columns.length - 1);
+        console.log(n_col)
+        const buffer = new Float32Array(n_col * datalist.length);
+        
+        let offset = 0;
+        for (let d of datalist) {
+          this.parse_datum(d, datatypes, buffer, offset);
+          offset += n_col;
+        }
+        this._buffer = buffer
+        return buffer
       })
   }
-
+  
   find_closest(p) {
     let dist = Infinity;
     let candidate = undefined;
@@ -221,12 +252,18 @@ export default class Tile {
     this._datatypes = Promise.all([this.description(), this.promise])
       .then(
         ([description, datalist]) => {
-          const { fields } = description
-
+          let { fields } = description
+          fields = [...fields]
+          fields.push("flexbuff1")
+          fields.push("flexbuff2")
+          fields.push("flexbuff3")
+          fields.push("flexbuff4")
+          
           const first_elems = new Map()
 
           fields
             .forEach(field_name => first_elems.set(field_name, new Set()))
+          
           datalist.forEach(datum => {
             Object.keys(datum).forEach(
               k => {
@@ -236,49 +273,86 @@ export default class Tile {
               }
             )
           })
-          const my_types = [['x', 'float'], ['y', 'float'], ['ix', 'float']]
-          for (const [k, v] of first_elems.entries()) {
-            if (['x', 'y', 'ix'].indexOf(k) > -1) {
-              continue
-            }
-            if (k == 'word') {
-              my_types.push(['char0', 'ascii'])
-              my_types.push(['char2', 'ascii'])
-              my_types.push(['char4', 'ascii'])                            
-//              my_types.push(['char8', 'ascii'])
-            }
-            if (v.size <= 8) {
-              my_types.push([k, "categorical"])
-              continue
-            }
-            const n_floats = [...v.values()].filter(v => v != "").map(parseFloat).filter(d => d).length
-            if (n_floats/v.size > .9) {
-              my_types.push([k, "float"])
-              continue
+
+          // Initialize the attributes field that
+          // we share with regl.
+          
+          const attributes = {}
+
+          // store position as a vec2.
+
+          // Note that x and y are also registered *separately*.
+          // I don't think there's any major cost to this, but who knows.
+          attributes['position'] = {
+            stride: fields.length * 4,
+            offset: 0,
+            dtype: "vec2"
+          }
+
+          fields.forEach((k, i) => {
+            
+            const v = first_elems.get(k);
+            
+            attributes[k] = {
+              offset: i * 4,
+              stride: fields.length * 4
             }
             
-            my_types.push([k, "unknown"])
-          }
-          return my_types
+            if (k.startsWith("flexbuff")) {
+              attributes[k].dtype = "float";
+              return
+            }
+            
+            if (v.size <= 32) {
+              attributes[k].dtype = "categorical"
+              return
+            }
+            
+            const n_floats = [...v.values()].filter(v => v != "").map(parseFloat).filter(d => d).length
+            
+            if (n_floats/v.size > .9) {
+              attributes[k].dtype = "float";
+              return
+            }
+            attributes[k].dtype = "unknown";
+          })
+          // Store it both non-asynchronously and asynchronously
+          this.__datatypes = attributes;
+          return attributes
         })
     return this._datatypes
   }
+  
+  [Symbol.iterator]() {
+     let i = 0;
 
-  parse_datum(datum, datatypes) {
-    const out = new Array(datatypes.length);
-    let i = 0
-    for (const [k, dtype] of datatypes) {
-      if (k == 'x') {
-        out[i] = datum._position[0]
-      } else if (k == 'y') {
-        out[i] = datum._position[1]
-      } else if (dtype == 'float') {
-        out[i] = +datum[k];
-      } else if (k.match(/char[0-9]+/)) {
-        let code = +(k.replace("char", ""))
-        let [one, two] = [code, code + 1].map(i => datum.word.charCodeAt(i))
-        if (two > 255) {two = 128}
-        out[i] = one * 256 + two;
+     return {
+       next: () => {
+         if (index < this.data.length) {
+           return {value: this._data[index++], done: false}
+         } else {
+           return {done: true}
+         }
+       }
+     }
+  }
+  
+  parse_datum(datum, datatypes, buffer, offset) {
+    
+    // Optionally can write *in place* to an array buffer
+    // at an offset described by offset. This is strongly preferred.
+
+    // If not, it will simply write to a new js array.
+    
+    const out = buffer || new Array(datatypes.length);
+    let i = offset || 0;
+    for (const [k, description] of Object.entries(datatypes)) {
+      if (k == 'position') {
+        continue
+      }  else if (k.startsWith("flexbuff")) {
+        out[i + offset] = 0
+      } else if (description.dtype == 'float') {
+        out[i + offset] = +datum[k];
       } else {
         // Set to an integer hash.
         out[i] = stringHash(datum[k]);
