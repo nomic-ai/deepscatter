@@ -15,6 +15,7 @@ export default class Tile {
     } else {
       this.scales = {};
     }
+    
     this.key = key || "0/0/0";
     this.codes = this.key.split("/").map(t => parseInt(t))
     this.min_ix = undefined;
@@ -43,15 +44,13 @@ export default class Tile {
     
     const n_pixels = width * height;
      
-    
     const rawValues = new Uint16Array(new ArrayBuffer(2 * width * height));
     
     for (let row of this.values()) {
       // set the relevant pixel of count += 1
-    }
-    
+    } 
   }
-
+  
   is_visible(max_ix, viewport_limits) {
     // viewport_limits is in coordinate points.
     // Will typically be got by calling current_corners.
@@ -78,16 +77,21 @@ export default class Tile {
   download_to_depth(depth, corners = {"x":[-1, 1], "y": [-1, 1]}) {
     // First, execute the download to populate this.max_ix
 
-    return this.promise.then(() => {
+    return Promise.all([this.promise, this.description()])
+    .then(([data, description]) => {
       // If the last point here is less than the target depth, keep going.
-      if (this.max_ix < depth & this.is_visible(depth, corners)) {
+      if (this.max_ix < depth && 
+        this.is_visible(depth, corners) &&
+        data.length == description.tileSize
+      ) {
         // Create the children. (Be careful about this, because a '.children()'
         // call actually generates a bunch of promises.
         const child_processes = this.children()
         // Filter to visible. Newly generated children
         // will return invisible.
               .map(child => child.download_to_depth(depth, corners))
-        return Promise.all(child_processes).catch(err => undefined).then(d => this)
+        return Promise.all(child_processes)
+        .catch(err => undefined).then(d => this)
       }
       return this;
     })
@@ -244,7 +248,7 @@ export default class Tile {
     // Also, this whole method is kind of junk. Must be re-inventing the wheel.
     
     if (this.parent) {
-      return this.parent.dataTypes()
+      return this.parent.dataTypes().then( d => {this.__datatypes = d; return d}) 
     }
     if (this._datatypes) {
       return this._datatypes
@@ -328,8 +332,8 @@ export default class Tile {
 
      return {
        next: () => {
-         if (index < this.data.length) {
-           return {value: this._data[index++], done: false}
+         if (i < this._data.length) {
+           return {value: this._data[i++], done: false}
          } else {
            return {done: true}
          }
@@ -338,26 +342,24 @@ export default class Tile {
   }
   
   parse_datum(datum, datatypes, buffer, offset) {
-    
     // Optionally can write *in place* to an array buffer
     // at an offset described by offset. This is strongly preferred.
-
     // If not, it will simply write to a new js array.
     
     const out = buffer || new Array(datatypes.length);
-    let i = offset || 0;
+    let ix = offset || 0;
     for (const [k, description] of Object.entries(datatypes)) {
       if (k == 'position') {
         continue
       }  else if (k.startsWith("flexbuff")) {
-        out[i + offset] = 0
+        out[ix] = 0
       } else if (description.dtype == 'float') {
-        out[i + offset] = +datum[k];
+        out[ix] = +datum[k];
       } else {
         // Set to an integer hash.
-        out[i] = stringHash(datum[k]);
+        out[ix] = stringHash(datum[k]);
       }
-      i += 1
+      ix += 1
     }
     return out
   }

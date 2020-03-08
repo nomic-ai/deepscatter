@@ -4,9 +4,9 @@ import { timer, timerFlush, interval } from 'd3-timer';
 import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
 import { range } from 'd3-array';
 import { rgb } from 'd3-color';
-import { interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
+import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
 import { Zoom } from './interaction.js';
-import vec_shader from './vertex.js';
+import { vertex_shader, frag_shader } from './shaders.glsl';
 
 export class Renderer {
   
@@ -15,16 +15,8 @@ export class Renderer {
     this.holder = select(selector);
     this.canvas = this.holder.select("canvas")
     this.tileSet = tileSet;
-    
     this.regl = wrapREGL(this.canvas.node());
-    
-    this.prefs = {
-      pointSize: 2.5,
-      max_points: 10000,
-      // Share of points that should get text drawn.
-      "label_threshold": 0, 
-    }
-    
+    this.prefs = prefs
     this.width = +this.canvas.attr("width")
     this.height = +this.canvas.attr("height")
     
@@ -81,7 +73,6 @@ export default class ReglRenderer extends Renderer {
   tick(force = false) {
     
     const { prefs } = this;
-    
     const { regl, tileSet, canvas, width, height } = this;
     const { transform } = this.zoom;
     
@@ -99,7 +90,7 @@ export default class ReglRenderer extends Renderer {
     tileSet.download_to_depth(props.max_ix, this.zoom.current_corners())
     
     regl.clear({
-      color: [0.25, 0.1, 0.2, 1],
+      color: [0.1, 0.1, 0.13, 1],
       depth: 1
     });
     
@@ -108,21 +99,25 @@ export default class ReglRenderer extends Renderer {
     const tiles_to_draw = tileSet
     .map(d => d)
     .filter(d => d.is_visible(props.max_ix, this.zoom.current_corners()))
-    // seek_renderer initiates a promise for the 
+    // seek_renderer initiates a promise for the
     // tiles regl elements buffer.
     .filter(d => this.seek_renderer(d) != undefined)
     .map(tile => {
       n_visible += 1;
+      this._set_word_buffers(tile)
       props.count = tile._regl_elements.count
       props.data = tile._regl_elements.data
-      let passes = 1
+      let passes = 1;
+      
       if (this.prefs.label_field) {
         passes = 8
       }
+      
       for (let i = 0; i < passes; i++) {
         props.string_index = i;
         this._renderer(props);
       }
+      
     })
   }
   
@@ -166,36 +161,65 @@ export default class ReglRenderer extends Renderer {
     return c.getImageData(0, 0, 16 * height, 16 * height)
   }
   
-  _set_word_buffers(field, tile) {
+  _set_word_buffers(tile) {
+    
     // hard coded at eight letters.
-    if (tile._regl_settings = undefined) {
+    if (tile._regl_settings == undefined) {
       tile._regl_settings = {}
     }
-    
     const { prefs } = this;
     
-    if (tile._regl_settings.flexbuff == `${prefs.label_field}-ASCII`) {
+    if (tile._data == undefined) {
       return
     }
     
-    const {offset, stride} = this.__datatypes['flexbuff1']
+    if (tile._regl_settings.flexbuff == `${prefs.label_field}-ASCII`) {
+      return
+    } else {
+      tile._regl_settings.flexbuff = `${prefs.label_field}-ASCII`
+      console.log(tile._regl_settings.flexbuff)
+    }
+    
+    console.log(`Setting word buffers on ${tile.key}`)
+    
+    const {offset, stride} = tile.__datatypes['flexbuff1']
     let position = offset;
     const wordbuffer = new Float32Array(4);
     for (let datum of tile) {
       for (let block of [0, 1, 2, 3]) {
-        let [one, two] = [0, 1].map(i => datum.word.charCodeAt(i))
-        if (two > 255) {two = 128}
-        wordbuffer[i] = one * 256 + two;
-      }  
+        let [one, two] = [0, 1].map(
+          i => datum[prefs.label_field].charCodeAt(i + block * 2)
+        )
+        if (one > 255) {
+          one = 127;
+        } else if (isNaN(one)) {
+          one = 8
+        }
+        if (two > 255) {
+          two = 127;
+        } else if (isNaN(two)) {
+          two = 8
+       }
+        wordbuffer[block] = two * 256 + one;
+      }
+      if (datum.word == "1789") {
+        console.log(wordbuffer)
+      }
+
+      // console.log(wordbuffer)
+      tile._regl_elements.data.subdata(
+        wordbuffer, position
+      )
+      position += stride;
     }
-    tile._regl_settings.flexbuff == `${prefs.label_field}-ASCII`
+    
   }
   
   initialize_textures() {
     const { regl } = this;
     const viridis = range(256)
     .map(i => {
-      const p = rgb(interpolateViridis(i/255));
+      const p = rgb(interpolatePuOr(i/255));
       return [p.r, p.g, p.b, p.opacity * 255]
     })
     const niccoli_rainbow = range(256).map(i => {
@@ -243,7 +267,7 @@ export default class ReglRenderer extends Renderer {
       return false
     } 
     
-    const { regl, width, height, zoom } = this;
+    const { regl, width, height, zoom, prefs } = this;
     
     // This should be scoped somewhere to allow resizing.
     const webgl_scale = zoom.webgl_scale().flat();
@@ -251,49 +275,19 @@ export default class ReglRenderer extends Renderer {
     const parameters = {
       depth: { enable: false },
       stencil: { enable: false },
-      frag: `
-      
-      precision mediump float;
-      
-      varying vec4 fill;
-      varying vec2 letter_pos;
-      varying float text_mode;
-      uniform sampler2D u_charmap;
-      
-      void main() {
-        
-        // Drop portions of the rectangle not in the 
-        // unit circle for this point.
-        
-        
-        if (text_mode < 0.0 ) {
-          vec2 cxy = 2.0 * gl_PointCoord - 1.0;
-          float r = dot(cxy, cxy);
-          if (r > 1.0) discard;
-          gl_FragColor = fill;
-        } else {
-          if (gl_PointCoord.x > 0.50) discard;
-          vec2 coords = letter_pos + gl_PointCoord/16.0;
-          vec4 letter = texture2D(u_charmap, coords);
-          if (letter.a <= 0.03) discard;
-          gl_FragColor = mix(fill, vec4(0.25, 0.1, 0.2, 1.0), 1.0 - letter.a);
-        }
-      }
-      `,
       primitive: "points",
-      vert: vertex_shader(datatypes),
-      count: function(context,props) {
-        return props.count
-      },
+      frag: frag_shader,
+      vert: vertex_shader,
+      count: regl.prop('count'),
+      attributes: {},
       uniforms: {
         u_colormap: this.viridis_texture,
         u_charmap: this.char_texture,
-        //        u_rainbow: this.rainbow_texture,
-        //        u_minYear: function(context, props) {
-        //          return props.minYear
-        //        },
         u_render_text_min_ix: function(context, props) {
           return props.render_label_threshold
+        },
+        u_color_domain: function(context, props) {
+          return props._scales.color.domain()
         },
         u_string_index: function(context, props) {
           return props.string_index
@@ -319,30 +313,36 @@ export default class ReglRenderer extends Renderer {
         },
         u_size: regl.prop('size')
       }
-      
     }
-    // Add all the other fields we've found, each encoded as a float.
-    parameters.attributes = JSON.parse(JSON.stringify(datatypes));
+        
+    for (let k of ['position', 'ix']) {
+      console.log(k, parameters.attributes)
+      parameters.attributes[k] = Object.assign({}, datatypes[k])
+    }
+    for (let k of ['color', 'label']) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
+      let field;
+      if (k == 'label') {
+        field = 'flexbuff1';
+      } else {
+        field = prefs[`${k}_field`];
+        const domain = prefs[`${k}_domain`]
+        parameters.uniforms["u_" + k + "_domain"] = domain;
+        // Copy the parameters from the data name.
+      }
+        parameters.attributes["a_" + k] = Object.assign(
+        {},
+        datatypes[field]
+      );
+    }
+
     Object.entries(parameters.attributes).forEach(([k, v]) => {
       delete v.dtype
       v.buffer = function(context, props) {
         return props.data
       }
     })
+    
     this._renderer = regl(parameters)
     return this._renderer
   }
-}
-
-
-function vertex_shader (datatypes) {
-  const custom_attributes = Object.entries(datatypes).map(([k, v]) => {
-    let name = k;
-    let dtype = 'float';
-    if (k == "position") {
-      dtype = 'vec2'
-    }
-    return `attribute ${dtype} ${name};`
-  }).join("\n");
-  return vec_shader(custom_attributes)
 }
