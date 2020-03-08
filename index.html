@@ -32,8 +32,9 @@ Yeah, this library depends on bootstrap css to actually look OK.
   scatterplot.plotAPI({
     point_size: 3,
     max_points: 20000,
-    label_threshold: 2,
-    
-    
+    label_threshold: .02,
+    color_field: 'goodness',
+    label_field: "word",
+    color_domain: [-0.5, 0.5]
   })
 </script>

@@ -23,12 +23,12 @@ import Renderer from './regl_rendering.js';
 
 export default class Scatterplot {
   
-  constructor(state) {
+  constructor(state, prefs) {
     console.log("Building", state)
     const { source_url, selector } = state;
     this._root = new Tile(source_url)
-    this._renderer = new Renderer(selector, this._root)
-    
+    this._renderer = new Renderer(selector, this._root, state)
+
     // I think probably this should be a primary level 
     // creation to handle interactions independently 
     // of any specific renderer?
@@ -39,10 +39,11 @@ export default class Scatterplot {
     this._renderer.initialize()
   }
 
-  plotAPI(state) {
-    console.log("Plotting", state)
-    this._renderer.update_prefs(state)
-    console.log("Updating", state)
+  plotAPI(prefs) {
+    
+    console.log("Plotting", prefs)
+    this._renderer.update_prefs(prefs)
+    console.log("Updating", prefs)
     this._renderer.tick()
   }
     
