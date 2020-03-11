@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/CreatingData/deepscatter#readme",
   "dependencies": {
+    "d3-selection": "^1.4.1",
     "d3-array": "^1.2.4",
     "d3-ease": "^1.0.5",
     "d3-fetch": "^1.1.2",

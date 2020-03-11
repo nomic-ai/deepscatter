@@ -1,7 +1,7 @@
 import wrapREGL from 'regl';
 import { select } from 'd3-selection';
 import { timer, timerFlush, interval } from 'd3-timer';
-import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
+// import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
 import { range } from 'd3-array';
 import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
@@ -9,35 +9,31 @@ import { Zoom } from './interaction.js';
 import { vertex_shader, frag_shader } from './shaders.glsl';
 
 export class Renderer {
-  
   // A renderer handles drawing to a GL canvas.
-  constructor(selector, tileSet, prefs, zoom) {
+  constructor(selector, tileSet, prefs) {
     this.holder = select(selector);
     this.canvas = this.holder.select("canvas")
-    this.tileSet = tileSet;
     this.regl = wrapREGL(this.canvas.node());
-    this.prefs = prefs
-    this.width = +this.canvas.attr("width")
-    this.height = +this.canvas.attr("height")
+    this.tileSet = tileSet;
+    this.prefs = prefs;
+    this.width = +this.canvas.attr("width");
+    this.height = +this.canvas.attr("height");
     
-    this.zoom = zoom || new Zoom(this.width, this.height, this.canvas, this.prefs)
-    .attach_renderer(this)
-    .attach_tiles(tileSet)
-    
-    this.initialize_textures()        
+    this.initialize_textures()
     
     // Not the right way, for sure.
-    
     this._initializations = [
       // some things that need to be initialized before the renderer is loaded.
       this.tileSet
       .dataTypes()
-      .then(types => this.remake_renderer(types))
-      
+      .then(types => this.remake_renderer(types)) 
     ]
-    
     this.initialize()
-    
+  }
+
+  bind_zoom(zoom) {
+    this.zoom = zoom;
+    return this
   }
   
   update_prefs(prefs) {
@@ -57,7 +53,7 @@ export default class ReglRenderer extends Renderer {
   
   zoom_to(k, x, y, duration = 1000) {
     const { canvas, zoomer } = this;
-    const t = d3.zoomIdentity.translate(x, y).scale(k);
+    const t = zoomIdentity.translate(x, y).scale(k);
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
   
@@ -79,7 +75,7 @@ export default class ReglRenderer extends Renderer {
     const {k} = transform;
     
     const props = {
-      size: prefs.pointSize || 7,
+      size: prefs.point_size || 7,
       transform: transform,
       max_ix: prefs.max_points * k,
       time: (Date.now() - this.zoom._start)/1000,
@@ -149,7 +145,7 @@ export default class ReglRenderer extends Renderer {
     const c = offscreen.node().getContext('2d');
     c.font = `${height - height/3}px Georgia`;
     // Draw the first 255 characters. (Are there even any after 127?)
-    d3.range(128).map(i =>
+    range(128).map(i =>
       c.fillText(String.fromCharCode(i),
       (height * (i % 16)),
       Math.floor(i/16)*height - height/3
@@ -185,11 +181,17 @@ export default class ReglRenderer extends Renderer {
     const {offset, stride} = tile.__datatypes['flexbuff1']
     let position = offset;
     const wordbuffer = new Float32Array(4);
+    tile.charset = tile.parent ? new Set(tile.parent.charset) : new Set();
     for (let datum of tile) {
       for (let block of [0, 1, 2, 3]) {
         let [one, two] = [0, 1].map(
           i => datum[prefs.label_field].charCodeAt(i + block * 2)
         )
+
+        tile.charset.add(String.fromCharCode(one));
+        tile.charset.add(String.fromCharCode(two));
+
+        
         if (one > 255) {
           one = 127;
         } else if (isNaN(one)) {
@@ -205,7 +207,6 @@ export default class ReglRenderer extends Renderer {
       if (datum.word == "1789") {
         console.log(wordbuffer)
       }
-
       // console.log(wordbuffer)
       tile._regl_elements.data.subdata(
         wordbuffer, position
@@ -229,7 +230,7 @@ export default class ReglRenderer extends Renderer {
       } else {
         p = interpolateCool((i - 128)/127)
       }
-      p = d3.rgb(p);
+      p = rgb(p);
       return [p.r, p.g, p.b, p.opacity * 255]
     })
     
@@ -345,4 +346,5 @@ export default class ReglRenderer extends Renderer {
     this._renderer = regl(parameters)
     return this._renderer
   }
+  
 }

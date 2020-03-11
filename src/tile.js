@@ -63,7 +63,7 @@ export default class Tile {
     if (this.min_ix > max_ix) {
       return false;
     }
-    return true;
+
     const c = this.corners()
 
     return (

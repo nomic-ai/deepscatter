@@ -9,7 +9,7 @@
   }
   </style>
 <script src='deepScatter.js'></script>
-<script src='https://d3js.org/d3.v5.min.js'></script>
+
 <div class=scrollership>
   <div class=tale>
     <h1 style="color:red">"Hi there"</h1>
@@ -26,11 +26,11 @@
 Yeah, this library depends on bootstrap css to actually look OK.
 
 <script>
-  d3.select("#canvas").attr("width", window.innerWidth).attr("height", window.innerHeight)
+
   scatterplot = new deepScatter.default({selector: "#deepscatter", source_url: "build"})
   scatterplot.initialize()
   scatterplot.plotAPI({
-    point_size: 3,
+    point_size: 1.5,
     max_points: 20000,
     label_threshold: .02,
     color_field: 'goodness',
