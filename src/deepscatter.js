@@ -35,11 +35,10 @@ export default class Scatterplot {
   }
 
   plotAPI(prefs) {
-    
-    console.log("Plotting", prefs)
-    this._renderer.update_prefs(prefs)
-    console.log("Updating", prefs)
-    this._renderer.tick()
+    this._root.promise.then(d => {
+      this._renderer.update_prefs(prefs)
+      this._zoom.restart_timer(5000)
+    })
   }
     
 }

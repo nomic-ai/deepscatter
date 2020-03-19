@@ -20,6 +20,9 @@ uniform vec2 u_time_domain;
 uniform mat3 u_window_scale;
 // Transform from the open window to the d3-zoom.
 uniform mat3 u_zoom;
+// Transform from the canvas coordinates to the
+// webgl ones.
+uniform mat3 u_untransform;
 // Base point size
 uniform float u_size;
 // The maximum index to plot.
@@ -32,7 +35,7 @@ uniform float u_k;
 uniform float u_render_text_min_ix;
 // If drawing text, which text element should we draw?
 uniform float u_string_index;
-
+// Usually 'viridis'.
 uniform sampler2D u_colormap;
 
 // The fill color.
@@ -44,8 +47,11 @@ varying float text_mode;
 varying vec2 letter_pos;
 
 
-
+// A coordinate to throw away a vertex point.
 vec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);
+
+mat3 from_coord_to_gl = u_window_scale * u_zoom * u_untransform;
+
 
 /*************** COLOR SCALES *******************************/
 
@@ -59,7 +65,7 @@ vec3 hsv2rgb( in vec3 c )
   return c.z * mix( vec3(1.0), rgb, c.y);
 }
 
-vec4 catscale(in float x) {
+vec4 scaleCategorical(in float x) {
   // Category data is integers hashed to the strings.
   // Each can get its own unique colors in one plane of HSV space.
   vec3 hsv = vec3(mod(x, 11255.0)/11255.0, 0.7, 0.7);
@@ -78,17 +84,6 @@ vec4 scaleLinear(in float x) {
 
 /*************** END COLOR SCALES *******************************/
 
-// Making d3-zoom work well with webgl requires two transformations at the end.
-// First, we have to move each point to the left by one and up by by 1.0 because
-// (mumbles to hide lack of understanding...) the [-1, 1] scales vs d3's [0, 1] scales
-
-const mat3 untransform = mat3(
-  vec3(1.0, 0.0, -1.0),
-  vec3(0.0, 1.0, -1.0),
-  vec3(0.0, 0.0, 1.0)
-);
-// and finally, flip the y axis to resemble canvas and svg where 0 is the top.
-const vec3 flip_y = vec3(1.0, -1.0, 1.0);
 
 void main() {
 
@@ -106,18 +101,17 @@ if (ix > u_maxix) {
   gl_PointSize = min(gl_PointSize, 16.);
   if (gl_PointSize <= 0.00001) {
     return;
-    } else {
-      // First apply the d3 zoom transform; perform the uniform translations;
-      vec3 pos2d = vec3(position.x, -position.y, 1.0) * u_window_scale * u_zoom * untransform * flip_y;
-      gl_Position = vec4(pos2d, 1);
-      
-      fill = scaleLinear(a_color);
-      text_mode = u_render_text_min_ix - ix;
-      if (text_mode > 0.0) {
-        // Text needs more space.
-        // We could get very fancy here. Store the bounding box in the texture.
-        // The char0 here packs two ascii bytes into a float. It's not clear to me
-        // if you can do four or not.
+  } else {
+  // First apply the d3 zoom transform; perform the uniform translations;
+   vec3 pos2d = vec3(position.x, position.y, 1.0) * from_coord_to_gl;
+    gl_Position = vec4(pos2d, 1);
+    fill = scaleLinear(a_color);
+    text_mode = u_render_text_min_ix - ix;
+    if (text_mode > 0.0) {
+      // Text needs more space.
+      // We could get very fancy here. Store the bounding box in the texture.
+      // The char0 here packs two ascii bytes into a float. It's not clear to me
+      // if you can do four or not.
         
         float chardex;
         
@@ -126,7 +120,9 @@ if (ix > u_maxix) {
         float joint_index;        
         float pos = -1.0;
         float char_x = -char_width;
+        
         for (int i = 0; i < 4; i++) {
+          // Cycle through the letter-byte-characters.
           joint_index = a_label[i];
           
           pos = pos + 1.0;
@@ -140,8 +136,6 @@ if (ix > u_maxix) {
           if (pos >= u_string_index) { break; }
         }
         
-        gl_Position = gl_Position + vec4(char_x * gl_PointSize, 0., 0., 0.);
-        
         // Bail if the charcode isn't defined.
         if (chardex > 128.0) {
           // Something has gone wrong; this is not an ascii point.
@@ -152,6 +146,7 @@ if (ix > u_maxix) {
         letter_pos = vec2(fract(chardex / 16.0), floor((chardex - 16.0) / 16.0)/16.0);
         } else if (u_string_index > 0.0) {
           gl_Position = discard_me;
+          return;
         }
       }
     }
@@ -174,7 +169,7 @@ void main() {
     vec2 cxy = 2.0 * gl_PointCoord - 1.0;
     float r = dot(cxy, cxy);
     if (r > 1.0) discard;
-    if (r < 0.5) discard;
+//    if (r < 0.5) discard;
     
     gl_FragColor = fill;
   } else {
@@ -184,6 +179,8 @@ void main() {
     vec4 letter = texture2D(u_charmap, coords);
     if (letter.a <= 0.03) discard;
     gl_FragColor = mix(fill, vec4(0.25, 0.1, 0.2, 1.0), 1.0 - letter.a);
+    
   }
+  gl_FragColor = vec4(0.8, 0.8, 0.8, 1.0);
 }
 `

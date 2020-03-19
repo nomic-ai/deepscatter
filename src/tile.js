@@ -10,10 +10,7 @@ export default class Tile {
     this.parent = parent;
     if (this.parent) {
       this.image_settings = parent.image_settings;
-      this.scales = this.parent.scales;
       this.limits = this.parent.limits;
-    } else {
-      this.scales = {};
     }
     
     this.key = key || "0/0/0";
@@ -21,22 +18,21 @@ export default class Tile {
     this.min_ix = undefined;
     this.max_ix = undefined;
 
+    this.corners = {
+      x: [Infinity, -Infinity],
+      y: [Infinity, -Infinity]
+    }
+    
     // Start a download process immediately.
     // populates this.promise
     this._download()
+    
     this.underway_promises = new Set(["download"])
+    
     this.class = new.target
   }
 
-  corners() {
-    const [d, x, y] = this.codes;
-    const t = 2**d;
-    return {
-      x: [x/t*2 - 1, (x+1)/t*2 - 1],
-      y: [(t-y - 1)/t*2 - 1, (t - y)/t*2 - 1]
-    }
 
-  }
 
   smoothed_density_estimates(depth, width = 128, height = 128) {
     // Not implemented.
@@ -55,8 +51,9 @@ export default class Tile {
     // viewport_limits is in coordinate points.
     // Will typically be got by calling current_corners.
 
-    // Top tile is always visible
-    if (!this.parent) {return true}
+    // Top tile is always visible (even if offscreen).
+    // if (!this.parent) {return true}
+
     if (this.min_ix == undefined || this.max_ix == undefined) {
       return false
     }
@@ -64,14 +61,18 @@ export default class Tile {
       return false;
     }
 
-    const c = this.corners()
-
+    if (this.corners.x[0] == Infinity) {
+      this.set_corners()
+    }
+    
+    const c = this.corners;
+    
     return (
       !(c.x[0] > viewport_limits.x[1] ||
         c.x[1] < viewport_limits.x[0] ||
         c.y[0] > viewport_limits.y[1] ||
         c.y[1] < viewport_limits.y[0]))
-    //return has_overlaps(corners, viewport_limits)
+
   }
 
   download_to_depth(depth, corners = {"x":[-1, 1], "y": [-1, 1]}) {
@@ -106,7 +107,12 @@ export default class Tile {
       } else {
         this._description = d3Json(`${this.url}/data_description.json`)
           .then(d => {
-            this.limits = d.limits
+            
+            this.limits =
+              {
+                x: d.limits[0],
+                y: d.limits[1]
+              }
             const limits = d.limits            
             // The ranges are not set here; because that's
             // for the interaction elements to understand.
@@ -167,10 +173,44 @@ export default class Tile {
     return this._children;
   }
 
+  set_corners() {
+    // Can't run until the parent's
+    // limits are loaded.
+
+    // Use the limits to determine
+    // what the quad tiles actually indicate
+    // in terms of data.
+
+    // Note that these are not the actual
+    // data corners; they can't be, because
+    // a *child* tile of this one
+    // might be visible even if this one
+    // isn't.
+    
+    const [d, x, y] = this.codes;
+    const t = 2**d;
+    const zero_one_space_limits =  {
+      x: [x/t, (x+1)/t],
+      y: [y/t, (y+1)/t],
+    }
+
+    for (let axis of ['x', 'y']) {
+      
+      const scale = scaleLinear()
+            .domain([0, 1])
+            .range(this.limits[axis])
+      
+      this.corners[axis] =
+        zero_one_space_limits[axis].map( d => scale(d)
+
+        )
+    }
+  }
   _download() {
     // This should only be called once per tile.
     const url = `${this.url}/tiles/${this.key}.csv`
-    this.promise = this.description()
+    this.promise =
+      this.description()
       .then(() => d3Csv(url))
       .then(d => {
         d.forEach(e => {
@@ -287,11 +327,6 @@ export default class Tile {
 
           // Note that x and y are also registered *separately*.
           // I don't think there's any major cost to this, but who knows.
-          attributes['position'] = {
-            stride: fields.length * 4,
-            offset: 0,
-            dtype: "vec2"
-          }
 
           fields.forEach((k, i) => {
             
@@ -320,10 +355,24 @@ export default class Tile {
             }
             attributes[k].dtype = "unknown";
           })
+
+          attributes['position'] = {
+            stride: fields.length * 4,
+            offset: attributes['x']['offset'],
+            dtype: "vec2"
+          }
+
+          if (attributes.x.offset != (attributes.y.offset - 4)) {
+            console.warn("PLOTTING IS BROKEN BECAUSE X AND Y ARE NOT IN ORDER")
+          }
+
+          console.log(attributes)
+          
           // Store it both non-asynchronously and asynchronously
           this.__datatypes = attributes;
           return attributes
         })
+
     return this._datatypes
   }
   
@@ -349,6 +398,7 @@ export default class Tile {
     const out = buffer || new Array(datatypes.length);
     let ix = offset || 0;
     for (const [k, description] of Object.entries(datatypes)) {
+
       if (k == 'position') {
         continue
       }  else if (k.startsWith("flexbuff")) {
@@ -361,6 +411,8 @@ export default class Tile {
       }
       ix += 1
     }
+
+    
     return out
   }
 }

@@ -1,7 +1,9 @@
 import { select, event } from 'd3-selection';
 import { timer, timerFlush, interval } from 'd3-timer';
 import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
-import { range, min } from 'd3-array';
+import { mean, range, min, extent } from 'd3-array';
+import { scaleLinear } from 'd3-scale';
+
 
 export default class Zoom {
 
@@ -34,8 +36,9 @@ export default class Zoom {
   }
 
   zoom_to(k, x, y, duration = 100) {
+    const scales = this.scales()
     const { canvas, zoomer } = this;
-    const t = zoomIdentity.translate(x, y).scale(k);
+    const t = zoomIdentity.translate(scales.x(x), scales.y(y)).scale(k);
     canvas
       .transition()
       .duration(duration)
@@ -43,36 +46,41 @@ export default class Zoom {
   }
 
   initialize_zoom() {
-    
+
     const { width, height, canvas } = this;
     console.log("INITIALIZING ZOOM", width, height, canvas);
+
     this.transform = zoomIdentity;
 
     const zoomer = zoom()
           .scaleExtent([1/3, 100000])
-          .extent([[0, height], [width, 0]])
+          .extent([[0, 0], [width, height]])
           .on("zoom", () => {
             this.transform = event.transform;
             this.renderers.forEach( d => d.tick())
           })
+
     canvas.call(zoomer);
-    canvas.call(zoomer.translateBy, width/2, height/2);
     this.zoomer = zoomer
+
   }
 
+
+
   current_corners() {
-    // The corners of the current zoom transform, in webgl coordinates.
-    const { width, height } = this;
-    const t = this.transform;
-    const unscaled = [
-      t.invert([0, 0]),
-      t.invert([width, height])
-    ]
-    console.log("unscaled", unscaled)
+    // The corners of the current zoom transform, in data coordinates.
+    const { width, height, transform } = this;
+
+    // Use the rescaled versions of the scales.
+    const scales = this.scales()
+    if (scales === undefined) {
+      return undefined
+    }
+    const {x_, y_ } = scales;
+
     return {
-      x: [unscaled[0][0]/width*2, unscaled[1][0]/width*2],
-      y: [unscaled[0][1]/height*2, unscaled[1][1]/height*2],
-      k: t.k
+      x: [x_.invert(0), x_.invert(width)],
+      y: [y_.invert(0), y_.invert(width)]
     }
   }
 
@@ -91,6 +99,7 @@ export default class Zoom {
     }
 
     const t = timer(this.tick.bind(this));
+
     this._timer = t;
 
     this._timer.stop_at = stop_at;
@@ -109,48 +118,53 @@ export default class Zoom {
     }
   }
 
-  current_corners() {
-    // The corners of the current zoom transform, in webgl coordinates.
-    const { width, height } = this;
-    const t = zoomTransform(this.canvas.node())
-    const unscaled = [
-      t.invert([0, 0]),
-      t.invert([width, height])
-    ]
-
-    return {
-      x: [unscaled[0][0]/width*2, unscaled[1][0]/width*2],
-      y: [unscaled[0][1]/height*2, unscaled[1][1]/height*2],
-      k: t.k
+  scales() {
+    // General x and y scales that map from data space
+    // to pixel coordinates, and also
+    // rescaled ones that describe the current zoom.
+    // The base scales are called 'x' and 'y',
+    // and the zoomed ones are called 'x_' and 'y_'.
+    if (this._scales) {
+      this._scales.x_ = this.transform.rescaleX(this._scales.x)
+      this._scales.y_ = this.transform.rescaleY(this._scales.y)
+      return this._scales
     }
+
+    const { width, height, tileSet } = this;
+    const square_box = min([width, height])
+
+    const scales = {};
+    if (this.tileSet.limits === undefined) {
+      return undefined;
+    }
+
+    for (let [name, dim] of [['x', width], ['y', height]]) {
+      // The smaller dimension is buffered on either
+      // both sides.
+      const buffer = (dim - square_box)/2
+      const limits = tileSet.limits[name]
+      scales[name] =
+        scaleLinear()
+        .domain(limits)
+        .range([buffer, dim-buffer])
+    }
+
+    scales.x_ = this.transform.rescaleX(scales.x)
+    scales.y_ = this.transform.rescaleY(scales.y)
+
+    this._scales = scales
+    return scales
   }
 
-  webgl_scale(symmetrical = true) {
-    // symmetrcial: do x and y need to take up the same units?
-    const { tileSet, width, height } = this;
-
-    const [xmin, xmax] = tileSet.limits[0]
-    const [ymin, ymax] = tileSet.limits[1]
-    const aspect_ratio = width/height;
-    // multiply by 2 b/c webgl is in the range [-1, 1].
-    const scale_factor = min([(xmax - xmin)/width*aspect_ratio, (ymax-ymin)/height]) * 2;
-
-    let xscale, yscale;
-    if (aspect_ratio < 1) {
-      xscale = scale_factor;
-      yscale = scale_factor * aspect_ratio;
-    } else {
-      xscale = scale_factor / aspect_ratio;
-      yscale = scale_factor;
+  webgl_scale(flatten = true) {
+    const {width, height} = this
+    const {x, y} = this.scales()
+    let values = window_transform(x, y, width, height)
+    if (flatten) {
+      // Needed for regl, although unclear
+      values = values.map(d => d.flat())
     }
-
-
-    return [
-      // transform by the scale;
-      [xscale, 0, (xmin + xmax) / 2 * xscale / 2],
-      [0, yscale, (ymin + ymax) / 2 * yscale / 2],
-      [0, 0, 1]
-    ]
+    return values
   }
 
   tick(force = false) {
@@ -161,7 +175,7 @@ export default class Zoom {
     // says we are not animating.
 
     if (this._timer) {
-      console.log(Date.now() - this._timer.stop_at, this._timer.stop_at <= Date.now())
+      // console.log(Date.now() - this._timer.stop_at, this._timer.stop_at <= Date.now())
     }
     if (force !== true) {
       if (this._timer) {
@@ -177,4 +191,48 @@ export default class Zoom {
       renderer.tick()
     }
   }
+}
+
+
+function window_transform(x_scale, y_scale, width, height) {
+
+  // width and height are svg parameters; x and y scales project from the data x and y into the
+  // the webgl space.
+
+  // Given two d3 scales in coordinate space, create two matrices that project from the original
+  // space into [-1, 1] webgl space.
+
+
+  function gap(array) {
+    // Return the magnitude of a scale.
+    return array[1] - array[0]
+  }
+
+  let x_mid = mean(x_scale.domain())
+  let y_mid = mean(y_scale.domain())
+
+  const xmulti = gap(x_scale.range())/gap(x_scale.domain());
+  const ymulti = gap(y_scale.range())/gap(y_scale.domain());
+
+  // the xscale and yscale ranges may not be the full width or height.
+
+  const aspect_ratio = width/height;
+
+  // translates from data space to scaled space.
+  const m1 =  [
+    // transform by the scale;
+    [xmulti, 0, -xmulti * x_mid + mean(x_scale.range()) ],
+    [0, ymulti, -ymulti * y_mid + mean(y_scale.range()) ],
+    [0, 0, 1]
+  ]
+
+  // translate from scaled space to webgl space.
+  // The '2' here is because webgl space runs from -1 to 1.
+  const m2 = [
+    [2 / width, 0, -1],
+    [0, - 2 / height, 1],
+    [0, 0, 1]
+  ]
+
+  return [m1, m2]
 }

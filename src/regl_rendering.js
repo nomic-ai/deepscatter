@@ -1,26 +1,20 @@
 import wrapREGL from 'regl';
 import { select } from 'd3-selection';
 import { timer, timerFlush, interval } from 'd3-timer';
-// import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
 import { range } from 'd3-array';
 import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
 import { Zoom } from './interaction.js';
 import { vertex_shader, frag_shader } from './shaders.glsl';
+import { Renderer } from './rendering.js';
 
-export class Renderer {
-  // A renderer handles drawing to a GL canvas.
+
+export default class ReglRenderer extends Renderer {
+
   constructor(selector, tileSet, prefs) {
-    this.holder = select(selector);
-    this.canvas = this.holder.select("canvas")
+    super(selector, tileSet, prefs)
     this.regl = wrapREGL(this.canvas.node());
-    this.tileSet = tileSet;
-    this.prefs = prefs;
-    this.width = +this.canvas.attr("width");
-    this.height = +this.canvas.attr("height");
-    
     this.initialize_textures()
-    
     // Not the right way, for sure.
     this._initializations = [
       // some things that need to be initialized before the renderer is loaded.
@@ -29,32 +23,6 @@ export class Renderer {
       .then(types => this.remake_renderer(types)) 
     ]
     this.initialize()
-  }
-
-  bind_zoom(zoom) {
-    this.zoom = zoom;
-    return this
-  }
-  
-  update_prefs(prefs) {
-    Object.assign(this.prefs, prefs)
-  }
-  
-  *initialize() {
-    // Asynchronously wait for the basic elements to be done.
-    return Promise.all(this._initializations).then(d => {
-      this.zoom.restart_timer(5000)
-    })
-    
-  }
-}
-
-export default class ReglRenderer extends Renderer {
-  
-  zoom_to(k, x, y, duration = 1000) {
-    const { canvas, zoomer } = this;
-    const t = zoomIdentity.translate(x, y).scale(k);
-    canvas.transition().duration(duration).call(zoomer.transform, t);
   }
   
   data(dataset) {
@@ -82,39 +50,39 @@ export default class ReglRenderer extends Renderer {
       render_label_threshold: prefs.max_points * k * prefs.label_threshold,
       string_index: 0,
     }
-    
+
     tileSet.download_to_depth(props.max_ix, this.zoom.current_corners())
     
     regl.clear({
-      color: [0.1, 0.1, 0.13, 1],
+      color: [0.1, 0.1, 0.13, 1.0],
       depth: 1
     });
     
     let n_visible = 0;
     
-    const tiles_to_draw = tileSet
-    .map(d => d)
-    .filter(d => d.is_visible(props.max_ix, this.zoom.current_corners()))
-    // seek_renderer initiates a promise for the
-    // tiles regl elements buffer.
-    .filter(d => this.seek_renderer(d) != undefined)
-    .map(tile => {
+    for (let tile of this.visible_tiles(props.max_ix)) {     
+      // seek_renderer initiates a promise for the
+      // tile's regl elements buffer.
+      if (this.seek_renderer(tile) == undefined) {
+        continue
+      }
       n_visible += 1;
-      this._set_word_buffers(tile)
-      props.count = tile._regl_elements.count
-      props.data = tile._regl_elements.data
+      if ((tile.min_ix * prefs.label_threshold) > props.max_ix) {
+        console.log("Building buffers on " + tile.key)
+        this._set_word_buffers(tile);
+      }
+      props.count = tile._regl_elements.count;
+      props.data = tile._regl_elements.data;
       let passes = 1;
-      
       if (this.prefs.label_field) {
         passes = 8
       }
-      
       for (let i = 0; i < passes; i++) {
+        // Draw multiple times for each letter in the buffer.
         props.string_index = i;
         this._renderer(props);
       }
-      
-    })
+    }
   }
   
   seek_renderer(tile, force = false) {
@@ -173,10 +141,9 @@ export default class ReglRenderer extends Renderer {
       return
     } else {
       tile._regl_settings.flexbuff = `${prefs.label_field}-ASCII`
-      console.log(tile._regl_settings.flexbuff)
     }
     
-    console.log(`Setting word buffers on ${tile.key}`)
+    console.log(`Setting ${prefs.label_field} text buffers on ${tile.key}`)
     
     const {offset, stride} = tile.__datatypes['flexbuff1']
     let position = offset;
@@ -204,10 +171,6 @@ export default class ReglRenderer extends Renderer {
        }
         wordbuffer[block] = two * 256 + one;
       }
-      if (datum.word == "1789") {
-        console.log(wordbuffer)
-      }
-      // console.log(wordbuffer)
       tile._regl_elements.data.subdata(
         wordbuffer, position
       )
@@ -262,6 +225,7 @@ export default class ReglRenderer extends Renderer {
   
   remake_renderer() {
     const datatypes = this.tileSet.__datatypes;
+    
     if (this.tileSet._datatypes == undefined) {
       // start the promise.
       this.tileSet.dataTypes()
@@ -271,8 +235,11 @@ export default class ReglRenderer extends Renderer {
     const { regl, width, height, zoom, prefs } = this;
     
     // This should be scoped somewhere to allow resizing.
-    const webgl_scale = zoom.webgl_scale().flat();
-    
+    const [webgl_scale, untransform_matrix] =
+          zoom.webgl_scale()
+
+
+
     const parameters = {
       depth: { enable: false },
       stencil: { enable: false },
@@ -299,27 +266,29 @@ export default class ReglRenderer extends Renderer {
         u_k: function(context, props) {
           return props.transform.k;
         },
-        u_window_scale: function(context, props) {
-          return webgl_scale;
-        },
+        u_window_scale: webgl_scale,
+        u_untransform: untransform_matrix,
         u_time: function(context, props) {
           return props.time;
         },
         u_zoom: function(context, props) {
-          return [
-            [props.transform.k, 0, 2*props.transform.x/width],
-            [0, props.transform.k, 2*props.transform.y/height],
+          const zoom_matrix = [
+            [props.transform.k, 0, props.transform.x],
+            [0, props.transform.k, props.transform.y],
             [0, 0, 1],
           ].flat()
+
+          return zoom_matrix;
         },
         u_size: regl.prop('size')
       }
     }
         
     for (let k of ['position', 'ix']) {
-      console.log(k, parameters.attributes)
       parameters.attributes[k] = Object.assign({}, datatypes[k])
     }
+
+    
     for (let k of ['color', 'label']) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
       let field;
       if (k == 'label') {
@@ -333,9 +302,10 @@ export default class ReglRenderer extends Renderer {
         parameters.attributes["a_" + k] = Object.assign(
         {},
         datatypes[field]
-      );
+        );
+      
     }
-
+    
     Object.entries(parameters.attributes).forEach(([k, v]) => {
       delete v.dtype
       v.buffer = function(context, props) {

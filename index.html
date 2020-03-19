@@ -30,11 +30,11 @@ Yeah, this library depends on bootstrap css to actually look OK.
   scatterplot = new deepScatter.default({selector: "#deepscatter", source_url: "build"})
   scatterplot.initialize()
   scatterplot.plotAPI({
-    point_size: 1.5,
-    max_points: 20000,
-    label_threshold: .02,
-    color_field: 'goodness',
-    label_field: "word",
-    color_domain: [-0.5, 0.5]
+   point_size: 1.5,
+   max_points: 30000,
+   label_threshold: .01,
+   label_field: "title",
+   color_field: "lc1",
+   color_domain: [100000, 0]
   })
 </script>
