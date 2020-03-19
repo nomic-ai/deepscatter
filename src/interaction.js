@@ -4,6 +4,13 @@ import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
 import { mean, range, min, extent } from 'd3-array';
 import { scaleLinear } from 'd3-scale';
 
+export class Mouseover {
+  // Easiest just to inherit from zoom.
+  constructor(zoom) {
+    
+  }
+
+}
 
 export default class Zoom {
 
@@ -36,13 +43,16 @@ export default class Zoom {
   }
 
   zoom_to(k, x, y, duration = 100) {
+    
     const scales = this.scales()
-    const { canvas, zoomer } = this;
+    const { canvas, zoomer, width, height } = this;
     const t = zoomIdentity.translate(scales.x(x), scales.y(y)).scale(k);
+    console.log(t);
     canvas
       .transition()
       .duration(duration)
       .call(zoomer.transform, t);
+    
   }
 
   initialize_zoom() {

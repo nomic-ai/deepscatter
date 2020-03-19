@@ -4,7 +4,9 @@ export class Renderer {
   // A renderer handles drawing to a display element.
   constructor(selector, tileSet, prefs) {
     this.holder = select(selector);
-    this.canvas = this.holder.select("canvas")
+    console.log(this.holder.node())
+    this.canvas = select(this.holder.node().firstElementChild)
+    console.log(this.canvas.node())
     this.tileSet = tileSet;
     this.prefs = prefs;
     this.width = +this.canvas.attr("width");

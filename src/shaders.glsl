@@ -77,7 +77,7 @@ float linstep (in float edge0, float edge1, float x) {
 }
 
 vec4 scaleLinear(in float x) {
-  float fractional = linstep(-0.5, 0.5, x);
+  float fractional = linstep(u_color_domain.x, u_color_domain.y, x);
   return texture2D(u_colormap,
     vec2(1.0 - fractional, 0.5));
 }
@@ -116,7 +116,7 @@ if (ix > u_maxix) {
         float chardex;
         
         gl_PointSize = min(gl_PointSize * 4.0, 64.0);
-        float char_width = 0.0025 / 4.0;
+        float char_width = 0.0025 / 4.0 * gl_PointSize;
         float joint_index;        
         float pos = -1.0;
         float char_x = -char_width;
@@ -135,7 +135,9 @@ if (ix > u_maxix) {
           chardex = (joint_index-chardex)/256.0;
           if (pos >= u_string_index) { break; }
         }
-        
+
+        gl_Position = gl_Position + vec4(char_x, 0., 0., 0.);
+
         // Bail if the charcode isn't defined.
         if (chardex > 128.0) {
           // Something has gone wrong; this is not an ascii point.
@@ -179,8 +181,6 @@ void main() {
     vec4 letter = texture2D(u_charmap, coords);
     if (letter.a <= 0.03) discard;
     gl_FragColor = mix(fill, vec4(0.25, 0.1, 0.2, 1.0), 1.0 - letter.a);
-    
   }
-  gl_FragColor = vec4(0.8, 0.8, 0.8, 1.0);
 }
 `

@@ -1,5 +1,5 @@
 import wrapREGL from 'regl';
-import { select } from 'd3-selection';
+import { select, create } from 'd3-selection';
 import { timer, timerFlush, interval } from 'd3-timer';
 import { range } from 'd3-array';
 import { rgb } from 'd3-color';
@@ -9,10 +9,11 @@ import { vertex_shader, frag_shader } from './shaders.glsl';
 import { Renderer } from './rendering.js';
 
 
-export default class ReglRenderer extends Renderer {
+export class ReglRenderer extends Renderer {
 
   constructor(selector, tileSet, prefs) {
     super(selector, tileSet, prefs)
+    console.log("CANV", this.canvas, this.canvas.node())
     this.regl = wrapREGL(this.canvas.node());
     this.initialize_textures()
     // Not the right way, for sure.
@@ -49,6 +50,7 @@ export default class ReglRenderer extends Renderer {
       time: (Date.now() - this.zoom._start)/1000,
       render_label_threshold: prefs.max_points * k * prefs.label_threshold,
       string_index: 0,
+      prefs: prefs
     }
 
     tileSet.download_to_depth(props.max_ix, this.zoom.current_corners())
@@ -67,8 +69,7 @@ export default class ReglRenderer extends Renderer {
         continue
       }
       n_visible += 1;
-      if ((tile.min_ix * prefs.label_threshold) > props.max_ix) {
-        console.log("Building buffers on " + tile.key)
+      if ((tile.min_ix) < (props.max_ix * prefs.label_threshold)) {
         this._set_word_buffers(tile);
       }
       props.count = tile._regl_elements.count;
@@ -105,13 +106,17 @@ export default class ReglRenderer extends Renderer {
   }
   
   _character_map(height=32) {
-    var offscreen = select("#letters")
     const n_grid = 16;
-    offscreen.attr("height", 16 * height)
-    offscreen.attr("width", 16 * height)
-    offscreen.transition().delay(2000).attr("opacity", 0).style("display", "none")
+    
+    var offscreen = create("canvas")
+        .attr("height", 16 * height)
+        .attr("width", 16 * height)
+        .style("display", "none")
+    
     const c = offscreen.node().getContext('2d');
+    
     c.font = `${height - height/3}px Georgia`;
+    
     // Draw the first 255 characters. (Are there even any after 127?)
     range(128).map(i =>
       c.fillText(String.fromCharCode(i),
@@ -183,7 +188,7 @@ export default class ReglRenderer extends Renderer {
     const { regl } = this;
     const viridis = range(256)
     .map(i => {
-      const p = rgb(interpolatePuOr(i/255));
+      const p = rgb(interpolateViridis(i/255));
       return [p.r, p.g, p.b, p.opacity * 255]
     })
     const niccoli_rainbow = range(256).map(i => {
@@ -255,7 +260,9 @@ export default class ReglRenderer extends Renderer {
           return props.render_label_threshold
         },
         u_color_domain: function(context, props) {
-          return props._scales.color.domain()
+          // return props._scales.color.domain()
+          console.log("DOMAIN", props.prefs.color_domain)
+          return props.prefs.color_domain
         },
         u_string_index: function(context, props) {
           return props.string_index
