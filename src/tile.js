@@ -12,7 +12,7 @@ export default class Tile {
       this.image_settings = parent.image_settings;
       this.limits = this.parent.limits;
     }
-    
+
     this.key = key || "0/0/0";
     this.codes = this.key.split("/").map(t => parseInt(t))
     this.min_ix = undefined;
@@ -22,13 +22,13 @@ export default class Tile {
       x: [Infinity, -Infinity],
       y: [Infinity, -Infinity]
     }
-    
+
     // Start a download process immediately.
     // populates this.promise
     this._download()
-    
+
     this.underway_promises = new Set(["download"])
-    
+
     this.class = new.target
   }
 
@@ -36,17 +36,17 @@ export default class Tile {
 
   smoothed_density_estimates(depth, width = 128, height = 128) {
     // Not implemented.
-    // The idea is to use a Gaussian blur on 
-    
+    // The idea is to use a Gaussian blur on
+
     const n_pixels = width * height;
-     
+
     const rawValues = new Uint16Array(new ArrayBuffer(2 * width * height));
-    
+
     for (let row of this.values()) {
       // set the relevant pixel of count += 1
-    } 
+    }
   }
-  
+
   is_visible(max_ix, viewport_limits) {
     // viewport_limits is in coordinate points.
     // Will typically be got by calling current_corners.
@@ -64,9 +64,9 @@ export default class Tile {
     if (this.corners.x[0] == Infinity) {
       this.set_corners()
     }
-    
+
     const c = this.corners;
-    
+
     return (
       !(c.x[0] > viewport_limits.x[1] ||
         c.x[1] < viewport_limits.x[0] ||
@@ -81,7 +81,7 @@ export default class Tile {
     return Promise.all([this.promise, this.description()])
     .then(([data, description]) => {
       // If the last point here is less than the target depth, keep going.
-      if (this.max_ix < depth && 
+      if (this.max_ix < depth &&
         this.is_visible(depth, corners) &&
         data.length == description.tileSize
       ) {
@@ -107,13 +107,13 @@ export default class Tile {
       } else {
         this._description = d3Json(`${this.url}/data_description.json`)
           .then(d => {
-            
+
             this.limits =
               {
                 x: d.limits[0],
                 y: d.limits[1]
               }
-            const limits = d.limits            
+            const limits = d.limits
             // The ranges are not set here; because that's
             // for the interaction elements to understand.
             return d
@@ -128,6 +128,17 @@ export default class Tile {
     const q = [];
     this.visit(d => {q.push(callback(d))}, after = after)
     return q
+  }
+
+  *points() {
+    const tiles = this.map(d => d)
+    .filter(d => d._data)
+
+    for (let tile of tiles) {
+      for (let datum of tile._data) {
+        yield datum
+      }
+    }
   }
 
   visit(callback, after = false) {
@@ -186,7 +197,7 @@ export default class Tile {
     // a *child* tile of this one
     // might be visible even if this one
     // isn't.
-    
+
     const [d, x, y] = this.codes;
     const t = 2**d;
     const zero_one_space_limits =  {
@@ -195,11 +206,11 @@ export default class Tile {
     }
 
     for (let axis of ['x', 'y']) {
-      
+
       const scale = scaleLinear()
             .domain([0, 1])
             .range(this.limits[axis])
-      
+
       this.corners[axis] =
         zero_one_space_limits[axis].map( d => scale(d)
 
@@ -220,7 +231,7 @@ export default class Tile {
           ],
           e.ix = +e.ix
         })
-        
+
         // Store a little info on the object.
         this.min_ix = d[0].ix
         this.max_ix = d[d.length-1].ix
@@ -239,21 +250,21 @@ export default class Tile {
   buffer() {
     return Promise.all([this.promise, this.dataTypes()])
       .then(([datalist, datatypes]) => {
-        
+
         if (this._buffer) {
           return Promise.resolve(this._buffer);
         }
-        
+
         const columns = Object.keys(datatypes);
 
         // One fewer than columns.length because
         // we double count position, x, and y.
-        
+
         // and over-allocate 4 floats for characters, etc.
         const n_col = (columns.length - 1);
         console.log(n_col)
         const buffer = new Float32Array(n_col * datalist.length);
-        
+
         let offset = 0;
         for (let d of datalist) {
           this.parse_datum(d, datatypes, buffer, offset);
@@ -263,7 +274,7 @@ export default class Tile {
         return buffer
       })
   }
-  
+
   find_closest(p) {
     let dist = Infinity;
     let candidate = undefined;
@@ -286,9 +297,9 @@ export default class Tile {
     // It would be amazing to work with typed data, not csv.
 
     // Also, this whole method is kind of junk. Must be re-inventing the wheel.
-    
+
     if (this.parent) {
-      return this.parent.dataTypes().then( d => {this.__datatypes = d; return d}) 
+      return this.parent.dataTypes().then( d => {this.__datatypes = d; return d})
     }
     if (this._datatypes) {
       return this._datatypes
@@ -302,12 +313,12 @@ export default class Tile {
           fields.push("flexbuff2")
           fields.push("flexbuff3")
           fields.push("flexbuff4")
-          
+
           const first_elems = new Map()
 
           fields
             .forEach(field_name => first_elems.set(field_name, new Set()))
-          
+
           datalist.forEach(datum => {
             Object.keys(datum).forEach(
               k => {
@@ -320,7 +331,7 @@ export default class Tile {
 
           // Initialize the attributes field that
           // we share with regl.
-          
+
           const attributes = {}
 
           // store position as a vec2.
@@ -329,26 +340,26 @@ export default class Tile {
           // I don't think there's any major cost to this, but who knows.
 
           fields.forEach((k, i) => {
-            
+
             const v = first_elems.get(k);
-            
+
             attributes[k] = {
               offset: i * 4,
               stride: fields.length * 4
             }
-            
+
             if (k.startsWith("flexbuff")) {
               attributes[k].dtype = "float";
               return
             }
-            
+
             if (v.size <= 32) {
               attributes[k].dtype = "categorical"
               return
             }
-            
+
             const n_floats = [...v.values()].filter(v => v != "").map(parseFloat).filter(d => d).length
-            
+
             if (n_floats/v.size > .9) {
               attributes[k].dtype = "float";
               return
@@ -367,7 +378,7 @@ export default class Tile {
           }
 
           console.log(attributes)
-          
+
           // Store it both non-asynchronously and asynchronously
           this.__datatypes = attributes;
           return attributes
@@ -375,7 +386,7 @@ export default class Tile {
 
     return this._datatypes
   }
-  
+
   [Symbol.iterator]() {
      let i = 0;
 
@@ -389,12 +400,12 @@ export default class Tile {
        }
      }
   }
-  
+
   parse_datum(datum, datatypes, buffer, offset) {
     // Optionally can write *in place* to an array buffer
     // at an offset described by offset. This is strongly preferred.
     // If not, it will simply write to a new js array.
-    
+
     const out = buffer || new Array(datatypes.length);
     let ix = offset || 0;
     for (const [k, description] of Object.entries(datatypes)) {
@@ -412,7 +423,7 @@ export default class Tile {
       ix += 1
     }
 
-    
+
     return out
   }
 }

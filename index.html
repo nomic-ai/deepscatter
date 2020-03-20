@@ -17,7 +17,7 @@
 </div>
 
   <div id="deepscatter" style="position:fixed;top:0;left:0">
-    
+
 </div>
 
 <header>Wow this is ugly!</header>
@@ -29,11 +29,27 @@ Yeah, this library depends on bootstrap css to actually look OK.
   scatterplot = new deepScatter.default({selector: "#deepscatter", source_url: "build"})
   scatterplot.initialize()
   scatterplot.plotAPI({
-   point_size: 2.5,
+   point_size: 1.5,
    max_points: 30000,
-   label_threshold: .01,
-   label_field: "lc1",
-   color_field: "record_date",
-   color_domain: [1800, 2000]
+   label_threshold: .005,
+   label_field: "word",
+   color_field: "goodness",
+   color_domain: [-.5, .5]
   })
+
+  keyaction = function(val) {
+    // This search function simply looks at every point and zooms
+    // to them if it matches the string.
+    const text = val.value
+    for (let p of scatterplot._root.points()) {
+      if (p.word === text) {
+        scatterplot._zoom.zoom_to(30, p.x, p.y, 8000)
+        break
+      }
+    }
+  }
 </script>
+
+<input type="text" style="position:fixed" width=20 onkeyup="keyaction(this)">
+
+</input>

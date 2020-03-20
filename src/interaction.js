@@ -7,9 +7,14 @@ import { scaleLinear } from 'd3-scale';
 export class Mouseover {
   // Easiest just to inherit from zoom.
   constructor(zoom) {
-    
+    zoom.canvas.on("mouseover", () => {
+      const {x_, y_} = zoom.scales()
+      const closest = zoom.tileSet.find_closest(
+        [x_.invert(event.x),
+         y_.invert(event.y)
+        ])
+    })
   }
-
 }
 
 export default class Zoom {
@@ -27,7 +32,7 @@ export default class Zoom {
     // A zoom keeps track of all the renderers
     // that it's in charge of adjusting.
 
-    this.renderers = [];
+     this.renderers = [];
   }
 
   attach_tiles(tiles) {
@@ -42,17 +47,21 @@ export default class Zoom {
     return this;
   }
 
-  zoom_to(k, x, y, duration = 100) {
-    
+  zoom_to(k, x, y, duration = 4000) {
+
     const scales = this.scales()
     const { canvas, zoomer, width, height } = this;
-    const t = zoomIdentity.translate(scales.x(x), scales.y(y)).scale(k);
-    console.log(t);
+
+    const t = zoomIdentity
+    .translate(width/2, height/2)
+    .scale(k)
+    .translate(-scales.x(x), -scales.y(y))
+
     canvas
       .transition()
       .duration(duration)
       .call(zoomer.transform, t);
-    
+
   }
 
   initialize_zoom() {
@@ -71,10 +80,49 @@ export default class Zoom {
           })
 
     canvas.call(zoomer);
+
+    this.add_mouseover()
+
     this.zoomer = zoomer
 
   }
 
+  add_mouseover() {
+    const tel = select("#deepscatter-svg")
+    .selectAll("g.label")
+    .data([1])
+
+    tel
+    .enter()
+    .append("g")
+    .attr("class", "label")
+    .merge(tel)
+
+    tel.append("circle")
+    .attr("r", 3)
+    .style("fill", "pink")
+    tel.append("text")
+
+    this.canvas.on("mousemove", () => {
+      const {x_, y_} = this.scales()
+      const closest = this.tileSet.find_closest(
+        [x_.invert(event.x),
+         y_.invert(event.y)
+        ])
+
+      tel
+      .attr("transform", `translate(
+        ${x_(closest.x)},
+        ${y_(closest.y)}
+      )`)
+        .select("text")
+        .text(closest[this.prefs.label_field])
+
+        .style("font-size", "18px")
+        .style("fill", "white")
+
+    })
+  }
 
 
   current_corners() {
