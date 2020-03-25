@@ -2,6 +2,8 @@ import { json as d3Json, csv as d3Csv } from 'd3-fetch';
 import { quadtree } from 'd3-quadtree';
 import { scaleLinear } from 'd3-scale';
 import stringHash from 'string-hash';
+import {contourDensity} from 'd3-contour';
+import {geoPath} from 'd3-geo';
 
 export default class Tile {
 
@@ -139,6 +141,34 @@ export default class Tile {
         yield datum
       }
     }
+  }
+
+  forEach(callback) {
+    for (let p of this) {
+      callback(p)
+    }
+  }
+
+  contours(width, height, drawTo, scales) {
+    const {x_, y_} = scales;
+    const contours = contourDensity()
+
+    .x(d=>x_(d.x))
+    .y(d=>y_(d.y))
+    .size([width, height])
+    (this)
+
+    const svg = drawTo.select("svg")
+
+    svg.append("g")
+      .attr("fill", "none")
+      .attr("stroke", "steelblue")
+      .attr("stroke-linejoin", "round")
+    .selectAll("path")
+    .data(contours)
+    .enter().append("path")
+      .attr("stroke-width", (d, i) => i % 5 ? 0.25 : 1)
+      .attr("d", geoPath());
   }
 
   visit(callback, after = false) {
@@ -298,6 +328,7 @@ export default class Tile {
 
     // Also, this whole method is kind of junk. Must be re-inventing the wheel.
 
+
     if (this.parent) {
       return this.parent.dataTypes().then( d => {this.__datatypes = d; return d})
     }
@@ -353,17 +384,22 @@ export default class Tile {
               return
             }
 
+            const n_floats = [...v.values()]
+              .filter(v => v != "")
+              .map(parseFloat)
+              .filter(d => d)
+              .length
+
+            if (n_floats/v.size > .5) {
+              attributes[k].dtype = "float";
+              return
+            }
+
             if (v.size <= 32) {
               attributes[k].dtype = "categorical"
               return
             }
 
-            const n_floats = [...v.values()].filter(v => v != "").map(parseFloat).filter(d => d).length
-
-            if (n_floats/v.size > .9) {
-              attributes[k].dtype = "float";
-              return
-            }
             attributes[k].dtype = "unknown";
           })
 
