@@ -133,18 +133,49 @@ export default class Tile {
   }
 
   *points() {
-    const tiles = this.map(d => d)
-    .filter(d => d._data)
 
-    for (let tile of tiles) {
-      for (let datum of tile._data) {
-        yield datum
+    for (let p of this) {
+      yield p
+    }
+
+
+    if (this._children) {
+      let children = this._children
+        .filter(d=>d)
+        .map(tile => {
+          const f = {
+            t: tile,
+            iterator: tile.points()
+          }
+          f.next = f.iterator.next()
+          return f
+        }).filter(
+          d => d._data
+        )
+
+      children.sort((a,b) => a.next.value.ix - b.next.value.ix)
+
+      if (children) {
+        while (children.length > 0) {
+          if (children[0].next.done) {
+              children = children.slice(1)
+              console.log(children)
+            } else {
+              children.sort((a,b) => a.next.value.ix - b.next.value.ix)
+              yield children[0].next
+              children[0].next = children[0].iterator.next()
+            }
+          }
       }
     }
-  }
+}
 
   forEach(callback) {
-    for (let p of this) {
+    for (let p of this.points()) {
+      // console.log(p)
+      if (p === undefined) {
+        continue
+      }
       callback(p)
     }
   }
@@ -413,8 +444,6 @@ export default class Tile {
             console.warn("PLOTTING IS BROKEN BECAUSE X AND Y ARE NOT IN ORDER")
           }
 
-          console.log(attributes)
-
           // Store it both non-asynchronously and asynchronously
           this.__datatypes = attributes;
           return attributes
@@ -425,10 +454,9 @@ export default class Tile {
 
   [Symbol.iterator]() {
      let i = 0;
-
      return {
        next: () => {
-         if (i < this._data.length) {
+         if (this._data && i < this._data.length) {
            return {value: this._data[i++], done: false}
          } else {
            return {done: true}

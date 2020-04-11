@@ -2,7 +2,8 @@ import { select } from 'd3-selection';
 
 export class Renderer {
   // A renderer handles drawing to a display element.
-  constructor(selector, tileSet, prefs) {
+  constructor(selector, tileSet, prefs, parent) {
+    this._parent = parent;
     this.holder = select(selector);
     console.log(this.holder.node())
     this.canvas = select(this.holder.node().firstElementChild)
@@ -17,39 +18,38 @@ export class Renderer {
   *visible_tiles(max_ix) {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
-    
+
     const { tileSet } = this;
     // Materialize using a tileset method.
     const all_tiles = tileSet.map(d => d);
-    
+
     for (let tile of all_tiles) {
       if (tile.is_visible(max_ix, this.zoom.current_corners())) {
         yield(tile);
       }
     }
-    
   }
-  
+
   bind_zoom(zoom) {
     this.zoom = zoom;
     return this
   }
-  
+
   update_prefs(prefs) {
     Object.assign(this.prefs, prefs)
   }
-  
+
   *initialize() {
     // Asynchronously wait for the basic elements to be done.
     return Promise.all(this._initializations).then(d => {
-      this.zoom.restart_timer(5000)
+      this.zoom.restart_timer(500000)
     })
-    
+
   }
 }
 
 export class CanvasRenderer extends Renderer {
 
-  
-  
+
+
 }

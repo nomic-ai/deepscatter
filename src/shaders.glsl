@@ -10,11 +10,13 @@ attribute float a_color;
 attribute float a_size ;
 attribute float a_time;
 attribute float a_opacity;
+attribute float a_visibility;
 attribute vec4 a_label;
 
 uniform vec2 u_color_domain;
 uniform vec2 u_size_domain;
 uniform vec2 u_time_domain;
+uniform float u_aspect_ratio;
 
 // Transform from data space to the open window.
 uniform mat3 u_window_scale;
@@ -83,28 +85,72 @@ vec4 scaleLinear(in float x) {
 }
 
 /*************** END COLOR SCALES *******************************/
+float ix_to_random(in float ix, in float seed) {
+  return fract(sin(ix * seed) * 43758.5453);
+}
+
+float ix_to_gaussian(in float ix, in float seed) {
+  return ix_to_random(ix, seed) +
+    ix_to_random(ix, seed + 1.) +
+    ix_to_random(ix, seed + 2.) +
+    ix_to_random(ix, seed + 3.) +
+    ix_to_random(ix, seed + 4.) +
+    ix_to_random(ix, seed + 5.) - 3.;
+}
 
 
 void main() {
 
+
+// filter_location
+if (a_visibility < 0.05) {
+  gl_Position = discard_me;
+  return;
+}
 if (ix > u_maxix) {
     // throwaway points that are too low.
     gl_Position = discard_me;
     return;
 } else {
-  // Manually generate a linear scale.
   float depth_size_adjust = (1.0 - ix / (u_maxix));
-  //     gl_PointSize = 10.0;
-  //        float time_adjust = sin(u_time / 4.0 + ix/u_maxix)*0.13 + 1.0;
-  
-  gl_PointSize = u_size*exp(log(u_k)*0.5) * depth_size_adjust;// * time_adjust;// * step(0.0, time_adjust) * time_adjust;// * depth_size_adjust;//
+  float point_size_adjust = exp(log(u_k)*0.5);
+  gl_PointSize = u_size* point_size_adjust * depth_size_adjust;// * time_adjust;// * step(0.0, time_adjust) * time_adjust;// * depth_size_adjust;//
   gl_PointSize = min(gl_PointSize, 16.);
   if (gl_PointSize <= 0.00001) {
     return;
   } else {
   // First apply the d3 zoom transform; perform the uniform translations;
-   vec3 pos2d = vec3(position.x, position.y, 1.0) * from_coord_to_gl;
-    gl_Position = vec4(pos2d, 1);
+    vec3 pos2d = vec3(position.x, position.y, 1.0) * from_coord_to_gl;
+
+    // Random jitter.
+
+    float stagger_time = ix_to_random(ix, 1.) * 2. * 3.14159265359;
+    float radius = (ix_to_random(ix, 5.) - 0.5) * point_size_adjust;
+    // float skew = ix_to_random(ix, 8.) * 3.14159265359 * 2.;
+    float velocity = (ix_to_gaussian(ix, 10.) / 2.5 + 0.2)/radius;
+
+    float skew_static = ix_to_random(ix, 2.) * 2. * 3.14159265359;
+    float static_jitter = ix_to_gaussian(ix, 1.) * 0.06;
+
+    vec3 static_adjust = vec3(
+      static_jitter * cos(skew_static) / u_aspect_ratio,
+      static_jitter * sin(skew_static),
+      0.
+    );
+    /*
+    vec3 float_adjust = vec3(
+      sin(u_time * velocity + stagger_time) * 0.04 * radius * cos(skew) / u_aspect_ratio,
+      cos(u_time * velocity + stagger_time) * 0.04 * radius * sin(skew),
+      0.
+    );
+    */
+    vec3 float_adjust = vec3(
+      sin(u_time * velocity + stagger_time) * 0.04 * radius / u_aspect_ratio,
+      cos(u_time * velocity + stagger_time) * 0.04 * radius,
+      0.
+    );
+    gl_Position = vec4(pos2d + float_adjust + static_adjust, 1.);
+    
     fill = scaleLinear(a_color);
     text_mode = u_render_text_min_ix - ix;
     if (text_mode > 0.0) {
@@ -112,26 +158,26 @@ if (ix > u_maxix) {
       // We could get very fancy here. Store the bounding box in the texture.
       // The char0 here packs two ascii bytes into a float. It's not clear to me
       // if you can do four or not.
-        
+
         float chardex;
-        
+
         gl_PointSize = min(gl_PointSize * 4.0, 64.0);
         float char_width = 0.0025 / 4.0 * gl_PointSize;
-        float joint_index;        
+        float joint_index;
         float pos = -1.0;
         float char_x = -char_width;
-        
+
         for (int i = 0; i < 4; i++) {
           // Cycle through the letter-byte-characters.
           joint_index = a_label[i];
-          
+
           pos = pos + 1.0;
           char_x = char_x + char_width;
           chardex = mod(joint_index, 256.0);
           if (pos >= u_string_index) {break; }
-          
+
           pos = pos + 1.0;
-          char_x = char_x + char_width; 
+          char_x = char_x + char_width;
           chardex = (joint_index-chardex)/256.0;
           if (pos >= u_string_index) { break; }
         }
@@ -141,7 +187,7 @@ if (ix > u_maxix) {
         // Bail if the charcode isn't defined.
         if (chardex > 128.0) {
           // Something has gone wrong; this is not an ascii point.
-          // Pink question mark.              
+          // Pink question mark.
           fill = vec4(0.9, 0.1, 0.1, 0.5);
           chardex = 63.0;
         }
@@ -172,7 +218,7 @@ void main() {
     float r = dot(cxy, cxy);
     if (r > 1.0) discard;
 //    if (r < 0.5) discard;
-    
+
     gl_FragColor = fill;
   } else {
     // Letters rarely go all the way wide.

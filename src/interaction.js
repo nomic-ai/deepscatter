@@ -142,7 +142,7 @@ export default class Zoom {
     }
   }
 
-  restart_timer(run_at_least = 1000) {
+  restart_timer(run_at_least = 10000) {
     // Restart the timer and run it for
     // run_at_least milliseconds or the current timeout,
     // whichever is greater.
@@ -176,12 +176,15 @@ export default class Zoom {
     }
   }
 
-  scales() {
+  scales(equal_units = true) {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.
     // The base scales are called 'x' and 'y',
     // and the zoomed ones are called 'x_' and 'y_'.
+
+    // equal_units: should a point of x be the same as a point of y?
+
     if (this._scales) {
       this._scales.x_ = this.transform.rescaleX(this._scales.x)
       this._scales.y_ = this.transform.rescaleY(this._scales.y)
@@ -189,23 +192,46 @@ export default class Zoom {
     }
 
     const { width, height, tileSet } = this;
-    const square_box = min([width, height])
 
     const scales = {};
     if (this.tileSet.limits === undefined) {
       return undefined;
     }
 
+    const scale_dat = {'x': {}, 'y': {}}
+
     for (let [name, dim] of [['x', width], ['y', height]]) {
-      // The smaller dimension is buffered on either
-      // both sides.
-      const buffer = (dim - square_box)/2
       const limits = tileSet.limits[name]
-      scales[name] =
-        scaleLinear()
-        .domain(limits)
-        .range([buffer, dim-buffer])
+      scale_dat[name].limits = limits;
+      scale_dat[name].size_range = limits[1] - limits[0]
+      scale_dat[name].pixels_per_unit = dim / scale_dat[name].size_range
     }
+
+    const data_aspect_ratio =
+       scale_dat.x.pixels_per_unit / scale_dat.y.pixels_per_unit
+
+    let x_buffer_size = 0, y_buffer_size = 0,
+    x_target_size = width, y_target_size = height;
+    if (data_aspect_ratio > 1) {
+      // There are more pixels in the x dimension, so we need a buffer
+      // around it.
+      x_target_size = width / data_aspect_ratio;
+      x_buffer_size = (width - x_target_size)/2
+    } else {
+      y_target_size = height * data_aspect_ratio;
+      y_buffer_size = (height - y_target_size)/2
+    }
+
+
+    scales.x =
+      scaleLinear()
+      .domain(scale_dat.x.limits)
+      .range([x_buffer_size, width-x_buffer_size])
+
+    scales.y =
+      scaleLinear()
+      .domain(scale_dat.y.limits)
+      .range([y_buffer_size, height-y_buffer_size])
 
     scales.x_ = this.transform.rescaleX(scales.x)
     scales.y_ = this.transform.rescaleY(scales.y)

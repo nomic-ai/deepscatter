@@ -29,6 +29,7 @@ export default class Scatterplot {
     this.div = select(selector);
 
     this.elements = []
+    this.filters = [];
 
     for (const d of base_elements) {
       const container =
@@ -52,7 +53,17 @@ export default class Scatterplot {
 
 
     this._root = new Tile(source_url);
-    this._renderer = new ReglRenderer("#container-for-webgl-canvas", this._root, prefs);
+
+    console.log("Making Renderer", this)
+
+    this._renderer = new ReglRenderer(
+      "#container-for-webgl-canvas",
+      this._root,
+      prefs,
+      this
+    );
+
+    console.log("Made renderer")
     this._zoom = new Zoom("#webgl-canvas", prefs);
 
     this._zoom.attach_tiles(this._root);
@@ -69,9 +80,17 @@ export default class Scatterplot {
   }
 
   plotAPI(prefs) {
+    if (prefs.filters) {
+      while (this.filters.length) {
+        this.filters.pop()
+      }
+      for (let filter_string of prefs.filters) {
+        this.filters.push(Function("datum", filter_string))
+      }
+    }
     this._root.promise.then(d => {
       this._renderer.update_prefs(prefs)
-      this._zoom.restart_timer(5000)
+      this._zoom.restart_timer(500000)
     })
   }
 
