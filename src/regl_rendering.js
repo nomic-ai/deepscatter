@@ -34,37 +34,6 @@ export class ReglRenderer extends Renderer {
     }
   }
 
-  update_visibility(tile, plot_num, modulo = 3) {
-    const plot_cycle = plot_num % modulo;
-    const { filters } = this._parent;
-    let visibility = [];
-    if (!tile._data || !tile._data.length) {
-      return
-    }
-    // Divide the full count into 30 chunks; each has this many
-    // items in it. Add .0001 to guarantee capturing the last item.
-    const {length} = tile._data
-    // In this cycle, we're only updating between these items.
-    const first = Math.floor(length * plot_cycle / modulo)
-    const last = Math.floor(length * (1 + plot_cycle) / modulo);
-    // console.log(first, last, tile._data.length)
-    const values = new Array(last - first).fill(0);
-    let i = 0;
-    let debug;
-    for (let datum of tile) {
-        // Only do 1 in 30 at each tick.
-        if (i >= first && i < last * 0.5) {
-          if (filters.every(func => func(datum))) {
-            values[i - first] = 1.0
-          }
-        }
-      i++;
-      debug = datum;
-    }
-    // console.log(filters[0](debug), values[values.length - 1])
-    // console.log(tile.key, sum(values) / length)
-    tile._regl_elements.visibility.subdata(values, first)
-  }
 
   tick(force = false) {
 
@@ -87,14 +56,25 @@ export class ReglRenderer extends Renderer {
       prefs: prefs
     }
 
+
     tileSet.download_to_depth(props.max_ix, this.zoom.current_corners())
 
     regl.clear({
-      color: [0.1, 0.1, 0.13, 1],
+      color: [0.1, 0.1, 0.13, 0],
       depth: 1
     });
 
     let n_visible = 0;
+
+    // Run this in a thread.
+    this.tileSet.update_visibility_buffer(
+      this.zoom.current_corners(),
+      this._parent.filters,
+      5,
+      props.max_ix,
+      Date.now(),
+      true
+    )
 
     for (let tile of this.visible_tiles(props.max_ix)) {
       // seek_renderer initiates a promise for the
@@ -103,8 +83,6 @@ export class ReglRenderer extends Renderer {
       if (this.seek_renderer(tile) == undefined) {
         continue
       }
-
-      this.update_visibility(tile, this.tick_num, 1)
 
       n_visible += 1;
       if ((tile.min_ix) < (props.max_ix * prefs.label_threshold)) {
@@ -142,6 +120,46 @@ export class ReglRenderer extends Renderer {
       // It's underway, but there's nothing to do until it gets here.
       return undefined
     }
+  }
+
+  spritesheet_setter(word) {
+    // Set if not there.
+    let ctx = 0;
+    if (!this.spritesheet) {
+      var offscreen = create("canvas")
+        .attr("width", 4096)
+        .attr("width", 4096)
+        .style("display", "none")
+
+      ctx = offscreen.node().getContext('2d');
+      const font_size = 32
+      ctx.font = `${font_size}px Times New Roman`;
+      ctx.fillStyle = "black";
+      ctx.lookups = new Map()
+      ctx.position = [0, font_size - font_size / 4.]
+      this.spritesheet = ctx
+    } else {
+      ctx = this.spritesheet
+    }
+    let [x, y] = ctx.position;
+
+    if (ctx.lookups.get(word)) {
+      return ctx.lookups.get(word)
+    }
+    const w_ = ctx.measureText(word).width
+    if (w_ > 4096) {
+      return
+    }
+    if ((x + w_) > 4096) {
+      x = 0
+      y += font_size
+    }
+    ctx.fillText(word, x, y);
+    lookups.set(word, {x: x, y: y, width: w_})
+    ctx.strokeRect(x, y - font_size, width, font_size)
+    x += w_
+    ctx.position = [x, y]
+    return lookups.get(word)
   }
 
   _character_map(height=32) {
@@ -240,7 +258,9 @@ export class ReglRenderer extends Renderer {
       p = rgb(p);
       return [p.r, p.g, p.b, p.opacity * 255]
     })
-
+    this.character_texture = regl.texture({
+      shape: [4096, 4096]
+    })
     this.rainbow_texture = regl.texture([niccoli_rainbow])
     this.viridis_texture = regl.texture([viridis])
     const char_textures = this._character_map(64)
@@ -262,15 +282,22 @@ export class ReglRenderer extends Renderer {
     // -1 because we store 'position', 'x', and 'y';
     const count = points.length /
                   (Object.entries(datatypes).length - 1);
-    return {
+    const elements = {
       'count': count,
       'data': regl.buffer(points),
       'visibility': regl.buffer({
         usage: 'dynamic',
+        data: new Array(points.length).fill(0),
+        type: 'float'
+      }),
+      'texture_locations': regl.buffer({
+        'usage': 'dynamic',
         length: count * 4,
         type: 'float'
       })
     }
+    return elements
+
 
   }
 

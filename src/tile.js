@@ -132,6 +132,104 @@ export default class Tile {
     return q
   }
 
+  update_visibility_buffer(
+    viewport, filters, max_time = 5, max_ix = 0,
+    original_start_time, recursive = true
+  ) {
+
+    // A tile stores a float32 array of 1 or zero about
+    // whether it is currently visible.
+
+    // viewport: corners in dataspace as returned by
+    // scattershot.zoom.current_corners()
+
+    // filters: a map to functions. The keys to the filter map
+    // are used to determine if the function has already
+    // been applied.
+
+    // max_time: unused, optimization parameter.
+
+    // max_ix; the greatest depth to plot.
+
+    // original_start: used to make sure the filtering
+    // isn't taking too long. Unimplemented.
+
+    // recursive: apply this to children. If so, each child
+    // is done one tick ('requestAnimationFrame') after the current one.
+    const original_start = original_start_time || Date.now();
+    let start_time = original_start;
+    const filter_names = new Set(Array.from(filters.keys()));
+    // https://stackoverflow.com/questions/31128855/comparing-ecma6-sets-for-equality
+    if (!this._data || !this._data.length || !this.is_visible(max_ix, viewport)) {
+      return
+      // Note--without bothering to update the buffers or the children.
+    }
+
+    // allocated once.
+    this.visibility_buffer = this.visibility_buffer ||
+        new Float32Array(this._data.length);
+
+    const isSetsEqual = (a, b) => a.size === b.size && [...a].every(value => b.has(value));
+
+    this.current_filters = this.current_filters || new Set();
+
+    // https://stackoverflow.com/questions/31128855/comparing-ecma6-sets-for-equality
+    if (!isSetsEqual(this.current_filters, filter_names) && this._regl_elements) {
+      // Only update if the filters have different names.
+      // but still update the children at the end.
+
+      // The next start point to write to.
+      let start_next_flush_at = 0;
+      let i = 0;
+      for (let datum of this) {
+        if (Array.from(filters.values()).every(func => func(datum))) {
+          this.visibility_buffer[i] = 1.0;
+        } else {
+          this.visibility_buffer[i] = 0.0;
+        }
+        /* A decent idea about splitting up inside this code.
+        if (false && Date.now() - start_time > max_time) {
+          tile._regl_elements.visibility
+          .subdata(
+          values.slice(start_next_flush_at, i + 1),
+          start_next_flush_at)
+            console.log("buffering")
+          window.requestAnimationFrame(d => undefined)
+          start_next_flush_at = i + 1 // the next start point.
+          start_time = Date.now()
+        }
+        */
+        i++;
+      }
+
+      // A REGL method that doesn't belong in this file.
+      // The logic should be handled in regl_rendering.js
+      // XXX
+      if (this._regl_elements) {
+        this._regl_elements.visibility
+        .subdata(this.visibility_buffer, 0)
+      }
+
+      this.current_filters = filter_names;
+      this.last_update_time = Date.now()
+      this.update_filter_promise_status = "completed"
+    }
+
+    if (recursive && this._children) {
+    for (const child of this._children) {
+
+      // Could only request the animation frame if
+      // the start time has been a while. But I don't.
+
+      window.requestAnimationFrame(() => {
+        child.update_visibility_buffer(
+        viewport, filters, max_time, max_ix,
+        original_start_time)
+      })
+    }
+    }
+  }
+
   *points() {
 
     for (let p of this) {
@@ -159,7 +257,6 @@ export default class Tile {
         while (children.length > 0) {
           if (children[0].next.done) {
               children = children.slice(1)
-              console.log(children)
             } else {
               children.sort((a,b) => a.next.value.ix - b.next.value.ix)
               yield children[0].next
@@ -323,7 +420,6 @@ export default class Tile {
 
         // and over-allocate 4 floats for characters, etc.
         const n_col = (columns.length - 1);
-        console.log(n_col)
         const buffer = new Float32Array(n_col * datalist.length);
 
         let offset = 0;
@@ -441,7 +537,7 @@ export default class Tile {
           }
 
           if (attributes.x.offset != (attributes.y.offset - 4)) {
-            console.warn("PLOTTING IS BROKEN BECAUSE X AND Y ARE NOT IN ORDER")
+            console.error("PLOTTING IS BROKEN BECAUSE X AND Y ARE NOT IN ORDER")
           }
 
           // Store it both non-asynchronously and asynchronously

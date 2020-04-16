@@ -85,8 +85,19 @@ vec4 scaleLinear(in float x) {
 }
 
 /*************** END COLOR SCALES *******************************/
-float ix_to_random(in float ix, in float seed) {
+/*float ix_to_random(in float ix, in float seed) {
   return fract(sin(ix * seed) * 43758.5453);
+}*/
+
+highp float ix_to_random(in float ix, in float seed)
+{
+    vec2 co = vec2(ix, seed);
+    highp float a = 12.9898;
+    highp float b = 78.233;
+    highp float c = 43758.5453;
+    highp float dt= dot(co.xy ,vec2(a,b));
+    highp float sn= mod(dt,3.14);
+    return fract(sin(sn) * c);
 }
 
 float ix_to_gaussian(in float ix, in float seed) {
@@ -98,11 +109,98 @@ float ix_to_gaussian(in float ix, in float seed) {
     ix_to_random(ix, seed + 5.) - 3.;
 }
 
+const float e = 1.618282;
+// I've been convinced.
+const float tau = 2. * 3.14159265359;
+
+vec4 logarithmic_spiral_position(
+  in vec3 pos2d,
+  in float ix,
+  in float a, // Log parameter
+  in float turns, // Number of turns of spiral to do.
+  in float point_size_adjust,
+  in float time
+  ) {
+  // If this is staged between 0 and tau, it's a Random
+  // location; otherwise, it's a band (or two)
+
+  // float turns = 4.;
+  // float a = 0.31;
+
+  if (abs(pos2d.x) > 1.1 || abs(pos2d.y) > 1.1) {
+    // discard even if the spiraling arm might happen to be flying by us.
+    return vec4(100., 100., 1., 1.);
+  }
+
+  // Each point starts at a different place on the spiral.
+  float stagger_time = ix_to_gaussian(ix, 11.) * 1.5;
+  if (stagger_time > 0.75) {
+    stagger_time = stagger_time + tau/2.;
+  }
+
+
+  // How long does a circuit take?
+  float time_period = 85. * exp(ix_to_gaussian(ix, 12.)/ 6.) * (pos2d.x + 1.);
+
+
+
+
+  // Adjust u_time from the clock to our current spot.
+  float varying_time = u_time + stagger_time * time_period;
+  // Where are we from 0 to 1 relative to the time period
+  float relative_time =
+     mod(varying_time, time_period)/time_period;
+
+  // The core parameters of a log spiral.
+
+
+  float theta = (1. - relative_time) * turns * tau;
+  float radius = (pow(e, a * theta) - 1.0) * .0005 * point_size_adjust + .0005;
+
+  // into euclidean space.
+  vec3 pos_spiral = vec3(
+   cos(theta)*radius,
+   sin(theta)*radius,
+   0.
+  );
+
+  float rotation = ix_to_random(ix, 3.) * tau * 0.5;
+
+  float x_jitter = 0.*ix_to_gaussian(ix, 1.);
+  float y_jitter = 0.*ix_to_gaussian(ix, 2.);
+
+  float shear_x = 0.4 * abs(ix_to_gaussian(ix, 4.));
+  mat3 transform =
+      // Random jitter and zoom scale
+      mat3(point_size_adjust, 0., x_jitter * .01 * point_size_adjust,
+         0., point_size_adjust, y_jitter * .01 * point_size_adjust,
+         0., 0., 1.) *
+      // random skew.
+         mat3(
+           1., shear_x, 0.,
+           0., 1., 0.,
+           0., 0., 1.
+
+         ) *
+         // random rotation
+         mat3(
+            cos(rotation), -sin(rotation), 0,
+            sin(rotation), cos(rotation), 0,
+            0, 0, 1) *
+        // rescale to viewport
+         mat3(
+            1., 0., 0.,
+            0., -u_aspect_ratio, 0.,
+            0., 0., 1.)
+         ;
+
+
+  return vec4((pos2d + pos_spiral * 5. *transform), 1.);
+}
+
 
 void main() {
 
-
-// filter_location
 if (a_visibility < 0.05) {
   gl_Position = discard_me;
   return;
@@ -114,43 +212,23 @@ if (ix > u_maxix) {
 } else {
   float depth_size_adjust = (1.0 - ix / (u_maxix));
   float point_size_adjust = exp(log(u_k)*0.5);
-  gl_PointSize = u_size* point_size_adjust * depth_size_adjust;// * time_adjust;// * step(0.0, time_adjust) * time_adjust;// * depth_size_adjust;//
+  gl_PointSize = u_size * point_size_adjust * depth_size_adjust;// * time_adjust;// * step(0.0, time_adjust) * time_adjust;// * depth_size_adjust;//
   gl_PointSize = min(gl_PointSize, 16.);
   if (gl_PointSize <= 0.00001) {
     return;
   } else {
   // First apply the d3 zoom transform; perform the uniform translations;
+
     vec3 pos2d = vec3(position.x, position.y, 1.0) * from_coord_to_gl;
 
-    // Random jitter.
+    gl_Position = logarithmic_spiral_position(
+      pos2d,
+      ix,
+      0.27, // a
+      4.0, // turns
+      point_size_adjust,
+      u_time);
 
-    float stagger_time = ix_to_random(ix, 1.) * 2. * 3.14159265359;
-    float radius = (ix_to_random(ix, 5.) - 0.5) * point_size_adjust;
-    // float skew = ix_to_random(ix, 8.) * 3.14159265359 * 2.;
-    float velocity = (ix_to_gaussian(ix, 10.) / 2.5 + 0.2)/radius;
-
-    float skew_static = ix_to_random(ix, 2.) * 2. * 3.14159265359;
-    float static_jitter = ix_to_gaussian(ix, 1.) * 0.06;
-
-    vec3 static_adjust = vec3(
-      static_jitter * cos(skew_static) / u_aspect_ratio,
-      static_jitter * sin(skew_static),
-      0.
-    );
-    /*
-    vec3 float_adjust = vec3(
-      sin(u_time * velocity + stagger_time) * 0.04 * radius * cos(skew) / u_aspect_ratio,
-      cos(u_time * velocity + stagger_time) * 0.04 * radius * sin(skew),
-      0.
-    );
-    */
-    vec3 float_adjust = vec3(
-      sin(u_time * velocity + stagger_time) * 0.04 * radius / u_aspect_ratio,
-      cos(u_time * velocity + stagger_time) * 0.04 * radius,
-      0.
-    );
-    gl_Position = vec4(pos2d + float_adjust + static_adjust, 1.);
-    
     fill = scaleLinear(a_color);
     text_mode = u_render_text_min_ix - ix;
     if (text_mode > 0.0) {

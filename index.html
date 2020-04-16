@@ -12,7 +12,7 @@
 
 <div class=scrollership>
   <div class=tale>
-    <h1 style="color:red">"Hi there"</h1>
+    <h1 style="color:red">"Deep Scatterplots"</h1>
   <div>
 </div>
 
@@ -20,23 +20,23 @@
 
 </div>
 
-<header>Wow this is ugly!</header>
+<header>Wuh-oh!</header>
 
-Yeah, this library depends on bootstrap css to actually look OK.
+Nurk!
 
 <script>
 
   scatterplot = new deepScatter.default({selector: "#deepscatter", source_url: "build"})
   scatterplot.initialize()
   scatterplot.plotAPI({
-   point_size: 0.5,
+   point_size: 1.3,
    max_points: 1000000,
    label_threshold: .0,
-   label_field: "metro",
+   label_field: "yearday",
    color_field: "yearday",
-   color_domain: [30, 120],
+   color_domain: [60, 110],
    filters: [
-    "return datum.yearday < 180"
+    "return datum.yearday <= 188"
    ]
   })
 
@@ -53,7 +53,7 @@ Yeah, this library depends on bootstrap css to actually look OK.
 </script>
 
 <input type="text" style="position:fixed"
-value="return datum.yearday < 80" size=60
+value=    "return datum.yearday < (Date.now()/1000)*4 % 60 + 50" size=60
 onkeyup="keyaction(this)">
 
 </input>
