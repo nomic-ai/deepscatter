@@ -4,6 +4,9 @@ import Zoom from './interaction.js';
 import {select} from 'd3-selection';
 import {geoPath, geoIdentity} from 'd3-geo';
 import {json as d3json } from 'd3-fetch';
+import {max} from 'd3-array';
+import * as topojson from "topojson-client";
+
 const base_elements = [
   {
     id: 'canvas-2d-background',
@@ -72,7 +75,7 @@ export default class Scatterplot {
     this._zoom = new Zoom("#webgl-canvas", prefs);
 
     this._zoom.attach_tiles(this._root);
-    this._zoom.attach_renderer(this._renderer);
+    this._zoom.attach_renderer("regl", this._renderer);
     this._zoom.initialize_zoom();
 
     const bkgd = select("#container-for-canvas-2d-background").select("canvas")
@@ -87,11 +90,13 @@ export default class Scatterplot {
     const ctx = bkgd.node().getContext("2d")
 
     if (!this.geojson) {
+      this.geojson = "in progress"
       return d3json(url).then(d => {
-        this.geojson = d;
-
+        console.log("FOOOO", d)
         const {x, y} = this._zoom.scales()
 
+        const lines = topojson.mesh(d, d.objects["-"])
+        const shape = topojson.merge(d, d.objects["-"].geometries)
         function fix_point(p) {
           if (!p) {return}
           if (p.coordinates) {
@@ -107,28 +112,33 @@ export default class Scatterplot {
             p[1] = y(p[1])
           }
         }
-        for (let feature of this.geojson.features) {
-          fix_point(feature.geometry)
+        fix_point(lines)
+        fix_point(shape)
+        this.geojson = {
+          lines, shape
         }
+        // Recurse to actually draw
+        this.drawBackgroundMap(url)
       })
     }
-
+    if (this.geojson == "in progress") {
+      return
+    }
     ctx.fillStyle = "rgba(25, 25, 29, 1)"
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
 
     console.log()
-    ctx.strokeStyle = "white"
+    ctx.strokeStyle = "#8a0303"//"rbga(255, 255, 255, 1)"
+    ctx.fillStyle = 'rgba(30, 30, 34, 1)'
 
+    ctx.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k/2))]);
 
     const path = geoPath(geoIdentity()
       .scale(this._zoom.transform.k)
       .translate([this._zoom.transform.x, this._zoom.transform.y]), ctx);
 
-
-
-    for (let feature of this.geojson.features) {
-      ctx.beginPath(), path(feature), ctx.stroke();
-    }
+//      ctx.beginPath(), path(this.geojson.shape), ctx.fill();
+      ctx.beginPath(), path(this.geojson.lines), ctx.stroke();
 
   }
 
@@ -146,7 +156,12 @@ export default class Scatterplot {
         this.filters.set(filter_string, Function("datum", filter_string))
       }
     }
+    if (prefs.basemap_geojson) {
+      this._zoom.renderers.set("basemap", {
+        tick: () => {this.drawBackgroundMap(prefs.basemap_geojson)}
+      })
 
+    }
     this._root.promise.then(d => {
       this._renderer.update_prefs(prefs)
       this._zoom.restart_timer(500000)

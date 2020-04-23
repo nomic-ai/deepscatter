@@ -29,12 +29,17 @@ const argv = yargs
         description: 'The number of datapoints in each tile.',
         type: 'number',
       })
+      .option('output-dir', {
+	'alias': 'o',
+	'default': 'build',
+	'description': "The directory to put tiles and metadata into",
+      })
       .help()
       .alias('help', 'h')
       .argv;
 
 async function main(argv) {
-  const {tileSize, maxFiles, file} = argv;
+  const {tileSize, maxFiles, file, outputDir} = argv;
   const limits = {
     x: [Infinity, -Infinity],
     y: [Infinity, -Infinity]
@@ -70,7 +75,7 @@ async function main(argv) {
         'max_zoom': Math.floor(n_items/tileSize),
         'fields': field_names,
       }
-      fs.writeFileSync("build/data_description.json", JSON.stringify(metadata))
+      fs.writeFileSync(`${outputDir}/data_description.json`, JSON.stringify(metadata))
       allocate_tiles({limits, field_names}, file, 0)
     })
 
@@ -110,7 +115,7 @@ async function main(argv) {
             that.flush(v, true)
           }
           for (const tname of overfull) {
-            const fname = `build/tiles/${tname}_overflow.csv`
+            const fname = `${outputDir}/tiles/${tname}_overflow.csv`
             const [z, x, y] = tname.split("/").map(d => +d)
             const stack = DiskTileStack(metadata, fname, z + 1, that.round+1)
             stack.make_children(z, x, y)
@@ -125,13 +130,13 @@ async function main(argv) {
 
     that.make_write = (key, overflow = false) => {
       const d = key.split("/").slice(0, 2).join("/")
-      fs.mkdirSync(`build/tiles/${d}`, { recursive: true });
+      fs.mkdirSync(`${outputDir}/tiles/${d}`, { recursive: true });
       let name = key
       if (overflow) {
         name = name + "_overflow"
       }
       that.open_files += 1
-      const fout = fs.createWriteStream("build/tiles/" + name + ".csv", {flags:'w'})
+      const fout = fs.createWriteStream(`${outputDir}/tiles/${name}.csv`, {flags:'w'})
       fout.write(stringify([that.metadata.field_names]))
       return fout
     }

@@ -17,6 +17,7 @@ uniform vec2 u_color_domain;
 uniform vec2 u_size_domain;
 uniform vec2 u_time_domain;
 uniform float u_aspect_ratio;
+uniform float u_jitter;
 
 // Transform from data space to the open window.
 uniform mat3 u_window_scale;
@@ -113,72 +114,73 @@ const float e = 1.618282;
 // I've been convinced.
 const float tau = 2. * 3.14159265359;
 
-vec4 logarithmic_spiral_position(
-  in vec3 pos2d,
-  in float ix,
+vec4 logarithmic_spiral_jitter(
+  in float ix, // a random seed.
   in float a, // Log parameter
-  in float turns, // Number of turns of spiral to do.
-  in float point_size_adjust,
-  in float time
+  in float k, // other parameter
+  in float max_r, // Number of turns of spiral to do.
+  in float randomize_rotation_max_radians,
+  in float randomize_shear,
+  in float hole,
+  in float period,
+  in float time,
+  in float aspect_ratio
   ) {
-  // If this is staged between 0 and tau, it's a Random
-  // location; otherwise, it's a band (or two)
 
-  // float turns = 4.;
-  // float a = 0.31;
-
-  if (abs(pos2d.x) > 1.1 || abs(pos2d.y) > 1.1) {
-    // discard even if the spiraling arm might happen to be flying by us.
-    return vec4(100., 100., 1., 1.);
-  }
+  // Requires you to have defined 'tau' and 'e' elsewhere, like this:
+  /*
+  const float e = 1.618282;
+  const float tau = 2. * 3.14159265359;
+  */
 
   // Each point starts at a different place on the spiral.
-  float stagger_time = ix_to_gaussian(ix, 11.) * 1.5;
+
+  float stagger_time = ix_to_gaussian(ix, 11.) * tau;
   if (stagger_time > 0.75) {
     stagger_time = stagger_time + tau/2.;
   }
 
-
   // How long does a circuit take?
-  float time_period = 85. * exp(ix_to_gaussian(ix, 12.)/ 6.) * (pos2d.x + 1.);
+  float time_period = period * exp(ix_to_gaussian(ix, 0.01) / 6.);
 
-
-
-
-  // Adjust u_time from the clock to our current spot.
-  float varying_time = u_time + stagger_time * time_period;
+  // Adjust time from the clock to our current spot.
+  float varying_time = time + stagger_time * time_period;
   // Where are we from 0 to 1 relative to the time period
+
   float relative_time =
-     mod(varying_time, time_period)/time_period;
+     1. - mod(varying_time, time_period)/time_period;
 
   // The core parameters of a log spiral.
 
+  // Calculate the radius first, since that's a user parameter, and then derive theta from that.
 
-  float theta = (1. - relative_time) * turns * tau;
-  float radius = (pow(e, a * theta) - 1.0) * .0005 * point_size_adjust + .0005;
+  float radius = max_r * relative_time;
+  float theta  = 1./k * log(radius / a);
 
   // into euclidean space.
   vec3 pos_spiral = vec3(
-   cos(theta)*radius,
-   sin(theta)*radius,
+   cos(theta)*(radius + hole),
+   sin(theta)*(radius + hole),
    0.
   );
 
-  float rotation = ix_to_random(ix, 3.) * tau * 0.5;
+  float rotation = ix_to_gaussian(ix, 3.) / 3. * randomize_rotation_max_radians;
 
-  float x_jitter = 0.*ix_to_gaussian(ix, 1.);
-  float y_jitter = 0.*ix_to_gaussian(ix, 2.);
+  float x_jitter = 0.1*ix_to_gaussian(ix, 1.);
+  float y_jitter = 0.1*ix_to_gaussian(ix, 2.);
 
-  float shear_x = 0.4 * abs(ix_to_gaussian(ix, 4.));
+  float shear_x = ix_to_gaussian(ix, 4.) * randomize_shear;
+  float shear_y = ix_to_gaussian(ix, 0.1) * randomize_shear;
+
   mat3 transform =
       // Random jitter and zoom scale
-      mat3(point_size_adjust, 0., x_jitter * .01 * point_size_adjust,
-         0., point_size_adjust, y_jitter * .01 * point_size_adjust,
+      mat3(1., 0., x_jitter * .01,
+         0., 1., y_jitter * .01,
          0., 0., 1.) *
       // random skew.
          mat3(
            1., shear_x, 0.,
-           0., 1., 0.,
+           shear_y, 1., 0.,
            0., 0., 1.
 
          ) *
@@ -189,15 +191,14 @@ vec4 logarithmic_spiral_position(
             0, 0, 1) *
         // rescale to viewport
          mat3(
-            1., 0., 0.,
-            0., -u_aspect_ratio, 0.,
+            1./aspect_ratio, 0., 0.,
+            0., 1., 0.,
             0., 0., 1.)
          ;
 
 
-  return vec4((pos2d + pos_spiral * 5. *transform), 1.);
+  return vec4(pos_spiral * transform, 1.);
 }
-
 
 void main() {
 
@@ -220,14 +221,46 @@ if (ix > u_maxix) {
   // First apply the d3 zoom transform; perform the uniform translations;
 
     vec3 pos2d = vec3(position.x, position.y, 1.0) * from_coord_to_gl;
+    /*
+    in float a, // Log parameter
+    in float k, // other parameter
+    in float max_r, // Number of turns of spiral to do.
+    in float randomize_rotation_max_radians,
+    in float randomize_shear,
+    in float hole,
+    in float period,
+    in float time
+    */
 
-    gl_Position = logarithmic_spiral_position(
-      pos2d,
-      ix,
-      0.27, // a
-      4.0, // turns
-      point_size_adjust,
-      u_time);
+    if (u_jitter < 0.5) {
+      gl_Position = vec4(pos2d, 1.);
+
+    } else {
+    vec4 jitter;
+      if (u_jitter < 1.5) {
+          jitter = logarithmic_spiral_jitter(
+            ix,
+            0.27, // a
+            0.35, //k
+            0.041, //r,
+            3.04, //random_1
+            0.25, //shear
+            0.01, //donut.
+            30., // period
+            u_time,
+            u_aspect_ratio);
+        } else if (u_jitter < 2.5) {
+          jitter = vec4(ix_to_random(ix, 1.) * .005, ix_to_random(ix, 2.) * .005, 0., 0.);
+        } else if (u_jitter < 3.5) {
+          jitter = vec4(ix_to_gaussian(ix, 1.) * .01, ix_to_gaussian(ix, 2.) * .01, 0., 0.);
+        }
+
+        gl_Position = vec4(pos2d + jitter.xyz * point_size_adjust, 1.);
+
+      }
+
+
+
 
     fill = scaleLinear(a_color);
     text_mode = u_render_text_min_ix - ix;
@@ -286,10 +319,10 @@ varying vec4 fill;
 varying vec2 letter_pos;
 varying float text_mode;
 
-uniform sampler2D u_charmap;
+// uniform sampler2D u_charmap;
 
 void main() {
-  if (text_mode < 0.0 ) {
+  //if (pic_mode < 0.0 ) {
     // Drop parts of the rectangle outside the unit circle.
     // I took this from observable.
     vec2 cxy = 2.0 * gl_PointCoord - 1.0;
@@ -298,13 +331,12 @@ void main() {
 //    if (r < 0.5) discard;
 
     gl_FragColor = fill;
-  } else {
+  /*} else {
     // Letters rarely go all the way wide.
-    if (gl_PointCoord.x > 0.65) discard;
     vec2 coords = letter_pos + gl_PointCoord/16.0;
-    vec4 letter = texture2D(u_charmap, coords);
-    if (letter.a <= 0.03) discard;
+    // vec4 letter = texture2D(u_charmap, coords);
+    // if (letter.a <= 0.03) discard;
     gl_FragColor = mix(fill, vec4(0.25, 0.1, 0.2, 1.0), 1.0 - letter.a);
-  }
+  }*/
 }
 `

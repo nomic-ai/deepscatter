@@ -4,6 +4,8 @@ import { scaleLinear } from 'd3-scale';
 import stringHash from 'string-hash';
 import {contourDensity} from 'd3-contour';
 import {geoPath} from 'd3-geo';
+// Shouldn't be here, just while contours are.
+import {select} from 'd3-selection';
 
 export default class Tile {
 
@@ -277,26 +279,35 @@ export default class Tile {
     }
   }
 
-  contours(width, height, drawTo, scales) {
-    const {x_, y_} = scales;
-    const contours = contourDensity()
+  contours(drawTo) {
 
+    const {x_, y_} = this._zoom.scales();
+    const {width, height} = this._zoom;
+    const contours = contourDensity()
     .x(d=>x_(d.x))
     .y(d=>y_(d.y))
     .size([width, height])
     (this)
+    const drawTwo = drawTo || select("body");
 
-    const svg = drawTo.select("svg")
+    const svg = drawTwo.select("svg")
 
     svg.append("g")
       .attr("fill", "none")
       .attr("stroke", "steelblue")
       .attr("stroke-linejoin", "round")
-    .selectAll("path")
-    .data(contours)
-    .enter().append("path")
+      .selectAll("path")
+      .data(contours)
+      .join("path")
       .attr("stroke-width", (d, i) => i % 5 ? 0.25 : 1)
       .attr("d", geoPath());
+
+    const renderer = {
+      tick: () => svg.attr("transform", this._zoom.transform)
+    }
+
+    this._zoom.renderers.set("contours", renderer)
+
   }
 
   visit(callback, after = false) {

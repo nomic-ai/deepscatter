@@ -32,17 +32,18 @@ export default class Zoom {
     // A zoom keeps track of all the renderers
     // that it's in charge of adjusting.
 
-     this.renderers = [];
+     this.renderers = new Map();
   }
 
   attach_tiles(tiles) {
     this.tileSet = tiles;
+    this.tileSet._zoom = this
     return this;
   }
 
-  attach_renderer(renderer) {
+  attach_renderer(key, renderer) {
     renderer.zoom = this;
-    this.renderers.push(renderer);
+    this.renderers.set(key, renderer);
     renderer.zoom.initialize_zoom()
     return this;
   }
@@ -76,7 +77,7 @@ export default class Zoom {
           .extent([[0, 0], [width, height]])
           .on("zoom", () => {
             this.transform = event.transform;
-            this.renderers.forEach( d => d.tick())
+            this.restart_timer(10 * 1000)
           })
 
     canvas.call(zoomer);
@@ -162,7 +163,7 @@ export default class Zoom {
 
     this._timer.stop_at = stop_at;
 
-    timerFlush();
+  //  timerFlush();
 
     return this._timer;
   }
@@ -271,7 +272,7 @@ export default class Zoom {
       }
     }
 
-    for (let renderer of this.renderers) {
+    for (let renderer of this.renderers.values()) {
       renderer.tick()
     }
   }

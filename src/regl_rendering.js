@@ -6,6 +6,7 @@ import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool }
 import { Zoom } from './interaction.js';
 import { vertex_shader, frag_shader } from './shaders.glsl';
 import { Renderer } from './rendering.js';
+import GLBench from 'gl-bench/dist/gl-bench';
 
 
 export class ReglRenderer extends Renderer {
@@ -14,6 +15,20 @@ export class ReglRenderer extends Renderer {
     super(selector, tileSet, prefs, parent)
     console.log("CANV", this.canvas, this.canvas.node())
     this.regl = wrapREGL(this.canvas.node());
+
+    /* BOILERPLATE */
+    let gl = this.canvas.node().getContext('webgl') || this.canvas.node().getContext('experimental-webgl');
+    let bench = new GLBench(gl);
+    function draw(now) {
+      bench.begin('Drawing speed');
+      // some bottleneck
+      bench.end('');
+      bench.nextFrame(now);
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+    /* END BOILERPLATE */
+
     this.initialize_textures()
     // Not the right way, for sure.
     this._initializations = [
@@ -76,6 +91,9 @@ export class ReglRenderer extends Renderer {
       true
     )
 
+    // Bundle up the regl draw calls.
+    let prop_list = [];
+
     for (let tile of this.visible_tiles(props.max_ix)) {
       // seek_renderer initiates a promise for the
       // tile's regl elements buffer.
@@ -88,19 +106,16 @@ export class ReglRenderer extends Renderer {
       if ((tile.min_ix) < (props.max_ix * prefs.label_threshold)) {
         this._set_word_buffers(tile);
       }
-      props.count = tile._regl_elements.count;
-      props.data = tile._regl_elements.data;
-      props.visibility = tile._regl_elements.visibility;
-      let passes = 1;
-      if (this.prefs.label_field) {
-        passes = 8
+      const this_props = {
+        count: tile._regl_elements.count,
+        data: tile._regl_elements.data,
+        visibility: tile._regl_elements.visibility
       }
-      for (let i = 0; i < passes; i++) {
-        // Draw multiple times for each letter in the buffer.
-        props.string_index = i;
-        this._renderer(props);
-      }
+      Object.assign(this_props, props)
+      prop_list.push(this_props)
+      //this._renderer(props);
     }
+    this._renderer(prop_list)
   }
 
   seek_renderer(tile, force = false) {
@@ -258,13 +273,13 @@ export class ReglRenderer extends Renderer {
       p = rgb(p);
       return [p.r, p.g, p.b, p.opacity * 255]
     })
-    this.character_texture = regl.texture({
+/*    this.character_texture = regl.texture({
       shape: [4096, 4096]
-    })
-    this.rainbow_texture = regl.texture([niccoli_rainbow])
-    this.viridis_texture = regl.texture([viridis])
-    const char_textures = this._character_map(64)
-    this.char_texture = regl.texture(char_textures);
+    })*/
+    this.color_scale = regl.texture([viridis])
+//    const char_textures = this._character_map(64)
+//    this.char_texture = regl.texture(char_textures);
+    this.year = regl.texture({shape: [1024, 32] })
   }
 
   make_char_buffer(tile, char_field) {
@@ -336,15 +351,25 @@ export class ReglRenderer extends Renderer {
 
       uniforms: {
         u_aspect_ratio: width/height,
-        u_colormap: this.viridis_texture,
-        u_charmap: this.char_texture,
-        u_render_text_min_ix: function(context, props) {
-          return props.render_label_threshold
-        },
+        u_colormap: this.color_scale,
         u_color_domain: function(context, props) {
           // return props._scales.color.domain()
           console.log("DOMAIN", props.prefs.color_domain)
           return props.prefs.color_domain
+        },
+        u_render_text_min_ix: function(context, props) {
+          return props.render_label_threshold
+        },
+        u_jitter: function(context, props) {
+          if (props.prefs.jitter == "spiral") {
+            return 1
+          } else if (props.prefs.jitter == "uniform") {
+            return 2
+          } else if (props.prefs.jitter == "normal") {
+            return 3
+          } else {
+            return 0
+          }
         },
         u_string_index: function(context, props) {
           return props.string_index
