@@ -6,6 +6,7 @@ import {contourDensity} from 'd3-contour';
 import {geoPath} from 'd3-geo';
 // Shouldn't be here, just while contours are.
 import {select} from 'd3-selection';
+import 'regenerator-runtime/runtime'
 
 export default class Tile {
 

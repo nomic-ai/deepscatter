@@ -2,14 +2,14 @@ import { select } from 'd3-selection';
 
 export class Renderer {
   // A renderer handles drawing to a display element.
-  constructor(selector, tileSet, prefs, parent) {
+  constructor(selector, tileSet, parent) {
     this._parent = parent;
     this.holder = select(selector);
     console.log(this.holder.node())
     this.canvas = select(this.holder.node().firstElementChild)
     console.log(this.canvas.node())
     this.tileSet = tileSet;
-    this.prefs = prefs;
+    this.prefs = parent.prefs;
     this.width = +this.canvas.attr("width");
     this.height = +this.canvas.attr("height");
   }
@@ -35,9 +35,6 @@ export class Renderer {
     return this
   }
 
-  update_prefs(prefs) {
-    Object.assign(this.prefs, prefs)
-  }
 
   *initialize() {
     // Asynchronously wait for the basic elements to be done.
@@ -49,7 +46,5 @@ export class Renderer {
 }
 
 export class CanvasRenderer extends Renderer {
-
-
 
 }

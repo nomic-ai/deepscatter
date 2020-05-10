@@ -15,7 +15,6 @@ export class ReglRenderer extends Renderer {
     super(selector, tileSet, prefs, parent)
     console.log("CANV", this.canvas, this.canvas.node())
     this.regl = wrapREGL(this.canvas.node());
-
     /* BOILERPLATE */
     let gl = this.canvas.node().getContext('webgl') || this.canvas.node().getContext('experimental-webgl');
     let bench = new GLBench(gl);
@@ -52,6 +51,21 @@ export class ReglRenderer extends Renderer {
 
   tick(force = false) {
 
+    /*
+    this.thresh = this.thresh || .1
+    this.thresh += 0.0005
+    if (this.thresh > 1) {this.thresh = 0.01}
+
+    const my_data = new Uint8Array(range(256).map(i =>{
+      const frac = i/255;
+      return (Math.abs(this.thresh - frac) < 0.1) ? 255 : 0
+    }))
+    this.alpha_map.subimage({
+      width: 1,
+      height: 256,
+      data: my_data
+    }, 0, 0)
+    */
     const { prefs } = this;
     const { regl, tileSet, canvas, width, height } = this;
     const { transform } = this.zoom;
@@ -101,19 +115,30 @@ export class ReglRenderer extends Renderer {
       if (this.seek_renderer(tile) == undefined) {
         continue
       }
+      this.set_full_image(tile, props.max_ix)
 
       n_visible += 1;
       if ((tile.min_ix) < (props.max_ix * prefs.label_threshold)) {
-        this._set_word_buffers(tile);
+        //
       }
       const this_props = {
         count: tile._regl_elements.count,
         data: tile._regl_elements.data,
-        visibility: tile._regl_elements.visibility
+        visibility: tile._regl_elements.visibility,
+        image_locations: tile._regl_elements.image_locations,
+        sprites: this.sprites
       }
       Object.assign(this_props, props)
       prop_list.push(this_props)
       //this._renderer(props);
+    }
+    //console.log(this)
+    //console.log(this._renderer)
+    if (this._renderer === undefined) {
+      if (this._zoom && this._zoom._timer) {
+        this._zoom._timer.stop()
+      }
+      return
     }
     this._renderer(prop_list)
   }
@@ -135,6 +160,76 @@ export class ReglRenderer extends Renderer {
       // It's underway, but there's nothing to do until it gets here.
       return undefined
     }
+  }
+
+  initialize_sprites(tile) {
+
+    const { regl }  = this;
+    tile._regl_elements.sprites = tile._regl_elements.sprites || this.sprites
+    tile._regl_elements.sprites.lookup = tile._regl_elements.sprites.lookup || {};
+    tile._regl_elements.sprites.current_position = tile._regl_elements.sprites.current_position || [0, 0]
+
+  }
+
+  set_full_image(tile, maxix) {
+    if (!tile._data[0].img_alpha) {
+      return
+    }
+    if (tile._image_set_until === undefined) {
+      tile._image_set_until = 0;
+    }
+    for (let i = tile._image_set_until; i < tile._data.length && i < maxix; i++) {
+      this.set_image_data(tile, i)
+      tile._image_set_until = i;
+    }
+
+  }
+
+  set_image_data(tile, ix) {
+    // Stores a *single* image onto the texture.
+    const { regl }  = this;
+
+    this.initialize_sprites(tile)
+
+    const { sprites, image_locations } = tile._regl_elements;
+    const { current_position } = sprites
+    if (current_position[1] > (4096 - 18*2)) {
+      console.error(`First spritesheet overflow on ${tile.key}`)
+      // Just move back to the beginning. Will cause all sorts of havoc.
+
+      sprites.current_position = [0, 0]
+      return
+    }
+//    if (sprites.lookup[ix]) {
+//      return sprites.lookup[ix]
+//    }
+
+    const image_alpha = tile._data[ix].img_alpha;
+    const image_width = tile._data[ix].img_width;
+    const alpha_array =
+       Uint8Array.from(atob(image_alpha), c => c.charCodeAt(0))
+
+    const image_height = alpha_array.length/image_width;
+
+
+    sprites.subimage({
+      width: image_width,
+      height: image_height,
+      data: alpha_array
+    }, current_position[0], current_position[1])
+
+    image_locations.subdata(
+        [current_position[0] * 4096 + current_position[1]
+        , image_width * 4096 + image_height]
+        , ix * 8
+    )
+
+    current_position[0] += 28;
+    if (current_position[0] > 4096 - 28) {
+      current_position[1] += 28
+      current_position[0] = 0
+    }
+
   }
 
   spritesheet_setter(word) {
@@ -171,98 +266,21 @@ export class ReglRenderer extends Renderer {
     }
     ctx.fillText(word, x, y);
     lookups.set(word, {x: x, y: y, width: w_})
-    ctx.strokeRect(x, y - font_size, width, font_size)
+    // ctx.strokeRect(x, y - font_size, width, font_size)
     x += w_
     ctx.position = [x, y]
     return lookups.get(word)
   }
 
-  _character_map(height=32) {
-    const n_grid = 16;
-
-    var offscreen = create("canvas")
-    .attr("height", 16 * height)
-    .attr("width", 16 * height)
-    .style("display", "none")
-
-    const c = offscreen.node().getContext('2d');
-
-    c.font = `${height - height/3}px Georgia`;
-
-    // Draw the first 255 characters. (Are there even any after 127?)
-    range(128).map(i =>
-      c.fillText(String.fromCharCode(i),
-      (height * (i % 16)),
-      Math.floor(i/16)*height - height/3
-    ))
-    c.font = `18px Georgia`;
-    c.fillText("This canvas should vanish; it is a character map being used for looking up sprite positions.", 20, height * 9)
-    c.fillText("All the white space between letters is currently being drawn, which is hella bad.", 20, height * 9.5)
-    c.fillText("Characters not found here should render as red circles.", 20, height * 10.0)
-    return c.getImageData(0, 0, 16 * height, 16 * height)
-  }
-
-  _set_word_buffers(tile) {
-
-    // hard coded at eight letters.
-    if (tile._regl_settings == undefined) {
-      tile._regl_settings = {}
-    }
-    const { prefs } = this;
-
-    if (tile._data == undefined) {
-      return
-    }
-
-    if (tile._regl_settings.flexbuff == `${prefs.label_field}-ASCII`) {
-      return
-    } else {
-      tile._regl_settings.flexbuff = `${prefs.label_field}-ASCII`
-    }
-
-    console.log(`Setting ${prefs.label_field} text buffers on ${tile.key}`)
-
-    const {offset, stride} = tile.__datatypes['flexbuff1']
-    let position = offset;
-    const wordbuffer = new Float32Array(4);
-    tile.charset = tile.parent ? new Set(tile.parent.charset) : new Set();
-    for (let datum of tile) {
-      for (let block of [0, 1, 2, 3]) {
-        let [one, two] = [0, 1].map(
-          i => datum[prefs.label_field].charCodeAt(i + block * 2)
-        )
-
-        tile.charset.add(String.fromCharCode(one));
-        tile.charset.add(String.fromCharCode(two));
-
-
-        if (one > 255) {
-          one = 127;
-        } else if (isNaN(one)) {
-          one = 8
-        }
-        if (two > 255) {
-          two = 127;
-        } else if (isNaN(two)) {
-          two = 8
-        }
-        wordbuffer[block] = two * 256 + one;
-      }
-      tile._regl_elements.data.subdata(
-        wordbuffer, position
-      )
-      position += stride;
-    }
-
-  }
 
   initialize_textures() {
     const { regl } = this;
-    const viridis = range(256)
-    .map(i => {
-      const p = rgb(interpolateViridis(i/255));
+
+    const viridis = range(256).map(i => {
+      const p = rgb(interpolateViridis(1 - i/255));
       return [p.r, p.g, p.b, p.opacity * 255]
-    })
+    });
+
     const niccoli_rainbow = range(256).map(i => {
       let p;
       if (i < 128) {
@@ -273,24 +291,32 @@ export class ReglRenderer extends Renderer {
       p = rgb(p);
       return [p.r, p.g, p.b, p.opacity * 255]
     })
-/*    this.character_texture = regl.texture({
-      shape: [4096, 4096]
-    })*/
+
+    this.alpha_map = regl
+      .texture({
+        width: 8,
+        height: 256,
+        type: 'uint8',
+        format: 'alpha',
+        data: new Uint8Array(Array(8*256).fill(255))
+      })
     this.color_scale = regl.texture([viridis])
-//    const char_textures = this._character_map(64)
-//    this.char_texture = regl.texture(char_textures);
+
     this.year = regl.texture({shape: [1024, 32] })
+
+
+    this.sprites = regl.texture({
+        width: 4096,
+        height: 4096,
+        format: 'alpha',
+        type: 'uint8',
+      })
+    //this.sprites.subimage({
+  //    width: 4096, height: 4096, data: new Array(4096*4096).fill(25)})
+
   }
 
-  make_char_buffer(tile, char_field) {
-    if (!tile._char_buffers) {
-      tile._char_buffers = {}
-    }
-    if (tile.char_buffers[char_field]) {
-      return tile.char_buffers[char_field]
-    }
 
-  }
 
   make_elements(points, datatypes) {
     const { regl } = this;
@@ -305,9 +331,9 @@ export class ReglRenderer extends Renderer {
         data: new Array(points.length).fill(0),
         type: 'float'
       }),
-      'texture_locations': regl.buffer({
+      'image_locations': regl.buffer({
         'usage': 'dynamic',
-        length: count * 4,
+        data: new Array(points.length * 2).fill(0),
         type: 'float'
       })
     }
@@ -315,6 +341,7 @@ export class ReglRenderer extends Renderer {
 
 
   }
+
 
   remake_renderer() {
     const datatypes = this.tileSet.__datatypes;
@@ -326,7 +353,7 @@ export class ReglRenderer extends Renderer {
     }
 
     const { regl, width, height, zoom, prefs } = this;
-
+    console.log(prefs)
     // This should be scoped somewhere to allow resizing.
     const [webgl_scale, untransform_matrix] =
     zoom.webgl_scale()
@@ -346,12 +373,24 @@ export class ReglRenderer extends Renderer {
                   },
           offset: 0,
           stride: 4
-         }
+        },
+        a_image_locations: {
+          buffer: regl.prop('image_locations'),
+          offset: 0,
+          stride: 8,
+        }
       },
 
       uniforms: {
         u_aspect_ratio: width/height,
+        u_sprites: function(context, props) {
+          return props.sprites
+        },
         u_colormap: this.color_scale,
+        u_alphamap: this.alpha_map,
+        u_alpha_domain: function(context, props) {
+          return props.prefs.alpha_domain
+        },
         u_color_domain: function(context, props) {
           // return props._scales.color.domain()
           console.log("DOMAIN", props.prefs.color_domain)
@@ -367,6 +406,8 @@ export class ReglRenderer extends Renderer {
             return 2
           } else if (props.prefs.jitter == "normal") {
             return 3
+          } else if (props.prefs.jitter == "circle") {
+            return 4
           } else {
             return 0
           }
@@ -403,25 +444,37 @@ export class ReglRenderer extends Renderer {
     }
 
 
-    for (let k of ['color', 'label']) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
+    for (let k of ['color', 'label',
+                   'jitter_radius', 'jitter_period', 'size',
+                    'alpha']) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
       let field;
+      let ship_to_buffer = false;
       if (k == 'label') {
         field = 'flexbuff1';
       } else {
         field = prefs[`${k}_field`];
-        const domain = prefs[`${k}_domain`]
-        parameters.uniforms["u_" + k + "_domain"] = domain;
+        const domain = prefs[`${k}_domain`] || [1, 1]
+        parameters.uniforms["u_" + k + "_domain"] = function (state, props) {
+          return this.prefs[`${k}_domain`] || [1, 1]
+        }
         // Copy the parameters from the data name.
       }
-      parameters.attributes["a_" + k] = Object.assign(
-        {},
-        datatypes[field]
-      );
+      if (field) {
+        parameters.attributes["a_" + k] = Object.assign(
+          {},
+          datatypes[field]
+        );
+      } else {
+        parameters.attributes["a_" + k] = Object.assign(
+          // Dummy use ix
+          {}, datatypes.ix
+        )
+      }
     }
 
     Object.entries(parameters.attributes).forEach(([k, v]) => {
       // Not defined in the tile data.
-      if (k == "a_visibility") {return}
+      if (k == "a_visibility" || k == "a_image_locations") {return}
       delete v.dtype
       v.buffer = function(context, props) {
         return props.data

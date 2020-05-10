@@ -12,7 +12,7 @@ export class Mouseover {
       const closest = zoom.tileSet.find_closest(
         [x_.invert(event.x),
          y_.invert(event.y)
-        ])
+       ])
     })
   }
 }
@@ -47,7 +47,6 @@ export default class Zoom {
     renderer.zoom.initialize_zoom()
     return this;
   }
-
   zoom_to(k, x, y, duration = 4000) {
 
     const scales = this.scales()
@@ -64,6 +63,30 @@ export default class Zoom {
       .call(zoomer.transform, t);
 
   }
+
+  zoom_to_bbox(corners, duration = 4000) {
+
+    // Zooms to two points.
+    const scales = this.scales();
+    const [x0, x1] = corners.x.map(scales.x)
+    const [y0, y1] = corners.y.map(scales.y)
+
+    console.log(x0, y0, x1, y1)
+    const { canvas, zoomer, width, height } = this;
+
+    const t = zoomIdentity
+        .translate(width / 2, height / 2)
+        .scale(0.9 / Math.max((x1 - x0) / width, (y1 - y0) / height))
+        .translate(-(x0 + x1) / 2, -(y0 + y1) / 2)
+
+    canvas
+      .transition()
+      .duration(duration)
+      .call(zoomer.transform, t);
+
+  }
+
+
 
   initialize_zoom() {
 
@@ -273,6 +296,7 @@ export default class Zoom {
     }
 
     for (let renderer of this.renderers.values()) {
+
       renderer.tick()
     }
   }

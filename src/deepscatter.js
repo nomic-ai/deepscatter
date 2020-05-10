@@ -28,15 +28,16 @@ const base_elements = [
 
 export default class Scatterplot {
 
-  constructor(prefs) {
+  constructor(selector, width, height) {
+    console.warn("INITIALIZING")
 
-    const { source_url, selector } = prefs;
+    this.width = width
+    this.height = height
 
     this.div = select(selector);
 
     this.elements = []
     this.filters = new Map();
-
 
 
     for (const d of base_elements) {
@@ -52,27 +53,31 @@ export default class Scatterplot {
      container
        .append(d.nodetype)
        .attr("id", d.id)
-       .attr("width", prefs.width || window.innerWidth)
-       .attr("height", prefs.height || window.innerHeight)
+       .attr("width", width || window.innerWidth)
+       .attr("height", height || window.innerHeight)
 
       this.elements.push(container)
     }
+  }
 
-    this._root = new Tile(source_url);
+  reinitialize() {
+
+    const { prefs } = this;
+
+    this._root = new Tile(this.source_url);
 
     console.log("Making Renderer", this)
 
     this._renderer = new ReglRenderer(
       "#container-for-webgl-canvas",
       this._root,
-      prefs,
-      this
+      this,
+      {width: this.width, height: this.height}
+
     );
 
-
-
     console.log("Made renderer")
-    this._zoom = new Zoom("#webgl-canvas", prefs);
+    this._zoom = new Zoom("#webgl-canvas", this.prefs);
 
     this._zoom.attach_tiles(this._root);
     this._zoom.attach_renderer("regl", this._renderer);
@@ -83,6 +88,10 @@ export default class Scatterplot {
 
     ctx.fillStyle = "rgba(25, 25, 29, 1)"
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
+
+    this._renderer.initialize()
+
+    return this._root.promise
   }
 
   drawBackgroundMap(url) {
@@ -142,13 +151,26 @@ export default class Scatterplot {
 
   }
 
-  initialize() {
-    console.log("Initializing renderer")
-    this._renderer.initialize()
-    console.log("Initialized renderer")
+  update_prefs(prefs) {
+    if (this.prefs === undefined) {
+      this.prefs = {}
+    }
+
+    Object.assign(this.prefs, prefs)
   }
 
-  plotAPI(prefs) {
+  plotAPI(prefs = {}) {
+
+    this.update_prefs(prefs);
+    /*
+    if (!this._root) {
+      return this.reinitialize().then(this.plotAPI(prefs))
+    } */
+
+    if (prefs['source_url'] && prefs.source_url !== this.source_url) {
+      this.source_url = prefs.source_url
+      this.reinitialize()
+    }
 
     if (prefs.filters) {
       this.filters.clear()
@@ -156,16 +178,21 @@ export default class Scatterplot {
         this.filters.set(filter_string, Function("datum", filter_string))
       }
     }
+
     if (prefs.basemap_geojson) {
       this._zoom.renderers.set("basemap", {
         tick: () => {this.drawBackgroundMap(prefs.basemap_geojson)}
       })
-
     }
-    this._root.promise.then(d => {
-      this._renderer.update_prefs(prefs)
+
+    return this._root.promise.then(d => {
+      this.update_prefs(prefs)
+      if (prefs.zoom) {
+        this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration)
+      }
       this._zoom.restart_timer(500000)
     })
+
   }
 
 }
