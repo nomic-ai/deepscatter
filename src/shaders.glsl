@@ -193,7 +193,9 @@ vec4 scaleLinear(in float x) {
 
 highp float ix_to_random(in float ix, in float seed)
 {
-    vec2 co = vec2(ix, seed);
+    // For high numbers, taking the log avoids coincidence.
+    highp float seed2 = log(ix) + 1.;
+    vec2 co = vec2(seed2, seed);
     highp float a = 12.9898;
     highp float b = 78.233;
     highp float c = 43758.5453;
@@ -332,7 +334,21 @@ else {
         gl_Position = vec4(pos2d + jitter.xyz * point_size_adjust, 1.);
       }
 
-    fill = scaleLinear(a_color);
+      float fractional_color = linstep(u_color_domain, a_color);
+
+      float stagger_speed = ix_to_random(a_color, 3.);
+      float time_period = 20. * exp(stagger_speed);
+
+      // Adjust that time by raising to a power to set the speed along the curve.
+      // Not sure if this is the soundest way to parametrize.
+      float relative_time = mod(u_time / time_period, time_period);
+
+      float fractional = fract(fractional_color + relative_time);
+
+      fill = texture2D(u_colormap,
+      vec2(
+        1.0 - fractional, 0.5));
+
     pic_mode = u_render_text_min_ix - ix;
     if (pic_mode > 0.0) {
 

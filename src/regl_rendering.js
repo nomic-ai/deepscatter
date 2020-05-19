@@ -1,6 +1,6 @@
 import wrapREGL from 'regl';
 import { select, create } from 'd3-selection';
-import { range, sum } from 'd3-array';
+import { range, sum, shuffle } from 'd3-array';
 import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
 import { Zoom } from './interaction.js';
@@ -8,16 +8,23 @@ import { vertex_shader, frag_shader } from './shaders.glsl';
 import { Renderer } from './rendering.js';
 import GLBench from 'gl-bench/dist/gl-bench';
 
+let tiles_allocated = 0;
 
 export class ReglRenderer extends Renderer {
 
   constructor(selector, tileSet, prefs, parent) {
     super(selector, tileSet, prefs, parent)
-    console.log("CANV", this.canvas, this.canvas.node())
     this.regl = wrapREGL(this.canvas.node());
     /* BOILERPLATE */
     let gl = this.canvas.node().getContext('webgl') || this.canvas.node().getContext('experimental-webgl');
-    let bench = new GLBench(gl);
+    let bench = new GLBench(gl, {
+      // css: 'position:absolute;top:120;',
+      withoutUI: false,
+      trackGPU: false,      // don't track GPU load by default
+      chartHz: 20,          // chart update speed
+      chartLen: 20,
+    }
+    );
     function draw(now) {
       bench.begin('Drawing speed');
       // some bottleneck
@@ -66,6 +73,7 @@ export class ReglRenderer extends Renderer {
       data: my_data
     }, 0, 0)
     */
+
     const { prefs } = this;
     const { regl, tileSet, canvas, width, height } = this;
     const { transform } = this.zoom;
@@ -82,7 +90,8 @@ export class ReglRenderer extends Renderer {
       time: (Date.now() - this.zoom._start)/1000,
       render_label_threshold: prefs.max_points * k * prefs.label_threshold,
       string_index: 0,
-      prefs: prefs
+      prefs: prefs,
+      colormap: this.niccoli_rainbow//viridis256
     }
 
 
@@ -129,8 +138,8 @@ export class ReglRenderer extends Renderer {
         sprites: this.sprites
       }
       Object.assign(this_props, props)
-      prop_list.push(this_props)
-      //this._renderer(props);
+      //prop_list.push(this_props)
+      this._renderer(this_props);
     }
     //console.log(this)
     //console.log(this._renderer)
@@ -147,14 +156,26 @@ export class ReglRenderer extends Renderer {
     // returns a renderer if one exists, else it
     // starts the process of binding one to the tile
     // and returns undefined
+
+
     if (tile._regl_elements && !force) {
       return tile._regl_elements
     } else {
+
+      // DEBOUNCING
+      this.last_renderer_build_time = this.last_renderer_build_time || 0;
+      let BUFFER_THROTTLE = 1/50 * 1000;
+      if (Date.now() - this.last_renderer_build_time < BUFFER_THROTTLE) {
+        return
+      }
+      this.last_renderer_build_time = Date.now()
+
       if (!tile.underway_promises.has(!"regl")) {
         tile.underway_promises.add("regl")
         Promise.all([tile.buffer(), tile.dataTypes()])
         .then(([buffer, datatypes]) => {
           tile._regl_elements = this.make_elements(buffer, datatypes);
+          delete tile._buffer
         })
       }
       // It's underway, but there's nothing to do until it gets here.
@@ -172,6 +193,7 @@ export class ReglRenderer extends Renderer {
   }
 
   set_full_image(tile, maxix) {
+    return
     if (!tile._data[0].img_alpha) {
       return
     }
@@ -281,16 +303,18 @@ export class ReglRenderer extends Renderer {
       return [p.r, p.g, p.b, p.opacity * 255]
     });
 
-    const niccoli_rainbow = range(256).map(i => {
+    const niccoli_rainbow = range(1024).map(i => {
       let p;
-      if (i < 128) {
-        p = interpolateWarm(i/127)
+      if (i < 512) {
+        p = interpolateWarm(i/511)
       } else {
-        p = interpolateCool((i - 128)/127)
+        p = interpolateCool((512 - (i - 512))/511)
       }
       p = rgb(p);
       return [p.r, p.g, p.b, p.opacity * 255]
     })
+
+    const shufbow = shuffle([...niccoli_rainbow])
 
     this.alpha_map = regl
       .texture({
@@ -300,7 +324,10 @@ export class ReglRenderer extends Renderer {
         format: 'alpha',
         data: new Uint8Array(Array(8*256).fill(255))
       })
-    this.color_scale = regl.texture([viridis])
+
+    this.viridis256 = regl.texture([viridis])
+    this.niccoli_rainbow = regl.texture([niccoli_rainbow])
+    this.shufbow = regl.texture([shufbow])
 
     this.year = regl.texture({shape: [1024, 32] })
 
@@ -316,13 +343,13 @@ export class ReglRenderer extends Renderer {
 
   }
 
-
-
   make_elements(points, datatypes) {
+//    console.log(`building buffer for tile ${tiles_allocated++}`)
     const { regl } = this;
     // -1 because we store 'position', 'x', and 'y';
     const count = points.length /
                   (Object.entries(datatypes).length - 1);
+
     const elements = {
       'count': count,
       'data': regl.buffer(points),
@@ -353,7 +380,6 @@ export class ReglRenderer extends Renderer {
     }
 
     const { regl, width, height, zoom, prefs } = this;
-    console.log(prefs)
     // This should be scoped somewhere to allow resizing.
     const [webgl_scale, untransform_matrix] =
     zoom.webgl_scale()
@@ -386,16 +412,18 @@ export class ReglRenderer extends Renderer {
         u_sprites: function(context, props) {
           return props.sprites
         },
-        u_colormap: this.color_scale,
+        u_colormap: function(context, props) {
+          return props.colormap
+        },
         u_alphamap: this.alpha_map,
         u_alpha_domain: function(context, props) {
           return props.prefs.alpha_domain
         },
-        u_color_domain: function(context, props) {
+          /* u_color_domain: function(context, props) {
           // return props._scales.color.domain()
           console.log("DOMAIN", props.prefs.color_domain)
           return props.prefs.color_domain
-        },
+        },*/
         u_render_text_min_ix: function(context, props) {
           return props.render_label_threshold
         },
@@ -440,47 +468,43 @@ export class ReglRenderer extends Renderer {
     }
 
     for (let k of ['position', 'ix']) {
-      parameters.attributes[k] = Object.assign({}, datatypes[k])
+      parameters.attributes[k] = function(state, props) {
+        return {
+          buffer: props.data,
+          offset: datatypes[k].offset,
+          stride: datatypes[k].stride
+        }
+      }
     }
 
 
     for (let k of ['color', 'label',
                    'jitter_radius', 'jitter_period', 'size',
                     'alpha']) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
-      let field;
-      let ship_to_buffer = false;
-      if (k == 'label') {
-        field = 'flexbuff1';
-      } else {
-        field = prefs[`${k}_field`];
-        const domain = prefs[`${k}_domain`] || [1, 1]
-        parameters.uniforms["u_" + k + "_domain"] = function (state, props) {
-          return this.prefs[`${k}_domain`] || [1, 1]
+
+      parameters.uniforms["u_" + k + "_domain"] = function (state, props) {
+        if (k === 'color' && props.colormap._texture.width == 1024) {
+          // 1024 dimensional textures are used only for categorical data.
+          // (This is a convention--remember it!)
+          // If so, the domain needs to align precisely.
+          return [0, 1023]
         }
-        // Copy the parameters from the data name.
+        return this.prefs[`${k}_domain`] || [1, 1]
       }
-      if (field) {
-        parameters.attributes["a_" + k] = Object.assign(
-          {},
-          datatypes[field]
-        );
-      } else {
-        parameters.attributes["a_" + k] = Object.assign(
-          // Dummy use ix
-          {}, datatypes.ix
-        )
+      // Copy the parameters from the data name.
+
+      parameters.attributes[`a_${k}`] = function(state, props) {
+        return {
+          buffer : props.data,
+          offset :
+            // console.log(`${k}_field`, props.prefs[`${k}_field`])
+            props.prefs[`${k}_field`] ? datatypes[props.prefs[`${k}_field`]].offset : datatypes['ix'].offset,
+          stride :
+            props.prefs[`${k}_field`] ? datatypes[props.prefs[`${k}_field`]].stride : datatypes['ix'].stride
+
+        }
       }
     }
-
-    Object.entries(parameters.attributes).forEach(([k, v]) => {
-      // Not defined in the tile data.
-      if (k == "a_visibility" || k == "a_image_locations") {return}
-      delete v.dtype
-      v.buffer = function(context, props) {
-        return props.data
-      }
-    })
-
     this._renderer = regl(parameters)
     return this._renderer
   }

@@ -4,9 +4,14 @@ import { scaleLinear } from 'd3-scale';
 import stringHash from 'string-hash';
 import {contourDensity} from 'd3-contour';
 import {geoPath} from 'd3-geo';
+import {extent, range} from 'd3-array';
 // Shouldn't be here, just while contours are.
 import {select} from 'd3-selection';
 import 'regenerator-runtime/runtime'
+import { Table, Dictionary, Vector, Utf8, Int32 } from 'apache-arrow';
+// import  Quad  from 'd3-quadtree/src/quad.js'
+import ArrowTree from './ArrowTree'
+
 
 export default class Tile {
 
@@ -22,6 +27,12 @@ export default class Tile {
     this.codes = this.key.split("/").map(t => parseInt(t))
     this.min_ix = undefined;
     this.max_ix = undefined;
+
+    if (this.parent !== undefined) {
+      this.keylist = this.parent.keylist
+    } else {
+      this.keylist = {}
+    }
 
     this.corners = {
       x: [Infinity, -Infinity],
@@ -126,6 +137,36 @@ export default class Tile {
         return this._description
       }
     }
+  }
+
+  mutate(fieldname, type) {
+    const func = function(row) {
+      return row.lc1 ? row.lc1.slice(0, 1) : ""
+    }
+
+    let output = Array(this._data.length);
+    {
+      // assume it's a function.
+      let i = 0;
+      for (let row of this._data) {
+        output[i] = func(row)
+        i++;
+      }
+    }
+    const vector = Vector.from({
+      values: output,
+      type: new Dictionary(new Utf8(), new Int32()),
+      highWaterMark: Infinity
+    })
+
+    // Make output into an Arrow Vector.
+    const names =   [...this.table.schema.fields.map(d => d.name), fieldname]
+    vector.type.id = names.length
+    this.table = Table.new(
+      [...this.table.data.childData, vector.data],
+      names
+    )
+    return this.table
   }
 
   map(callback, after = false) {
@@ -235,6 +276,8 @@ export default class Tile {
 
   *points() {
 
+
+
     for (let p of this) {
       yield p
     }
@@ -242,7 +285,7 @@ export default class Tile {
 
     if (this._children) {
       let children = this._children
-        .filter(d=>d)
+        .filter(d =>  d._data)
         .map(tile => {
           const f = {
             t: tile,
@@ -250,10 +293,7 @@ export default class Tile {
           }
           f.next = f.iterator.next()
           return f
-        }).filter(
-          d => d._data
-        )
-
+        })
       children.sort((a,b) => a.next.value.ix - b.next.value.ix)
 
       if (children) {
@@ -272,7 +312,6 @@ export default class Tile {
 
   forEach(callback) {
     for (let p of this.points()) {
-      // console.log(p)
       if (p === undefined) {
         continue
       }
@@ -387,34 +426,50 @@ export default class Tile {
         )
     }
   }
+
+  kdtree() {
+    if (this._kdtree) {
+      return this._kdtree
+    }
+    if (this._data == undefined) {
+      return undefined
+    }
+    this._kdtree = new ArrowTree(this._data, "x", "y")
+    return this._kdtree
+  }
+
   _download() {
     // This should only be called once per tile.
-    const url = `${this.url}/tiles/${this.key}.csv`
+    const url = `${this.url}/tiles/${this.key}.arrow`
     this.promise =
       this.description()
-      .then(() => d3Csv(url))
-      .then(d => {
-        d.forEach(e => {
-          e._position = [
-            +e.x,
-            +e.y
-          ],
-          e.ix = +e.ix
-        })
-
-        // Store a little info on the object.
-        this.min_ix = d[0].ix
-        this.max_ix = d[d.length-1].ix
-
-        this._quadtree = quadtree(d, d => d._position[0], d => d._position[1])
-        this._data = d
-        return this._data
+      .then(() => fetch(url))
+      .then(resp => resp.arrayBuffer())
+      .then(response => {
+        return Table.from([new Uint8Array(response)])
       })
-      .catch(err => {
+      .then(d => {
+        this._data = d
+        if (this._data.length == 0) {
+          return undefined
+        }
+        // Store a little info on the object.
+        this.min_ix = d.getColumn("ix").get(0)
+        this.max_ix = d.getColumn("ix").get(d.length - 1)
+
+        // The "table" object may be mutated.
+        this.table = this._data
+
+        return this._data
+
+
+      })
+/*      .catch(err => {
+        console.warning(err)
         this.min_ix = Infinity;
         this.max_ix = -Infinity;
-        return Promise.resolve([])
-      })
+//        return Promise.resolve([])
+}) */
   }
 
   buffer() {
@@ -433,30 +488,79 @@ export default class Tile {
         // and over-allocate 4 floats for characters, etc.
         const n_col = (columns.length - 1);
         const buffer = new Float32Array(n_col * datalist.length);
+        let offset = -1;
 
-        let offset = 0;
-        for (let d of datalist) {
-          this.parse_datum(d, datatypes, buffer, offset);
-          offset += n_col;
+        for (let column of columns) {
+          // Just an alias for x, y--not passed separately
+          if (column == "position") continue
+          offset += 1;
+
+
+
+          const c = this._data.getColumn(column)
+          let row = 0;
+
+          let reverse_lookup = undefined
+
+
+          if (c.dictionary) {
+            reverse_lookup = []
+            const keys = c.dictionary.toArray()
+
+
+            if (this.keylist[column] === undefined) {
+              this.keylist[column] = new Map()
+            }
+
+            let i = 0;
+            for (let k of keys) {
+              if (!this.keylist[column].has(k)) {
+                this.keylist[column].set(k, this.keylist[column].size)
+              }
+              reverse_lookup[i++] = this.keylist[column].get(k)
+            }
+            for (let val of c.data.values) {
+              buffer[offset + row * n_col] = reverse_lookup[val]
+              row += 1;
+            }
+          } else {
+            for (let val of c.data.values) {
+              buffer[offset + row * n_col] = val;
+              row += 1;
+            }
+          }
         }
         this._buffer = buffer
         return buffer
       })
   }
 
-  find_closest(p) {
-    let dist = Infinity;
+  find_closest(p, dist = Infinity, filter) {
+    let my_dist = dist;
     let candidate = undefined;
+    const DEBOUNCE = 1/60 * 1000;
+    this._last_kdbuild_time = this._last_kdbuild_time || 0;
+
+
     this.visit(tile => {
-      if (tile._quadtree) { // may not have loaded yet.
-        const closest = tile._quadtree.find(p[0], p[1], dist)
+      // Don't visit tiles too far away.
+      if (corner_distance(tile.corners, p[0], p[1]) > my_dist) {
+        return
+      }
+      if (tile._data && !tile._kdtree) {
+        // Spawn trees on all tiles
+        tile.kdtree()
+      }
+      if (tile._kdtree) { // may not have loaded yet.
+        const closest = tile._kdtree.find(p[0], p[1], my_dist, filter);
         if (closest) {
-          const d = Math.sqrt((closest._position[0] - p[0])**2 + (closest._position[1] - p[1])**2)
+          const d = Math.sqrt((closest.x - p[0])**2 + (closest.y - p[1])**2)
           candidate = closest;
-          dist = d;
+          my_dist = d;
         }
       }
     })
+
     return candidate;
   }
 
@@ -471,82 +575,57 @@ export default class Tile {
     if (this.parent) {
       return this.parent.dataTypes().then( d => {this.__datatypes = d; return d})
     }
+
     if (this._datatypes) {
       return this._datatypes
     }
+
     this._datatypes = Promise.all([this.description(), this.promise])
       .then(
         ([description, datalist]) => {
           let { fields } = description
           fields = [...fields]
-          fields.push("flexbuff1")
-          fields.push("flexbuff2")
-          fields.push("flexbuff3")
-          fields.push("flexbuff4")
-
-          const first_elems = new Map()
-
-          fields
-            .forEach(field_name => first_elems.set(field_name, new Set()))
-
-          datalist.forEach(datum => {
-            Object.keys(datum).forEach(
-              k => {
-                if (first_elems.has(k)) {
-                  first_elems.get(k).add(datum[k])
-                }
-              }
-            )
-          })
 
           // Initialize the attributes field that
           // we share with regl.
 
           const attributes = {}
-
+          const attr_list = []
           // store position as a vec2.
 
           // Note that x and y are also registered *separately*.
           // I don't think there's any major cost to this, but who knows.
 
-          fields.forEach((k, i) => {
+          let offset = 0;
 
-            const v = first_elems.get(k);
-
-            attributes[k] = {
-              offset: i * 4,
-              stride: fields.length * 4
+          for (let field of this._data.schema.fields) {
+            const { name, type, nullable} = field
+            if (type && type.typeId == 5) {
+              // character
+              continue
             }
-
-            if (k.startsWith("flexbuff")) {
-              attributes[k].dtype = "float";
-              return
+            attributes[name] = {
+              offset: offset * 4,
+              // Everything is packed as a float.
+              dtype: 'float',
+              name: name
             }
-
-            const n_floats = [...v.values()]
-              .filter(v => v != "")
-              .map(parseFloat)
-              .filter(d => d)
-              .length
-
-            if (n_floats/v.size > .5) {
-              attributes[k].dtype = "float";
-              return
-            }
-
-            if (v.size <= 32) {
-              attributes[k].dtype = "categorical"
-              return
-            }
-
-            attributes[k].dtype = "unknown";
-          })
+            attr_list.push(attributes[name])
+            offset++;
+          }
 
           attributes['position'] = {
-            stride: fields.length * 4,
             offset: attributes['x']['offset'],
-            dtype: "vec2"
+            dtype: "vec2",
+            name: "position",
           }
+
+          attr_list.push(attributes['position'])
+
+          // Whatever number we've come up with is the stride.
+          attr_list.forEach(attr => {
+            attr.stride = (attr_list.length - 1) * 4
+          })
 
           if (attributes.x.offset != (attributes.y.offset - 4)) {
             console.error("PLOTTING IS BROKEN BECAUSE X AND Y ARE NOT IN ORDER")
@@ -560,8 +639,52 @@ export default class Tile {
     return this._datatypes
   }
 
+  *yielder() {
+
+    /*const batch_size = 1000;
+    const field_names = this.table.schema.fields.map(d => d.name)
+    const yieldable = new Object()
+    for (let field_name of field_names) {
+      yieldable[field_name] = undefined
+    }
+
+    let start_ix = 0;
+    while (start_ix < this.table.length) {
+      const buffer = {}
+      for (let col of range(field_names.length)) {
+        buffer[field_names[col]] = this.table.getColumnAt(col).slice(start_ix, start_ix + batch_size).toArray()
+      }
+      for (let i of range(buffer.ix.length)) {
+        for (let j of range(field_names.length)) {
+          yieldable[field_names[j]] = buffer[field_names[j]][i]
+        }
+        yield yieldable
+      }
+      start_ix
+    }
+    map._root._data.getColumnAt(3).toArray()
+    */
+    for (let row of this._data) {
+      if (row) {
+        yield row
+      }
+    }
+
+  }
+
+  nth(n) {
+    // get the nth row. This is probably possible,
+    // but the docs on arrow are so lousy...
+    return this._data.get(n)
+  }
+
+  [Symbol.iterator]() {
+    return this.yielder()
+  }
+/*
   [Symbol.iterator]() {
      let i = 0;
+
      return {
        next: () => {
          if (this._data && i < this._data.length) {
@@ -572,30 +695,128 @@ export default class Tile {
        }
      }
   }
+*/
 
-  parse_datum(datum, datatypes, buffer, offset) {
-    // Optionally can write *in place* to an array buffer
-    // at an offset described by offset. This is strongly preferred.
-    // If not, it will simply write to a new js array.
+}
+/*
+quadtree.prototype.add_arrow = function(tile, xkey = "x", ykey = "y") {
 
-    const out = buffer || new Array(datatypes.length);
-    let ix = offset || 0;
-    for (const [k, description] of Object.entries(datatypes)) {
+    // Compute the points and their extent.
+  const xz = tile._data.getColumn(xkey).data.values
+  const yz = tile._data.getColumn(ykey).data.values
 
-      if (k == 'position') {
-        continue
-      }  else if (k.startsWith("flexbuff")) {
-        out[ix] = 0
-      } else if (description.dtype == 'float') {
-        out[ix] = +datum[k];
-      } else {
-        // Set to an integer hash.
-        out[ix] = stringHash(datum[k]);
-      }
-      ix += 1
-    }
+  const [x0, x1] = extent(xz)
+  const [y0, y1] = extent(yz)
 
 
-    return out
+  // If there were no (valid) points, abort.
+  if (x0 > x1 || y0 > y1) return this;
+
+  // Expand the tree to cover the new points.
+  this.cover(x0, y0).cover(x1, y1);
+
+  // Add the new points.
+  // To fix--using the exposed add function
+  // uselessly tries to cover the quadtree each time.
+  // Better to import https://github.com/d3/d3-quadtree/blob/9804ee5307efa3822097b3e49de8061555dfe792/src/add.js#L7-L34
+  for (let i = 0; i < xz.length; ++i) {
+    this.add({x: xz[i], y: yz[i], i: i, parent: tile});
   }
+
+  return this;
+}
+*/
+
+/*
+//D3-quadtree needs numbered accessors.
+quadtree.prototype.find2 = function(x, y, radius, filter) {
+  var data,
+      x0 = this._x0,
+      y0 = this._y0,
+      x1,
+      y1,
+      x2,
+      y2,
+      x3 = this._x1,
+      y3 = this._y1,
+      quads = [],
+      node = this._root,
+      q,
+      i;
+
+  if (node) quads.push(new Quad(node, x0, y0, x3, y3));
+  if (radius == null) radius = Infinity;
+  else {
+    x0 = x - radius, y0 = y - radius;
+    x3 = x + radius, y3 = y + radius;
+    radius *= radius;
+  }
+
+  while (q = quads.pop()) {
+
+    // Stop searching if this quadrant can’t contain a closer node.
+    if (!(node = q.node)
+        || (x1 = q.x0) > x3
+        || (y1 = q.y0) > y3
+        || (x2 = q.x1) < x0
+        || (y2 = q.y1) < y0) continue;
+
+    // Bisect the current quadrant.
+    if (node.length) {
+      var xm = (x1 + x2) / 2,
+          ym = (y1 + y2) / 2;
+
+      quads.push(
+        new Quad(node[3], xm, ym, x2, y2),
+        new Quad(node[2], x1, ym, xm, y2),
+        new Quad(node[1], xm, y1, x2, ym),
+        new Quad(node[0], x1, y1, xm, ym)
+      );
+
+      // Visit the closest quadrant first.
+      if (i = (y >= ym) << 1 | (x >= xm)) {
+        q = quads[quads.length - 1];
+        quads[quads.length - 1] = quads[quads.length - 1 - i];
+        quads[quads.length - 1 - i] = q;
+      }
+    }
+    else {
+      // Visit this point. (Visiting coincident points is necessary.
+      if (node) { // Are there points?
+        var dx = x - +this._x.call(null, node.data),
+            dy = y - +this._y.call(null, node.data),
+            d2 = dx * dx + dy * dy;
+        if (d2 < radius) {
+          if (filter) {
+            // Run the filter function on
+            // all coincident points.
+
+            while (true) {
+              if (filter(node.data)) {
+                continue
+              } else {
+                node = node.next
+                if (node === undefined) {continue}
+              }
+            }
+            if (node === undefined) {continue}
+          }
+          var d = Math.sqrt(radius = d2);
+          x0 = x - d, y0 = y - d;
+          x3 = x + d, y3 = y + d;
+          data = node.data;
+        }
+      }
+    }
+  }
+
+  return data;
+}
+*/
+
+function corner_distance(corners, x, y) {
+  //https://stackoverflow.com/questions/5254838/calculating-distance-between-a-point-and-a-rectangular-box-nearest-point
+  var dx = Math.max(corners.x[0] - x, 0, x - corners.x[1]);
+  var dy = Math.max(corners.y[0] - y, 0, y - corners.y[1]);
+  return Math.sqrt(dx*dx + dy*dy);
 }

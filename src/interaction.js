@@ -4,7 +4,7 @@ import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
 import { mean, range, min, extent } from 'd3-array';
 import { scaleLinear } from 'd3-scale';
 
-export class Mouseover {
+/*export class Mouseover {
   // Easiest just to inherit from zoom.
   constructor(zoom) {
     zoom.canvas.on("mouseover", () => {
@@ -15,7 +15,7 @@ export class Mouseover {
        ])
     })
   }
-}
+}*/
 
 export default class Zoom {
 
@@ -47,6 +47,7 @@ export default class Zoom {
     renderer.zoom.initialize_zoom()
     return this;
   }
+
   zoom_to(k, x, y, duration = 4000) {
 
     const scales = this.scales()
@@ -126,14 +127,28 @@ export default class Zoom {
     .attr("r", 3)
     .style("fill", "pink")
     tel.append("text")
+    let last_fired = 0;
 
     this.canvas.on("mousemove", () => {
-      const {x_, y_} = this.scales()
+      if (Date.now() - last_fired < 50) {
+        return
+      }
+      last_fired = Date.now()
+
+      const {x_, y_} = this.scales() || {}
+
+      // Might happen before the data is loaded.
+      if (x_ === undefined) {return}
       const closest = this.tileSet.find_closest(
         [x_.invert(event.x),
          y_.invert(event.y)
-        ])
-
+       ],
+       undefined
+/*       function(node) {
+          return true
+       } */
+     );
+      if (closest == undefined) {return}
       tel
       .attr("transform", `translate(
         ${x_(closest.x)},
@@ -141,7 +156,6 @@ export default class Zoom {
       )`)
         .select("text")
         .text(closest[this.prefs.label_field])
-
         .style("font-size", "18px")
         .style("fill", "white")
 

@@ -175,7 +175,16 @@ export default class Scatterplot {
     if (prefs.filters) {
       this.filters.clear()
       for (let filter_string of prefs.filters) {
-        this.filters.set(filter_string, Function("datum", filter_string))
+        const raw_filter = Function("datum", filter_string)
+        this.filters.set(filter_string, function(datum) {
+          // Wrap the filter in a catch because arrow types
+          // can be weird; for instance, string.match(/foo/)
+          // might fail on a null value.
+          try {return raw_filter(datum)}
+          catch(err) {
+            return false
+          }
+        })
       }
     }
 
@@ -190,7 +199,7 @@ export default class Scatterplot {
       if (prefs.zoom) {
         this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration)
       }
-      this._zoom.restart_timer(500000)
+      this._zoom.restart_timer(60000)
     })
 
   }
