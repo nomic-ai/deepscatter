@@ -82,18 +82,24 @@ export class ReglRenderer extends Renderer {
 
     this.tick_num = this.tick_num || 0;
     this.tick_num++;
-
+    let color_type;
+    if (this.tileSet.table) {
+      color_type = this.tileSet.table.schema.fields.filter(
+        d => d.name == [map.prefs.color_field])[0].type.isOrdered === undefined ?
+        "linear": "categorical"
+    } else {
+      return
+    }
     const props = {
-      size: prefs.point_size || 7,
+      size: prefs.point_size || 3,
       transform: transform,
       max_ix: prefs.max_points * k,
       time: (Date.now() - this.zoom._start)/1000,
       render_label_threshold: prefs.max_points * k * prefs.label_threshold,
       string_index: 0,
       prefs: prefs,
-      colormap: this.niccoli_rainbow//viridis256
+      color_type: color_type
     }
-
 
     tileSet.download_to_depth(props.max_ix, this.zoom.current_corners())
 
@@ -406,24 +412,22 @@ export class ReglRenderer extends Renderer {
           stride: 8,
         }
       },
-
       uniforms: {
         u_aspect_ratio: width/height,
         u_sprites: function(context, props) {
           return props.sprites
         },
         u_colormap: function(context, props) {
-          return props.colormap
+          if (props.color_type == "categorical") {
+            return this.shufbow
+          } else {
+            return this.viridis256
+          }
         },
         u_alphamap: this.alpha_map,
         u_alpha_domain: function(context, props) {
           return props.prefs.alpha_domain
         },
-          /* u_color_domain: function(context, props) {
-          // return props._scales.color.domain()
-          console.log("DOMAIN", props.prefs.color_domain)
-          return props.prefs.color_domain
-        },*/
         u_render_text_min_ix: function(context, props) {
           return props.render_label_threshold
         },
@@ -460,7 +464,6 @@ export class ReglRenderer extends Renderer {
             [0, props.transform.k, props.transform.y],
             [0, 0, 1],
           ].flat()
-
           return zoom_matrix;
         },
         u_size: regl.prop('size')
@@ -478,30 +481,28 @@ export class ReglRenderer extends Renderer {
     }
 
 
-    for (let k of ['color', 'label',
-                   'jitter_radius', 'jitter_period', 'size',
-                    'alpha']) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
-
+    for (let k of ['color', 'label', 'jitter_radius',
+                   'jitter_period', 'size', 'alpha',
+                 ]) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
       parameters.uniforms["u_" + k + "_domain"] = function (state, props) {
-        if (k === 'color' && props.colormap._texture.width == 1024) {
+        if (k === 'color' && props.color_type == "categorical") {
           // 1024 dimensional textures are used only for categorical data.
           // (This is a convention--remember it!)
           // If so, the domain needs to align precisely.
           return [0, 1023]
         }
-        return this.prefs[`${k}_domain`] || [1, 1]
+        return this.prefs[`${k}_domain`] || [.1, .1]
       }
-      // Copy the parameters from the data name.
 
+      // Copy the parameters from the data name.
       parameters.attributes[`a_${k}`] = function(state, props) {
+        if (props.prefs[`${k}_field`] === undefined) {return {constant: 1}}
         return {
           buffer : props.data,
           offset :
-            // console.log(`${k}_field`, props.prefs[`${k}_field`])
-            props.prefs[`${k}_field`] ? datatypes[props.prefs[`${k}_field`]].offset : datatypes['ix'].offset,
+            datatypes[props.prefs[`${k}_field`]].offset,
           stride :
-            props.prefs[`${k}_field`] ? datatypes[props.prefs[`${k}_field`]].stride : datatypes['ix'].stride
-
+            datatypes[props.prefs[`${k}_field`]].stride
         }
       }
     }

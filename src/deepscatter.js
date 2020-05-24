@@ -65,7 +65,7 @@ export default class Scatterplot {
     const { prefs } = this;
 
     this._root = new Tile(this.source_url);
-
+    
     console.log("Making Renderer", this)
 
     this._renderer = new ReglRenderer(

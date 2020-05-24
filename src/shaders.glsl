@@ -277,8 +277,7 @@ if (alpha < 0.05) {
 else {
   float depth_size_adjust = (1.0 - ix / (u_maxix));
   float point_size_adjust = exp(log(u_k)*0.5);
-  gl_PointSize = u_size * point_size_adjust * depth_size_adjust;// * time_adjust;// * step(0.0, time_adjust) * time_adjust;// * depth_size_adjust;//
-  gl_PointSize = min(gl_PointSize, 32.);
+  gl_PointSize = u_size * point_size_adjust;// * depth_size_adjust;
   if (gl_PointSize <= 0.00001) {
     return;
   } else {
@@ -343,7 +342,7 @@ else {
       // Not sure if this is the soundest way to parametrize.
       float relative_time = mod(u_time / time_period, time_period);
 
-      float fractional = fract(fractional_color + relative_time);
+      float fractional = fract(fractional_color);// + relative_time);
 
       fill = texture2D(u_colormap,
       vec2(

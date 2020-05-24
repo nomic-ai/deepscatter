@@ -10,8 +10,16 @@ import {select} from 'd3-selection';
 import 'regenerator-runtime/runtime'
 import { Table, Dictionary, Vector, Utf8, Int32 } from 'apache-arrow';
 // import  Quad  from 'd3-quadtree/src/quad.js'
-import ArrowTree from './ArrowTree'
+import ArrowTree from './ArrowTree';
+import * as Comlink from 'comlink';
+//import TableMutatorFactory from "worker-loader!./tileworker.worker.js";
 
+const worker = new Worker('./tileworker.worker.js', { type: 'module' });
+const processor = Comlink.wrap(worker)
+
+window.worker = worker
+window.processor = processor
+processor.inc().then(d => {console.log("inside return")})
 
 export default class Tile {
 
@@ -94,12 +102,11 @@ export default class Tile {
   download_to_depth(depth, corners = {"x":[-1, 1], "y": [-1, 1]}) {
     // First, execute the download to populate this.max_ix
 
-    return Promise.all([this.promise, this.description()])
-    .then(([data, description]) => {
+    return this.promise
+    .then(data => {
       // If the last point here is less than the target depth, keep going.
       if (this.max_ix < depth &&
-        this.is_visible(depth, corners) &&
-        data.length == description.tileSize
+        this.is_visible(depth, corners)
       ) {
         // Create the children. (Be careful about this, because a '.children()'
         // call actually generates a bunch of promises.
@@ -114,32 +121,30 @@ export default class Tile {
     })
   }
 
-  description() {
-    if (this.parent) {
-      return this.parent.description()
-    } else {
-      if (this._description) {
-        return this._description
-      } else {
-        this._description = d3Json(`${this.url}/data_description.json`)
-          .then(d => {
+  mutate(fieldname, func) {
+    this.worker = this.worker || new TableMutatorFactory()
+    this.wrapper= this.wrapper || Comlink.wrap(this.worker)
+    console.log("hi")
+    this.wrapper.inc().then(
+      worker => this.wrapper.inc()
+    ).then(
+      incremented => this.counter
+    ).then(
+      counted => console.log(counted)
+    )
+/*    new factory().then( processor => {
+      processor.inc()
+      console.log("Hello")
+      window.processor = processor
+      return processor.transfer("foo", this._data).then(_ => processor)
+    })
 
-            this.limits =
-              {
-                x: d.limits[0],
-                y: d.limits[1]
-              }
-            const limits = d.limits
-            // The ranges are not set here; because that's
-            // for the interaction elements to understand.
-            return d
-          })
-        return this._description
-      }
-    }
+*/
+
+    console.log("hi")
   }
 
-  mutate(fieldname, type) {
+  fmutate(fieldname, type) {
     const func = function(row) {
       return row.lc1 ? row.lc1.slice(0, 1) : ""
     }
@@ -440,16 +445,16 @@ export default class Tile {
 
   _download() {
     // This should only be called once per tile.
-    const url = `${this.url}/tiles/${this.key}.arrow`
+    const url = `${this.url}/${this.key}.feather`
     this.promise =
-      this.description()
-      .then(() => fetch(url))
+      fetch(url)
       .then(resp => resp.arrayBuffer())
       .then(response => {
         return Table.from([new Uint8Array(response)])
       })
       .then(d => {
         this._data = d
+        this.limits = this.parent ? this.parent.limits : JSON.parse(d.schema.metadata.get("extent"));
         if (this._data.length == 0) {
           return undefined
         }
@@ -580,11 +585,10 @@ export default class Tile {
       return this._datatypes
     }
 
-    this._datatypes = Promise.all([this.description(), this.promise])
+    this._datatypes = this.promise
       .then(
-        ([description, datalist]) => {
-          let { fields } = description
-          fields = [...fields]
+        () => {
+          const fields = this._data.schema.fields.map(d => d.name)
 
           // Initialize the attributes field that
           // we share with regl.
