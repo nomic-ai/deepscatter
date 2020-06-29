@@ -1,5 +1,5 @@
 import { select } from 'd3-selection';
-
+import { p_in_rect } from './tile.js'
 export class Renderer {
   // A renderer handles drawing to a display element.
   constructor(selector, tileSet, parent) {
@@ -14,20 +14,32 @@ export class Renderer {
     this.height = +this.canvas.attr("height");
   }
 
+  get max_ix() {
+    const {k} = this.zoom.transform
+    const prefs = this.prefs
+    const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance)
+    return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
+  }
 
-  *visible_tiles(max_ix) {
+  is_visible(point) {
+    return p_in_rect(point, this._zoom.current_corners) &&
+    point.ix < this.prefs.max_points * this._zoom.k
+  }
+
+  visible_tiles() {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
-
+    const { max_ix } = this;
     const { tileSet } = this;
     // Materialize using a tileset method.
-    const all_tiles = tileSet.map(d => d);
+    const all_tiles = tileSet.map(d => d)
+      .filter(tile => tile.is_visible(max_ix, this.zoom.current_corners()))
 
-    for (let tile of all_tiles) {
-      if (tile.is_visible(max_ix, this.zoom.current_corners())) {
-        yield(tile);
-      }
-    }
+    all_tiles.sort((a, b) => a.min_ix - b.min_ix)
+
+//    all_tiles.map(d => console.log(`${d.key} (${d.min_ix} - ${d.max_ix})`))
+
+    return all_tiles
   }
 
   bind_zoom(zoom) {

@@ -4,11 +4,19 @@ import { range, sum, shuffle } from 'd3-array';
 import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
 import { Zoom } from './interaction.js';
-import { vertex_shader, frag_shader } from './shaders.glsl';
+import { frag_shader, aesthetic_variables } from './shaders';
 import { Renderer } from './rendering.js';
+import Aesthetic from "./Aesthetic.js";
 import GLBench from 'gl-bench/dist/gl-bench';
+import {contours} from 'd3-contour';
+import nextPow2 from 'next-pow-2';
+import glur from 'glur/mono16';
+
+import vertex_shader from './glsl/general_vertex.glsl';
+console.warn(vertex_shader)
 
 let tiles_allocated = 0;
+
 
 export class ReglRenderer extends Renderer {
 
@@ -35,15 +43,32 @@ export class ReglRenderer extends Renderer {
     requestAnimationFrame(draw);
     /* END BOILERPLATE */
 
+    this.aes = {}
+
+    for (const aes_upper of ["Size", "Alpha", "Jitter_speed", "Jitter_radius", "Color", "Filter"]) {
+      const aes = aes_upper.toLowerCase()
+      this.aes[aes] = new Aesthetic[aes_upper](aes, this.regl, tileSet)
+    }
+
+    // allocate buffers in 64 MB blocks.
+    this.buffer_size = 1024 * 1024 * 64
+
     this.initialize_textures()
     // Not the right way, for sure.
     this._initializations = [
       // some things that need to be initialized before the renderer is loaded.
       this.tileSet
-      .dataTypes()
-      .then(types => this.remake_renderer(types))
+      .promise
+      .then(() => this.remake_renderer())
     ]
     this.initialize()
+  }
+
+
+  get buffers() {
+    this._buffers = this._buffers ||
+      new MultipurposeBufferSet(this.regl, this.buffer_size)
+    return this._buffers
   }
 
   data(dataset) {
@@ -55,162 +80,136 @@ export class ReglRenderer extends Renderer {
     }
   }
 
+  apply_encoding(encoding) {
+    this.encoding = this.encoding || new Map();
+    for (let [k, v] of Object.entries(encoding)) {
+      if (this.encoding.has(k) &&
+          JSON.stringify(v) == this.encoding.get(k)
+         ) {
+        continue
+        } else {
+          this.aes[k].update(v)
+          this.encoding.set(k, JSON.stringify(v))
+        }
+    }
+  }
 
-  tick(force = false) {
-
-    /*
-    this.thresh = this.thresh || .1
-    this.thresh += 0.0005
-    if (this.thresh > 1) {this.thresh = 0.01}
-
-    const my_data = new Uint8Array(range(256).map(i =>{
-      const frac = i/255;
-      return (Math.abs(this.thresh - frac) < 0.1) ? 255 : 0
-    }))
-    this.alpha_map.subimage({
-      width: 1,
-      height: 256,
-      data: my_data
-    }, 0, 0)
-    */
-
-    const { prefs } = this;
-    const { regl, tileSet, canvas, width, height } = this;
+  get props() {
+    const prefs = this.prefs
     const { transform } = this.zoom;
-
     const {k} = transform;
 
-    this.tick_num = this.tick_num || 0;
-    this.tick_num++;
-    let color_type;
-    if (this.tileSet.table) {
-      color_type = this.tileSet.table.schema.fields.filter(
-        d => d.name == [map.prefs.color_field])[0].type.isOrdered === undefined ?
-        "linear": "categorical"
-    } else {
-      return
-    }
     const props = {
-      size: prefs.point_size || 3,
+      zoom_balance: prefs.zoom_balance,
       transform: transform,
-      max_ix: prefs.max_points * k,
+      max_ix: this.max_ix,
       time: (Date.now() - this.zoom._start)/1000,
-      render_label_threshold: prefs.max_points * k * prefs.label_threshold,
       string_index: 0,
       prefs: prefs,
-      color_type: color_type
+      color_type: undefined,
+      color_picker_mode: 0 // whether to draw as a color picker.
     }
+    // Clone.
+    return JSON.parse(JSON.stringify(props))
+  }
 
-    tileSet.download_to_depth(props.max_ix, this.zoom.current_corners())
 
-    regl.clear({
-      color: [0.1, 0.1, 0.13, 0],
-      depth: 1
-    });
+  render_points(props) {
 
-    let n_visible = 0;
-
-    // Run this in a thread.
-    this.tileSet.update_visibility_buffer(
-      this.zoom.current_corners(),
-      this._parent.filters,
-      5,
-      props.max_ix,
-      Date.now(),
-      true
-    )
-
-    // Bundle up the regl draw calls.
     let prop_list = [];
 
-    for (let tile of this.visible_tiles(props.max_ix)) {
-      // seek_renderer initiates a promise for the
-      // tile's regl elements buffer.
+    for (let tile of this.visible_tiles()) {
+      // Do the binding operation; returns truthy if it's already done.
+      const manager = new TileBufferManager(this.regl, tile, this)
+      if (!manager.ready(props.prefs)) {continue}
 
-      if (this.seek_renderer(tile) == undefined) {
-        continue
-      }
-      this.set_full_image(tile, props.max_ix)
-
-      n_visible += 1;
-      if ((tile.min_ix) < (props.max_ix * prefs.label_threshold)) {
-        //
-      }
       const this_props = {
-        count: tile._regl_elements.count,
-        data: tile._regl_elements.data,
-        visibility: tile._regl_elements.visibility,
-        image_locations: tile._regl_elements.image_locations,
+        manager: manager,
+        image_locations: manager.image_locations,
         sprites: this.sprites
       }
       Object.assign(this_props, props)
-      //prop_list.push(this_props)
-      this._renderer(this_props);
+      prop_list.push(this_props)
     }
-    //console.log(this)
-    //console.log(this._renderer)
+
     if (this._renderer === undefined) {
       if (this._zoom && this._zoom._timer) {
         this._zoom._timer.stop()
       }
       return
     }
+
+    // Do the lowest tiles first.
+    prop_list.reverse()
     this._renderer(prop_list)
-  }
-
-  seek_renderer(tile, force = false) {
-    // returns a renderer if one exists, else it
-    // starts the process of binding one to the tile
-    // and returns undefined
-
-
-    if (tile._regl_elements && !force) {
-      return tile._regl_elements
-    } else {
-
-      // DEBOUNCING
-      this.last_renderer_build_time = this.last_renderer_build_time || 0;
-      let BUFFER_THROTTLE = 1/50 * 1000;
-      if (Date.now() - this.last_renderer_build_time < BUFFER_THROTTLE) {
-        return
-      }
-      this.last_renderer_build_time = Date.now()
-
-      if (!tile.underway_promises.has(!"regl")) {
-        tile.underway_promises.add("regl")
-        Promise.all([tile.buffer(), tile.dataTypes()])
-        .then(([buffer, datatypes]) => {
-          tile._regl_elements = this.make_elements(buffer, datatypes);
-          delete tile._buffer
-        })
-      }
-      // It's underway, but there's nothing to do until it gets here.
-      return undefined
-    }
-  }
-
-  initialize_sprites(tile) {
-
-    const { regl }  = this;
-    tile._regl_elements.sprites = tile._regl_elements.sprites || this.sprites
-    tile._regl_elements.sprites.lookup = tile._regl_elements.sprites.lookup || {};
-    tile._regl_elements.sprites.current_position = tile._regl_elements.sprites.current_position || [0, 0]
 
   }
 
-  set_full_image(tile, maxix) {
-    return
-    if (!tile._data[0].img_alpha) {
-      return
-    }
-    if (tile._image_set_until === undefined) {
-      tile._image_set_until = 0;
-    }
-    for (let i = tile._image_set_until; i < tile._data.length && i < maxix; i++) {
-      this.set_image_data(tile, i)
-      tile._image_set_until = i;
-    }
+  tick(force = false) {
 
+    const { prefs } = this;
+    const { regl, tileSet, canvas, width, height } = this;
+    const { transform } = this.zoom;
+    const {k} = transform;
+    const {props} = this;
+
+    this.tick_num = this.tick_num || 0;
+    this.tick_num++;
+
+    // Set a download call in motion.
+    tileSet.download_to_depth(this.props.max_ix, this.zoom.current_corners())
+
+    regl.clear({
+      color: [0.9, 0.9, 0.93, 0],
+      depth: 1
+    });
+
+    this.render_all(props)
+
+  }
+
+  render_jpeg(props) {
+
+  }
+
+  render_all(props) {
+    const { regl } = this;
+    this.fbos.points.use( () => {
+      regl.clear({color: [0, 0, 0, 0]});
+      this.render_points(props)
+    })
+
+    regl.clear({color: [0, 0, 0, 0]});
+
+    regl({
+      frag: `
+      precision mediump float;
+      varying vec2 uv;
+      uniform sampler2D tex;
+      uniform float wRcp, hRcp;
+      void main() {
+        gl_FragColor = texture2D(tex, uv);
+      }`,
+
+      vert: `
+      precision mediump float;
+      attribute vec2 position;
+      varying vec2 uv;
+      void main() {
+        uv = 0.5 * (position + 1.0);
+        gl_Position = vec4(position, 0, 1);
+      }`,
+      attributes: {
+        position: [ -4, -4, 4, -4, 0, 4 ]
+      },
+      uniforms: {
+        tex: ({count}) => this.fbos.points,
+        wRcp: ({viewportWidth}) => 1.0 / viewportWidth,
+        hRcp: ({viewportHeight}) => 1.0 / viewportHeight
+      },
+      depth: { enable: false },
+      count: 3
+    })()
   }
 
   set_image_data(tile, ix) {
@@ -224,7 +223,6 @@ export class ReglRenderer extends Renderer {
     if (current_position[1] > (4096 - 18*2)) {
       console.error(`First spritesheet overflow on ${tile.key}`)
       // Just move back to the beginning. Will cause all sorts of havoc.
-
       sprites.current_position = [0, 0]
       return
     }
@@ -232,32 +230,9 @@ export class ReglRenderer extends Renderer {
 //      return sprites.lookup[ix]
 //    }
 
-    const image_alpha = tile._data[ix].img_alpha;
-    const image_width = tile._data[ix].img_width;
-    const alpha_array =
-       Uint8Array.from(atob(image_alpha), c => c.charCodeAt(0))
-
-    const image_height = alpha_array.length/image_width;
-
-
-    sprites.subimage({
-      width: image_width,
-      height: image_height,
-      data: alpha_array
-    }, current_position[0], current_position[1])
-
-    image_locations.subdata(
-        [current_position[0] * 4096 + current_position[1]
-        , image_width * 4096 + image_height]
-        , ix * 8
-    )
-
-    current_position[0] += 28;
-    if (current_position[0] > 4096 - 28) {
-      current_position[1] += 28
-      current_position[0] = 0
+    if (!tile.table.get(ix)._jpeg) {
+      return
     }
-
   }
 
   spritesheet_setter(word) {
@@ -304,86 +279,167 @@ export class ReglRenderer extends Renderer {
   initialize_textures() {
     const { regl } = this;
 
-    const viridis = range(256).map(i => {
-      const p = rgb(interpolateViridis(1 - i/255));
-      return [p.r, p.g, p.b, p.opacity * 255]
-    });
+      // RGBA color.
 
-    const niccoli_rainbow = range(1024).map(i => {
-      let p;
-      if (i < 512) {
-        p = interpolateWarm(i/511)
-      } else {
-        p = interpolateCool((512 - (i - 512))/511)
-      }
-      p = rgb(p);
-      return [p.r, p.g, p.b, p.opacity * 255]
+    this.aesthetic_maps = this.aesthetic_maps || {}
+
+    for (let k of ["alpha", "color", "size",
+                   "jitter_radius", "jitter_speed", "filter"]) {
+      [this.aesthetic_maps[`${k}_old`],
+       this.aesthetic_maps[k]] = this.aes[k].create_textures();
+    }
+
+    this.fbos = this.fbos || {}
+
+    this.fbos.points =
+      regl.framebuffer({
+            width: this.width,
+            height: this.height,
+            depth: false
+      })
+
+    this.fbos.contour = this.fbos.contour ||
+      regl.framebuffer({
+        width: this.width,
+        height: this.height,
+        depth: false
+      })
+
+    this.fbos.colorpicker = this.fbos.colorpicker  ||
+      regl.framebuffer({
+        width: this.width,
+        height: this.height,
+        depth: false
+      })
+
+    this.fbos.dummy = this.fbos.dummy  ||
+      regl.framebuffer({
+        width: 1,
+        height: 1,
+        depth: false
+      })
+
+  }
+
+  n_visible(only_color = -1) {
+
+    let {width, height} = this;
+    width = Math.floor(width)
+    height = Math.floor(height)
+    this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height)
+
+    const props = this.props;
+    props.only_color = only_color;
+    let v;
+    this.fbos.contour.use(() => {
+      this.regl.clear({color: [0, 0, 0, 0]});
+      // read onto the contour vals.
+      this.render_points(props)
+      this.regl.read(this.contour_vals);
+      v = sum(this.contour_vals);
+    })
+    return v;
+  }
+
+  calculate_contours(field = 'lc0') {
+    const {width, height} = this;
+    let ix = 16;
+    let contour_set = []
+    const contour_machine = contours()
+      .size([parseInt(width), parseInt(height)])
+      .thresholds(d3.range(2, 9).map(p => Math.pow(2, p*2)));
+
+    for (let ix of range(this.tileSet.dictionary_lookups[field].size)) {
+      this.draw_contour_buffer(field, ix);
+      // Rather than take the fourth element of each channel, I can use
+      // a Uint32Array view of the data directly since rgb channels are all
+      // zero. This just gives a view 256 * 256 * 256 larger than the actual numbers.
+      const my_contours = contour_machine(this.contour_alpha_vals)
+      my_contours.forEach((d) => {
+        d.label = this.tileSet.dictionary_lookups[field].get(ix)
+      })
+      contour_set = contour_set.concat(my_contours)
+    }
+    return contour_set
+  }
+
+  color_pick(x, y) {
+    const {props} = this;
+    props.color_picker_mode = 1
+
+    let v
+    this.fbos.colorpicker.use(() => {
+      this.regl.clear({color: [0, 0, 0, 0]});
+
+      // read onto the contour vals.
+      this.render_points(props)
+      v = this.regl.read({x: x, y: y, width: 1, height: 1});
     })
 
-    const shufbow = shuffle([...niccoli_rainbow])
-
-    this.alpha_map = regl
-      .texture({
-        width: 8,
-        height: 256,
-        type: 'uint8',
-        format: 'alpha',
-        data: new Uint8Array(Array(8*256).fill(255))
-      })
-
-    this.viridis256 = regl.texture([viridis])
-    this.niccoli_rainbow = regl.texture([niccoli_rainbow])
-    this.shufbow = regl.texture([shufbow])
-
-    this.year = regl.texture({shape: [1024, 32] })
-
-
-    this.sprites = regl.texture({
-        width: 4096,
-        height: 4096,
-        format: 'alpha',
-        type: 'uint8',
-      })
-    //this.sprites.subimage({
-  //    width: 4096, height: 4096, data: new Array(4096*4096).fill(25)})
+    const inflated = v[0] + v[1] * 255 + v[2] * 255 * 255
 
   }
 
-  make_elements(points, datatypes) {
-//    console.log(`building buffer for tile ${tiles_allocated++}`)
-    const { regl } = this;
-    // -1 because we store 'position', 'x', and 'y';
-    const count = points.length /
-                  (Object.entries(datatypes).length - 1);
-
-    const elements = {
-      'count': count,
-      'data': regl.buffer(points),
-      'visibility': regl.buffer({
-        usage: 'dynamic',
-        data: new Array(points.length).fill(0),
-        type: 'float'
-      }),
-      'image_locations': regl.buffer({
-        'usage': 'dynamic',
-        data: new Array(points.length * 2).fill(0),
-        type: 'float'
-      })
+  blur(fbo) {
+    var passes = [];
+    var radii = [Math.round(
+      Math.max(1, state.bloom.radius * pixelRatio / state.bloom.downsample))];
+    for (var radius = nextPow2(radii[0]) / 2; radius >= 1; radius /= 2) {
+      radii.push(radius);
     }
-    return elements
-
-
+    radii.forEach(radius => {
+      for (var pass = 0; pass < state.bloom.blur.passes; pass++) {
+        passes.push({
+          kernel: 13,
+          src: bloomFbo[0],
+          dst: bloomFbo[1],
+          direction: [radius, 0]
+        }, {
+          kernel: 13,
+          src: bloomFbo[1],
+          dst: bloomFbo[0],
+          direction: [0, radius]
+        });
+      }
+    })
   }
 
+  draw_contour_buffer(field, ix) {
+
+    let {width, height} = this;
+    width = Math.floor(width)
+    height = Math.floor(height)
+
+    this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height)
+    this.contour_alpha_vals = this.contour_alpha_vals || new Uint16Array(width * height)
+
+    const props = this.props;
+    props.prefs.encoding.color.field = field;
+    props.only_color = ix;
+
+    this.fbos.contour.use(() => {
+      this.regl.clear({color: [0, 0, 0, 0]});
+      // read onto the contour vals.
+      this.render_point(props)
+
+
+
+
+      this.regl.read(this.contour_vals);
+    })
+
+    let i = 0;
+
+    while (i < width * height * 4) {
+      this.contour_alpha_vals[i/4] = this.contour_vals[i + 3] * 255;
+      i += 4
+    }
+    window.glur = glur;
+    glur(this.contour_alpha_vals, width, height, 9)
+    return this.contour_alpha_vals
+  }
 
   remake_renderer() {
-    const datatypes = this.tileSet.__datatypes;
-
-    if (this.tileSet._datatypes == undefined) {
-      // start the promise.
-      this.tileSet.dataTypes()
-      return false
-    }
 
     const { regl, width, height, zoom, prefs } = this;
     // This should be scoped somewhere to allow resizing.
@@ -393,60 +449,66 @@ export class ReglRenderer extends Renderer {
     const parameters = {
       depth: { enable: false },
       stencil: { enable: false },
-
+      blend: {
+        enable: true,
+        func: {
+          srcRGB: 'one',
+          srcAlpha: 'one',
+          dstRGB: 'one minus src alpha',
+          dstAlpha: 'one minus src alpha',
+        },
+      },
       primitive: "points",
       frag: frag_shader,
       vert: vertex_shader,
-      count: regl.prop('count'),
+      count: function(context, props) {
+        return props.manager.count
+      },
       attributes: {
-        a_visibility: {
-          buffer: function(context, props) {
-                      return props.visibility
-                  },
-          offset: 0,
-          stride: 4
-        },
         a_image_locations: {
-          buffer: regl.prop('image_locations'),
-          offset: 0,
-          stride: 8,
+          constant: [-1, -1]
         }
       },
       uniforms: {
+        // Used to quickly count regions.
+        u_only_color: function(context, props) {
+          if (props.only_color !== undefined) {
+            return props.only_color
+          }
+          // Use -2 to disable color plotting. -1 is a special
+          // value to plot all.
+          return -2
+        },
+        u_color_picker_mode: regl.prop("color_picker_mode"),
         u_aspect_ratio: width/height,
         u_sprites: function(context, props) {
-          return props.sprites
+          return props.sprites ?
+          props.sprites : this.fbos.dummy
         },
-        u_colormap: function(context, props) {
-          if (props.color_type == "categorical") {
-            return this.shufbow
-          } else {
-            return this.viridis256
-          }
-        },
-        u_alphamap: this.alpha_map,
-        u_alpha_domain: function(context, props) {
-          return props.prefs.alpha_domain
-        },
-        u_render_text_min_ix: function(context, props) {
-          return props.render_label_threshold
-        },
+        u_color_map: this.aesthetic_maps.color,
+        u_alpha_map: this.aesthetic_maps.alpha,
+        u_size_map: this.aesthetic_maps.size,
+        u_jitter_radius_map: this.aesthetic_maps.jitter_radius,
+        u_jitter_speed_map: this.aesthetic_maps.jitter_speed,
+        u_filter_map: this.aesthetic_maps.filter,
         u_jitter: function(context, props) {
           if (props.prefs.jitter == "spiral") {
+            // animated in a logarithmic spiral.
             return 1
           } else if (props.prefs.jitter == "uniform") {
+            // Static jitter inside a circle
             return 2
           } else if (props.prefs.jitter == "normal") {
+            // Static, normally distributed, standard deviation 1.
             return 3
           } else if (props.prefs.jitter == "circle") {
+            // animated, evenly distributed in a circle with radius 1.
             return 4
           } else {
             return 0
           }
         },
-        u_string_index: function(context, props) {
-          return props.string_index
-        },
+        u_zoom_balance: regl.prop('zoom_balance'),
         u_maxix: function(context, props) {
           return props.max_ix;
         },
@@ -465,49 +527,199 @@ export class ReglRenderer extends Renderer {
             [0, 0, 1],
           ].flat()
           return zoom_matrix;
-        },
-        u_size: regl.prop('size')
-      }
-    }
-
-    for (let k of ['position', 'ix']) {
-      parameters.attributes[k] = function(state, props) {
-        return {
-          buffer: props.data,
-          offset: datatypes[k].offset,
-          stride: datatypes[k].stride
         }
       }
     }
 
+    for (let k of ['ix', 'position']) {
+      parameters.attributes[k] = function(state, props) {
+        return props.manager.regl_buffer(k)
+      }
+    }
 
     for (let k of ['color', 'label', 'jitter_radius',
-                   'jitter_period', 'size', 'alpha',
-                 ]) { //, 'a_size', 'a_time', 'a_opacity', 'a_text']) {
+                   'jitter_speed', 'size', 'alpha', 'filter'
+                 ]) {
+      const aesthetic = this.aes[k]
       parameters.uniforms["u_" + k + "_domain"] = function (state, props) {
-        if (k === 'color' && props.color_type == "categorical") {
-          // 1024 dimensional textures are used only for categorical data.
-          // (This is a convention--remember it!)
-          // If so, the domain needs to align precisely.
-          return [0, 1023]
-        }
-        return this.prefs[`${k}_domain`] || [.1, .1]
+        // wrap as function to clue regl that it might change.
+        return aesthetic.get_domain()
+      }
+      parameters.uniforms[`u_${k}_transform`] = function(state, props) {
+        const t = aesthetic.transform
+        if (t == "linear") return 1
+        if (t == "sqrt") return 2
+        if (t == "log") return 3
+        return 0
       }
 
       // Copy the parameters from the data name.
       parameters.attributes[`a_${k}`] = function(state, props) {
-        if (props.prefs[`${k}_field`] === undefined) {return {constant: 1}}
-        return {
-          buffer : props.data,
-          offset :
-            datatypes[props.prefs[`${k}_field`]].offset,
-          stride :
-            datatypes[props.prefs[`${k}_field`]].stride
+
+        if (props.prefs.encoding[k] === null ||
+          aesthetic.field === undefined
+        ) {
+          return { constant: 1 }
         }
+        if (typeof(props.prefs.encoding[k]) === "number") {
+          return { constant: props.prefs.encoding[k] }
+        }
+        return props.manager.regl_buffer(aesthetic.field)
       }
     }
     this._renderer = regl(parameters)
     return this._renderer
   }
+}
 
+class TileBufferManager {
+  // Handle the interactions of a tile with a regl state.
+
+  // binds elements directly to the tile, so it's safe
+  // to re-run this multiple times on the same tile.
+  constructor(regl, tile, renderer) {
+    this.tile = tile;
+    this.regl = regl;
+    this.renderer = renderer;
+    tile._regl_elements = tile._regl_elements || new Map()
+    this.regl_elements = tile._regl_elements
+  }
+
+  ready(prefs) {
+    const keys = Object.entries(prefs.encoding)
+    .map(([k, v]) => v ? v.field : undefined)
+    .filter( d => d)
+
+    for (let k of keys.concat(["position", "ix"])) {
+      if (!this.regl_elements.has(k)) {
+        if (!this.tile.ready) {
+          return false
+        }
+      }
+    }
+    return true
+  }
+
+  get count() {
+    const { tile, regl_elements } = this;
+    if (regl_elements.has("_count")) {
+      return regl_elements.get("_count")
+    }
+    if (tile.ready) {
+      regl_elements.set("_count", tile.table.length)
+      return regl_elements.get("_count")
+    }
+  }
+
+  create_position_buffer() {
+    const { table } = this.tile
+    const x = table.getColumn("x").data.values
+    const y = table.getColumn("y").data.values
+    const buffer = new Float32Array(this.count * 2)
+    for (let i = 0; i < this.count; i += 1) {
+        buffer[i*2] = x[i]
+        buffer[i*2 + 1] = y[i]
+    }
+    return buffer
+  }
+
+  create_buffer_data(key) {
+    const { tile } = this;
+    if (!tile.ready) {
+      throw "Tile table not present."
+    }
+    const column = tile.table.getColumn(key)
+
+    if (key == "position") {
+      return this.create_position_buffer()
+    }
+    if (column.dictionary) {
+      const buffer = new Float32Array(tile.table.length)
+      let row = 0;
+      for (let val of column.data.values) {
+        const char_value = tile.local_dictionary_lookups[key].get(val)
+        buffer[row] = tile.dictionary_lookups[key].get(char_value)
+        row += 1;
+      }
+      return buffer
+    } else if (column.data.values.constructor != Float32Array) {
+      const buffer = new Float32Array(tile.table.length)
+      for (let i = 0; i < tile.table.length; i++) {
+        buffer[i] = column.data.values[i]
+      }
+      return buffer
+    } else {
+      // For numeric data, it's safe to simply return the data straight up.
+      return column.data.values
+    }
+  }
+
+  regl_buffer(key) {
+    const { regl, regl_elements } = this;
+    if (regl_elements.has(key)) {
+      return regl_elements.get(key)
+    }
+    const data = this.create_buffer_data(key)
+    let item_size = 4
+    let data_length = data.length
+
+    if (key == "position") {
+      item_size = 8
+      data_length = data_length / 2
+    }
+
+    const buffer_desc = this.renderer.buffers.allocate_block(
+      // Divided by four b/c always a float.
+      data_length, item_size)
+
+    regl_elements.set(
+      key,
+      buffer_desc
+    )
+    buffer_desc.buffer.subdata(data, buffer_desc.offset)
+    return regl_elements.get(key)
+  }
+}
+
+class MultipurposeBufferSet {
+  constructor(regl, buffer_size) {
+    this.regl = regl
+    this.buffer_size = buffer_size
+    this.buffers = []
+    // Track the ends in case we want to allocate smaller items.
+    this.buffer_offsets = []
+    this.generate_new_buffer()
+  }
+
+  generate_new_buffer() {
+    // Adds to beginning of list.
+    console.log(`Creating buffer number ${this.buffers.length}`)
+    if (this.pointer) {this.buffer_offsets.unshift(this.pointer)}
+    this.pointer = 0
+    this.buffers.unshift(
+      this.regl.buffer({
+        type: "float",
+        length: this.buffer_size,
+        usage: "dynamic"
+      })
+    )
+  }
+
+  allocate_block(items, bytes_per_item) {
+    // Allocate a block of this buffer.
+    // NB size is in **bytes**
+    if (this.pointer + items * bytes_per_item > this.buffer_size) {
+      // May lead to ragged ends. Could be smarter about reallocation here,
+      // too.
+      this.generate_new_buffer()
+    }
+    const value = {
+      // First slot stores the active buffer.
+      buffer: this.buffers[0],
+      offset: this.pointer,
+      stride: bytes_per_item
+    }
+    this.pointer += items * bytes_per_item
+    return value
+  }
 }

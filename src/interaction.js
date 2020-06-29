@@ -65,7 +65,7 @@ export default class Zoom {
 
   }
 
-  zoom_to_bbox(corners, duration = 4000) {
+  zoom_to_bbox(corners, duration = 4) {
 
     // Zooms to two points.
     const scales = this.scales();
@@ -82,7 +82,7 @@ export default class Zoom {
 
     canvas
       .transition()
-      .duration(duration)
+      .duration(duration * 1000)
       .call(zoomer.transform, t);
 
   }
@@ -113,23 +113,22 @@ export default class Zoom {
   }
 
   add_mouseover() {
-    const tel = select("#deepscatter-svg")
-    .selectAll("g.label")
-    .data([1])
 
-    tel
-    .enter()
-    .append("g")
-    .attr("class", "label")
-    .merge(tel)
+    const defaultClick = "`window.open('https://babel.hathitrust.org/cgi/pt?id=${datum.id}', target = 'blank')`"
 
-    tel.append("circle")
-    .attr("r", 3)
-    .style("fill", "pink")
-    tel.append("text")
+    const clickfunc = new Function("datum",
+      "window.open(`https://babel.hathitrust.org/cgi/pt?id=${datum.id}`, target = 'blank')")
+
     let last_fired = 0;
 
+    const labels = select("#deepscatter-svg")
+      .append("g")
+      .attr("class", "label")
+
+
     this.canvas.on("mousemove", () => {
+
+      // Debouncing this is really important, it turns out.
       if (Date.now() - last_fired < 50) {
         return
       }
@@ -148,18 +147,38 @@ export default class Zoom {
           return true
        } */
      );
-      if (closest == undefined) {return}
-      tel
-      .attr("transform", `translate(
-        ${x_(closest.x)},
-        ${y_(closest.y)}
-      )`)
-        .select("text")
-        .text(closest[this.prefs.label_field])
-        .style("font-size", "18px")
-        .style("fill", "white")
 
+    // if undefined, empty arrary.
+    const data = closest ? [closest] : [];
+
+    const labelSet = labels
+      .selectAll("g")
+      .data(data)
+      .join("g")
+      .attr("transform", d => `translate(
+        ${x_(d.x)},
+        ${y_(d.y)}
+      )`)      .on("click", d => clickfunc(d))
+
+      /*
+    */
+    labelSet
+      .selectAll("circle")
+      .data(d => [d])
+      .join("circle")
+      .attr("r", 6)
+      .style("fill", "pink")
+
+    labelSet
+      .selectAll("text")
+      .data(d => [d])
+      .join("text")
+      .attr("transform", "translate(3, 3)")
+      .text(d => d[this.prefs.label_field])
+      .style("font-size", "18px")
+      .style("fill", "white")
     })
+
   }
 
 
@@ -200,8 +219,6 @@ export default class Zoom {
 
     this._timer.stop_at = stop_at;
 
-  //  timerFlush();
-
     return this._timer;
   }
 
@@ -231,15 +248,17 @@ export default class Zoom {
 
     const { width, height, tileSet } = this;
 
+    const { extent } = this.tileSet
+
     const scales = {};
-    if (this.tileSet.limits === undefined) {
+    if (extent === undefined) {
       return undefined;
     }
 
     const scale_dat = {'x': {}, 'y': {}}
 
     for (let [name, dim] of [['x', width], ['y', height]]) {
-      const limits = tileSet.limits[name]
+      const limits = extent[name]
       scale_dat[name].limits = limits;
       scale_dat[name].size_range = limits[1] - limits[0]
       scale_dat[name].pixels_per_unit = dim / scale_dat[name].size_range
@@ -310,8 +329,12 @@ export default class Zoom {
     }
 
     for (let renderer of this.renderers.values()) {
-
-      renderer.tick()
+      try {
+        renderer.tick()
+      } catch(err) {
+        this._timer.stop()
+        throw err
+      }
     }
   }
 }

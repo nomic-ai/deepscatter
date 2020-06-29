@@ -1,51 +1,161 @@
 import * as Comlink from "comlink";
-import { Table, Column, Float32Vector } from 'apache-arrow';
+import { Table, Column, Vector, Utf8, Float32, Uint32, Dictionary } from 'apache-arrow';
+import ArrowTree from './ArrowTree';
 
-/*
-function TableMutator() {
 
-  post_table(buffer) {
-    table = Table.from(buffer)
+function compose_functions(val) {
+  if (typeof val === "string") {
+    return compose_singleton_function(val)
   }
+  // If passed a list of functions, treat them
+  // as successive filters.
 
-  post_functions(key, func) {
-    this.key = key
-    this.func = Function("datum", func)
-  }
+  // Note that you're best off putting the hardest function first.
+  // I don't optimize for that, because I'm not a lunatic.
 
-  run_transform() {
-    const data = Array(table.length)
-    let i = 0
-    for (let row of table) {
-      data[i] = this.func(row)
-      i++
-    }
-    const vector = Float32Vector.from(data)
-    const table = Table.new(
-      Column.new(this.key, vector)
-    )
-    return table.serialize()
-  }
-
+  const functions = val.map(compose_singleton_function)
+  // Does the datum pass every function?
+  const logical_test = datum => functions.every(func => func(datum))
 }
 
-const mutate = function(key, buffer) {
-  console.log(key)
-  console.log("Hello from workerland")
-  const data = new TableMutator()
-  data.post_table(buffer)
-  data.post_functions(key)
+function compose_singleton_function(val) {
+  return Function("datum", val)
 }
-*/
 
-const obj = {
-  counter: 0,
-  inc(i=1) {
-    console.log(this.counter+=i)
-    this.counter+=i;
+// Somehow have to keep these independent.
+
+function dictVector(input, id) {
+  const dictionary = Vector.from({
+    values: input,
+    type: new Dictionary(new Utf8(), new Uint32(), id),
+    highWaterMark: 1000000
+  })
+  return dictionary
+}
+
+function floatVector(input) {
+  return Vector.from(
+  {
+    values: input,
+    type: new Float32(),
+    highWaterMark: 1000000
+  })
+}
+
+const WorkerTile = {
+
+  fetch(url, mutations) {
+    return fetch(url)
+      .then(resp => resp.arrayBuffer())
+      .then(response => {
+        let table = Table.from(response);
+        const metadata = table.schema.metadata;
+        const tile = url.split("/").slice(-3).join("/")
+        mutations['tile_key'] = `return "${tile}"`;
+
+        let buffer;
+        if (Object.keys(mutations).length) {
+          buffer = mutate(mutations, response)
+        } else {
+          buffer = response
+        }
+        const codes = get_dictionary_codes(buffer)
+        return [Comlink.transfer(buffer, [buffer]), metadata, codes]
+      })
+
   },
-};
 
-Comlink.expose(obj);
+  kdtree(table_buffer) {
+    const table = Table.from(table_buffer)
+    const tree = ArrowTree.from_arrow(table, "x", "y")
+    return [
+      Comlink.transfer(table_buffer, [table_buffer]),
+      Comlink.transfer(tree.bush.data, [tree.bush.data])
+    ]
+  },
+
+  run_transforms(map, table_buffer) {
+    const buffer = mutate(map, table_buffer)
+    const codes = get_dictionary_codes(buffer)
+    return [Comlink.transfer(buffer, [buffer]), codes]
+  }
+
+}
+
+function get_dictionary_codes(buffer) {
+  // Too expensive to do on the client.
+  const table = Table.from(buffer)
+
+  const dicts = {}
+  for (const field of table.schema.fields) {
+    if (field.type.dictionary) {
+      dicts[field.name] = new Map()
+      const c = table.getColumn(field.name)
+      const keys = c.dictionary.toArray()
+      let ix = 0;
+      for (let k of keys) {
+        // safe to go both ways at once because one is a string and
+        // the other an int.
+        dicts[field.name].set(ix, k)
+        ix++;
+      }
+    }
+  }
+  return dicts
+}
+
+function mutate(map, table_buffer) {
+    const table = Table.from(table_buffer)
+
+    const data = new Map()
+    const funcmap = new Map()
+
+    for (let [k, v] of Object.entries(map)) {
+      data.set(k, Array(table.length))
+      // Materialize the mutate functions from strings.
+      funcmap.set(k, Function("datum", v))
+    }
+
+
+    let tilepos = 0
+    funcmap.set("position_in_tile", function(datum) {return tilepos++})
+    data.set("position_in_tile", Array(table.length))
+
+    let i = 0;
+    // Set the values in the rows.
+    for (let row of table) {
+      for (let [k, func] of funcmap) {
+        data.get(k)[i] = func(row)
+      }
+      i++;
+    }
+    const columns = {};
+
+    for (let k of table.schema.fields.map(d => d.name)) {
+      if (!funcmap.has(k)) {
+        // Allow overwriting.
+        columns[k] = table.getColumn(k)
+      }
+    }
+
+    let highest_dict_id = Math.max(...table.schema.dictionaries.keys())
+    for (let [k, vector] of data) {
+      let column
+      if (typeof(vector[0]) == "string") {
+        highest_dict_id++;
+        column = dictVector(vector, highest_dict_id)
+      } else {
+        column = floatVector(vector)
+      }
+      columns[k] = column;
+    }
+
+    const return_table = Table.new(columns)
+
+    const buffer = return_table.serialize().buffer
+    return buffer
+}
+
+Comlink.expose(WorkerTile);
 
 //Comlink.expose(TableMutator)

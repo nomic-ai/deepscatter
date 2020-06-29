@@ -5,7 +5,11 @@ import {select} from 'd3-selection';
 import {geoPath, geoIdentity} from 'd3-geo';
 import {json as d3json } from 'd3-fetch';
 import {max} from 'd3-array';
+import merge from 'lodash.merge';
+
 import * as topojson from "topojson-client";
+
+import {default_aesthetics} from "./Aesthetic.js"
 
 const base_elements = [
   {
@@ -39,6 +43,10 @@ export default class Scatterplot {
     this.elements = []
     this.filters = new Map();
 
+    this.encoding = {}
+    for (let k of Object.keys(default_aesthetics)) {
+      this.encoding[k] = null;
+    }
 
     for (const d of base_elements) {
       const container =
@@ -48,7 +56,7 @@ export default class Scatterplot {
        .style("position", "fixed")
        .style("top", 0)
        .style("left", 0)
-       .style("pointer-events", d.id == "webgl-canvas" ? "auto":"none")
+       .style("pointer-events", d.id == "deepscatter-svg" ? "auto":"none")
 
      container
        .append(d.nodetype)
@@ -64,8 +72,8 @@ export default class Scatterplot {
 
     const { prefs } = this;
 
-    this._root = new Tile(this.source_url);
-    
+    this._root = new Tile(this.source_url, prefs);
+
     console.log("Making Renderer", this)
 
     this._renderer = new ReglRenderer(
@@ -77,7 +85,7 @@ export default class Scatterplot {
     );
 
     console.log("Made renderer")
-    this._zoom = new Zoom("#webgl-canvas", this.prefs);
+    this._zoom = new Zoom("#deepscatter-svg", this.prefs);
 
     this._zoom.attach_tiles(this._root);
     this._zoom.attach_renderer("regl", this._renderer);
@@ -101,9 +109,7 @@ export default class Scatterplot {
     if (!this.geojson) {
       this.geojson = "in progress"
       return d3json(url).then(d => {
-        console.log("FOOOO", d)
         const {x, y} = this._zoom.scales()
-
         const lines = topojson.mesh(d, d.objects["-"])
         const shape = topojson.merge(d, d.objects["-"].geometries)
         function fix_point(p) {
@@ -136,7 +142,6 @@ export default class Scatterplot {
     ctx.fillStyle = "rgba(25, 25, 29, 1)"
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
 
-    console.log()
     ctx.strokeStyle = "#8a0303"//"rbga(255, 255, 255, 1)"
     ctx.fillStyle = 'rgba(30, 30, 34, 1)'
 
@@ -151,41 +156,53 @@ export default class Scatterplot {
 
   }
 
+  visualize_tiles() {
+    const map = this;
+    const ctx = map.elements[2].selectAll("canvas").node().getContext("2d");
+    ctx.clearRect(0, 0, 10000, 10000)
+    const {x_, y_} = map._zoom.scales()
+
+    const tiles = map._root.map(t => t)
+    for (let tile of tiles) {
+        if (!tile.extent) {continue} // Still loading
+        const [x1, x2] = tile.extent.x.map(x => x_(x))
+        const [y1, y2] = tile.extent.y.map(y => y_(y))
+
+        ctx.strokeRect(x1, y1, x2-x1, y2-y1)
+    }
+  }
+
   update_prefs(prefs) {
     if (this.prefs === undefined) {
-      this.prefs = {}
+      // defaults.
+      this.prefs = {
+        'zoom_balance': 0.25
+
+      }
     }
 
-    Object.assign(this.prefs, prefs)
+    merge(this.prefs, prefs)
   }
 
   plotAPI(prefs = {}) {
 
+
+    if (prefs === undefined || prefs === null) {return Promise.resolve(1)}
     this.update_prefs(prefs);
     /*
     if (!this._root) {
       return this.reinitialize().then(this.plotAPI(prefs))
     } */
 
+
+
     if (prefs['source_url'] && prefs.source_url !== this.source_url) {
       this.source_url = prefs.source_url
-      this.reinitialize()
+      return this.reinitialize().then(this.plotAPI(prefs))
     }
 
-    if (prefs.filters) {
-      this.filters.clear()
-      for (let filter_string of prefs.filters) {
-        const raw_filter = Function("datum", filter_string)
-        this.filters.set(filter_string, function(datum) {
-          // Wrap the filter in a catch because arrow types
-          // can be weird; for instance, string.match(/foo/)
-          // might fail on a null value.
-          try {return raw_filter(datum)}
-          catch(err) {
-            return false
-          }
-        })
-      }
+    if (prefs.mutate) {
+      this._root.apply_mutations(prefs.mutations)
     }
 
     if (prefs.basemap_geojson) {
@@ -195,13 +212,59 @@ export default class Scatterplot {
     }
 
     return this._root.promise.then(d => {
+
       this.update_prefs(prefs)
       if (prefs.zoom) {
         this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration)
       }
+      if (prefs.encoding) {
+
+        this.interpret_encoding(prefs.encoding)
+
+        for (let [name, renderer] of this._zoom.renderers) {
+          if (renderer.apply_encoding) {
+            renderer.apply_encoding(
+              this.encoding
+            )
+          }
+        }
+      }
       this._zoom.restart_timer(60000)
     })
+  }
 
+  interpret_encoding(encoding) {
+    this.encoding = this.encoding || JSON.parse(JSON.stringify(default_aesthetics))
+    // Could be crazy complicated.
+    merge(this.encoding, encoding)
+    merge(this.prefs.encoding, this.encoding)
+  }
+
+  drawContours(contours, drawTo) {
+
+    const drawTwo = drawTo || select("body");
+    const svg = drawTwo.select("svg")
+
+    svg.append("g")
+      .attr("fill", "none")
+      .attr("stroke", "steelblue")
+      .attr("stroke-linejoin", "round")
+      .selectAll("path")
+      .data(contours)
+      .join("path")
+      .attr("stroke-width", (d, i) => i % 5 ? 0.25 : 1)
+      .attr("d", geoPath());
+
+    const renderer = {
+      tick: () => svg.attr("transform", this._zoom.transform)
+    }
+    this._zoom.renderers.set("contours", renderer)
+
+  }
+
+  contours(aes = 'lc0') {
+    const data = this._renderer.calculate_contours(aes)
+    this.drawContours(data)
   }
 
 }
