@@ -12,7 +12,10 @@ export class Renderer {
     this.prefs = parent.prefs;
     this.width = +this.canvas.attr("width");
     this.height = +this.canvas.attr("height");
+    this.deferred_functions = []
   }
+
+
 
   get max_ix() {
     const {k} = this.zoom.transform

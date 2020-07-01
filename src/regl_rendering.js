@@ -1,28 +1,29 @@
 import wrapREGL from 'regl';
 import { select, create } from 'd3-selection';
-import { range, sum, shuffle } from 'd3-array';
+import { range, sum, max } from 'd3-array';
 import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
 import { Zoom } from './interaction.js';
-import { frag_shader, aesthetic_variables } from './shaders';
+// import { aesthetic_variables } from './shaders';
 import { Renderer } from './rendering.js';
 import Aesthetic from "./Aesthetic.js";
 import GLBench from 'gl-bench/dist/gl-bench';
 import {contours} from 'd3-contour';
-import nextPow2 from 'next-pow-2';
-import glur from 'glur/mono16';
-
+import gaussian_blur from './glsl/gaussian_blur.frag';
 import vertex_shader from './glsl/general_vertex.glsl';
-console.warn(vertex_shader)
-
-let tiles_allocated = 0;
-
+import frag_shader from './glsl/general.frag';
 
 export class ReglRenderer extends Renderer {
 
   constructor(selector, tileSet, prefs, parent) {
     super(selector, tileSet, prefs, parent)
-    this.regl = wrapREGL(this.canvas.node());
+    this.regl = wrapREGL(
+      {
+        canvas: this.canvas.node(),
+      }
+    );
+
+
     /* BOILERPLATE */
     let gl = this.canvas.node().getContext('webgl') || this.canvas.node().getContext('experimental-webgl');
     let bench = new GLBench(gl, {
@@ -33,6 +34,7 @@ export class ReglRenderer extends Renderer {
       chartLen: 20,
     }
     );
+
     function draw(now) {
       bench.begin('Drawing speed');
       // some bottleneck
@@ -40,6 +42,7 @@ export class ReglRenderer extends Renderer {
       bench.nextFrame(now);
       requestAnimationFrame(draw);
     }
+
     requestAnimationFrame(draw);
     /* END BOILERPLATE */
 
@@ -116,12 +119,24 @@ export class ReglRenderer extends Renderer {
 
   render_points(props) {
 
+    // Regl is faster if it can render a large number of draw calls together.
     let prop_list = [];
 
     for (let tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
+
       const manager = new TileBufferManager(this.regl, tile, this)
-      if (!manager.ready(props.prefs)) {continue}
+
+      try {
+        if (!manager.ready(props.prefs)) {
+          // The 'ready' call also pushes a creation request into
+          // the deferred_functions queue.
+          continue
+        }
+      } catch (err) {
+        console.warn(err)
+        continue
+      }
 
       const this_props = {
         manager: manager,
@@ -164,6 +179,17 @@ export class ReglRenderer extends Renderer {
       depth: 1
     });
 
+    const start = Date.now()
+
+    while (Date.now() - start < 10 && this.deferred_functions.length) {
+      // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
+      try {
+        this.deferred_functions.shift()()
+      } catch (err) {
+        console.warn(err)
+      }
+    }
+
     this.render_all(props)
 
   }
@@ -172,43 +198,96 @@ export class ReglRenderer extends Renderer {
 
   }
 
+  single_blur_pass(fbo1, fbo2, direction) {
+    const { regl } = this;
+    fbo2.use( () => {
+      regl.clear({color: [0, 0, 0, 0]});
+      regl(
+        {
+        frag: gaussian_blur,
+        uniforms: {
+          iResolution: ({viewportWidth, viewportHeight}) => [viewportWidth, viewportHeight],
+          iChannel0: fbo1,
+          direction
+        },
+        /* blend: {
+          enable: true,
+          func: {
+            srcRGB: 'one',
+            srcAlpha: 'one',
+            dstRGB: 'one minus src alpha',
+            dstAlpha: 'one minus src alpha',
+          },
+        }, */
+        vert: `
+          precision mediump float;
+          attribute vec2 position;
+          varying vec2 uv;
+          void main() {
+            uv = 0.5 * (position + 1.0);
+            gl_Position = vec4(position, 0, 1);
+          }`,
+          attributes: {
+            position: [ -4, -4, 4, -4, 0, 4 ]
+          },
+          depth: { enable: false },
+          count: 3,
+      })()
+    })
+  }
+
+  blur(fbo1, fbo2, passes = 3) {
+    let remaining = passes - 1
+    while (remaining > -1) {
+      this.single_blur_pass(fbo1, fbo2, [2 ** remaining, 0])
+      this.single_blur_pass(fbo2, fbo1, [0, 2 ** remaining])
+      remaining -= 1
+    }
+  }
+
   render_all(props) {
+
     const { regl } = this;
     this.fbos.points.use( () => {
       regl.clear({color: [0, 0, 0, 0]});
       this.render_points(props)
     })
 
+    // this.blur(this.fbos.points, this.fbos.ping, 1)
+
     regl.clear({color: [0, 0, 0, 0]});
 
+
+    // Copy the points buffer to the main buffer.
     regl({
       frag: `
-      precision mediump float;
-      varying vec2 uv;
-      uniform sampler2D tex;
-      uniform float wRcp, hRcp;
-      void main() {
-        gl_FragColor = texture2D(tex, uv);
-      }`,
-
+        precision mediump float;
+        varying vec2 uv;
+        uniform sampler2D tex;
+        uniform float wRcp, hRcp;
+        void main() {
+          gl_FragColor = texture2D(tex, uv);
+        }
+      `,
       vert: `
-      precision mediump float;
-      attribute vec2 position;
-      varying vec2 uv;
-      void main() {
-        uv = 0.5 * (position + 1.0);
-        gl_Position = vec4(position, 0, 1);
-      }`,
+        precision mediump float;
+        attribute vec2 position;
+        varying vec2 uv;
+        void main() {
+          uv = 0.5 * (position + 1.0);
+          gl_Position = vec4(position, 0, 1);
+        }
+      `,
       attributes: {
         position: [ -4, -4, 4, -4, 0, 4 ]
       },
+      depth: { enable: false },
+      count: 3,
       uniforms: {
-        tex: ({count}) => this.fbos.points,
+        tex: () => this.fbos.points,
         wRcp: ({viewportWidth}) => 1.0 / viewportWidth,
         hRcp: ({viewportHeight}) => 1.0 / viewportHeight
       },
-      depth: { enable: false },
-      count: 3
     })()
   }
 
@@ -295,6 +374,18 @@ export class ReglRenderer extends Renderer {
       regl.framebuffer({
             width: this.width,
             height: this.height,
+            depth: false      })
+
+    this.fbos.ping =
+      regl.framebuffer({
+            width: this.width,
+            height: this.height,
+            depth: false
+      })
+
+    this.fbos.pong = regl.framebuffer({
+            width: this.width,
+            height: this.height,
             depth: false
       })
 
@@ -347,15 +438,16 @@ export class ReglRenderer extends Renderer {
     let contour_set = []
     const contour_machine = contours()
       .size([parseInt(width), parseInt(height)])
-      .thresholds(d3.range(2, 9).map(p => Math.pow(2, p*2)));
+      .thresholds(d3.range(-1, 9).map(p => Math.pow(2, p*2)));
 
-    for (let ix of range(this.tileSet.dictionary_lookups[field].size)) {
+    for (let ix of range(this.tileSet.dictionary_lookups[field].size / 2)) {
       this.draw_contour_buffer(field, ix);
       // Rather than take the fourth element of each channel, I can use
       // a Uint32Array view of the data directly since rgb channels are all
       // zero. This just gives a view 256 * 256 * 256 larger than the actual numbers.
       const my_contours = contour_machine(this.contour_alpha_vals)
-      my_contours.forEach((d) => {
+      console.log(sum(this.contour_alpha_vals))
+      my_contours.forEach( (d) => {
         d.label = this.tileSet.dictionary_lookups[field].get(ix)
       })
       contour_set = contour_set.concat(my_contours)
@@ -380,7 +472,7 @@ export class ReglRenderer extends Renderer {
 
   }
 
-  blur(fbo) {
+  /*blur(fbo) {
     var passes = [];
     var radii = [Math.round(
       Math.max(1, state.bloom.radius * pixelRatio / state.bloom.downsample))];
@@ -402,7 +494,7 @@ export class ReglRenderer extends Renderer {
         });
       }
     })
-  }
+  }*/
 
   draw_contour_buffer(field, ix) {
 
@@ -414,19 +506,35 @@ export class ReglRenderer extends Renderer {
     this.contour_alpha_vals = this.contour_alpha_vals || new Uint16Array(width * height)
 
     const props = this.props;
-    props.prefs.encoding.color.field = field;
+    props.prefs.encoding.color = {
+      field: field
+    }
     props.only_color = ix;
 
     this.fbos.contour.use(() => {
       this.regl.clear({color: [0, 0, 0, 0]});
       // read onto the contour vals.
-      this.render_point(props)
-
-
-
-
+      this.render_points(props)
       this.regl.read(this.contour_vals);
+      console.log(
+        this.contour_vals.filter(d => d != 0)
+        .map(d => d/6).reduce((a,b) => a + b, 0)
+      )
     })
+
+    // 3-pass blur
+    this.blur(this.fbos.contour, this.fbos.ping, 3)
+
+    this.fbos.contour.use(() => {
+      this.regl.read(this.contour_vals);
+      console.log("blah")
+      console.log(
+        this.contour_vals.filter(d => d != 0)
+        .map(d => d/6)
+        .reduce((a, b) => a + b, 0)
+      )
+    })
+
 
     let i = 0;
 
@@ -434,8 +542,6 @@ export class ReglRenderer extends Renderer {
       this.contour_alpha_vals[i/4] = this.contour_vals[i + 3] * 255;
       i += 4
     }
-    window.glur = glur;
-    glur(this.contour_alpha_vals, width, height, 9)
     return this.contour_alpha_vals
   }
 
@@ -533,7 +639,7 @@ export class ReglRenderer extends Renderer {
 
     for (let k of ['ix', 'position']) {
       parameters.attributes[k] = function(state, props) {
-        return props.manager.regl_buffer(k)
+        return props.manager.regl_elements.get(k)
       }
     }
 
@@ -564,7 +670,7 @@ export class ReglRenderer extends Renderer {
         if (typeof(props.prefs.encoding[k]) === "number") {
           return { constant: props.prefs.encoding[k] }
         }
-        return props.manager.regl_buffer(aesthetic.field)
+        return props.manager.regl_elements.get(aesthetic.field)
       }
     }
     this._renderer = regl(parameters)
@@ -586,15 +692,30 @@ class TileBufferManager {
   }
 
   ready(prefs) {
+    const { renderer, regl_elements } = this;
     const keys = Object.entries(prefs.encoding)
-    .map(([k, v]) => v ? v.field : undefined)
+    .map(([k, v]) => {
+      if (!v) return false
+      if (v.field) return v.field
+      if (typeof(v) == "string") return v.split("=>").map(str => str.trim())[0]
+      return false
+    })
     .filter( d => d)
+    for (let key of keys.concat(["position", "ix"])) {
+      const current = this.regl_elements.get(key);
 
-    for (let k of keys.concat(["position", "ix"])) {
-      if (!this.regl_elements.has(k)) {
+      if (current === null) {
+        // It's in the process of being built.
+        return false
+      } else if (current === undefined) {
         if (!this.tile.ready) {
+          // Can't build b/c no tile ready.
           return false
         }
+        // Request that th buffer be created before returning false.
+        regl_elements.set(key, null)
+        renderer.deferred_functions.push(() => this.create_regl_buffer(key))
+        return false
       }
     }
     return true
@@ -654,11 +775,9 @@ class TileBufferManager {
     }
   }
 
-  regl_buffer(key) {
+  create_regl_buffer(key) {
     const { regl, regl_elements } = this;
-    if (regl_elements.has(key)) {
-      return regl_elements.get(key)
-    }
+
     const data = this.create_buffer_data(key)
     let item_size = 4
     let data_length = data.length
@@ -677,7 +796,6 @@ class TileBufferManager {
       buffer_desc
     )
     buffer_desc.buffer.subdata(data, buffer_desc.offset)
-    return regl_elements.get(key)
   }
 }
 
@@ -693,7 +811,7 @@ class MultipurposeBufferSet {
 
   generate_new_buffer() {
     // Adds to beginning of list.
-    console.log(`Creating buffer number ${this.buffers.length}`)
+    // console.log(`Creating buffer number ${this.buffers.length}`)
     if (this.pointer) {this.buffer_offsets.unshift(this.pointer)}
     this.pointer = 0
     this.buffers.unshift(

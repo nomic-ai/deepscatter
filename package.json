@@ -43,6 +43,7 @@
     "d3-zoom": "^1.8.3",
     "flatbush": "^3.3.0",
     "glsl": "0.0.1",
+    "glsl-fast-gaussian-blur": "^1.0.2",
     "glslify": "^7.0.0",
     "glur": "^1.1.2",
     "lodash.merge": "^4.6.2",

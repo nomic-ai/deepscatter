@@ -243,27 +243,48 @@ export default class Scatterplot {
   drawContours(contours, drawTo) {
 
     const drawTwo = drawTo || select("body");
-    const svg = drawTwo.select("svg")
+    const canvas = drawTwo.select("#canvas-2d")
+    const ctx = canvas.node().getContext("2d")
 
-    svg.append("g")
-      .attr("fill", "none")
-      .attr("stroke", "steelblue")
-      .attr("stroke-linejoin", "round")
-      .selectAll("path")
-      .data(contours)
-      .join("path")
-      .attr("stroke-width", (d, i) => i % 5 ? 0.25 : 1)
-      .attr("d", geoPath());
 
-    const renderer = {
-      tick: () => svg.attr("transform", this._zoom.transform)
-    }
-    this._zoom.renderers.set("contours", renderer)
+    for (const contour of contours) {
+      ctx.fillStyle = "rgba(25, 25, 29, 1)"
+      ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
 
+      ctx.strokeStyle = "#8a0303"//"rbga(255, 255, 255, 1)"
+      ctx.fillStyle = 'rgba(30, 30, 34, 1)'
+
+      ctx.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k/2))]);
+
+      const path = geoPath(geoIdentity()
+        .scale(this._zoom.transform.k)
+        .translate([this._zoom.transform.x, this._zoom.transform.y]), ctx);
+
+  //      ctx.beginPath(), path(this.geojson.shape), ctx.fill();
+        ctx.beginPath(), path(contour), ctx.fill();
+      }
   }
 
   contours(aes = 'lc0') {
     const data = this._renderer.calculate_contours(aes)
+
+    const {x, y, x_, y_} = this._zoom.scales()
+    function fix_point(p) {
+      if (!p) {return}
+      if (p.coordinates) {
+        return fix_point(p.coordinates)
+      }
+      if (!p.length) {
+        return
+      }
+      if (p[0].length) {
+        return p.map(fix_point)
+      } else {
+        p[0] = x(x_.invert(p[0]))
+        p[1] = y(y_.invert(p[1]))
+      }
+    }
+    fix_point(data)
     this.drawContours(data)
   }
 

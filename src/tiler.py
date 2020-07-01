@@ -99,6 +99,7 @@ def rewrite_in_arrow_format(files, schema_safe, schema):
                                 convert_options = csv.ConvertOptions(
                                     column_types = schema_safe))
         for chunk_num, batch in enumerate(vals):
+            logging.info(f"Batch no {chunk_num}")
             # Loop through the whole CSV, writing out 100 MB at a time,
             # and converting each batch to dictionary as we go.
             d = dict()
@@ -312,7 +313,13 @@ class Tile():
         if self.data is None:
             return
         schema_copy = pa.schema(self.schema, metadata = metadata)
-        frame = pa.Table.from_batches(self.data, schema_copy).combine_chunks()
+        try:
+            frame = pa.Table.from_batches(self.data, schema_copy).combine_chunks()
+        except:
+            # Round trip to pandas while
+            # `pyarrow.lib.ArrowNotImplementedError: Concat with dictionary unification NYI`
+            frame = pa.Table.from_batches(self.data, schema_copy).to_pandas()
+            frame = pa.Table.from_pandas(frame, schema_copy)
         feather.write_feather(frame, destination, compression = compression)
         self.data = None
 

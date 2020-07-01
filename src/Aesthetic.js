@@ -4,7 +4,7 @@ import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool
  } from 'd3-scale-chromatic';
 
-import { * as d3Chromatic } from 'd3-scale-chromatic';
+import * as d3Chromatic from 'd3-scale-chromatic';
 
 const scales = {
   sqrt: scaleSqrt,
@@ -12,47 +12,46 @@ const scales = {
   linear: scaleLinear
 }
 
+const palette_size = 1024
+
 function to_buffer(data) {
-  const output = new Uint8Array(4 * 1024)
+  const output = new Uint8Array(4 * palette_size)
   output.set(data.flat())
   return output
 }
 
-const palette_size = 1024
-const viridis_raw = arange(palette_size).map(i => {
-  const p = rgb(interpolateViridis(i/palette_size));
-  return [p.r, p.g, p.b, 255]
-});
 
-
-const niccoli_rainbow = arange(1023).map(i => {
-  let p;
-  if (i < 512) {
-    p = interpolateWarm(i/511)
-  } else {
-    p = interpolateCool((512 - (i - 512))/511)
-  }
-  p = rgb(p);
-  return [p.r, p.g, p.b, 255]
-})
-
-const shufbow = shuffle([...niccoli_rainbow])
-
-
-const color_palettes = {
-  viridis: to_buffer(viridis_raw),
-  niccoli_rainbow: to_buffer(niccoli_rainbow),
-  shufbow: to_buffer(shufbow)
+function materialize_color_interplator(interpolator) {
+  const rawValues = arange(palette_size).map(i => {
+    const p = rgb(interpolator(i/palette_size));
+    return [p.r, p.g, p.b, 255]
+  });
+  return to_buffer(rawValues)
 }
 
+const color_palettes = {}
 
-console.log(d3Chromatic)
-for (let k of Object.keys(d3Chromatic)) {
-  if (k.startsWith("scheme")) {
-    console.log(k)
+for (let [k, v] of Object.entries(d3Chromatic)) {
+  if (k.startsWith("scheme") && typeof(v[0]) == "string") {
+    const colors = new Array(palette_size)
+    const scheme = v.map(v => {
+      const col = rgb(v)
+      return [col.r, col.g, col.b, 255]
+    })
+    for (let i of arange(palette_size)) {
+      colors[i] = scheme[i % v.length]
+    }
+    const name = k.replace("scheme", "").toLowerCase()
+
+    color_palettes[name] = to_buffer(colors)
   }
-  console.log(k)
-  color_palettes[k]
+  if (k.startsWith("interpolate")) {
+    const name = k.replace("interpolate", "").toLowerCase()
+    color_palettes[name] = materialize_color_interplator(v)
+    if (name == 'rainbow') {
+      color_palettes.shufbow = shuffle(color_palettes[name])
+    }
+  }
 }
 
 export const default_aesthetics = {

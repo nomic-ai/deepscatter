@@ -202,7 +202,6 @@ class Tile extends BaseTile {
         })
       if (!sorted) {
         for (const child of this._children) {
-          console.log(child.key)
           for (const p of child.points(bounding, sorted)) {
             yield p
           }

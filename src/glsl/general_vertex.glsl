@@ -1,4 +1,3 @@
-
 precision mediump float;
 
 #pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.glsl')
