@@ -15,8 +15,6 @@ export class Renderer {
     this.deferred_functions = []
   }
 
-
-
   get max_ix() {
     const {k} = this.zoom.transform
     const prefs = this.prefs

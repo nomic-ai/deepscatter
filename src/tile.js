@@ -3,7 +3,7 @@ import { quadtree } from 'd3-quadtree';
 import { scaleLinear } from 'd3-scale';
 import {contourDensity} from 'd3-contour';
 import {geoPath} from 'd3-geo';
-import {extent, range, shuffle, group, rollup} from 'd3-array';
+import {extent, range, shuffle, group, rollup, bisectLeft} from 'd3-array';
 // Shouldn't be here, just while contours are.
 import {select} from 'd3-selection';
 import 'regenerator-runtime/runtime'
@@ -202,6 +202,9 @@ class Tile extends BaseTile {
         })
       if (!sorted) {
         for (const child of this._children) {
+          if (!child.ready) {
+            continue
+          }
           for (const p of child.points(bounding, sorted)) {
             yield p
           }
@@ -578,6 +581,23 @@ export default class RootTile extends Tile {
   get mutations() {
     return this._mutations ?
       this._mutations : this._mutations = {}
+  }
+
+  findPoint(ix) {
+    let row;
+    window.bisectLeft = bisectLeft;
+    return this
+      .map(t => t)
+      .filter(t => t.table && t.min_ix < ix && t.max_ix > ix)
+      .map(t => {
+        const mid = bisectLeft(t.table.getColumn("ix").data.values, ix);
+        if (t.table.get(mid).ix == ix) {
+          return t.table.get(mid)
+        } else {
+          return null
+        }
+      })
+      .filter(d => d)
   }
 
   apply_mutations(function_map, synchronous = false) {

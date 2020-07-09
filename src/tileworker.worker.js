@@ -117,8 +117,8 @@ function mutate(map, table_buffer) {
     }
 
 
-    let tilepos = 0
-    funcmap.set("position_in_tile", function(datum) {return tilepos++})
+    // let tilepos = 0
+    // funcmap.set("position_in_tile", function(datum) {return tilepos++})
     data.set("position_in_tile", Array(table.length))
 
     let i = 0;

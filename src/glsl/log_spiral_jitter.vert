@@ -23,7 +23,7 @@ vec2 box_muller(in float ix, in float seed) {
   );
 }
 
-vec4 logarithmic_spiral_jitter(
+vec2 logarithmic_spiral_jitter(
   in float ix, // a random seed.
   in float a, // offset
   in float angle_parameter, // angle parameter
@@ -109,8 +109,8 @@ vec4 logarithmic_spiral_jitter(
             0., 1., 0.,
             0., 0., 1.);
 
-
-  return vec4(pos_spiral * shear_mat * adjust_to_viewport, 1.);
+  pos_spiral = pos_spiral * shear_mat * adjust_to_viewport;
+  return pos_spiral.xy;
 }
 
 #pragma glslify: export(logarithmic_spiral_jitter)

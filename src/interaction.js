@@ -300,12 +300,8 @@ export default class Zoom {
   webgl_scale(flatten = true) {
     const {width, height} = this
     const {x, y} = this.scales()
-    let values = window_transform(x, y, width, height)
-    if (flatten) {
-      // Needed for regl, although unclear
-      values = values.map(d => d.flat())
-    }
-    return values
+    let transform = window_transform(x, y).flat()
+    return transform
   }
 
   tick(force = false) {
@@ -340,7 +336,7 @@ export default class Zoom {
 }
 
 
-function window_transform(x_scale, y_scale, width, height) {
+export function window_transform(x_scale, y_scale) {
 
   // width and height are svg parameters; x and y scales project from the data x and y into the
   // the webgl space.
@@ -360,10 +356,6 @@ function window_transform(x_scale, y_scale, width, height) {
   const xmulti = gap(x_scale.range())/gap(x_scale.domain());
   const ymulti = gap(y_scale.range())/gap(y_scale.domain());
 
-  // the xscale and yscale ranges may not be the full width or height.
-
-  const aspect_ratio = width/height;
-
   // translates from data space to scaled space.
   const m1 =  [
     // transform by the scale;
@@ -372,13 +364,15 @@ function window_transform(x_scale, y_scale, width, height) {
     [0, 0, 1]
   ]
 
+  // Note--at the end, you need to multiply by this matrix.
+  // I calculate it directly on the GPU.
   // translate from scaled space to webgl space.
   // The '2' here is because webgl space runs from -1 to 1.
-  const m2 = [
+  /*const m2 = [
     [2 / width, 0, -1],
     [0, - 2 / height, 1],
     [0, 0, 1]
-  ]
+  ]*/
 
-  return [m1, m2]
+  return m1
 }

@@ -3,15 +3,19 @@ import { select, create } from 'd3-selection';
 import { range, sum, max } from 'd3-array';
 import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
-import { Zoom } from './interaction.js';
+import { Zoom, window_transform } from './interaction.js';
 // import { aesthetic_variables } from './shaders';
 import { Renderer } from './rendering.js';
 import Aesthetic from "./Aesthetic.js";
 import GLBench from 'gl-bench/dist/gl-bench';
 import {contours} from 'd3-contour';
 import gaussian_blur from './glsl/gaussian_blur.frag';
-import vertex_shader from './glsl/general_vertex.glsl';
+import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
+import {easeSinInOut, easeCubicInOut} from 'd3-ease';
+
+const aesthetic_variables = Array.from(Object.keys(Aesthetic))
+  .map(d => d.toLowerCase())
 
 export class ReglRenderer extends Renderer {
 
@@ -48,7 +52,7 @@ export class ReglRenderer extends Renderer {
 
     this.aes = {}
 
-    for (const aes_upper of ["Size", "Alpha", "Jitter_speed", "Jitter_radius", "Color", "Filter"]) {
+    for (const aes_upper of  Array.from(Object.keys(Aesthetic))) {
       const aes = aes_upper.toLowerCase()
       this.aes[aes] = new Aesthetic[aes_upper](aes, this.regl, tileSet)
     }
@@ -83,9 +87,16 @@ export class ReglRenderer extends Renderer {
     }
   }
 
+
   apply_encoding(encoding) {
+    this.most_recent_restart = Date.now()
     this.encoding = this.encoding || new Map();
-    for (let [k, v] of Object.entries(encoding)) {
+    console.log("APPLYING COLOR", encoding.color, encoding.domain, "STARTING WITH DOMAIN", this.aes.color.domain)
+
+    for (let k of aesthetic_variables) {
+      const v = encoding[k]
+      this.aes[k].update(v)
+      /*
       if (this.encoding.has(k) &&
           JSON.stringify(v) == this.encoding.get(k)
          ) {
@@ -94,6 +105,7 @@ export class ReglRenderer extends Renderer {
           this.aes[k].update(v)
           this.encoding.set(k, JSON.stringify(v))
         }
+        */
     }
   }
 
@@ -102,20 +114,42 @@ export class ReglRenderer extends Renderer {
     const { transform } = this.zoom;
     const {k} = transform;
 
+    let webglscale = this.default_webgl_scale;
+    let scale_matches_tiles = true
+    if (
+      this.prefs.encoding.x.transform && this.prefs.encoding.x.transform != "literal" ||
+      this.prefs.encoding.y.transform && this.prefs.encoding.x.transform != "literal"
+    ) {
+      scale_matches_tiles = false
+      webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat()
+    }
+
     const props = {
       zoom_balance: prefs.zoom_balance,
       transform: transform,
       max_ix: this.max_ix,
       time: (Date.now() - this.zoom._start)/1000,
+      update_time: (Date.now() - this.most_recent_restart)/1000,
       string_index: 0,
       prefs: prefs,
       color_type: undefined,
+      start_time: this.most_recent_restart,
+      webgl_scale: webglscale,
+      scale_matches_tiles,
       color_picker_mode: 0 // whether to draw as a color picker.
     }
     // Clone.
     return JSON.parse(JSON.stringify(props))
   }
 
+  get default_webgl_scale() {
+    if (this._default_webgl_scale) {
+      return this._default_webgl_scale
+    } else {
+      this._default_webgl_scale = this.zoom.webgl_scale()
+      return this._default_webgl_scale
+    }
+  }
 
   render_points(props) {
 
@@ -135,6 +169,7 @@ export class ReglRenderer extends Renderer {
         }
       } catch (err) {
         console.warn(err)
+        // throw "Dead"
         continue
       }
 
@@ -161,7 +196,6 @@ export class ReglRenderer extends Renderer {
   }
 
   tick(force = false) {
-
     const { prefs } = this;
     const { regl, tileSet, canvas, width, height } = this;
     const { transform } = this.zoom;
@@ -362,9 +396,9 @@ export class ReglRenderer extends Renderer {
 
     this.aesthetic_maps = this.aesthetic_maps || {}
 
-    for (let k of ["alpha", "color", "size",
-                   "jitter_radius", "jitter_speed", "filter"]) {
-      [this.aesthetic_maps[`${k}_old`],
+    for (let k of aesthetic_variables) {
+      // console.log(k, this.aesthetic_maps);
+      [this.aesthetic_maps[`last_${k}`],
        this.aesthetic_maps[k]] = this.aes[k].create_textures();
     }
 
@@ -535,7 +569,6 @@ export class ReglRenderer extends Renderer {
       )
     })
 
-
     let i = 0;
 
     while (i < width * height * 4) {
@@ -549,8 +582,6 @@ export class ReglRenderer extends Renderer {
 
     const { regl, width, height, zoom, prefs } = this;
     // This should be scoped somewhere to allow resizing.
-    const [webgl_scale, untransform_matrix] =
-    zoom.webgl_scale()
 
     const parameters = {
       depth: { enable: false },
@@ -577,6 +608,11 @@ export class ReglRenderer extends Renderer {
       },
       uniforms: {
         // Used to quickly count regions.
+        u_interpolation: function(context, props) {
+          //const fraction = (props.time)/props.prefs.duration;
+          const fraction = (props.update_time)/props.prefs.duration;
+          return fraction < 1 ? easeCubicInOut(fraction) : 1
+        },
         u_only_color: function(context, props) {
           if (props.only_color !== undefined) {
             return props.only_color
@@ -586,17 +622,14 @@ export class ReglRenderer extends Renderer {
           return -2
         },
         u_color_picker_mode: regl.prop("color_picker_mode"),
-        u_aspect_ratio: width/height,
+        u_width: ({viewportWidth}) => viewportWidth,
+        u_height: ({viewportHeight}) => viewportHeight,
+        u_aspect_ratio: ({viewportWidth, viewportHeight}) => viewportWidth/viewportHeight,
         u_sprites: function(context, props) {
           return props.sprites ?
           props.sprites : this.fbos.dummy
         },
-        u_color_map: this.aesthetic_maps.color,
-        u_alpha_map: this.aesthetic_maps.alpha,
-        u_size_map: this.aesthetic_maps.size,
-        u_jitter_radius_map: this.aesthetic_maps.jitter_radius,
-        u_jitter_speed_map: this.aesthetic_maps.jitter_speed,
-        u_filter_map: this.aesthetic_maps.filter,
+
         u_jitter: function(context, props) {
           if (props.prefs.jitter == "spiral") {
             // animated in a logarithmic spiral.
@@ -621,8 +654,7 @@ export class ReglRenderer extends Renderer {
         u_k: function(context, props) {
           return props.transform.k;
         },
-        u_window_scale: webgl_scale,
-        u_untransform: untransform_matrix,
+        u_window_scale: regl.prop('webgl_scale'),
         u_time: function(context, props) {
           return props.time;
         },
@@ -637,41 +669,63 @@ export class ReglRenderer extends Renderer {
       }
     }
 
-    for (let k of ['ix', 'position']) {
+    for (let k of ['ix']) {
       parameters.attributes[k] = function(state, props) {
         return props.manager.regl_elements.get(k)
       }
     }
 
-    for (let k of ['color', 'label', 'jitter_radius',
+    for (let k of ['x', 'y', 'color', 'jitter_radius',
                    'jitter_speed', 'size', 'alpha', 'filter'
                  ]) {
       const aesthetic = this.aes[k]
-      parameters.uniforms["u_" + k + "_domain"] = function (state, props) {
-        // wrap as function to clue regl that it might change.
-        return aesthetic.get_domain()
+
+      for (let temporal of ["last_", ""]) {
+        parameters.uniforms[`u_${temporal}${k}_map`] =
+          this.aesthetic_maps[temporal + k]
+
+        if (k == 'filter' && temporal == 'last') {
+          // Don't track the last filter.
+          continue
+        }
+
+        parameters.uniforms["u_" + temporal + k + "_domain"] = function (state, props) {
+          // wrap as function to clue regl that it might change.
+          return aesthetic[temporal + "domain"]
+        }
+
+        parameters.uniforms[`u_${temporal}${k}_transform`] = function(state, props) {
+          const t = aesthetic["_" + temporal + "transform"]
+          if (t == "linear") return 1
+          if (t == "sqrt") return 2
+          if (t == "log") return 3
+          if (t == "literal") return 4
+          return 0
+        }
+
+        parameters.attributes[`a_${temporal}${k}`] = function(state, props) {
+
+          if (props.prefs.encoding[k] === null ||
+            false//aesthetic[field] === undefined
+          ) {
+            return { constant: 1 }
+          }
+          if (typeof(props.prefs.encoding[k]) === "number") {
+            return { constant: props.prefs.encoding[k] }
+          }
+          if (temporal + k === "last_color") {
+//            console.log(aesthetic[temporal + "field"])
+          }
+          return props.manager.regl_elements.get(aesthetic[temporal + "field"])
+        }
+
+
+
       }
-      parameters.uniforms[`u_${k}_transform`] = function(state, props) {
-        const t = aesthetic.transform
-        if (t == "linear") return 1
-        if (t == "sqrt") return 2
-        if (t == "log") return 3
-        return 0
-      }
+
+
 
       // Copy the parameters from the data name.
-      parameters.attributes[`a_${k}`] = function(state, props) {
-
-        if (props.prefs.encoding[k] === null ||
-          aesthetic.field === undefined
-        ) {
-          return { constant: 1 }
-        }
-        if (typeof(props.prefs.encoding[k]) === "number") {
-          return { constant: props.prefs.encoding[k] }
-        }
-        return props.manager.regl_elements.get(aesthetic.field)
-      }
     }
     this._renderer = regl(parameters)
     return this._renderer
@@ -693,15 +747,22 @@ class TileBufferManager {
 
   ready(prefs) {
     const { renderer, regl_elements } = this;
+    const { aes } = renderer;
     const keys = Object.entries(prefs.encoding)
     .map(([k, v]) => {
-      if (!v) return false
-      if (v.field) return v.field
-      if (typeof(v) == "string") return v.split("=>").map(str => str.trim())[0]
-      return false
+      const needed = [];
+      if (!v || v === undefined) return needed;
+      if (v.field) needed.push(v.field);
+      if (k === 'color') {
+        //console.log("Last field", aes[k].last_field)
+      }
+      if (aes[k].last_field) needed.push(aes[k].last_field);
+      if (typeof(v) == "string") needed.push(v.split("=>").map(str => str.trim())[0])
+      return needed
     })
-    .filter( d => d)
-    for (let key of keys.concat(["position", "ix"])) {
+    .flat()
+
+    for (let key of keys.concat(["ix"])) {
       const current = this.regl_elements.get(key);
 
       if (current === null) {

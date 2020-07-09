@@ -47,6 +47,12 @@ export default class Scatterplot {
     for (let k of Object.keys(default_aesthetics)) {
       this.encoding[k] = null;
     }
+    this.encoding.x = {'field': 'x'}
+    this.encoding.y = {'field': 'y'}
+    this.prefs = {
+      'zoom_balance': 0.25,
+      "duration": 2
+    }
 
     for (const d of base_elements) {
       const container =
@@ -173,14 +179,6 @@ export default class Scatterplot {
   }
 
   update_prefs(prefs) {
-    if (this.prefs === undefined) {
-      // defaults.
-      this.prefs = {
-        'zoom_balance': 0.25
-
-      }
-    }
-
     merge(this.prefs, prefs)
   }
 
@@ -193,7 +191,6 @@ export default class Scatterplot {
     if (!this._root) {
       return this.reinitialize().then(this.plotAPI(prefs))
     } */
-
 
 
     if (prefs['source_url'] && prefs.source_url !== this.source_url) {
@@ -211,6 +208,14 @@ export default class Scatterplot {
       })
     }
 
+    if (prefs.encoding && prefs.encoding.position == "literal") {
+      console.warn("FOOOO")
+      // A shortcut.
+      prefs.encoding.x = {"field": "x", "transform": "literal"}
+      prefs.encoding.y = {"field": "y", "transform": "literal"}
+      delete prefs.encoding.position
+    }
+
     return this._root.promise.then(d => {
 
       this.update_prefs(prefs)
@@ -218,13 +223,11 @@ export default class Scatterplot {
         this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration)
       }
       if (prefs.encoding) {
-
         this.interpret_encoding(prefs.encoding)
-
         for (let [name, renderer] of this._zoom.renderers) {
           if (renderer.apply_encoding) {
             renderer.apply_encoding(
-              this.encoding
+              this.prefs.encoding
             )
           }
         }
