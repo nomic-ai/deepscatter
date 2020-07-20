@@ -31,12 +31,10 @@ class Tile extends BaseTile {
     this.min_ix = undefined;
     this.max_ix = undefined;
 
-
+    this.promise = Promise.resolve(1)
     // Start a download process immediately.
     // populates this.download
-    this._download()
-
-    this.underway_promises = new Set(["_to"])
+    this.extend_promise(() => this.download())
 
     this.class = new.target
   }
@@ -90,7 +88,7 @@ class Tile extends BaseTile {
   download_to_depth(depth, corners = {"x":[-1, 1], "y": [-1, 1]}) {
     // First, execute the download to populate this.max_ix
 
-    return this.download
+    return this.download()
     .then(_ => {
       // If the last point here is less than the target depth, keep going.
       if (this.max_ix < depth &&
@@ -133,49 +131,41 @@ class Tile extends BaseTile {
   }
 
 
-  apply_mutations_once(function_map) {
+  apply_mutations_once() {
     // Default to a resolved promise; if work is required,
     // it will be populated.
 
     const {needed_mutations} = this;
 
+    let new_promise;
+
+    if (Object.keys(needed_mutations).length === 0) {
+      return Promise.resolve("complete")
+    }
+
     if (needed_mutations === undefined) {
       return Promise.resolve("deferred")
     }
 
-    if (this.underway_promises.has("mutate")) {
-      return Promise.resolve("deferred")
-    }
+    return this.extend_promise(() => {
+      // Nuke the table
+      this._table = undefined;
+      console.log("Posting", ...Object.keys(needed_mutations), "on", this.key)
+      return this.tileWorker
+        .run_transforms(
+          needed_mutations, Comlink.transfer(this._table_buffer, [this._table_buffer])
+        )
+      .then( ([buffer, codes]) => {
+        // console.log(`Off location operation took ${Date.now() - start}ms on ${this.key}`)
+        this._table_buffer = buffer;
+        Object.assign(this._current_mutations, needed_mutations)
 
-    if (Object.keys(needed_mutations).length == 0) {
-      return Promise.resolve("unchanged")
-     }
+        this.local_dictionary_lookups = codes
+        this.update_master_dictionary_lookups()
 
-    // Nuke the table
-    this._table = undefined;
-    this.underway_promises.add("mutate")
-
-    if (this._table_buffer == undefined) {
-      return Promise.resolve("deferred")
-    }
-
-    return this.tileWorker
-      .run_transforms(
-        needed_mutations, Comlink.transfer(this._table_buffer, [this._table_buffer])
-      )
-    .then( ([buffer, codes]) => {
-      // console.log(`Off location operation took ${Date.now() - start}ms on ${this.key}`)
-      this._table_buffer = buffer;
-      Object.assign(this._current_mutations, needed_mutations)
-      this.underway_promises.delete("mutate")
-
-      this.local_dictionary_lookups = codes
-      this.update_master_dictionary_lookups()
-
-      return "changed"
-
-
-    })
+        return "changed"
+      })
+      })
 
   }
 
@@ -252,7 +242,7 @@ class Tile extends BaseTile {
     return this._children;
   }
 
-  kdtree() {
+  /*kdtree() {
     if (this._kdtree) {
       return this._kdtree
     }
@@ -282,7 +272,7 @@ class Tile extends BaseTile {
     this._kdtree = new ArrowTree(this.table, "x", "y")
     return this._kdtree
   }
-
+  */
   get table() {
 
     if (this._table) {return this._table}
@@ -295,12 +285,18 @@ class Tile extends BaseTile {
 
   }
 
-  _download() {
+  download() {
     // This should only be called once per tile.
+    if (this._download) {return this._download}
+
+    if (this._already_called) {
+      throw("Illegally attempting to download twice")
+    }
+    this._already_called = true;
+
     const url = `${window.location.origin}/${this.url}/${this.key}.feather`
 
-    this.download =
-      this.tileWorker
+    this._download = this.tileWorker
         .fetch(url, this.needed_mutations)
         .then(([buffer, metadata, codes]) => {
           // metadata is passed separately b/c I dont know
@@ -319,16 +315,20 @@ class Tile extends BaseTile {
 
           return this.table
         })
+    return this._download
   }
 
-  get promise() {
-    // Return a promise that guarantees we're ready to work.
-    return Promise.all([this.download])
+
+  extend_promise(callback) {
+    this.promise = this.promise.then(() => callback())
+    return this.promise
   }
 
   get ready() {
     // The flag for readiness is whether there is
     // an arraybuffer at this._table_buffer
+
+    // Unlike 'promise,' this returns asychronously
     return this._table_buffer && this._table_buffer.byteLength > 0
   }
 
@@ -608,11 +608,11 @@ export default class RootTile extends Tile {
     // if the mutation was applied.
 
     Object.assign(this.mutations, function_map)
-    const all = this.map(tile => [tile, tile.apply_mutations_once(function_map)])
+    const all = this.map(tile => tile.apply_mutations_once(function_map))
     if (synchronous) {
       return all
     } else {
-      return Promise.resolve(all)
+      return Promise.all(all)
     }
 
   }

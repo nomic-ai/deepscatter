@@ -3,6 +3,7 @@ import { timer, timerFlush, interval } from 'd3-timer';
 import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
 import { mean, range, min, extent } from 'd3-array';
 import { scaleLinear } from 'd3-scale';
+import { annotation, annotationLabel } from 'd3-svg-annotation';
 
 /*export class Mouseover {
   // Easiest just to inherit from zoom.
@@ -42,8 +43,9 @@ export default class Zoom {
   }
 
   attach_renderer(key, renderer) {
-    renderer.zoom = this;
+    console.log(key, renderer)
     this.renderers.set(key, renderer);
+    renderer.bind_zoom(this);
     renderer.zoom.initialize_zoom()
     return this;
   }
@@ -63,6 +65,37 @@ export default class Zoom {
       .duration(duration)
       .call(zoomer.transform, t);
 
+  }
+
+  html_annotation(points) {
+    const div = this.canvas.node().parentNode.parentNode
+    const els = select(div)
+      .selectAll("div.note")
+      .data(points)
+      .join(
+        enter => enter
+         .append("div")
+         .attr("class", "note")
+         .style("top", 0)
+         .style("left", 0)
+         .style("position", "fixed")
+         .style("z-index", 100)
+         .style("border-radius", "15px")
+         .style("padding", "10px")
+         .style("background", "rgba(255, 220, 225, 0.8)"),
+        exit => exit
+          ,
+        update => update
+        .html(d => label_from_point(d.data))
+
+      )
+      //.html(d => label_from_point(d.data))
+      els
+      .html(d => label_from_point(d.data))
+      .style("transform", d => {
+        const t = `translate(${d.x + d.dx}px, ${d.y + d.dy}px)`
+        return t
+      })
   }
 
   zoom_to_bbox(corners, duration = 4) {
@@ -125,6 +158,9 @@ export default class Zoom {
       .append("g")
       .attr("class", "label")
 
+    const renderer = this.renderers.get("regl")
+    const x_aes = renderer.aes.x;
+    const y_aes = renderer.aes.y;
 
     this.canvas.on("mousemove", () => {
 
@@ -133,35 +169,63 @@ export default class Zoom {
         return
       }
       last_fired = Date.now()
-
-      const {x_, y_} = this.scales() || {}
+      const p = renderer.color_pick(event.x, event.y);
+      // const {x_, y_} = this.scales() || {}
+      /*()
 
       // Might happen before the data is loaded.
-      if (x_ === undefined) {return}
       const closest = this.tileSet.find_closest(
         [x_.invert(event.x),
          y_.invert(event.y)
        ],
        undefined
-/*       function(node) {
-          return true
-       } */
      );
-
+    */
     // if undefined, empty arrary.
-    const data = closest ? [closest] : [];
+    // const data = closest ? [closest] : [];
+    const data = p ? [p] : [];
+    let x_, y_;
+    if (x_aes.field === 'x') {
+      const t = this.scales()
+      x_ = t.x_;
+      y_ = t.y_;
+    } else {
+      x_ = this.transform.rescaleX(x_aes.scale)
+      y_ = this.transform.rescaleY(y_aes.scale)
+    }
 
+    let d = data[0]
+
+    const annotations = d ? [
+      {
+        x: x_(x_aes.value_for(data[0])),
+        y: y_(y_aes.value_for(data[0])),
+        /*note: {
+          title: d[this.prefs.label_field],
+          bgPadding: 10,
+          wrapSplitter: /\n/,
+          label: ""//label_from_point(d)
+        },*/
+        data: d,
+        dx: 150,
+        dy: 30
+      }
+    ] : []
+
+    this.annotate(annotations)
+    this.html_annotation(annotations)
+
+    if (x_ === undefined) {return}
     const labelSet = labels
       .selectAll("g")
       .data(data)
       .join("g")
       .attr("transform", d => `translate(
-        ${x_(d.x)},
-        ${y_(d.y)}
-      )`)      .on("click", d => clickfunc(d))
+        ${x_(x_aes.value_for(d))},
+        ${y_(y_aes.value_for(d))}
+      )`)
+      .on("click", d => clickfunc(d))
 
-      /*
-    */
     labelSet
       .selectAll("circle")
       .data(d => [d])
@@ -169,18 +233,39 @@ export default class Zoom {
       .attr("r", 6)
       .style("fill", "pink")
 
-    labelSet
-      .selectAll("text")
-      .data(d => [d])
-      .join("text")
-      .attr("transform", "translate(3, 3)")
-      .text(d => d[this.prefs.label_field])
-      .style("font-size", "18px")
-      .style("fill", "white")
     })
-
   }
 
+  annotate(points) {
+    const type = annotationLabel
+
+    const makeAnnotations = annotation()
+      .editMode(false)
+      //also can set and override in the note.padding property
+      //of the annotation object
+      .notePadding(15)
+      .type(type)
+      //accessors & accessorsInverse not needed
+      //if using x, y in annotations JSON
+      .accessors({
+        x: d => d.x,
+        y: d => d.y
+      })
+      .annotations(points)
+
+    const container = select("#deepscatter-svg")
+      .selectAll("g.annotation-group")
+      .data([1])
+
+    const entering = container.enter().append("g")
+      .attr("class", "annotation-group")
+
+    container
+      .merge(entering)
+      .call(makeAnnotations)
+
+
+  }
 
   current_corners() {
     // The corners of the current zoom transform, in data coordinates.
@@ -375,4 +460,25 @@ export function window_transform(x_scale, y_scale) {
   ]*/
 
   return m1
+}
+
+function label_from_point(point, defaults) {
+  // defaults: a Set of keys to include.
+  let output = ""
+  const nope = new Set([
+    "x", "y", "ix", "bookstack", null, "tile_key"
+  ])
+  for (let [k, v] of point.entries()) {
+    if (defaults) {
+      if (!defaults.has(k)) {
+        continue
+      }
+    } else {
+      if (nope.has(k)) {continue}
+      if (v === null) {continue}
+      if (v === '') {continue}
+    }
+    output += `<strong>${k}</strong>: ${v}<br />`
+  }
+  return output
 }

@@ -168,6 +168,16 @@ class Aesthetic {
     return this._range || this.default_range
   }
 
+  get scale() {
+    return scales[this.transform]()
+      .domain(this.domain)
+      .range(this.range)
+  }
+
+  value_for(point) {
+    return point[this.field];
+  }
+
   create_textures() {
 
     this.texture_buffer = new Uint8Array(this.texture_size * 4)
@@ -240,73 +250,80 @@ class Aesthetic {
      return;
    }
 
-    if (typeof(encoding) == "string") {
-      encoding = parseLambdaString(encoding)
-      if (this.label === 'filter') {
-        encoding.domain = [0, 1023]
-      }
-      console.log(encoding)
-    }
-
-    if (typeof(encoding) == "numeric") {
-      encoding = {
-        "field": "ix",
-        "domain": [0, 0],
-        "range": [encoding, encoding]
-      }
-    }
-
-    if (encoding.lambda) {
-      // May overwrite 'field!!'
-      Object.assign(encoding, parseLambdaString(encoding.lambda))
-    }
-    const { label } = this;
-    const { lambda, field } = encoding;
-
-
-    // Store the last and current values.
-
-    this._last_transform = this._transform;
-    this._last_field = this.field
-    this.field = field
-    this._last_domain = safe_expand(this._domain)
-    this._domain = safe_expand(encoding.domain)
-    this.last_range = safe_expand(this.range)
-    this._range = safe_expand(encoding.range)
-
-    // resets to default if undefined
-
-    /*
-    console.log("Last Domain", this.label,
-       "domains", this.domain, this.last_domain,
-       this.field, this.last_field
-    )*/
-
-    this._transform = encoding.transform || this._last_transform;
-
-    if (typeof(encoding) == "number") {
-      this._range = [encoding, encoding]
-    }
-
-    const {range, domain, transform } = this;
-
-    // Passing a number directly means that all data
-    // will simply be represented as that number.
-    // Still maybe at the cost of a texture lookup, though.
-
-    // Set up the 'previous' value from whatever's currently
-    // being used.
-    this.post_to_regl_buffer(0)
-
-    if (lambda) {
-      this.apply_function_to_textures(field, this.domain, lambda)
-    } else {
-      this.encode_for_textures(this.range)
-    }
-
-    this.post_to_regl_buffer(1)
-
+  if (typeof(encoding) == "string") {
+  encoding = parseLambdaString(encoding)
+  if (this.label === 'filter') {
+    encoding.domain = [0, 1023]
   }
+  console.log(encoding)
+  }
+
+  if (typeof(encoding) == "numeric") {
+    encoding = {
+      "field": "ix",
+      "domain": [0, 0],
+      "range": [encoding, encoding]
+    }
+  }
+
+  if (encoding.lambda) {
+    // May overwrite 'field!!'
+    Object.assign(encoding, parseLambdaString(encoding.lambda))
+  }
+  const {
+    label
+  } = this;
+  const {
+    lambda,
+    field
+  } = encoding;
+
+
+  // Store the last and current values.
+
+  this._last_transform = this._transform;
+  this._last_field = this.field
+  this.field = field
+  this._last_domain = safe_expand(this._domain)
+  this._domain = safe_expand(encoding.domain)
+  this.last_range = safe_expand(this.range)
+  this._range = safe_expand(encoding.range)
+
+  // resets to default if undefined
+
+  /*
+  console.log("Last Domain", this.label,
+   "domains", this.domain, this.last_domain,
+   this.field, this.last_field
+  )*/
+
+  this._transform = encoding.transform || this._last_transform;
+
+  if (typeof(encoding) == "number") {
+    this._range = [encoding, encoding]
+  }
+
+  const {
+    range,
+    domain,
+    transform
+  } = this;
+
+  // Passing a number directly means that all data
+  // will simply be represented as that number.
+  // Still maybe at the cost of a texture lookup, though.
+
+  // Set up the 'previous' value from whatever's currently
+  // being used.
+  this.post_to_regl_buffer(0)
+
+  if (lambda) {
+    this.apply_function_to_textures(field, this.domain, lambda)
+  } else {
+    this.encode_for_textures(this.range)
+  }
+
+  this.post_to_regl_buffer(1)}
 
   encode_for_textures(range) {
 
@@ -342,6 +359,9 @@ class Aesthetic {
       return
     }
     const column = this.tileSet.table.getColumn(field)
+    if (!column) {
+      throw(`Column ${field} does not exist on table.`)
+    }
     if (column.type.dictionary) {
       const lookup = this.tileSet.dictionary_lookups[field]
       try {
@@ -363,24 +383,31 @@ class Size extends Aesthetic {
 
 class X extends Aesthetic {
 
-  constructor(...args) {
+  constructor(max, ...args) {
     super(...args)
+    this.max = max
     this._transform = "literal"
   }
 
   get range() {
-    return [2000, 0]
+    return [0, this.max]
   }
 
   get previous_range() {
-    return [2000, 0]
+    return [0, this.max]
   }
 
   get default_val() {return 0};
 }
 
 class Y extends X {
+  get range() {
+    return [this.max, 0]
+  }
 
+  get previous_range() {
+    return [this.max, 0]
+  }
 }
 
 class Alpha extends Aesthetic {

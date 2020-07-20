@@ -80,17 +80,14 @@ export default class Scatterplot {
 
     this._root = new Tile(this.source_url, prefs);
 
-    console.log("Making Renderer", this)
 
     this._renderer = new ReglRenderer(
       "#container-for-webgl-canvas",
       this._root,
       this,
       {width: this.width, height: this.height}
-
     );
 
-    console.log("Made renderer")
     this._zoom = new Zoom("#deepscatter-svg", this.prefs);
 
     this._zoom.attach_tiles(this._root);
@@ -184,8 +181,8 @@ export default class Scatterplot {
 
   plotAPI(prefs = {}) {
 
-
     if (prefs === undefined || prefs === null) {return Promise.resolve(1)}
+
     this.update_prefs(prefs);
     /*
     if (!this._root) {
@@ -199,7 +196,7 @@ export default class Scatterplot {
     }
 
     if (prefs.mutate) {
-      this._root.apply_mutations(prefs.mutations)
+      this._root.apply_mutations(prefs.mutate)
     }
 
     if (prefs.basemap_geojson) {
@@ -208,15 +205,8 @@ export default class Scatterplot {
       })
     }
 
-    if (prefs.encoding && prefs.encoding.position == "literal") {
-      console.warn("FOOOO")
-      // A shortcut.
-      prefs.encoding.x = {"field": "x", "transform": "literal"}
-      prefs.encoding.y = {"field": "y", "transform": "literal"}
-      delete prefs.encoding.position
-    }
 
-    return this._root.promise.then(d => {
+    return this._root.promise.then(() => {
 
       this.update_prefs(prefs)
       if (prefs.zoom) {
@@ -230,6 +220,9 @@ export default class Scatterplot {
               this.prefs.encoding
             )
           }
+          if (renderer.apply_webgl_scale) {
+            renderer.apply_webgl_scale(prefs)
+          }
         }
       }
       this._zoom.restart_timer(60000)
@@ -237,10 +230,26 @@ export default class Scatterplot {
   }
 
   interpret_encoding(encoding) {
+    if (encoding && encoding.position) {
+      if (encoding.position === "literal") {
+      // A shortcut.
+        encoding.x = {"field": "x", "transform": "literal"}
+        encoding.y = {"field": "y", "transform": "literal"}
+      } else {
+        const field = encoding.position
+        encoding.x = {"field": field + ".x", "transform": "literal"}
+        encoding.y = {"field": field + ".y", "transform": "literal"}
+      }
+
+      delete encoding.position
+    }
+
+
     this.encoding = this.encoding || JSON.parse(JSON.stringify(default_aesthetics))
-    // Could be crazy complicated.
+    // The merge operation could be crazy complicated to handle partial intersections.
     merge(this.encoding, encoding)
     merge(this.prefs.encoding, this.encoding)
+    delete this.prefs.encoding["position"]
   }
 
   drawContours(contours, drawTo) {

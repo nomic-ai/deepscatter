@@ -13,6 +13,7 @@ import gaussian_blur from './glsl/gaussian_blur.frag';
 import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import {easeSinInOut, easeCubicInOut} from 'd3-ease';
+import unpackFloat from "glsl-read-float";
 
 const aesthetic_variables = Array.from(Object.keys(Aesthetic))
   .map(d => d.toLowerCase())
@@ -26,7 +27,6 @@ export class ReglRenderer extends Renderer {
         canvas: this.canvas.node(),
       }
     );
-
 
     /* BOILERPLATE */
     let gl = this.canvas.node().getContext('webgl') || this.canvas.node().getContext('experimental-webgl');
@@ -54,7 +54,14 @@ export class ReglRenderer extends Renderer {
 
     for (const aes_upper of  Array.from(Object.keys(Aesthetic))) {
       const aes = aes_upper.toLowerCase()
-      this.aes[aes] = new Aesthetic[aes_upper](aes, this.regl, tileSet)
+      const args = [aes, this.regl, tileSet]
+      if (aes_upper == "Y") {
+        args.unshift(this.height)
+      }
+      if (aes_upper == "X") {
+        args.unshift(this.width)
+      }
+      this.aes[aes] = new Aesthetic[aes_upper](...args)
     }
 
     // allocate buffers in 64 MB blocks.
@@ -91,51 +98,54 @@ export class ReglRenderer extends Renderer {
   apply_encoding(encoding) {
     this.most_recent_restart = Date.now()
     this.encoding = this.encoding || new Map();
-    console.log("APPLYING COLOR", encoding.color, encoding.domain, "STARTING WITH DOMAIN", this.aes.color.domain)
-
     for (let k of aesthetic_variables) {
       const v = encoding[k]
       this.aes[k].update(v)
-      /*
-      if (this.encoding.has(k) &&
-          JSON.stringify(v) == this.encoding.get(k)
-         ) {
-        continue
-        } else {
-          this.aes[k].update(v)
-          this.encoding.set(k, JSON.stringify(v))
-        }
-        */
     }
   }
+
+  apply_webgl_scale(prefs) {
+    // The webgl transform can either be 'literal', in which case it uses
+    // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
+    // in which case it has to calculate off of the x and y dimensions.
+    if (!this._webgl_scale_history) {
+      this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale]
+    }
+      this._use_scale_to_download_tiles = true;
+      if (
+        this.prefs.encoding.x.transform && this.prefs.encoding.x.transform != "literal" ||
+        this.prefs.encoding.y.transform && this.prefs.encoding.x.transform != "literal"
+      ) {
+        const webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat();
+        this._webgl_scale_history.unshift(webglscale);
+        this._use_scale_to_download_tiles = false;
+      } else {
+        // Use the default linked to the coordinates used to build the tree.
+        this._webgl_scale_history.unshift(this.default_webgl_scale);
+      }
+
+  }
+
+
 
   get props() {
     const prefs = this.prefs
     const { transform } = this.zoom;
     const {k} = transform;
-
-    let webglscale = this.default_webgl_scale;
-    let scale_matches_tiles = true
-    if (
-      this.prefs.encoding.x.transform && this.prefs.encoding.x.transform != "literal" ||
-      this.prefs.encoding.y.transform && this.prefs.encoding.x.transform != "literal"
-    ) {
-      scale_matches_tiles = false
-      webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat()
-    }
-
     const props = {
+      colors_as_grid: 0,
       zoom_balance: prefs.zoom_balance,
       transform: transform,
       max_ix: this.max_ix,
       time: (Date.now() - this.zoom._start)/1000,
       update_time: (Date.now() - this.most_recent_restart)/1000,
       string_index: 0,
-      prefs: prefs,
+      prefs: JSON.parse(JSON.stringify(prefs)),
       color_type: undefined,
       start_time: this.most_recent_restart,
-      webgl_scale: webglscale,
-      scale_matches_tiles,
+      webgl_scale: this._webgl_scale_history[0],
+      last_webgl_scale: this._webgl_scale_history[1],
+      use_scale_for_tiles: this._use_scale_to_download_tiles,
       color_picker_mode: 0 // whether to draw as a color picker.
     }
     // Clone.
@@ -168,7 +178,7 @@ export class ReglRenderer extends Renderer {
           continue
         }
       } catch (err) {
-        console.warn(err)
+        // console.warn(err)
         // throw "Dead"
         continue
       }
@@ -176,7 +186,7 @@ export class ReglRenderer extends Renderer {
       const this_props = {
         manager: manager,
         image_locations: manager.image_locations,
-        sprites: this.sprites
+        sprites: this.sprites,
       }
       Object.assign(this_props, props)
       prop_list.push(this_props)
@@ -206,7 +216,11 @@ export class ReglRenderer extends Renderer {
     this.tick_num++;
 
     // Set a download call in motion.
-    tileSet.download_to_depth(this.props.max_ix, this.zoom.current_corners())
+    if (this._use_scale_to_download_tiles) {
+      tileSet.download_to_depth(this.props.max_ix, this.zoom.current_corners())
+    } else {
+      tileSet.download_to_depth(prefs.max_points)
+    }
 
     regl.clear({
       color: [0.9, 0.9, 0.93, 0],
@@ -214,13 +228,14 @@ export class ReglRenderer extends Renderer {
     });
 
     const start = Date.now()
-
+    let current = () => undefined
     while (Date.now() - start < 10 && this.deferred_functions.length) {
       // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
+      current = this.deferred_functions.shift()
       try {
-        this.deferred_functions.shift()()
+        current()
       } catch (err) {
-        console.warn(err)
+        console.warn(err, current)
       }
     }
 
@@ -339,10 +354,6 @@ export class ReglRenderer extends Renderer {
       sprites.current_position = [0, 0]
       return
     }
-//    if (sprites.lookup[ix]) {
-//      return sprites.lookup[ix]
-//    }
-
     if (!tile.table.get(ix)._jpeg) {
       return
     }
@@ -404,11 +415,20 @@ export class ReglRenderer extends Renderer {
 
     this.fbos = this.fbos || {}
 
+    this.fbos.minicounter =
+      regl.framebuffer({
+        width: 512,
+        height: 512,
+        depth: false
+      })
+
     this.fbos.points =
       regl.framebuffer({
-            width: this.width,
-            height: this.height,
-            depth: false      })
+        //type: 'half float',
+        width: this.width,
+        height: this.height,
+        depth: false
+      })
 
     this.fbos.ping =
       regl.framebuffer({
@@ -444,6 +464,62 @@ export class ReglRenderer extends Renderer {
         depth: false
       })
 
+  }
+
+  count_colors(field) {
+    const { regl, props } = this;
+    props.prefs.jitter = null;
+    if (field !== undefined) {
+      console.log(props.prefs, field)
+      props.prefs.encoding.color = {
+        field: field,
+        domain: [0, 1023]
+      }
+    } else {
+      field = props.prefs.encoding.color.field
+    }
+    const { width, height } = this.fbos.minicounter
+    const minilist = new Uint8Array(width * height * 4);
+    const counts = new Map()
+    this.fbos.minicounter.use(() => {
+      props.colors_as_grid = 1.0;
+      props.only_color = -1.
+      regl.clear({color: [0, 0, 0, 0]});
+      console.log(props.prefs.encoding)
+      this.render_points(props)
+      regl.read(
+        {data: minilist}
+      )
+    })
+    for (const [k, v] of this.tileSet.dictionary_lookups[field]) {
+      if (typeof(k)=="string") {continue}
+      const col = Math.floor(k/64);
+      const row = (k % 64);
+      const step = width/64
+      let score = 0;
+      let overflown = false;
+      for (let j of range(step)) {
+        for (let i of range(step)) {
+          const value = minilist[
+            col * step * 4 + i * 4 + //column
+            row * step * 4 * width + j*width*4 + //row
+            3];
+          if (value >= 128) {
+            overflown = true
+          }
+          score += value;
+        }
+      }
+      if (!overflown) {
+        // The cells might be filled up at 128;
+        counts.set(v, score)
+      } else {
+        console.log(v, "overflown, performing manually")
+        counts.set(v, this.n_visible(k))
+      }
+//        console.log(k, v, col, row, score)
+    }
+    return counts;
   }
 
   n_visible(only_color = -1) {
@@ -489,21 +565,25 @@ export class ReglRenderer extends Renderer {
     return contour_set
   }
 
-  color_pick(x, y) {
-    const {props} = this;
+  color_pick(x, y, verbose = false) {
+    const {props, height} = this;
     props.color_picker_mode = 1
 
-    let v
+    let color_at_point;
     this.fbos.colorpicker.use(() => {
       this.regl.clear({color: [0, 0, 0, 0]});
 
       // read onto the contour vals.
       this.render_points(props)
-      v = this.regl.read({x: x, y: y, width: 1, height: 1});
+      // Must be flipped
+      color_at_point = this.regl.read({x: x, y: height - y, width: 1, height: 1});
     })
 
-    const inflated = v[0] + v[1] * 255 + v[2] * 255 * 255
 
+    const float = unpackFloat(...color_at_point)
+    const p = this.tileSet.findPoint(float);
+    if (p.length==0) {return undefined}
+    return p[0];
   }
 
   /*blur(fbo) {
@@ -586,14 +666,17 @@ export class ReglRenderer extends Renderer {
     const parameters = {
       depth: { enable: false },
       stencil: { enable: false },
-      blend: {
-        enable: true,
-        func: {
-          srcRGB: 'one',
-          srcAlpha: 'one',
-          dstRGB: 'one minus src alpha',
-          dstAlpha: 'one minus src alpha',
-        },
+      blend: /*function(context, props) {
+        if (props.color_picker_mode > 10.5) {
+          return undefined;
+        }*/{
+            enable: function(state, {color_picker_mode}) {return color_picker_mode < 0.5},
+            func: {
+              srcRGB: 'one',
+              srcAlpha: 'one',
+              dstRGB: 'one minus src alpha',
+              dstAlpha: 'one minus src alpha',
+            }
       },
       primitive: "points",
       frag: frag_shader,
@@ -607,11 +690,10 @@ export class ReglRenderer extends Renderer {
         }
       },
       uniforms: {
-        // Used to quickly count regions.
-        u_interpolation: function(context, props) {
+        u_update_time: regl.prop('update_time'),
+        u_transition_duration: function(context, props) {
           //const fraction = (props.time)/props.prefs.duration;
-          const fraction = (props.update_time)/props.prefs.duration;
-          return fraction < 1 ? easeCubicInOut(fraction) : 1
+          return props.prefs.duration;
         },
         u_only_color: function(context, props) {
           if (props.only_color !== undefined) {
@@ -622,6 +704,7 @@ export class ReglRenderer extends Renderer {
           return -2
         },
         u_color_picker_mode: regl.prop("color_picker_mode"),
+        u_colors_as_grid: regl.prop("colors_as_grid"),
         u_width: ({viewportWidth}) => viewportWidth,
         u_height: ({viewportHeight}) => viewportHeight,
         u_aspect_ratio: ({viewportWidth, viewportHeight}) => viewportWidth/viewportHeight,
@@ -655,6 +738,7 @@ export class ReglRenderer extends Renderer {
           return props.transform.k;
         },
         u_window_scale: regl.prop('webgl_scale'),
+        u_last_window_scale: regl.prop('last_webgl_scale'),
         u_time: function(context, props) {
           return props.time;
         },
@@ -668,7 +752,6 @@ export class ReglRenderer extends Renderer {
         }
       }
     }
-
     for (let k of ['ix']) {
       parameters.attributes[k] = function(state, props) {
         return props.manager.regl_elements.get(k)
@@ -750,12 +833,10 @@ class TileBufferManager {
     const { aes } = renderer;
     const keys = Object.entries(prefs.encoding)
     .map(([k, v]) => {
+      if (k === undefined) {return}
       const needed = [];
       if (!v || v === undefined) return needed;
       if (v.field) needed.push(v.field);
-      if (k === 'color') {
-        //console.log("Last field", aes[k].last_field)
-      }
       if (aes[k].last_field) needed.push(aes[k].last_field);
       if (typeof(v) == "string") needed.push(v.split("=>").map(str => str.trim())[0])
       return needed
@@ -773,7 +854,7 @@ class TileBufferManager {
           // Can't build b/c no tile ready.
           return false
         }
-        // Request that th buffer be created before returning false.
+        // Request that the buffer be created before returning false.
         regl_elements.set(key, null)
         renderer.deferred_functions.push(() => this.create_regl_buffer(key))
         return false
@@ -843,19 +924,14 @@ class TileBufferManager {
     let item_size = 4
     let data_length = data.length
 
-    if (key == "position") {
-      item_size = 8
-      data_length = data_length / 2
-    }
-
     const buffer_desc = this.renderer.buffers.allocate_block(
-      // Divided by four b/c always a float.
       data_length, item_size)
 
     regl_elements.set(
       key,
       buffer_desc
     )
+
     buffer_desc.buffer.subdata(data, buffer_desc.offset)
   }
 }

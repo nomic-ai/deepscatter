@@ -13,11 +13,15 @@ export class Renderer {
     this.width = +this.canvas.attr("width");
     this.height = +this.canvas.attr("height");
     this.deferred_functions = []
+    this._use_scale_to_download_tiles = true
   }
 
   get max_ix() {
+    const prefs = this.prefs;
+    if (!this._use_scale_to_download_tiles) {
+      return prefs.max_points;
+    }
     const {k} = this.zoom.transform
-    const prefs = this.prefs
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance)
     return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
   }
@@ -33,9 +37,14 @@ export class Renderer {
     const { max_ix } = this;
     const { tileSet } = this;
     // Materialize using a tileset method.
-    const all_tiles = tileSet.map(d => d)
-      .filter(tile => tile.is_visible(max_ix, this.zoom.current_corners()))
-
+    let all_tiles;
+    if (this._use_scale_to_download_tiles) {
+      all_tiles = tileSet.map(d => d)
+        .filter(tile => tile.is_visible(max_ix, this.zoom.current_corners()))
+      } else {
+        all_tiles = tileSet.map(d => d)
+          .filter(tile => tile.min_ix < this.max_ix)
+      }
     all_tiles.sort((a, b) => a.min_ix - b.min_ix)
 
 //    all_tiles.map(d => console.log(`${d.key} (${d.min_ix} - ${d.max_ix})`))

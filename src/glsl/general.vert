@@ -4,15 +4,19 @@ precision mediump float;
 attribute vec2 a_image_locations;
 
 uniform float u_zoom_balance;
-uniform float u_interpolation;
+
+uniform float u_update_time;
+uniform float u_transition_duration;
 
 uniform float u_jitter_radius;
 uniform float u_jitter;
 // Whether to plot only a single category.
 uniform float u_only_color;
+uniform float u_colors_as_grid;
 
 // Transform from data space to the open window.
 uniform mat3 u_window_scale;
+uniform mat3 u_last_window_scale;
 // Transform from the open window to the d3-zoom.
 uniform mat3 u_zoom;
 
@@ -21,7 +25,6 @@ uniform float u_height;
 
 uniform float u_maxix;           // The maximum index to plot.
 uniform float u_time;            // The current time.
-uniform float u_transition_time; // Between 0 and 1, location in a transition;
 uniform float u_k;               // The d3-scale factor.
 uniform float u_color_picker_mode;
 
@@ -30,80 +33,80 @@ uniform float u_color_picker_mode;
 attribute float ix;
 
 attribute float a_x;
-   attribute float a_last_x;
-   uniform float u_x_transform;
-   uniform float u_last_x_transform;
-   uniform vec2 u_x_domain;
-   uniform vec2 u_last_x_domain;
-   uniform sampler2D u_x_map;
-   uniform sampler2D u_last_x_map;
+attribute float a_last_x;
+uniform float u_x_transform;
+uniform float u_last_x_transform;
+uniform vec2 u_x_domain;
+uniform vec2 u_last_x_domain;
+uniform sampler2D u_x_map;
+uniform sampler2D u_last_x_map;
 
 
-   attribute float a_y;
-   attribute float a_last_y;
-   uniform float u_y_transform;
-   uniform float u_last_y_transform;
-   uniform vec2 u_y_domain;
-   uniform vec2 u_last_y_domain;
-   uniform sampler2D u_y_map;
-   uniform sampler2D u_last_y_map;
+attribute float a_y;
+attribute float a_last_y;
+uniform float u_y_transform;
+uniform float u_last_y_transform;
+uniform vec2 u_y_domain;
+uniform vec2 u_last_y_domain;
+uniform sampler2D u_y_map;
+uniform sampler2D u_last_y_map;
 
 
-   attribute float a_color;
-   attribute float a_last_color;
-   uniform float u_color_transform;
-   uniform float u_last_color_transform;
-   uniform vec2 u_color_domain;
-   uniform vec2 u_last_color_domain;
-   uniform sampler2D u_color_map;
-   uniform sampler2D u_last_color_map;
+attribute float a_color;
+attribute float a_last_color;
+uniform float u_color_transform;
+uniform float u_last_color_transform;
+uniform vec2 u_color_domain;
+uniform vec2 u_last_color_domain;
+uniform sampler2D u_color_map;
+uniform sampler2D u_last_color_map;
 
 
-   attribute float a_jitter_radius;
-   attribute float a_last_jitter_radius;
-   uniform float u_jitter_radius_transform;
-   uniform float u_last_jitter_radius_transform;
-   uniform vec2 u_jitter_radius_domain;
-   uniform vec2 u_last_jitter_radius_domain;
-   uniform sampler2D u_jitter_radius_map;
-   uniform sampler2D u_last_jitter_radius_map;
+attribute float a_jitter_radius;
+attribute float a_last_jitter_radius;
+uniform float u_jitter_radius_transform;
+uniform float u_last_jitter_radius_transform;
+uniform vec2 u_jitter_radius_domain;
+uniform vec2 u_last_jitter_radius_domain;
+uniform sampler2D u_jitter_radius_map;
+uniform sampler2D u_last_jitter_radius_map;
 
 
-   attribute float a_size;
-   attribute float a_last_size;
-   uniform float u_size_transform;
-   uniform float u_last_size_transform;
-   uniform vec2 u_size_domain;
-   uniform vec2 u_last_size_domain;
-   uniform sampler2D u_size_map;
-   uniform sampler2D u_last_size_map;
+attribute float a_size;
+attribute float a_last_size;
+uniform float u_size_transform;
+uniform float u_last_size_transform;
+uniform vec2 u_size_domain;
+uniform vec2 u_last_size_domain;
+uniform sampler2D u_size_map;
+uniform sampler2D u_last_size_map;
 
 
-   attribute float a_alpha;
-   attribute float a_last_alpha;
-   uniform float u_alpha_transform;
-   uniform float u_last_alpha_transform;
-   uniform vec2 u_alpha_domain;
-   uniform vec2 u_last_alpha_domain;
-   uniform sampler2D u_alpha_map;
-   uniform sampler2D u_last_alpha_map;
+attribute float a_alpha;
+attribute float a_last_alpha;
+uniform float u_alpha_transform;
+uniform float u_last_alpha_transform;
+uniform vec2 u_alpha_domain;
+uniform vec2 u_last_alpha_domain;
+uniform sampler2D u_alpha_map;
+uniform sampler2D u_last_alpha_map;
 
 
-   attribute float a_jitter_speed;
-   uniform float u_jitter_speed_transform;
-   uniform vec2 u_jitter_speed_domain;
-   uniform sampler2D u_jitter_speed_map;
+attribute float a_jitter_speed;
+uniform float u_jitter_speed_transform;
+uniform vec2 u_jitter_speed_domain;
+uniform sampler2D u_jitter_speed_map;
 
 
-   attribute float a_filter;
-   attribute float a_last_filter;
-   // useless.
-   uniform float u_filter_transform;
-   uniform float u_last_filter_transform;
-   uniform vec2 u_filter_domain;
-   uniform vec2 u_last_filter_domain;
-   uniform sampler2D u_last_filter_map;
-   uniform sampler2D u_filter_map;
+attribute float a_filter;
+attribute float a_last_filter;
+// useless.
+uniform float u_filter_transform;
+uniform float u_last_filter_transform;
+uniform vec2 u_filter_domain;
+uniform vec2 u_last_filter_domain;
+uniform sampler2D u_last_filter_map;
+uniform sampler2D u_filter_map;
 
 
 // The fill color.
@@ -120,9 +123,7 @@ float point_size_adjust;
 vec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);
 
 // Initialized in the main loop
-mat3 from_coord_to_gl;
-
-mat3 from_dataspace_to_gl;
+// mat3 from_coord_to_gl;
 
 const float e = 1.618282;
 // I've been convinced.
@@ -139,7 +140,24 @@ vec3 hsv2rgb(in vec3 c) {
   return c.z * mix(vec3(1.0), rgb, c.y);
 }
 
+
+
+float interpolate_raw(in float x, in float min, in float max) {
+  if (x < min) {return 0.;}
+  if (x > max) {return 1.;}
+  return (x - min)/(max - min);
+}
+
+float interpolate(in float x, in float min, in float max) {
+  if (max < min) {
+    return 1. - interpolate_raw(x, max, min);
+  } else {
+    return interpolate_raw(x, min, max);
+  }
+}
+
 float linstep(in vec2 range, in float x) {
+  return interpolate(x, range.x, range.y);
   float scale_size = range.y - range.x;
   float from_left = x - range.x;
   return clamp(from_left / scale_size, 0.0, 1.0);
@@ -193,23 +211,32 @@ float domainify(in vec2 domain, in float transform, in float attr, in bool clamp
   }
 }
 
+mat3 pixelspace_to_glspace;
 
 vec2 calculate_position(in vec2 position, in float x_scale_type,
                         in vec2 x_domain, in float y_scale_type,
-                        in vec2 y_domain, in mat3 from_coord_to_gl) {
-//  if (x_scale_type == 4. && y_scale_type == 4.) {
-    vec3 pos2d = vec3(position, 1.0) * from_coord_to_gl;
+                        in vec2 y_domain, in mat3 window_scale,
+                        in mat3 zoom
+                        ) {
+
+    vec3 pos2d = vec3(position, 1.0) * window_scale * zoom;
+
+    if (x_scale_type <= 4. && y_scale_type <= 4.) {
+      pos2d = pos2d * pixelspace_to_glspace;
+    }
     return pos2d.xy;
-//  }
-
-  float px = domainify(x_domain, x_scale_type, position.x, false) * 2. - 1.;
-  float py = domainify(y_domain, y_scale_type, position.y, false) * 2. - 1.;
-
-  return vec2(px, py);
-
 }
 
+float cubicInOut(float t) {
+  return t < 0.5
+    ? 4.0 * t * t * t
+    : 1. - 4.0 * pow(1. - t, 3.0);
+}
+
+
 #pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
+#pragma glslify: packFloat = require('glsl-read-float')
+#pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
 
 const vec4 decoder = vec4(-1., 1. / 256. / 256., 1. / 256., 1.);
 
@@ -322,16 +349,18 @@ vec2 calculate_jitter(
   }
 }
 
-mat3 zoom_to_window;
 
 void main() {
-  zoom_to_window = mat3(
+  pixelspace_to_glspace = mat3(
       2. / u_width, 0., -1.,
       0., - 2. / u_height, 1.,
       0., 0., 1.
   );
-
-  from_coord_to_gl = u_window_scale * u_zoom * zoom_to_window;
+  float interpolation =
+    interpolate(u_update_time, 0., u_transition_duration);
+  float ease = interpolation;
+//  float ease = easeCubic(interpolation);
+//  from_coord_to_gl = u_window_scale * u_zoom * pixelspace_to_glspace;
 
   float debug_mode = 0.;
 
@@ -345,14 +374,56 @@ void main() {
   vec2 old_position = vec2(a_last_x, a_last_y);
 
   position = calculate_position(position, u_x_transform, u_x_domain,
-    u_y_transform, u_y_domain, from_coord_to_gl);
+    u_y_transform, u_y_domain, u_window_scale, u_zoom);
 
   old_position = calculate_position(old_position, u_last_x_transform, u_last_x_domain,
-      u_last_y_transform, u_last_y_domain, from_coord_to_gl);
+      u_last_y_transform, u_last_y_domain, u_last_window_scale, u_zoom);
 
-  float xpos = linstep(vec2(-1., 1.), old_position[1]);
+  float xpos = clamp((1. + position.x) / 2., 0., 1.);
+  float randy = ix_to_random(ix, 13.76);
+  float delay = xpos + randy * .1;
+  delay = delay * 3.;
+  // delay = 0.;
+  float frac = interpolate(
+    u_update_time,
+    delay,
+    u_transition_duration + delay
+  );
 
-  position = mix(old_position, position, u_interpolation);
+  frac = easeCubic(frac);
+
+  if (frac <= 0.) {
+    position = old_position;
+  } else if (frac < 1.) {
+    // position = mix(old_position, position, u_interpolation);
+
+    vec2 midpoint = box_muller(ix, 3.) * .05 *
+       dot(old_position - position, old_position - position)
+       + old_position / 2. + position / 2.;
+
+    position = mix(
+      mix(old_position, midpoint, frac),
+      mix(midpoint, position, frac),
+      frac);
+    //position = mix(old_position, position, frac);
+  } // else position just is what it is.
+
+  if (u_colors_as_grid > 0.) {
+    vec2 jitterspec = vec2(
+      ix_to_random(ix, 3.),
+      ix_to_random(ix, 1.)
+    );
+    position =
+      vec2(
+        floor(a_color / 4096. * 64.)/64.,
+        //floor(a_color/1024.*32.)/32.,
+        mod(a_color, 64.)/64.
+      ) + jitterspec / 64.;
+  //  position = jitterspec;
+    position = position * 2. - 1.;
+  }
+  float r = ix_to_random(ix, 4.);
+  //position = vec2(2. * frac - 1., position.y);
 
   if (debug_mode > 0.) {
     // Just plot every point.
@@ -369,7 +440,7 @@ void main() {
   float last_filter = texture_float_lookup(u_last_filter_map, u_last_filter_domain,
                                       u_last_filter_transform, a_last_filter);
 
-  if (ix_to_random(ix, 13.5) > u_interpolation) {
+  if (ix_to_random(ix, 13.5) > ease) {
     my_filter = last_filter;
   }
 
@@ -383,7 +454,7 @@ void main() {
                                      u_alpha_transform, a_alpha);
   float last_alpha = texture_float_lookup(u_last_alpha_map, u_last_alpha_domain,
                                      u_last_alpha_transform, a_last_alpha);
-  alpha = mix(last_alpha, alpha, u_interpolation);
+  alpha = mix(last_alpha, alpha, ease);
 
   if (alpha < 1. / 255.) {
     gl_Position = discard_me;
@@ -397,7 +468,7 @@ void main() {
   float last_size_multiplier = texture_float_lookup(u_last_size_map, u_last_size_domain,
                                               u_last_size_transform, a_last_size);
 
-  size_multiplier = mix(last_size_multiplier, size_multiplier, u_interpolation);
+  size_multiplier = mix(last_size_multiplier, size_multiplier, ease);
 
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
@@ -419,11 +490,12 @@ void main() {
     u_jitter_speed_map, u_jitter_speed_domain, u_jitter_speed_transform, a_jitter_speed
   );
 
-  if (u_interpolation < 1.) {
-    jitter = mix(last_jitter, jitter, u_interpolation);
+  if (ease < 1.) {
+    jitter = mix(last_jitter, jitter, ease);
   }
   gl_Position = vec4(position + jitter * point_size_adjust, 0., 1.);
 
+  // Plot a single tick of alpha.
   if (u_only_color >= -1.5) {
     if (u_only_color > -.5 && a_color != u_only_color) {
       gl_Position = discard_me;
@@ -434,25 +506,33 @@ void main() {
       gl_PointSize = 1.;
     }
   } else if (u_color_picker_mode > 0.) {
-    fill = vec4(
-      fract(ix / 255.),
-      fract(floor(ix / 255.) / 255.),
-      fract(floor(ix / 255. / 255.) / 255.), 1.);
+    fill = packFloat(ix);
   } else {
     float fractional_color = linstep(u_color_domain, a_color);
     // fractional_color = 0.;
     fill = texture2D(u_color_map, vec2(0., fractional_color));
     fill = vec4(fill.rgb, alpha);
 
-    float last_fractional = linstep(u_last_color_domain, a_last_color);
-    vec4 last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
 
-    // Alpha channel interpolation already happened.
-    last_fill = vec4(last_fill.rgb, alpha);
+    /*if (ease < ix_to_random(ix, 3.)) {
+      float last_fractional = linstep(u_last_color_domain, a_last_color);
+      vec4 last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
 
-    // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
-    // instead?
-    fill = mix(last_fill, fill, u_interpolation);
+      // Alpha channel interpolation already happened.
+      fill = vec4(last_fill.rgb, alpha);
+
+    }*/
+    if (ease < 1.) {
+      float last_fractional = linstep(u_last_color_domain, a_last_color);
+      vec4 last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
+
+      // Alpha channel interpolation already happened.
+      last_fill = vec4(last_fill.rgb, alpha);
+
+      // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
+      // instead?
+      fill = mix(last_fill, fill, ease);
+  }
 
   }
 
