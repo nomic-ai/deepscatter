@@ -5,6 +5,8 @@ import {select} from 'd3-selection';
 import {geoPath, geoIdentity} from 'd3-geo';
 import {json as d3json } from 'd3-fetch';
 import {max} from 'd3-array';
+import { Table } from 'apache-arrow';
+
 import merge from 'lodash.merge';
 
 import * as topojson from "topojson-client";
@@ -179,6 +181,24 @@ export default class Scatterplot {
     merge(this.prefs, prefs)
   }
 
+  load_lookup_table(item) {
+    this.lookup_tables = this.lookup_tables || new Map()
+    if (this.lookup_promises.get(item)) {
+      return this.lookup_promises.get(item)
+    } else {
+      const url = `${this.prefs.source_url}/${item}.feather`
+      const promise = fetch(url)
+            .then(response => response.arrayBuffer())
+            .then(response => {
+              let table = Table.from(response);
+              this.lookup_tables.set(item, table)
+              return "complete"
+            })
+      this.lookup_promises.set(item, promise)
+      return promise
+    }
+  }
+
   plotAPI(prefs = {}) {
 
     if (prefs === undefined || prefs === null) {return Promise.resolve(1)}
@@ -189,12 +209,25 @@ export default class Scatterplot {
       return this.reinitialize().then(this.plotAPI(prefs))
     } */
 
-
+    const preliminaria = [];
+    
     if (prefs['source_url'] && prefs.source_url !== this.source_url) {
       this.source_url = prefs.source_url
-      return this.reinitialize().then(this.plotAPI(prefs))
+      preliminaria.push(this.reinitialize())
     }
-
+    if (prefs.lookup_tables) {
+      this.lookup_promises = this.lookup_promises || new Map()
+      for (const table of prefs.lookup_tables) {
+        if (!this.lookup_promises.get(table)) {
+          preliminaria.push(this.load_lookup_table(table))
+        }
+      }
+    }
+    
+    if (preliminaria.length) {
+      return Promise.all(preliminaria).then(this.plotAPI(prefs))
+    }
+    
     if (prefs.mutate) {
       this._root.apply_mutations(prefs.mutate)
     }
