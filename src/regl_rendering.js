@@ -20,8 +20,8 @@ const aesthetic_variables = Array.from(Object.keys(Aesthetic))
 
 export class ReglRenderer extends Renderer {
 
-  constructor(selector, tileSet, prefs, parent) {
-    super(selector, tileSet, prefs, parent)
+  constructor(selector, tileSet, prefs, scatterplot) {
+    super(selector, tileSet, prefs, scatterplot)
     this.regl = wrapREGL(
       {
         canvas: this.canvas.node(),
@@ -54,7 +54,7 @@ export class ReglRenderer extends Renderer {
 
     for (const aes_upper of  Array.from(Object.keys(Aesthetic))) {
       const aes = aes_upper.toLowerCase()
-      const args = [aes, this.regl, tileSet]
+      const args = [aes, this.scatterplot, this.regl, tileSet]
       if (aes_upper == "Y") {
         args.unshift(this.height)
       }

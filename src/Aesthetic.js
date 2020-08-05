@@ -13,7 +13,7 @@ const scales = {
   literal: scaleIdentity
 }
 
-const palette_size = 1024
+const palette_size = 4096
 
 function to_buffer(data) {
   const output = new Uint8Array(4 * palette_size)
@@ -92,8 +92,9 @@ export const default_aesthetics = {
 
 class Aesthetic {
 
-  constructor(label, regl, tile) {
+  constructor(label, scatterplot, regl, tile) {
     this.label = label
+    this.scatterplot = scatterplot
     this.regl = regl
 
     this._current_code = undefined;
@@ -112,7 +113,7 @@ class Aesthetic {
   get default_val() {return 1};
 
   get texture_size() {
-    return 1024
+    return 4096
   }
 
   get transform() {
@@ -241,22 +242,21 @@ class Aesthetic {
       return this.clear()
     }
 
-   if (encoding === undefined) {
-     this.post_to_regl_buffer(0)
-     this._last_field = this.field
-     this._last_domain = safe_expand(this.domain);
-     this._last_transform = this._transform;
+    if (encoding === undefined) {
+      this.post_to_regl_buffer(0)
+      this._last_field = this.field
+      this._last_domain = safe_expand(this.domain);
+      this._last_transform = this._transform;
 
-     return;
-   }
+      return;
+    }
 
-  if (typeof(encoding) == "string") {
-  encoding = parseLambdaString(encoding)
-  if (this.label === 'filter') {
-    encoding.domain = [0, 1023]
-  }
-  console.log(encoding)
-  }
+    if (typeof(encoding) == "string") {
+      encoding = parseLambdaString(encoding, false)
+      if (this.label === 'filter') {
+        encoding.domain = [0, this.texture_size - 1]
+      }
+    }
 
   if (typeof(encoding) == "numeric") {
     encoding = {
@@ -266,13 +266,60 @@ class Aesthetic {
     }
   }
 
-  if (encoding.lambda) {
+  if (encoding.lookup) {
+    // These are the possible elements of the lookup.
+    const {table, value, filter} = encoding.lookup;
+    const key = encoding.field;
+    if (key === undefined) {
+      console.log
+    }
+    let filter_func, data_func, key_func;
+    const lookup = new Map();
+
+    if (filter) {
+      // Pass a function that filters each row.
+      filter_func = parseLambdaString(filter, true)
+    } else {
+      filter_func = () => true
+    }
+    if (value) {
+      data_func = parseLambdaString(value, true)
+    } else {
+      data_func = function(row) {
+        return row[this.label]
+      }
+    }
+    key_func = function(row) {
+      // Should allow alternate keys.
+      return row[encoding.field]
+    }
+    const t = this.scatterplot.lookup_tables.get(table);
+    for (let row of t) {
+      if (!filter_func(row)) {
+        continue
+      }
+      if (Math.random() < -.01) {
+        console.log(row)
+        console.log(key_func(row))
+        console.log(data_func(row))
+      }
+      lookup.set(key_func(row), data_func(row))
+    }
+    console.log(lookup)
+    encoding.lambda = (value) => {
+      if (Math.random() < .01) {console.log(value, lookup.get(value))}
+      return this.scale(lookup.get(value))
+    }
+  }
+
+  if (encoding.lambda && typeof(encoding.lambda) == "string")  {
     // May overwrite 'field!!'
-    Object.assign(encoding, parseLambdaString(encoding.lambda))
+    Object.assign(encoding, parseLambdaString(encoding.lambda, false))
   }
   const {
     label
   } = this;
+  
   const {
     lambda,
     field
@@ -339,19 +386,24 @@ class Aesthetic {
     this.texture_buffer.set(
       encodeFloatsRGBA(values, this.texture_buffer)
     );
-
+    
   }
 
-  apply_function_to_textures(field, range, function_string) {
+  apply_function_to_textures(field, range, function_reference) {
 
     let func;
-    let [name, lambda] = function_string.split("=>").map(d => d.trim())
-    if (lambda == undefined) {
-      func = Function("x", function_string)
+    
+    if (typeof(func) == "string") {
+      let [name, lambda] = function_reference.split("=>").map(d => d.trim())
+      if (lambda == undefined) {
+        func = Function("x", function_reference)
+      } else {
+        func = Function(name, lambda)
+      }
     } else {
-      func = Function(name, lambda)
+      func = function_reference
     }
-
+        
     this.scaleFunc = scaleLinear().range(range).domain([0, this.texture_size - 1])
     let input = arange(this.texture_size)
     if (field === undefined || this.tileSet.table == undefined) {
@@ -362,6 +414,7 @@ class Aesthetic {
     if (!column) {
       throw(`Column ${field} does not exist on table.`)
     }
+
     if (column.type.dictionary) {
       const lookup = this.tileSet.dictionary_lookups[field]
       try {
@@ -372,6 +425,7 @@ class Aesthetic {
     } else {
       input = input.map(d => this.scaleFunc(d))
     }
+    console.log(func)
     const values = input.map(i => +func(i))
     this.texture_buffer.set(encodeFloatsRGBA(values))
   }
@@ -421,9 +475,15 @@ class Filter extends Aesthetic {
 }
 
 function safe_expand(range) {
+  
+  // the range of a scale can sensibly take several different forms.
+  
+  // Usually for a color.
   if (typeof(range)=="string") {
     return range
   }
+  
+  // If it's a number, put it at both ends of the scale.
   if (typeof(range)=="numeric") {
     return [range, range]
   }
@@ -431,6 +491,8 @@ function safe_expand(range) {
     // Sketchy.
     return [1, 1]
   }
+  // Copy the elements by spreading because a copy-by-reference will 
+  // 
   try {
     return [...range]
   } catch (err) {
@@ -459,7 +521,7 @@ class Color extends Aesthetic {
 
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range])
-    } else if (range.length == 4096) {
+    } else if (range.length == this.texture_size * 4) {
       this.texture_buffer.set(range)
     } else {
       console.warn(`${range} unknown`)
@@ -505,16 +567,27 @@ float RGBAtoFloat(in vec4 floater) {
 */
 
 
-function parseLambdaString(lambdastring) {
 
+function parseLambdaString(lambdastring, materialize = false) {
+  // Materialize an arrow function from its string.
+  // Note that this *does* reassign 'this'.
   let [field, lambda] = lambdastring.split("=>").map(d => d.trim())
+  console.log(lambda)
   if (lambda === undefined) {
     throw `Couldn't parse ${lambdastring} into a function`
   }
-  if (lambda.slice(0) != "{" && lambda.slice(0, 6) != "return") {
+  
+  if (lambda.slice(0,1) != "{" && lambda.slice(0, 6) != "return") {
     lambda = "return " + lambda
   }
+  
   const func = `${field} => ${lambda}`
+  
+  if (materialize) {
+    console.log(field, lambda)
+    return Function(field, lambda)
+  }
+  
   return {
     field: field,
     lambda: func

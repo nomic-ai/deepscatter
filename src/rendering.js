@@ -2,14 +2,14 @@ import { select } from 'd3-selection';
 import { p_in_rect } from './tile.js'
 export class Renderer {
   // A renderer handles drawing to a display element.
-  constructor(selector, tileSet, parent) {
-    this._parent = parent;
+  constructor(selector, tileSet, scatterplot) {
+    this.scatterplot = scatterplot;
     this.holder = select(selector);
     console.log(this.holder.node())
     this.canvas = select(this.holder.node().firstElementChild)
     console.log(this.canvas.node())
     this.tileSet = tileSet;
-    this.prefs = parent.prefs;
+    this.prefs = scatterplot.prefs;
     this.width = +this.canvas.attr("width");
     this.height = +this.canvas.attr("height");
     this.deferred_functions = []
