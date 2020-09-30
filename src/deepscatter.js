@@ -6,12 +6,10 @@ import {geoPath, geoIdentity} from 'd3-geo';
 import {json as d3json } from 'd3-fetch';
 import {max} from 'd3-array';
 import { Table } from 'apache-arrow';
-
 import merge from 'lodash.merge';
 
-import * as topojson from "topojson-client";
-
 import {default_aesthetics} from "./Aesthetic.js"
+import GeoLines from './geo_lines.js'
 
 const base_elements = [
   {
@@ -75,14 +73,10 @@ export default class Scatterplot {
       this.elements.push(container)
     }
   }
-
+  
   reinitialize() {
-
     const { prefs } = this;
-
     this._root = new Tile(this.source_url, prefs);
-
-
     this._renderer = new ReglRenderer(
       "#container-for-webgl-canvas",
       this._root,
@@ -91,7 +85,6 @@ export default class Scatterplot {
     );
 
     this._zoom = new Zoom("#deepscatter-svg", this.prefs);
-
     this._zoom.attach_tiles(this._root);
     this._zoom.attach_renderer("regl", this._renderer);
     this._zoom.initialize_zoom();
@@ -99,71 +92,28 @@ export default class Scatterplot {
     const bkgd = select("#container-for-canvas-2d-background").select("canvas")
     const ctx = bkgd.node().getContext("2d")
 
-    ctx.fillStyle = "rgba(25, 25, 29, 1)"
-    ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
+    // ctx.fillStyle = "rgba(125, 25, 29, 1)"
+    // ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
 
     this._renderer.initialize()
 
     return this._root.promise
   }
 
-  drawBackgroundMap(url) {
-    const bkgd = select("#container-for-canvas-2d-background").select("canvas")
-    const ctx = bkgd.node().getContext("2d")
-
+  registerBackgroundMap(url) {
     if (!this.geojson) {
       this.geojson = "in progress"
-      return d3json(url).then(d => {
-        const {x, y} = this._zoom.scales()
-        const lines = topojson.mesh(d, d.objects["-"])
-        const shape = topojson.merge(d, d.objects["-"].geometries)
-        function fix_point(p) {
-          if (!p) {return}
-          if (p.coordinates) {
-            return fix_point(p.coordinates)
-          }
-          if (!p.length) {
-            return
-          }
-          if (p[0].length) {
-            return p.map(fix_point)
-          } else {
-            p[0] = x(p[0])
-            p[1] = y(p[1])
-          }
-        }
-        fix_point(lines)
-        fix_point(shape)
-        this.geojson = {
-          lines, shape
-        }
-        // Recurse to actually draw
-        this.drawBackgroundMap(url)
+      d3json(url).then(d => {
+        const holder = new GeoLines(d, this._renderer.regl)
+        this._renderer.geolines = holder
       })
     }
-    if (this.geojson == "in progress") {
-      return
-    }
-    ctx.fillStyle = "rgba(25, 25, 29, 1)"
-    ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
-
-    ctx.strokeStyle = "#8a0303"//"rbga(255, 255, 255, 1)"
-    ctx.fillStyle = 'rgba(30, 30, 34, 1)'
-
-    ctx.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k/2))]);
-
-    const path = geoPath(geoIdentity()
-      .scale(this._zoom.transform.k)
-      .translate([this._zoom.transform.x, this._zoom.transform.y]), ctx);
-
-//      ctx.beginPath(), path(this.geojson.shape), ctx.fill();
-      ctx.beginPath(), path(this.geojson.lines), ctx.stroke();
-
   }
 
   visualize_tiles() {
     const map = this;
-    const ctx = map.elements[2].selectAll("canvas").node().getContext("2d");
+    const ctx = map.elements[2]
+    .selectAll("canvas").node().getContext("2d");
     ctx.clearRect(0, 0, 10000, 10000)
     const {x_, y_} = map._zoom.scales()
 
@@ -172,7 +122,6 @@ export default class Scatterplot {
         if (!tile.extent) {continue} // Still loading
         const [x1, x2] = tile.extent.x.map(x => x_(x))
         const [y1, y2] = tile.extent.y.map(y => y_(y))
-
         ctx.strokeRect(x1, y1, x2-x1, y2-y1)
     }
   }
@@ -231,13 +180,10 @@ export default class Scatterplot {
     if (prefs.mutate) {
       this._root.apply_mutations(prefs.mutate)
     }
-
+    
     if (prefs.basemap_geojson) {
-      this._zoom.renderers.set("basemap", {
-        tick: () => {this.drawBackgroundMap(prefs.basemap_geojson)}
-      })
+      this.registerBackgroundMap(prefs.basemap_geojson)
     }
-
 
     return this._root.promise.then(() => {
 
@@ -310,7 +256,6 @@ export default class Scatterplot {
         .scale(this._zoom.transform.k)
         .translate([this._zoom.transform.x, this._zoom.transform.y]), ctx);
 
-  //      ctx.beginPath(), path(this.geojson.shape), ctx.fill();
         ctx.beginPath(), path(contour), ctx.fill();
       }
   }

@@ -1,6 +1,5 @@
 precision mediump float;
 
-
 attribute vec2 a_image_locations;
 
 uniform float u_zoom_balance;

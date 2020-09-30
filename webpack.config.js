@@ -16,7 +16,7 @@ module.exports = {
   plugins: [
      new WorkerPlugin()
   ],
-
+  stats: "minimal",
   module: {
     rules: [
       {
