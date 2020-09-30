@@ -24,6 +24,7 @@ export class ReglRenderer extends Renderer {
     super(selector, tileSet, prefs, scatterplot)
     this.regl = wrapREGL(
       {
+        extensions: 'angle_instanced_arrays',
         canvas: this.canvas.node(),
       }
     );
@@ -94,7 +95,6 @@ export class ReglRenderer extends Renderer {
     }
   }
 
-
   apply_encoding(encoding) {
     this.most_recent_restart = Date.now()
     this.encoding = this.encoding || new Map();
@@ -123,10 +123,7 @@ export class ReglRenderer extends Renderer {
         // Use the default linked to the coordinates used to build the tree.
         this._webgl_scale_history.unshift(this.default_webgl_scale);
       }
-
   }
-
-
 
   get props() {
     const prefs = this.prefs
@@ -302,42 +299,61 @@ export class ReglRenderer extends Renderer {
       this.render_points(props)
     })
 
+    if (this.geolines) {
+      this.fbos.lines.use( () => {
+        regl.clear({color: [0, 0, 0, 0]});
+        this.geolines.render(props)
+      })
+    }
+
     // this.blur(this.fbos.points, this.fbos.ping, 1)
 
     regl.clear({color: [0, 0, 0, 0]});
 
 
     // Copy the points buffer to the main buffer.
-    regl({
-      frag: `
-        precision mediump float;
-        varying vec2 uv;
-        uniform sampler2D tex;
-        uniform float wRcp, hRcp;
-        void main() {
-          gl_FragColor = texture2D(tex, uv);
-        }
-      `,
-      vert: `
-        precision mediump float;
-        attribute vec2 position;
-        varying vec2 uv;
-        void main() {
-          uv = 0.5 * (position + 1.0);
-          gl_Position = vec4(position, 0, 1);
-        }
-      `,
-      attributes: {
-        position: [ -4, -4, 4, -4, 0, 4 ]
-      },
-      depth: { enable: false },
-      count: 3,
-      uniforms: {
-        tex: () => this.fbos.points,
-        wRcp: ({viewportWidth}) => 1.0 / viewportWidth,
-        hRcp: ({viewportHeight}) => 1.0 / viewportHeight
-      },
-    })()
+    for (let layer of [this.fbos.points, this.fbos.lines]) {
+      regl({
+        blend: {
+          enable: true,
+          func: {
+            srcRGB: 'one',
+            srcAlpha: 'one',
+            dstRGB: 'one minus src alpha',
+            dstAlpha: 'one minus src alpha',
+          }
+        },
+
+        frag: `
+          precision mediump float;
+          varying vec2 uv;
+          uniform sampler2D tex;
+          uniform float wRcp, hRcp;
+          void main() {
+            gl_FragColor = texture2D(tex, uv);
+          }
+        `,
+        vert: `
+          precision mediump float;
+          attribute vec2 position;
+          varying vec2 uv;
+          void main() {
+            uv = 0.5 * (position + 1.0);
+            gl_Position = vec4(position, 0, 1);
+          }
+        `,
+        attributes: {
+          position: [ -4, -4, 4, -4, 0, 4 ]
+        },
+        depth: { enable: false },
+        count: 3,
+        uniforms: {
+          tex: () => layer,
+          wRcp: ({viewportWidth}) => 1.0 / viewportWidth,
+          hRcp: ({viewportHeight}) => 1.0 / viewportHeight
+        },
+      })()
+    }
   }
 
   set_image_data(tile, ix) {
@@ -419,6 +435,14 @@ export class ReglRenderer extends Renderer {
       regl.framebuffer({
         width: 512,
         height: 512,
+        depth: false
+      })
+
+    this.fbos.lines =
+      regl.framebuffer({
+        //type: 'half float',
+        width: this.width,
+        height: this.height,
         depth: false
       })
 
@@ -666,17 +690,14 @@ export class ReglRenderer extends Renderer {
     const parameters = {
       depth: { enable: false },
       stencil: { enable: false },
-      blend: /*function(context, props) {
-        if (props.color_picker_mode > 10.5) {
-          return undefined;
-        }*/{
-            enable: function(state, {color_picker_mode}) {return color_picker_mode < 0.5},
-            func: {
-              srcRGB: 'one',
-              srcAlpha: 'one',
-              dstRGB: 'one minus src alpha',
-              dstAlpha: 'one minus src alpha',
-            }
+      blend: {
+        enable: function(state, {color_picker_mode}) {return color_picker_mode < 0.5},
+        func: {
+          srcRGB: 'one',
+          srcAlpha: 'one',
+          dstRGB: 'one minus src alpha',
+          dstAlpha: 'one minus src alpha',
+        }
       },
       primitive: "points",
       frag: frag_shader,

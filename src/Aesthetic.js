@@ -305,9 +305,8 @@ class Aesthetic {
       }
       lookup.set(key_func(row), data_func(row))
     }
-    console.log(lookup)
     encoding.lambda = (value) => {
-      if (Math.random() < .01) {console.log(value, lookup.get(value))}
+      // if (Math.random() < .01) {console.log(value, lookup.get(value))}
       return this.scale(lookup.get(value))
     }
   }
@@ -572,7 +571,6 @@ function parseLambdaString(lambdastring, materialize = false) {
   // Materialize an arrow function from its string.
   // Note that this *does* reassign 'this'.
   let [field, lambda] = lambdastring.split("=>").map(d => d.trim())
-  console.log(lambda)
   if (lambda === undefined) {
     throw `Couldn't parse ${lambdastring} into a function`
   }
@@ -584,7 +582,6 @@ function parseLambdaString(lambdastring, materialize = false) {
   const func = `${field} => ${lambda}`
   
   if (materialize) {
-    console.log(field, lambda)
     return Function(field, lambda)
   }
   
