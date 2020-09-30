@@ -98,7 +98,15 @@ export class ReglRenderer extends Renderer {
   apply_encoding(encoding) {
     this.most_recent_restart = Date.now()
     this.encoding = this.encoding || new Map();
+    if (encoding.x0 && encoding.y0) {
+      // Having these means that we assign a *new* value
+      // to the previous position.
+      console.warn(encoding.y0)
+      this.aes['x'].update(encoding.x0)
+      this.aes['y'].update(encoding.y0)
+    }
     for (let k of aesthetic_variables) {
+      console.log(k)
       const v = encoding[k]
       this.aes[k].update(v)
     }
@@ -704,6 +712,14 @@ export class ReglRenderer extends Renderer {
           return -2
         },
         u_color_picker_mode: regl.prop("color_picker_mode"),
+        u_position_interpolation_mode: function(context, props) {
+          // 1 indicates that there should be a continuous loop between the two points.
+
+          if (props.prefs.encoding.position0 || props.prefs.encoding.x0) {
+            return 1
+          }
+          return 0
+        },
         u_colors_as_grid: regl.prop("colors_as_grid"),
         u_width: ({viewportWidth}) => viewportWidth,
         u_height: ({viewportHeight}) => viewportHeight,
@@ -833,6 +849,9 @@ class TileBufferManager {
     const { aes } = renderer;
     const keys = Object.entries(prefs.encoding)
     .map(([k, v]) => {
+      if (aesthetic_variables.indexOf(k) == -1) {
+        return []
+      }
       if (k === undefined) {return}
       const needed = [];
       if (!v || v === undefined) return needed;

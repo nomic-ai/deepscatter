@@ -139,6 +139,10 @@ function mutate(map, table_buffer) {
     }
 
     let highest_dict_id = Math.max(...table.schema.dictionaries.keys())
+
+    // If there are no dictionaries, this returns negative infinity.
+    if (highest_dict_id < 0) {highest_dict_id = -1}
+
     for (let [k, vector] of data) {
       let column
       if (typeof(vector[0]) == "string") {

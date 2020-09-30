@@ -210,7 +210,7 @@ export default class Scatterplot {
     } */
 
     const preliminaria = [];
-    
+
     if (prefs['source_url'] && prefs.source_url !== this.source_url) {
       this.source_url = prefs.source_url
       preliminaria.push(this.reinitialize())
@@ -223,11 +223,11 @@ export default class Scatterplot {
         }
       }
     }
-    
+
     if (preliminaria.length) {
       return Promise.all(preliminaria).then(this.plotAPI(prefs))
     }
-    
+
     if (prefs.mutate) {
       this._root.apply_mutations(prefs.mutate)
     }
@@ -263,26 +263,31 @@ export default class Scatterplot {
   }
 
   interpret_encoding(encoding) {
-    if (encoding && encoding.position) {
-      if (encoding.position === "literal") {
-      // A shortcut.
-        encoding.x = {"field": "x", "transform": "literal"}
-        encoding.y = {"field": "y", "transform": "literal"}
-      } else {
-        const field = encoding.position
-        encoding.x = {"field": field + ".x", "transform": "literal"}
-        encoding.y = {"field": field + ".y", "transform": "literal"}
+    if (encoding) {
+      for (let p of ["position", "position0"]) {
+        const suffix = p.replace("position", "")
+        if (encoding[p]) {
+          console.warn(`${p} '${suffix}'`)
+          if (encoding[p] === "literal") {
+          // A shortcut.
+            encoding["x" + suffix] = {"field": "x", "transform": "literal"}
+            encoding["y" + suffix] = {"field": "y", "transform": "literal"}
+          } else {
+            const field = encoding[p]
+            encoding["x" + suffix] = {"field": field + ".x", "transform": "literal"}
+            encoding["y" + suffix] = {"field": field + ".y", "transform": "literal"}
+          }
+          delete encoding[p]
+        }
       }
-
-      delete encoding.position
     }
-
 
     this.encoding = this.encoding || JSON.parse(JSON.stringify(default_aesthetics))
     // The merge operation could be crazy complicated to handle partial intersections.
     merge(this.encoding, encoding)
     merge(this.prefs.encoding, this.encoding)
     delete this.prefs.encoding["position"]
+    delete this.prefs.encoding["position0"]
   }
 
   drawContours(contours, drawTo) {

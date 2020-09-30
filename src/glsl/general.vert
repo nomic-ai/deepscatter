@@ -51,6 +51,7 @@ uniform vec2 u_last_y_domain;
 uniform sampler2D u_y_map;
 uniform sampler2D u_last_y_map;
 
+uniform float u_position_interpolation_mode;
 
 attribute float a_color;
 attribute float a_last_color;
@@ -382,6 +383,7 @@ void main() {
   float xpos = clamp((1. + position.x) / 2., 0., 1.);
   float randy = ix_to_random(ix, 13.76);
   float delay = xpos + randy * .1;
+
   delay = delay * 3.;
   // delay = 0.;
   float frac = interpolate(
@@ -390,13 +392,19 @@ void main() {
     u_transition_duration + delay
   );
 
+  if (u_position_interpolation_mode > 0.) {
+    // If it's a continuous loop, just choose a random point along that loop.
+    frac = fract(u_update_time/u_transition_duration);
+    frac = fract(frac + randy);
+  }
+
   frac = easeCubic(frac);
 
   if (frac <= 0.) {
     position = old_position;
   } else if (frac < 1.) {
     // position = mix(old_position, position, u_interpolation);
-
+    frac = fract(frac);
     vec2 midpoint = box_muller(ix, 3.) * .05 *
        dot(old_position - position, old_position - position)
        + old_position / 2. + position / 2.;
@@ -485,7 +493,8 @@ void main() {
   );
 
   vec2 last_jitter = calculate_jitter(
-    u_jitter, ix, u_last_jitter_radius_map, u_last_jitter_radius_domain,u_last_jitter_radius_transform,
+    //u_jitter,
+    0., ix, u_last_jitter_radius_map, u_last_jitter_radius_domain,u_last_jitter_radius_transform,
     a_last_jitter_radius,
     u_jitter_speed_map, u_jitter_speed_domain, u_jitter_speed_transform, a_jitter_speed
   );

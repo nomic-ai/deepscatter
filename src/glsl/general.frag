@@ -19,7 +19,7 @@ bool out_of_hollow_circle(in vec2 coord) {
   vec2 cxy = 2.0 * coord - 1.0;
   float r_sq = dot(cxy, cxy);
   if (r_sq > 1.0) {return true;}
-  if (r_sq < .35) {return true;}
+  if (r_sq < 0.6) {return true;}
   return false;
 }
 

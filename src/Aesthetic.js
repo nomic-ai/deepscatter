@@ -319,7 +319,7 @@ class Aesthetic {
   const {
     label
   } = this;
-  
+
   const {
     lambda,
     field
@@ -386,14 +386,13 @@ class Aesthetic {
     this.texture_buffer.set(
       encodeFloatsRGBA(values, this.texture_buffer)
     );
-    
+
   }
 
   apply_function_to_textures(field, range, function_reference) {
 
     let func;
-    
-    if (typeof(func) == "string") {
+    if (typeof(function_reference) == "string") {
       let [name, lambda] = function_reference.split("=>").map(d => d.trim())
       if (lambda == undefined) {
         func = Function("x", function_reference)
@@ -403,7 +402,7 @@ class Aesthetic {
     } else {
       func = function_reference
     }
-        
+
     this.scaleFunc = scaleLinear().range(range).domain([0, this.texture_size - 1])
     let input = arange(this.texture_size)
     if (field === undefined || this.tileSet.table == undefined) {
@@ -475,14 +474,14 @@ class Filter extends Aesthetic {
 }
 
 function safe_expand(range) {
-  
+
   // the range of a scale can sensibly take several different forms.
-  
+
   // Usually for a color.
   if (typeof(range)=="string") {
     return range
   }
-  
+
   // If it's a number, put it at both ends of the scale.
   if (typeof(range)=="numeric") {
     return [range, range]
@@ -491,8 +490,8 @@ function safe_expand(range) {
     // Sketchy.
     return [1, 1]
   }
-  // Copy the elements by spreading because a copy-by-reference will 
-  // 
+  // Copy the elements by spreading because a copy-by-reference will
+  //
   try {
     return [...range]
   } catch (err) {
@@ -576,18 +575,18 @@ function parseLambdaString(lambdastring, materialize = false) {
   if (lambda === undefined) {
     throw `Couldn't parse ${lambdastring} into a function`
   }
-  
+
   if (lambda.slice(0,1) != "{" && lambda.slice(0, 6) != "return") {
     lambda = "return " + lambda
   }
-  
+
   const func = `${field} => ${lambda}`
-  
+
   if (materialize) {
     console.log(field, lambda)
     return Function(field, lambda)
   }
-  
+
   return {
     field: field,
     lambda: func
