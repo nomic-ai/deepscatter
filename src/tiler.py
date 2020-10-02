@@ -12,6 +12,8 @@ logging.getLogger().setLevel(logging.INFO)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Tile an input file into a large number of arrow files.')
+    parser.add_argument('--first_tile_size', type=int, default = 1000, help ="Number of records in first tile.")
+
     parser.add_argument('--tile_size', type=int, default = 50000, help ="Number of records per tile.")
     parser.add_argument('--destination', '--directory', '-d', type=str, required = True, help = "Destination directory to write to.")
     parser.add_argument('--max_files', type=float, default = 200, help ="Max files to have open. Default 200; check ulimit -n to see what might be safe. But I've found that I can have many more than that, so... who knows.")
@@ -142,11 +144,9 @@ memory_tiles_open = set()
 files_open = set();
 
 # Will be overwritten from args
-TILE_SIZE = None;
 
 
 def main():
-    global TILE_SIZE
     args = parse_args()
     if (args.files[0].endswith(".csv") or args.files[0].endswith(".csv.gz")):
         schema, schema_safe = determine_schema(args)
@@ -167,10 +167,8 @@ def main():
         logging.info("extent")
         logging.info(extent)
         raw_schema = pa.ipc.RecordBatchFileReader(args.files[0]).schema
-
-    TILE_SIZE = args.tile_size
-
-    tiler = Tile(extent, [0, 0, 0], args.destination, raw_schema)
+    
+    tiler = Tile(extent, [0, 0, 0], args, raw_schema)
 
     logging.info("Starting .")
 
@@ -213,12 +211,15 @@ def partition(table, midpoint):
 class Tile():
     # some prep to make OCT_TREE SAFE--METHODS that support only quads
     # listed as QUAD_ONLY
-    def __init__(self, extent, coords, basedir, schema):
+    def __init__(self, extent, coords, args, schema):
         global memory_tiles_open
 
         self.coords = coords
         self.extent = extent
-        self.basedir = basedir
+        self.args = args
+        self.basedir = args.destination
+        self.first_tile_size = args.first_tile_size
+        self.tile_size = args.tile_size
         self.schema = schema
 
         # Wait to actually create the directories until needed.
@@ -240,6 +241,12 @@ class Tile():
     def __repr__(self):
         return f"Tile:\nextent: {self.extent}\ncoordinates:{self.coords}"
 
+    @property
+    def TILE_SIZE(self):
+        if self.coords[0] == 0:
+            return self.args.first_tile_size
+        else:
+            return self.args.tile_size
     def midpoints(self):
         midpoints = []
         for k, lim in self.extent.items():
@@ -323,30 +330,6 @@ class Tile():
         feather.write_feather(frame, destination, compression = compression)
         self.data = None
 
-    def old_flush(self, final = False):
-        global memory_tiles_open
-        if self.data is None:
-            return
-        if len(self.data)==0:
-            if self.filename in memory_tiles_open:
-                pass
-#                memory_tiles_open.remove(self.filename)
-            return
-        if self.n_data_points < TILE_SIZE and final == False:
-            if self.filename in memory_tiles_open:
-                pass
-#                memory_tiles_open.remove(self.filename)
-            return
-        if self._overflow_buffer:
-            # Don't try if children haven't been written.
-            if len(self.data) == TILE_SIZE and self._children and len(self._children) == 4:
-                # Safe to flush because we know all there is to know.
-                logging.debug("Continuing in good shape")
-            else:
-                self.temporary_flush()
-                return
-
-
     @property
     def overflow_buffer(self):
         global files_open
@@ -398,7 +381,7 @@ class Tile():
                 ylim.sort()
                 extent = {"x": xlim, "y": ylim}
                 coords = self.coords[0] + 1, self.coords[1]*2 + i, self.coords[2]*2 + j
-                child = Tile(extent, coords, self.basedir, self.schema)
+                child = Tile(extent, coords, self.args, self.schema)
                 self._children.append(child)
         return self._children
 
@@ -463,7 +446,7 @@ class Tile():
 
     def insert(self, pdframe, tile_budget = float("Inf")):
         #logging.debug(f"Inserting to {self.coords} with budget of {tile_budget}")
-        insert_n_locally = TILE_SIZE - self.n_data_points
+        insert_n_locally = self.TILE_SIZE - self.n_data_points
         if (insert_n_locally > 0):
             head = pdframe.iloc[:insert_n_locally,]
             if head.shape[0]:
@@ -497,7 +480,7 @@ class Tile():
                 tiles_allowed_overflow = tiles_allowed % children_per_tile
 
                 child_tile.insert(subset, tiles_allowed - tiles_allowed_overflow)
-            if insert_n_locally > 0 and self.n_data_points == TILE_SIZE:
+            if insert_n_locally > 0 and self.n_data_points == self.TILE_SIZE:
                 # We've only just completed. Flush.
                 self.first_flush()
             return
