@@ -92,8 +92,8 @@ export default class Scatterplot {
     const bkgd = select("#container-for-canvas-2d-background").select("canvas")
     const ctx = bkgd.node().getContext("2d")
 
-    // ctx.fillStyle = "rgba(125, 25, 29, 1)"
-    // ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
+    ctx.fillStyle = "rgba(133, 133, 111, .8)"
+    ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2)
 
     this._renderer.initialize()
 

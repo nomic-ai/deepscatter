@@ -11,8 +11,9 @@ export default class GeoLines {
   }
 
   parse_topojson() {
+    const k = Array.from(Object.keys(this.topojson.objects))[0]
     const lines = mesh(this.topojson,
-      this.topojson.objects["-"])
+      this.topojson.objects[k])
     const total_length = lines.coordinates.map(
       d => d.length).reduce( (a, b) => a + b)
     const buffer = new Float32Array(total_length * 2)

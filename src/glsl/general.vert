@@ -310,13 +310,14 @@ vec2 calculate_jitter(
                                         jitter_radius_transform, jitter_radius);
   if (jitter_type == 3.) {
     // normally distributed on x and y.
-    return jitter_r * box_muller(ix, 1.);
+    return jitter_r * box_muller(ix, 1.) * vec2(1., u_width/u_height);
   }
   if (jitter_type == 2.) {
+    // uniform in the circle.
     float theta = ix_to_random(ix, 15.) * tau;
     // Rescale.
     float r = jitter_r * sqrt(ix_to_random(ix, 145.));
-    return vec2(cos(theta) * r, sin(theta)*r);
+    return vec2(cos(theta) * r, sin(theta)*r * u_width / u_height);
   }
   /* Jittering that includes motion) */
 
