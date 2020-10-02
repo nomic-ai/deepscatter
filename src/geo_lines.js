@@ -1,5 +1,4 @@
 import {mesh} from "topojson-client";
-import createLine from "regl-line";
 import vertex_shader from './glsl/line_shader.vert';
 import frag_shader from './glsl/line.frag';
 
@@ -10,7 +9,7 @@ export default class GeoLines {
     this.parse_topojson()
     this.prepare_regl()
   }
-  
+
   parse_topojson() {
     const lines = mesh(this.topojson,
       this.topojson.objects["-"])
@@ -19,7 +18,7 @@ export default class GeoLines {
     const buffer = new Float32Array(total_length * 2)
     const start_points = [];
     let position = 0;
-    
+
     for (let coordinate_set of lines.coordinates) {
       start_points.push({
         offset: position * 4,
@@ -34,7 +33,7 @@ export default class GeoLines {
     this.line_buffer = this.regl.buffer(buffer);
     this.line_meta = start_points;
   }
-  
+
   prepare_regl() {
     const {line_buffer, meta, regl} = this;
     const parameters = {
@@ -92,7 +91,7 @@ export default class GeoLines {
     }
     this._render = this.regl(parameters)
   }
-  
+
   render(props) {
     const prop_list = []
     for (let segment of this.line_meta) {
@@ -102,8 +101,8 @@ export default class GeoLines {
       el.offset = segment.offset
       prop_list.push(el)
     }
-    
+
     this._render(prop_list)
-    
+
   }
 }
