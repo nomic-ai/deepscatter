@@ -505,7 +505,7 @@ export class ReglRenderer extends Renderer {
       console.log(props.prefs, field)
       props.prefs.encoding.color = {
         field: field,
-        domain: [0, 1023]
+        domain: [0, 4096]
       }
     } else {
       field = props.prefs.encoding.color.field
@@ -523,6 +523,7 @@ export class ReglRenderer extends Renderer {
         {data: minilist}
       )
     })
+    console.log(minilist)
     for (const [k, v] of this.tileSet.dictionary_lookups[field]) {
       if (typeof(k)=="string") {continue}
       const col = Math.floor(k/64);
@@ -535,9 +536,10 @@ export class ReglRenderer extends Renderer {
           const value = minilist[
             col * step * 4 + i * 4 + //column
             row * step * 4 * width + j*width*4 + //row
-            3];
+            3]; // opacity field.
           if (value >= 128) {
             overflown = true
+            continue
           }
           score += value;
         }
