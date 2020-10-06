@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import argparse
 import json
+from numpy import random as nprandom
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -17,6 +18,7 @@ def parse_args():
     parser.add_argument('--tile_size', type=int, default = 50000, help ="Number of records per tile.")
     parser.add_argument('--destination', '--directory', '-d', type=str, required = True, help = "Destination directory to write to.")
     parser.add_argument('--max_files', type=float, default = 200, help ="Max files to have open. Default 200; check ulimit -n to see what might be safe. But I've found that I can have many more than that, so... who knows.")
+    parser.add_argument('--randomize', type=float, default = 0, help ="Uniform random noise to add to points. If you have millions of coincident points, can reduce the depth of teh tree greatly.")
 
     parser.add_argument('--files', "-f", nargs = "+",
                         type = str,
@@ -167,7 +169,7 @@ def main():
         logging.info("extent")
         logging.info(extent)
         raw_schema = pa.ipc.RecordBatchFileReader(args.files[0]).schema
-    
+
     tiler = Tile(extent, [0, 0, 0], args, raw_schema)
 
     logging.info("Starting .")
@@ -176,6 +178,10 @@ def main():
         logging.info(f"Reading block {i} of {len(rewritten_files) - 1}")
         d = feather.read_feather(arrow_block)
         d = d[pd.notna(d['x'])]
+        if args.randomize > 0:
+            d['x'] = d['x'] + nprandom.normal(0, args.randomize, d.shape[0])
+            d['y'] = d['y'] + nprandom.normal(0, args.randomize, d.shape[0])
+
         logging.info(f"{len(memory_tiles_open)} partially filled tiles buffered in memory and {len(files_open)} flushing overflow directly to disk.")
         remaining_tiles = args.max_files - len(memory_tiles_open) - len(files_open)
         logging.info(f"Inserting block {i} of {len(rewritten_files) - 1}")
