@@ -508,6 +508,7 @@ export class ReglRenderer extends Renderer {
         {data: minilist}
       )
     })
+    console.log(minilist)
     for (const [k, v] of this.tileSet.dictionary_lookups[field]) {
       if (typeof(k)=="string") {continue}
       const col = Math.floor(k/64);
@@ -525,6 +526,7 @@ export class ReglRenderer extends Renderer {
           // So for factors with > 128 items, count them manually.
           if (value >= 128) {
             overflown = true
+            continue
           }
           score += value;
         }
