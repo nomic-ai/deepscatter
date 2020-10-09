@@ -37,8 +37,8 @@ def parse_args():
                         help="datatypes, in 'key=value' format with no spaces. Eg --dtypes year=float64")
 
     parser.add_argument('--log-level',
-    type = int,
-    default = 30)
+        type = int,
+        default = 30)
 
     args = parser.parse_args()
     logging.getLogger().setLevel(args.log_level)
@@ -205,7 +205,6 @@ def main():
         flushed += flushed_here
     logging.info(f"{count} added, {flushed} flushed")
     logging.debug(memory_tiles_open)
-
 
 def partition(table, midpoint):
     # Divide a table in two based on a midpoint

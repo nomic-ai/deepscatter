@@ -6,7 +6,6 @@ import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool }
 import { Zoom, window_transform } from './interaction.js';
 // import { aesthetic_variables } from './shaders';
 import { Renderer } from './rendering.js';
-import Aesthetic from "./Aesthetic.js";
 import GLBench from 'gl-bench/dist/gl-bench';
 import {contours} from 'd3-contour';
 import gaussian_blur from './glsl/gaussian_blur.frag';
@@ -14,9 +13,8 @@ import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import {easeSinInOut, easeCubicInOut} from 'd3-ease';
 import unpackFloat from "glsl-read-float";
-
-const aesthetic_variables = Array.from(Object.keys(Aesthetic))
-  .map(d => d.toLowerCase())
+import { aesthetic_variables } from './AestheticSet.js'
+import AestheticSet from './AestheticSet.js';
 
 export class ReglRenderer extends Renderer {
 
@@ -51,19 +49,7 @@ export class ReglRenderer extends Renderer {
     requestAnimationFrame(draw);
     /* END BOILERPLATE */
 
-    this.aes = {}
-
-    for (const aes_upper of  Array.from(Object.keys(Aesthetic))) {
-      const aes = aes_upper.toLowerCase()
-      const args = [aes, this.scatterplot, this.regl, tileSet]
-      if (aes_upper == "Y") {
-        args.unshift(this.height)
-      }
-      if (aes_upper == "X") {
-        args.unshift(this.width)
-      }
-      this.aes[aes] = new Aesthetic[aes_upper](...args)
-    }
+    this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
 
     // allocate buffers in 64 MB blocks.
     this.buffer_size = 1024 * 1024 * 64
@@ -101,12 +87,10 @@ export class ReglRenderer extends Renderer {
     if (encoding.x0 && encoding.y0) {
       // Having these means that we assign a *new* value
       // to the previous position.
-      console.warn(encoding.y0)
       this.aes['x'].update(encoding.x0)
       this.aes['y'].update(encoding.y0)
     }
     for (let k of aesthetic_variables) {
-      console.log(k)
       const v = encoding[k]
       this.aes[k].update(v)
     }
@@ -166,18 +150,16 @@ export class ReglRenderer extends Renderer {
     }
   }
 
-  render_points(props) {
+  render_points(props, block_for_full_data = false) {
 
     // Regl is faster if it can render a large number of draw calls together.
     let prop_list = [];
 
     for (let tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
-
       const manager = new TileBufferManager(this.regl, tile, this)
-
       try {
-        if (!manager.ready(props.prefs)) {
+        if (!manager.ready(props.prefs, block_for_full_data)) {
           // The 'ready' call also pushes a creation request into
           // the deferred_functions queue.
           continue
@@ -203,7 +185,6 @@ export class ReglRenderer extends Renderer {
       }
       return
     }
-
     // Do the lowest tiles first.
     prop_list.reverse()
     this._renderer(prop_list)
@@ -502,23 +483,27 @@ export class ReglRenderer extends Renderer {
     const { regl, props } = this;
     props.prefs.jitter = null;
     if (field !== undefined) {
-      console.log(props.prefs, field)
+      console.log("USING FIELD", field, props.prefs, field)
       props.prefs.encoding.color = {
         field: field,
-        domain: [0, 1023]
+        domain: [0, 4096],
+        // range: "shufbow"
       }
     } else {
       field = props.prefs.encoding.color.field
     }
+
+    props.only_color = -1;
+    props.prefs.jitter = null;
+    props.prefs.last_jitter = null;
+    props.colors_as_grid = 1.0;
+
     const { width, height } = this.fbos.minicounter
     const minilist = new Uint8Array(width * height * 4);
     const counts = new Map()
     this.fbos.minicounter.use(() => {
-      props.colors_as_grid = 1.0;
-      props.only_color = -1.
       regl.clear({color: [0, 0, 0, 0]});
-      console.log(props.prefs.encoding)
-      this.render_points(props)
+      this.render_points(props, true)
       regl.read(
         {data: minilist}
       )
@@ -536,6 +521,8 @@ export class ReglRenderer extends Renderer {
             col * step * 4 + i * 4 + //column
             row * step * 4 * width + j*width*4 + //row
             3];
+          // Can't be sure that we've got precision up above half precision.
+          // So for factors with > 128 items, count them manually.
           if (value >= 128) {
             overflown = true
           }
@@ -546,7 +533,7 @@ export class ReglRenderer extends Renderer {
         // The cells might be filled up at 128;
         counts.set(v, score)
       } else {
-        console.log(v, "overflown, performing manually")
+        console.log(k, v, "overflown, performing manually")
         counts.set(v, this.n_visible(k))
       }
 //        console.log(k, v, col, row, score)
@@ -610,7 +597,6 @@ export class ReglRenderer extends Renderer {
       // Must be flipped
       color_at_point = this.regl.read({x: x, y: height - y, width: 1, height: 1});
     })
-
 
     const float = unpackFloat(...color_at_point)
     const p = this.tileSet.findPoint(float);
@@ -749,23 +735,11 @@ export class ReglRenderer extends Renderer {
           return props.sprites ?
           props.sprites : this.fbos.dummy
         },
-
+        u_last_jitter: function (context, props) {
+          return encode_jitter_to_int(props.prefs.last_jitter);
+        },
         u_jitter: function(context, props) {
-          if (props.prefs.jitter == "spiral") {
-            // animated in a logarithmic spiral.
-            return 1
-          } else if (props.prefs.jitter == "uniform") {
-            // Static jitter inside a circle
-            return 2
-          } else if (props.prefs.jitter == "normal") {
-            // Static, normally distributed, standard deviation 1.
-            return 3
-          } else if (props.prefs.jitter == "circle") {
-            // animated, evenly distributed in a circle with radius 1.
-            return 4
-          } else {
-            return 0
-          }
+          return encode_jitter_to_int(props.prefs.jitter);
         },
         u_zoom_balance: regl.prop('zoom_balance'),
         u_maxix: function(context, props) {
@@ -779,6 +753,23 @@ export class ReglRenderer extends Renderer {
         u_time: function(context, props) {
           return props.time;
         },
+
+        u_filter_numeric: function(context, props) {
+          if (!props.prefs.encoding.filter || !props.prefs.encoding.filter.op) {
+            return [0, 0, 0]
+          } else {
+            const val = [
+              // Encoding of op as number.
+              [null, "lt", "gt", "eq", "within"]
+                .indexOf(props.prefs.encoding.filter.op),
+              props.prefs.encoding.filter.a || 0,
+              props.prefs.encoding.filter.b || 0
+            ]
+            return val;
+          }
+        },
+
+
         u_zoom: function(context, props) {
           const zoom_matrix = [
             [props.transform.k, 0, props.transform.x],
@@ -809,6 +800,7 @@ export class ReglRenderer extends Renderer {
           continue
         }
 
+
         parameters.uniforms["u_" + temporal + k + "_domain"] = function (state, props) {
           // wrap as function to clue regl that it might change.
           return aesthetic[temporal + "domain"]
@@ -823,10 +815,15 @@ export class ReglRenderer extends Renderer {
           return 0
         }
 
+
         parameters.attributes[`a_${temporal}${k}`] = function(state, props) {
 
+          if (props.only_color > -2) {
+            return props.manager.regl_elements.get(props.prefs.encoding.color.field)
+          }
+
           if (props.prefs.encoding[k] === null ||
-            false//aesthetic[field] === undefined
+            false//.[field] === undefined
           ) {
             return { constant: 1 }
           }
@@ -865,7 +862,7 @@ class TileBufferManager {
     this.regl_elements = tile._regl_elements
   }
 
-  ready(prefs) {
+  ready(prefs, block_for_full_data = false) {
     const { renderer, regl_elements } = this;
     const { aes } = renderer;
     const keys = Object.entries(prefs.encoding)
@@ -896,8 +893,14 @@ class TileBufferManager {
         }
         // Request that the buffer be created before returning false.
         regl_elements.set(key, null)
-        renderer.deferred_functions.push(() => this.create_regl_buffer(key))
-        return false
+        if (block_for_full_data) {
+          this.create_regl_buffer(key)
+        } else
+        {
+          renderer.deferred_functions.push(() => this.create_regl_buffer(key))
+          return false
+        }
+
       }
     }
     return true
@@ -1016,5 +1019,24 @@ class MultipurposeBufferSet {
     }
     this.pointer += items * bytes_per_item
     return value
+  }
+}
+
+
+function encode_jitter_to_int(jitter) {
+  if (jitter == "spiral") {
+    // animated in a logarithmic spiral.
+    return 1
+  } else if (jitter == "uniform") {
+    // Static jitter inside a circle
+    return 2
+  } else if (jitter == "normal") {
+    // Static, normally distributed, standard deviation 1.
+    return 3
+  } else if (jitter == "circle") {
+    // animated, evenly distributed in a circle with radius 1.
+    return 4
+  } else {
+    return 0
   }
 }
