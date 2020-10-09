@@ -7,7 +7,8 @@ from pathlib import Path
 import sys
 import argparse
 import json
-
+from collections import defaultdict, Counter
+from typing import DefaultDict, Dict, List, Tuple, Set
 logging.getLogger().setLevel(logging.INFO)
 
 def parse_args():
@@ -52,7 +53,7 @@ def determine_schema(args):
                         csv.ReadOptions(block_size= 1024*1024*64),
                         convert_options = csv.ConvertOptions(
                             auto_dict_encode = True,
-                            auto_dict_max_cardinality=512
+                            auto_dict_max_cardinality=4096
                         ))
     override = {}
     for arg in args.dtypes:
@@ -64,10 +65,14 @@ def determine_schema(args):
     schema = {}
     for el in raw_schema:
         t = el.type
-        if t == pa.int64():
+        if t == pa.int64() and el.name != 'ix':
+            t = pa.float32()
+        if t == pa.int32() and el.name != 'ix':
             t = pa.float32()
         if t == pa.float64():
             t = pa.float32()
+        if isinstance(t, pa.DictionaryType) and pa.types.is_string(t.value_type):
+            t = pa.dictionary(pa.int16(), pa.utf8())
         schema[el.name] = t
         if el.name in override:
             schema[el.name] = getattr(pa, override[el.name])()
@@ -80,7 +85,7 @@ def determine_schema(args):
 # These are the things that we'll actually read in.
 
 # We write to arrow because we need a first pass anyway to determine
-# the data bounds; and it will be much faster to re-parse
+# the data bounds and some other stuff; and it will be much faster to re-parse
 # everything from arrow than from CSV.
 
 def rewrite_in_arrow_format(files, schema_safe, schema):
@@ -111,9 +116,9 @@ def rewrite_in_arrow_format(files, schema_safe, schema):
                 else:
                     d[name] = batch[i]
             data = pa.Table.from_batches([batch])
-            # Count each element in an int32 array (float32 risks overflow,
+            # Count each element in a uint64 array (float32 risks overflow,
             # Uint32 supports up to 2 billion or so, which is cutting it close for stars.)
-            d["ix"] = pa.array(range(ix, ix + len(batch)), type = pa.uint32())
+            d["ix"] = pa.array(range(ix, ix + len(batch)), type = pa.uint64())
             ix += len(batch)
             for dim in extent.keys(): # ["x", "y", maybe "z"]
                 col = data.column(dim)
@@ -140,8 +145,8 @@ def check_filesnames(args):
 # Memory tiles *might* be flushed into overflow mode, so we count them.
 
 # Start at one to count the initial tile. (This number is incremented when children are built.)
-memory_tiles_open = set()
-files_open = set();
+memory_tiles_open : Set[str] = set()
+files_open : Set[str] = set()
 
 # Will be overwritten from args
 
@@ -166,12 +171,14 @@ def main():
         }
         logging.info("extent")
         logging.info(extent)
-        raw_schema = pa.ipc.RecordBatchFileReader(args.files[0]).schema
+        raw_schema : pa.Schema = pa.ipc.RecordBatchFileReader(args.files[0]).schema
     
     tiler = Tile(extent, [0, 0, 0], args, raw_schema)
 
-    logging.info("Starting .")
+    logging.info("Starting.")
 
+    count_holder = defaultdict(Counter)
+    
     for i, arrow_block in enumerate(rewritten_files):
         logging.info(f"Reading block {i} of {len(rewritten_files) - 1}")
         d = feather.read_feather(arrow_block)
@@ -179,8 +186,15 @@ def main():
         logging.info(f"{len(memory_tiles_open)} partially filled tiles buffered in memory and {len(files_open)} flushing overflow directly to disk.")
         remaining_tiles = args.max_files - len(memory_tiles_open) - len(files_open)
         logging.info(f"Inserting block {i} of {len(rewritten_files) - 1}")
-        tiler.insert(d, remaining_tiles)
+        tiler.insert(d, remaining_tiles)  
+        for name, col in schema.items():
+            if pa.types.is_dictionary(col):
+                col_values = d[name].to_list()
+                count_holder[name].update(col_values)
         logging.info(f"Done inserting block {i} of {len(rewritten_files) - 1}")
+    
+    final_dictionaries = make_final_dictionaries(count_holder)
+    
     logging.info("Initial partition complete--proceeding to children.")
 
     # Flush all open tiles that are not overflown.
@@ -189,24 +203,41 @@ def main():
     # Works recursively lower down, including first flush for all newly created children.
     tiler.map_tiles(lambda tile: tile.retry_overflown_buffers(max_tiles = args.max_files))
 
+    
     # Reflush every tile.
-    tiler.map_tiles(lambda tile: tile.final_flush())
+    tiler.map_tiles(lambda tile: tile.final_flush(final_dictionaries))
 
     count = 0
     flushed = 0
+    
     for (coords, count_here, flushed_here) in tiler.summary():
         count += count_here
         flushed += flushed_here
+        
     logging.info(f"{count} added, {flushed} flushed")
     logging.debug(memory_tiles_open)
 
 
-def partition(table, midpoint):
+def partition(table: pd.DataFrame, midpoint: Tuple[str, float]) -> List[pd.DataFrame]:
     # Divide a table in two based on a midpoint
     key, pivot = midpoint
     criterion = table[key] < pivot
-    splitted = table[criterion], table[~criterion]
+    splitted = [table[criterion], table[~criterion]]
     return splitted
+
+
+def make_final_dictionaries(count_holder: dict) -> Dict[str, Tuple[list, defaultdict]]:
+    final_dicts = {}
+    for name, counts in count_holder.items():
+        keys : List[str] = [l[0] for l in counts.most_common(4094)]
+        length = len(keys)
+        reverse_lookup : DefaultDict[str, int] = defaultdict(lambda x: length) # Returns one more
+        if length==4094:
+            keys += ["Other"]
+        for i, k in enumerate(keys):
+            reverse_lookup[k] = i
+        final_dicts[name] = (pa.array(keys, pa.utf8()), reverse_lookup)
+    return final_dicts
 
 class Tile():
     # some prep to make OCT_TREE SAFE--METHODS that support only quads
@@ -227,7 +258,7 @@ class Tile():
         self._children = None
         self._overflow_buffer = None
         # Unwritten records for myself.
-        self.data = []
+        self.data : List[Union[pa.RecordBatch, pd.DataFrame]] = []
         # Unwritten records for my children.
         self.hold_for_children = []
 
@@ -247,10 +278,10 @@ class Tile():
             return self.args.first_tile_size
         else:
             return self.args.tile_size
-    def midpoints(self):
-        midpoints = []
+    def midpoints(self) -> List[Tuple[str, float]]:
+        midpoints : List[Tuple[str, float]] = []
         for k, lim in self.extent.items():
-            params = []
+            # params = []
             midpoint = (lim[1] + lim[0])/2
             midpoints.append((k, midpoint))
         # Ensure x,y,z order--shouldn't be necessary.
@@ -267,8 +298,9 @@ class Tile():
         self._filename = dest_file
         return self._filename
 
-
     def first_flush(self):
+        # Ensure this function is only ever called once.
+        
         if self.flush_status == "needs metadata":
             return
         self.flush_status = "needs metadata"
@@ -282,7 +314,7 @@ class Tile():
         self.flush_data(destination, {}, "lz4")
         memory_tiles_open.remove(self.filename)
 
-    def final_flush(self):
+    def final_flush(self, final_dictionaries) -> None:
         """
         At the end, we can see which tiles have children and append that
         to the metadata.
@@ -292,11 +324,12 @@ class Tile():
         metadata = {
             "extent": json.dumps(self.extent),
         }
+        
         if self._children is None:
             metadata["children"] = "[]"
         else:
             for child in self._children:
-                child.final_flush()
+                child.final_flush(final_dictionaries)
                 self.total_points += child.total_points
             populated_kids = [c.id for c in self._children if c.total_points > 0]
             metadata["children"] = json.dumps(populated_kids)
@@ -306,27 +339,50 @@ class Tile():
             tab = pa.ipc.RecordBatchFileReader(unclean_path)
         except FileNotFoundError:
             return
-        self.data = [tab.get_batch(i) for i in range(tab.num_record_batches)]
+            
+        # Ensure it's empty (it should be.)
+        if self.data is None:
+            self.data = []
+        else:
+            self.data.clear()
+        
+        for i in range(tab.num_record_batches):
+            raw = tab.get_batch(i)
+            cols : List[pa.Array] = []
+            for (name, col) in zip(raw.schema.names, raw):
+                if pa.types.is_dictionary(col.type):
+                    labels, lookup = final_dictionaries[name]
+                    indices = pa.array([lookup[k] for k in col.to_pylist()], pa.int16())                                
+                    col = pa.DictionaryArray.from_arrays(indices, labels)
+                cols.append(col)
+                
+            batch = pa.RecordBatch.from_arrays(cols, raw.schema.names)
+            self.data.append(batch)
+        
+        
+            
         # Flush will remove the tile--bookkeeping.
         for batch in self.data:
             self.total_points += batch.num_rows
 
         metadata["total_points"] = str(self.total_points)
-        self.flush_data(self.filename, metadata, "uncompressed")
-        unclean_path.unlink()
+        self.flush_data(self.filename, metadata, "uncompressed", self.data[0].schema)
+        # unclean_path.unlink()
 
 
-    def flush_data(self, destination, metadata, compression):
+    def flush_data(self, destination, metadata, compression, schema = None):
         if self.data is None:
             return
-        schema_copy = pa.schema(self.schema, metadata = metadata)
-        try:
-            frame = pa.Table.from_batches(self.data, schema_copy).combine_chunks()
-        except:
+        if schema is None:
+            schema = self.schema
+        schema_copy = pa.schema(self.data[0].schema, metadata = metadata)
+        #try:
+        frame = pa.Table.from_batches(self.data, schema_copy).combine_chunks()
+        #except:
             # Round trip to pandas while
             # `pyarrow.lib.ArrowNotImplementedError: Concat with dictionary unification NYI`
-            frame = pa.Table.from_batches(self.data, schema_copy).to_pandas()
-            frame = pa.Table.from_pandas(frame, schema_copy)
+        #    frame = pa.Table.from_batches(self.data, schema_copy).to_pandas()
+        #    frame = pa.Table.from_pandas(frame, schema_copy)
         feather.write_feather(frame, destination, compression = compression)
         self.data = None
 
@@ -344,9 +400,10 @@ class Tile():
         files_open.add(fname)
         return self._overflow_buffer
 
-    def partition_to_children(self, table):
+    def partition_to_children(self, table) -> List[pd.DataFrame]:
         # Coerce to a list in quadtree/octree order.
         frames = [table]
+        pivot_dim : Tuple[str, float]
         for pivot_dim in self.midpoints():
             expanded = []
             for frame in frames:
