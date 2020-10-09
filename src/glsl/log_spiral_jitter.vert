@@ -13,7 +13,7 @@ highp float ix_to_random(in float ix, in float seed) {
   return fract(sin(sn) * c);
 }
 
-vec2 box_muller(in float ix, in float seed) {
+highp vec2 box_muller(in float ix, in float seed) {
   // Box-Muller transform gives you two gaussian randoms for two uniforms.
   highp float U = ix_to_random(ix, seed);
   highp float V = ix_to_random(ix, seed + 17.123123);
@@ -109,7 +109,8 @@ vec2 logarithmic_spiral_jitter(
             0., 1., 0.,
             0., 0., 1.);
 
-  pos_spiral = pos_spiral * shear_mat * adjust_to_viewport;
+  pos_spiral = pos_spiral * shear_mat * 
+               adjust_to_viewport;
   return pos_spiral.xy;
 }
 
