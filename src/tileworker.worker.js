@@ -1,6 +1,6 @@
 import * as Comlink from "comlink";
-import { Table, Column, Vector, Utf8, Float32, Uint32, Dictionary } from 'apache-arrow';
-import ArrowTree from './ArrowTree';
+import { Table, Column, Vector, Utf8, Float32, Uint32, Int32, Int64, Dictionary } from 'apache-arrow';
+// import ArrowTree from './ArrowTree';
 
 
 function compose_functions(val) {
@@ -59,27 +59,31 @@ const WorkerTile = {
         } else {
           buffer = response
         }
+        
         const codes = get_dictionary_codes(buffer)
+        
         return [Comlink.transfer(buffer, [buffer]), metadata, codes]
+        
       })
 
   },
 
-  kdtree(table_buffer) {
+  /* kdtree(table_buffer) {
     const table = Table.from(table_buffer)
     const tree = ArrowTree.from_arrow(table, "x", "y")
     return [
       Comlink.transfer(table_buffer, [table_buffer]),
       Comlink.transfer(tree.bush.data, [tree.bush.data])
     ]
-  },
+  }, */
+
+  
 
   run_transforms(map, table_buffer) {
     const buffer = mutate(map, table_buffer)
     const codes = get_dictionary_codes(buffer)
     return [Comlink.transfer(buffer, [buffer]), codes]
   }
-
 }
 
 function get_dictionary_codes(buffer) {
@@ -104,6 +108,8 @@ function get_dictionary_codes(buffer) {
   return dicts
 }
 
+
+
 function mutate(map, table_buffer) {
     const table = Table.from(table_buffer)
 
@@ -116,11 +122,6 @@ function mutate(map, table_buffer) {
       funcmap.set(k, Function("datum", v))
     }
 
-
-    // let tilepos = 0
-    // funcmap.set("position_in_tile", function(datum) {return tilepos++})
-    data.set("position_in_tile", Array(table.length))
-
     let i = 0;
     // Set the values in the rows.
     for (let row of table) {
@@ -129,12 +130,27 @@ function mutate(map, table_buffer) {
       }
       i++;
     }
+    
     const columns = {};
 
+
+
+    // First, population the old columns
     for (let k of table.schema.fields.map(d => d.name)) {
       if (!funcmap.has(k)) {
-        // Allow overwriting.
-        columns[k] = table.getColumn(k)
+        // Allow overwriting, so don't copy if it's there.
+        const col = table.getColumn(k)
+        columns[k] = col
+        
+        
+        // Translate to float versions here to avoid casting in the main thread.
+        if (col.dictionary) {
+          const float_version = new Float32Array(table.length)
+          for (let i of range(table.length)) {
+            float_version[i] = col.index.get(i) - 2047
+          }
+          columns[k + "_dict_index"] = floatVector(float_version)
+        }
       }
     }
 
@@ -153,6 +169,8 @@ function mutate(map, table_buffer) {
       }
       columns[k] = column;
     }
+
+    
 
     const return_table = Table.new(columns)
 
