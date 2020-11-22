@@ -1,5 +1,4 @@
 import { select } from 'd3-selection';
-import { p_in_rect } from './tile.js'
 export class Renderer {
   // A renderer handles drawing to a display element.
   constructor(selector, tileSet, scatterplot) {
@@ -22,8 +21,9 @@ export class Renderer {
       return prefs.max_points;
     }
     const {k} = this.zoom.transform
-    const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance)
-    return prefs.max_points * k / point_size_adjust / point_size_adjust;
+    const point_size_adjust = Math.exp(Math.log(k) *
+      prefs.zoom_balance)
+    return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
   }
 
   is_visible(point) {

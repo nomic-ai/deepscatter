@@ -59,11 +59,11 @@ const WorkerTile = {
         } else {
           buffer = response
         }
-        
+
         const codes = get_dictionary_codes(buffer)
-        
+
         return [Comlink.transfer(buffer, [buffer]), metadata, codes]
-        
+
       })
 
   },
@@ -77,7 +77,7 @@ const WorkerTile = {
     ]
   }, */
 
-  
+
 
   run_transforms(map, table_buffer) {
     const buffer = mutate(map, table_buffer)
@@ -130,7 +130,7 @@ function mutate(map, table_buffer) {
       }
       i++;
     }
-    
+
     const columns = {};
 
 
@@ -140,17 +140,26 @@ function mutate(map, table_buffer) {
       if (!funcmap.has(k)) {
         // Allow overwriting, so don't copy if it's there.
         const col = table.getColumn(k)
-        columns[k] = col
-        
-        
+        if (k === "ix") {
+          // coerce the ix field to float.
+          // Ultimately, may need to
+          // pack it across a few different channels.
+          columns[k] = floatVector(col)//.data.values
+        } else {
+          columns[k] = col
+        }
+
         // Translate to float versions here to avoid casting in the main thread.
         if (col.dictionary) {
           const float_version = new Float32Array(table.length)
-          for (let i of range(table.length)) {
-            float_version[i] = col.index.get(i) - 2047
+          for (let i = 0; i < table.length; i++) {
+            // At half precision, -2047 to 2047 is the
+            // range through which integers are exactly right.
+            float_version[i] = col.indices.get(i) - 2047
           }
           columns[k + "_dict_index"] = floatVector(float_version)
         }
+
       }
     }
 
@@ -170,7 +179,7 @@ function mutate(map, table_buffer) {
       columns[k] = column;
     }
 
-    
+
 
     const return_table = Table.new(columns)
 

@@ -50,7 +50,7 @@ export default class Zoom {
     return this;
   }
 
-  zoom_to(k, x, y, duration = 4000) {
+  zoom_to(k, x = null, y = null, duration = 4000) {
 
     const scales = this.scales()
     const { canvas, zoomer, width, height } = this;
@@ -159,8 +159,8 @@ export default class Zoom {
       .attr("class", "label")
 
     const renderer = this.renderers.get("regl")
-    const x_aes = renderer.aes.x;
-    const y_aes = renderer.aes.y;
+    const x_aes = renderer.aes.x.current;
+    const y_aes = renderer.aes.y.current;
 
     this.canvas.on("mousemove", () => {
 
@@ -475,6 +475,7 @@ function label_from_point(point, defaults) {
       }
     } else {
       if (nope.has(k)) {continue}
+      if (k.match(/_dict_index/)) {continue}
       if (v === null) {continue}
       if (v === '') {continue}
     }

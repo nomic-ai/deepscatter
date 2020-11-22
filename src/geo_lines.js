@@ -1,6 +1,7 @@
 import {mesh} from "topojson-client";
 import vertex_shader from './glsl/line_shader.vert';
 import frag_shader from './glsl/line.frag';
+import earcut from 'earcut';
 
 export default class GeoLines {
   constructor(topojson, regl) {
@@ -33,6 +34,11 @@ export default class GeoLines {
     }
     this.line_buffer = this.regl.buffer(buffer);
     this.line_meta = start_points;
+
+/*    const geojson = topojson.merge(this.topojson, this.topojson.objects[k])
+    const earcut_data = earcut.flatten(geojson.geometry.coordinates);
+    this.triangles = earcut(earcut_data.vertices, earcut_data.holes, earcut_data.dimensions);
+*/
   }
 
   prepare_regl() {

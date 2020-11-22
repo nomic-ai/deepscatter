@@ -85,14 +85,17 @@ class Tile extends BaseTile {
 
   }
 
-  download_to_depth(depth, corners = {"x":[-1, 1], "y": [-1, 1]}) {
+  download_to_depth(depth, corners = {"x":[-1, 1], "y": [-1, 1]}, recurse=false) {
     // First, execute the download to populate this.max_ix
+    if (this.max_ix < depth && this.is_visible(depth, corners) && !recurse) {
+        return this.children().map(child => child.download_to_depth(depth, corners, false))
+    }
 
     return this.download()
     .then(_ => {
       // If the last point here is less than the target depth, keep going.
       if (this.max_ix < depth &&
-        this.is_visible(depth, corners)
+        this.is_visible(depth, corners) && recurse
       ) {
         // Create the children. (Be careful about this, because a '.children()'
         // call actually generates a bunch of fetch promises.

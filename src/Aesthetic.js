@@ -4,6 +4,7 @@ import { rgb } from 'd3-color';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool
  } from 'd3-scale-chromatic';
 
+import objectEqual from 'lodash.isequal';
 import * as d3Chromatic from 'd3-scale-chromatic';
 
 const scales = {
@@ -20,7 +21,6 @@ function to_buffer(data) {
   output.set(data.flat())
   return output
 }
-
 
 function materialize_color_interplator(interpolator) {
   const rawValues = arange(palette_size).map(i => {
@@ -55,40 +55,53 @@ for (let [k, v] of Object.entries(d3Chromatic)) {
   }
 }
 
+
 export const default_aesthetics = {
   "x": {
-    range: [-1, 1],
+    field: "x",
+    constant: 1,
+    range: [0, 500],
     transform: "literal"
   },
   "y": {
-    range: [-1, 1],
+    field: "y",
+    constant: 1,
+    range: [0, 500],
     transform: "literal"
   },
   "color": {
+    constant: [.5, .5, .5],
     range: color_palettes.viridis,
     transform: "linear"
   },
   "jitter_radius": {
+    constant: 0,
     range: [0, 0.05],
     transform: 'sqrt'
   },
   "jitter_speed": {
+    constant: 0,
     range: [.05, 1],
     transform: "linear"
   },
   "size": {
+    constant: 1.5,
     range: [.5, 5],
     transform: "sqrt"
   },
   "alpha": {
+    constant: 1,
     range: [0, 1],
     transform: "linear"
   },
   "filter": {
+    constant: 1, // Necessary though meaningless.
     range: [0, 1],
     transform: "linear"
   }
 }
+
+
 
 class Aesthetic {
 
@@ -97,20 +110,21 @@ class Aesthetic {
     this.scatterplot = scatterplot
     this.regl = regl
 
-    this._current_code = undefined;
-    this._last_code = undefined;
-
     this._domain = this.default_domain
-    this._last_domain = this.default_domain
-    this._range = this.default_data()
+    this._range = this.default_range
     this._transform = default_aesthetics[label]['transform']
     this.tileSet = tile;
+
+    // A flag that will be turned on and off in AestheticSet.
+    this.needs_transitions = true;
 
     this._domains = {}
     this.create_textures()
   }
 
-  get default_val() {return 1};
+  get default_val() {
+    return 1
+  };
 
   get texture_size() {
     return 4096
@@ -151,11 +165,6 @@ class Aesthetic {
     }
   }
 
-
-  get last_domain() {
-    return this._last_domain;
-  }
-
   default_data() {
     return encodeFloatsRGBA(Array(this.texture_size)
       .fill(this.default_val))
@@ -165,6 +174,7 @@ class Aesthetic {
   get domain() {
     return this._domain || this.default_domain
   }
+
   get range() {
     return this._range || this.default_range
   }
@@ -214,64 +224,75 @@ class Aesthetic {
 
   post_to_regl_buffer(buffer_index) {
     this.textures[buffer_index].subimage({
-      data: this.texture_buffer, width: 1, height: this.texture_size
+      data: this.texture_buffer,
+      width: 1,
+      height: this.texture_size
     })
-  }
-
-  get last_field() {
-    return this._last_field || this.field
   }
 
   clear() {
     // cache last values.
-    this.post_to_regl_buffer(0);
+//    this.reset_last_entries()
     this.texture_buffer.set(this.default_data())
     this.post_to_regl_buffer(1)
-    this._last_field = this.field
-    this._last_transform = this._transform;
-    this._last_domain = safe_expand(this.domain);
     this.field = undefined;
-
     this._domain = undefined;
     this._range = undefined;
     this._transform = undefined;
   }
 
+
+
   update(encoding) {
+
     if (encoding === null) {
       return this.clear()
     }
 
     if (encoding === undefined) {
-      this.post_to_regl_buffer(0)
-      this._last_field = this.field
-      this._last_domain = safe_expand(this.domain);
-      this._last_transform = this._transform;
-
-      return;
+      throw "This should have been removed earlier"
     }
+
+    if (
+      (encoding.field === "x" || encoding.field === "y") &&
+        encoding.range) {
+      console.warn(`Asked for an x or y range, but it will be automatically
+                    set to the window scale.`)
+    }
+
+//    const stringversion = JSON.parse(JSON.stringify(encoding))
+//    if (objectEqual(stringversion, this.stringversion)) {
+//      this.needs_transitions = false;
+//      return;
+//    }
+
+    this.stringversion = JSON.parse(JSON.stringify(encoding));
 
     if (typeof(encoding) == "string") {
       encoding = parseLambdaString(encoding, false)
       if (this.label === 'filter') {
-        encoding.domain = [0, this.texture_size - 1]
+        console.log(encoding)
+        encoding.domain = [-2047, 2047]
       }
     }
 
-  if (typeof(encoding) == "numeric") {
-    encoding = {
-      "field": "ix",
-      "domain": [0, 0],
-      "range": [encoding, encoding]
+    // Numbers or arrays treated as constants.
+    if (typeof(encoding) == "number" || encoding.length) {
+      encoding = {
+        "constant": encoding,
+        "transform": "literal"
+      }
     }
-  }
 
-  if (encoding.lookup) {
+
+  if (encoding.lookup !== undefined) {
     // These are the possible elements of the lookup.
+    //console.log("GAH", encoding)
     const {table, value, filter} = encoding.lookup;
+    //console.log("BARH", encoding)
     const key = encoding.field;
     if (key === undefined) {
-      console.log
+      //console.log
     }
     let filter_func, data_func, key_func;
     const lookup = new Map();
@@ -293,12 +314,15 @@ class Aesthetic {
       // Should allow alternate keys.
       return row[encoding.field]
     }
+//    console.log("SCATTERPLOT", this.scatterplot)
+    //console.log("TRYING TO GET", table, this.scatterplot.lookup_tables)
     const t = this.scatterplot.lookup_tables.get(table);
+    //console.log(t)
     for (let row of t) {
       if (!filter_func(row)) {
         continue
       }
-      if (Math.random() < -.01) {
+      if (Math.random() < -0.01) {
         console.log(row)
         console.log(key_func(row))
         console.log(data_func(row))
@@ -315,6 +339,7 @@ class Aesthetic {
     // May overwrite 'field!!'
     Object.assign(encoding, parseLambdaString(encoding.lambda, false))
   }
+
   const {
     label
   } = this;
@@ -324,30 +349,16 @@ class Aesthetic {
     field
   } = encoding;
 
-
   // Store the last and current values.
 
-  this._last_transform = this._transform;
-  this._last_field = this.field
   this.field = field
-  this._last_domain = safe_expand(this._domain)
   this._domain = safe_expand(encoding.domain)
-  this.last_range = safe_expand(this.range)
   this._range = safe_expand(encoding.range)
 
+  this._constant = encoding.constant
   // resets to default if undefined
 
-  /*
-  console.log("Last Domain", this.label,
-   "domains", this.domain, this.last_domain,
-   this.field, this.last_field
-  )*/
-
-  this._transform = encoding.transform || this._last_transform;
-
-  if (typeof(encoding) == "number") {
-    this._range = [encoding, encoding]
-  }
+  this._transform = encoding.transform || this.default_transform;
 
   const {
     range,
@@ -374,6 +385,7 @@ class Aesthetic {
   encode_for_textures(range) {
 
     const values = new Array(this.texture_size);
+
     this.scaleFunc = scales[this.transform]()
       .range(range)
       .domain([0, this.texture_size - 1])
@@ -386,6 +398,29 @@ class Aesthetic {
       encodeFloatsRGBA(values, this.texture_buffer)
     );
 
+  }
+
+  arrow_column() {
+    return this.tileSet.table.getColumn(this.field)
+  }
+
+  is_dictionary() {
+    if (this.field == undefined) {
+      return false
+    }
+    return this.arrow_column().type.dictionary
+  }
+
+  get constant() {
+    return this._constant;
+  }
+  get use_map_on_regl() {
+    if (this.is_dictionary()) {
+      if (this.domain === [-2047, 2047]) {
+        return 1
+      }
+    }
+    return 0
   }
 
   apply_function_to_textures(field, range, function_reference) {
@@ -402,28 +437,27 @@ class Aesthetic {
       func = function_reference
     }
 
-    this.scaleFunc = scaleLinear().range(range).domain([0, this.texture_size - 1])
+    this.scaleFunc = scaleLinear().range(range)
+      .domain([0, this.texture_size - 1])
     let input = arange(this.texture_size)
     if (field === undefined || this.tileSet.table == undefined) {
       this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return
     }
-    const column = this.tileSet.table.getColumn(field)
+    const column = this.arrow_column()
     if (!column) {
       throw(`Column ${field} does not exist on table.`)
     }
 
     if (column.type.dictionary) {
-      const lookup = this.tileSet.dictionary_lookups[field]
-      try {
-        input = input.map(d => lookup.get(d))
-      } catch(err) {
-        console.log(err)
-      }
+      // NB--Assumes string type for dictionaries.
+      input.fill("")
+      const dvals = column.data.dictionary.toArray()
+      dvals.forEach((d, i) => input[i] = d)
     } else {
       input = input.map(d => this.scaleFunc(d))
     }
-    console.log(func)
+    //console.log(func)
     const values = input.map(i => +func(i))
     this.texture_buffer.set(encodeFloatsRGBA(values))
   }
@@ -435,31 +469,33 @@ class Size extends Aesthetic {
 
 class X extends Aesthetic {
 
-  constructor(max, ...args) {
+  constructor(...args) {
     super(...args)
-    this.max = max
     this._transform = "literal"
   }
 
   get range() {
-    return [0, this.max]
+    return this.tileSet.extent ? this.tileSet.extent.x : [-20, 20]
   }
 
   get previous_range() {
-    return [0, this.max]
+    return this.range
   }
 
-  get default_val() {return 0};
+  get default_val() {return 1};
 }
 
 class Y extends X {
+
   get range() {
-    return [this.max, 0]
+    const [min, max] = this.tileSet.extent ? this.tileSet.extent.y : [-20, 20]
+    return [max, min]
   }
 
   get previous_range() {
-    return [this.max, 0]
+    return this.range
   }
+
 }
 
 class Alpha extends Aesthetic {
@@ -470,6 +506,27 @@ class Filter extends Aesthetic {
   get default_val() {
     return 1
   };
+
+  get domain() {
+    return this.is_dictionary() ?
+    [-2047, 2047] : [0, 1]
+  }
+
+  ops_to_array() {
+    let input = this.stringversion
+    if (!input || !input.op) {
+      return [0, 0, 0]
+    }
+
+    const val = [
+      // Encoding of op as number.
+      [null, "lt", "gt", "eq", "within"]
+        .indexOf(input.op),
+      input.a || 0,
+      input.b || 0
+    ]
+    return val;
+  }
 }
 
 function safe_expand(range) {
@@ -515,6 +572,17 @@ class Color extends Aesthetic {
     return color_palettes.viridis
   }
 
+  get constant() {
+    // Perform color conversion.
+    if (this._constant === undefined) {return undefined}
+    if (typeof(this._constant) == "string") {
+      const {r, g, b} = rgb(this._constant)
+      this._constant = [r/255, g/255, b/255]
+      return this._constant
+    }
+    return this._constant
+  }
+
   encode_for_textures(range) {
 
     if (color_palettes[range]) {
@@ -522,15 +590,12 @@ class Color extends Aesthetic {
     } else if (range.length == this.texture_size * 4) {
       this.texture_buffer.set(range)
     } else {
-      console.warn(`${range} unknown`)
+      console.warn(`request range of ${range} for color ${this.field} unknown`)
     }
   }
 
 }
 
-export default {
-  Size, Alpha, Jitter_speed, Jitter_radius, Color, Filter, X, Y
-};
 
 // A really stupid way to encode floats into rgb values.
 // Stores numbers from -255.98 to 255.98 with a resolution of
@@ -565,6 +630,61 @@ float RGBAtoFloat(in vec4 floater) {
 */
 
 
+export const dimensions = {
+  Size, Alpha, Jitter_speed, Jitter_radius, Color, Filter, X, Y
+};
+
+export class StatefulAesthetic {
+  // An aesthetic that tracks two states--current and last.
+
+  // Point is to handle transitions.
+
+  constructor(label, scatterplot, regl, tile) {
+    this.states = []
+    const lower = label.toLowerCase()
+    const Factory = dimensions[label]
+    for (let _ of [1, 2]) {
+      this.states.push(
+        new Factory(lower, scatterplot, regl, tile)
+      )
+    }
+    for (let state of this.states) {
+      state.update({constant: default_aesthetics[lower].constant})
+    }
+
+    this.current_encoding = JSON.stringify(
+      {constant: default_aesthetics[lower].constant})
+
+  }
+
+  get current() {
+    return this.states[0]
+  }
+  get last() {
+    return this.states[1]
+  }
+
+  update(encoding) {
+    const stringy = JSON.stringify(encoding)
+    // Overwrite the last version.
+    if (stringy == this.current_encoding || encoding === undefined) {
+      // If an undefined encoding is passed, that means
+      // we've seen an update without any change.
+      if (this.needs_transitions) {
+        // The first one is fine, but we gotta update the *last* one.
+        this.states[1].update(JSON.parse(this.current_encoding))
+      }
+      this.needs_transitions = false
+      return
+    }
+    // Flip the current encoding to the second position.
+    this.states.reverse()
+    this.states[0].update(encoding)
+    this.needs_transitions = true
+    this.current_encoding = stringy;
+
+  }
+}
 
 function parseLambdaString(lambdastring, materialize = false) {
   // Materialize an arrow function from its string.

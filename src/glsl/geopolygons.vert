@@ -2,12 +2,9 @@ precision mediump float;
 
 attribute vec2 a_position;
 
-varying vec4 fill;
-
 uniform mat3 u_window_scale;
 uniform mat3 u_zoom;
 uniform float u_height;
-uniform vec4 u_color;
 uniform float u_width;
 
 mat3 pixelspace_to_glspace;
@@ -28,7 +25,6 @@ void main() {
       0., 0., 1.
   );
 
-  fill = vec4(.5, .5, .5, .5);
   vec2 position = calculate_position(a_position,
     u_window_scale, u_zoom);
   gl_Position = vec4(position, 1., 1.);

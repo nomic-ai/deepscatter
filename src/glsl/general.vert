@@ -7,11 +7,15 @@ uniform float u_zoom_balance;
 uniform float u_update_time;
 uniform float u_transition_duration;
 
-uniform float u_jitter_radius;
+//uniform float u_jitter_radius;
 uniform float u_jitter;
+uniform float u_last_jitter;
 // Whether to plot only a single category.
 uniform float u_only_color;
-uniform float u_colors_as_grid;
+uniform float u_grid_mode;
+
+uniform vec3 u_filter_numeric; // An override for simple numeric operations.
+uniform vec3 u_filter_last_numeric; // An override for simple numeric operations.
 
 // Transform from data space to the open window.
 uniform mat3 u_window_scale;
@@ -37,9 +41,13 @@ uniform float u_x_transform;
 uniform float u_last_x_transform;
 uniform vec2 u_x_domain;
 uniform vec2 u_last_x_domain;
+uniform vec2 u_x_range;
+uniform vec2 u_last_x_range;
+
 uniform sampler2D u_x_map;
 uniform sampler2D u_last_x_map;
-
+uniform float u_last_x_needs_map;
+uniform float u_x_needs_map;
 
 attribute float a_y;
 attribute float a_last_y;
@@ -47,9 +55,18 @@ uniform float u_y_transform;
 uniform float u_last_y_transform;
 uniform vec2 u_y_domain;
 uniform vec2 u_last_y_domain;
+uniform vec2 u_y_range;
+uniform vec2 u_last_y_range;
+
 uniform sampler2D u_y_map;
 uniform sampler2D u_last_y_map;
 
+
+uniform float u_last_y_needs_map;
+uniform float u_y_needs_map;
+
+// whether to continuously interpolate between
+// lastx and x, lasty and y.
 uniform float u_position_interpolation_mode;
 
 attribute float a_color;
@@ -60,7 +77,11 @@ uniform vec2 u_color_domain;
 uniform vec2 u_last_color_domain;
 uniform sampler2D u_color_map;
 uniform sampler2D u_last_color_map;
+uniform float u_last_color_needs_map;
+uniform float u_color_needs_map;
 
+uniform vec3 u_constant_color;
+uniform vec3 u_constant_last_color;
 
 attribute float a_jitter_radius;
 attribute float a_last_jitter_radius;
@@ -70,7 +91,10 @@ uniform vec2 u_jitter_radius_domain;
 uniform vec2 u_last_jitter_radius_domain;
 uniform sampler2D u_jitter_radius_map;
 uniform sampler2D u_last_jitter_radius_map;
-
+uniform float u_last_jitter_radius_needs_map;
+uniform float u_jitter_radius_needs_map;
+uniform vec2 u_jitter_radius_range;
+uniform vec2 u_last_jitter_radius_range;
 
 attribute float a_size;
 attribute float a_last_size;
@@ -80,6 +104,10 @@ uniform vec2 u_size_domain;
 uniform vec2 u_last_size_domain;
 uniform sampler2D u_size_map;
 uniform sampler2D u_last_size_map;
+uniform float u_last_size_needs_map;
+uniform float u_size_needs_map;
+uniform vec2 u_size_range;
+uniform vec2 u_last_size_range;
 
 
 attribute float a_alpha;
@@ -90,12 +118,20 @@ uniform vec2 u_alpha_domain;
 uniform vec2 u_last_alpha_domain;
 uniform sampler2D u_alpha_map;
 uniform sampler2D u_last_alpha_map;
+uniform float u_last_alpha_needs_map;
+uniform float u_alpha_needs_map;
+uniform vec2 u_alpha_range;
+uniform vec2 u_last_alpha_range;
 
 
 attribute float a_jitter_speed;
 uniform float u_jitter_speed_transform;
 uniform vec2 u_jitter_speed_domain;
 uniform sampler2D u_jitter_speed_map;
+uniform float u_jitter_speed_needs_map;
+uniform float u_last_jitter_speed_needs_map;
+uniform vec2 u_jitter_speed_range;
+uniform vec2 u_last_jitter_speed_range;
 
 
 attribute float a_filter;
@@ -129,6 +165,8 @@ const float e = 1.618282;
 // I've been convinced.
 const float tau = 2. * 3.14159265359;
 
+// uniform vec4 corners;
+
 /*************** COLOR SCALES *******************************/
 
 // Ha! A gazillion version of this function:
@@ -139,8 +177,6 @@ vec3 hsv2rgb(in vec3 c) {
   rgb = rgb * rgb * (3.0 - 2.0 * rgb);
   return c.z * mix(vec3(1.0), rgb, c.y);
 }
-
-
 
 float interpolate_raw(in float x, in float min, in float max) {
   if (x < min) {return 0.;}
@@ -191,8 +227,6 @@ vec2 box_muller(in float ix, in float seed) {
 
 /*************** END COLOR SCALES *******************************/
 
-
-
 float domainify(in vec2 domain, in float transform, in float attr, in bool clamped) {
 
   // Clamp an attribute into a domain, with an option log or sqrt transform.
@@ -213,17 +247,89 @@ float domainify(in vec2 domain, in float transform, in float attr, in bool clamp
 
 mat3 pixelspace_to_glspace;
 
+float run_filter(in float a_filter,
+  in float u_filter_op, in float u_filter_param_1,
+  in float u_filter_param_2) {
+  bool truthy;
+  if (u_filter_op < 1.5) {
+    truthy = a_filter < u_filter_param_1;
+  } else if (u_filter_op < 2.5) {
+    truthy = a_filter > u_filter_param_1;
+  } else if (u_filter_op < 3.5) {
+    truthy = a_filter == u_filter_param_1;
+  } else if (u_filter_op < 4.5) {
+    truthy = abs(a_filter - u_filter_param_2) < u_filter_param_1;
+  }
+  if (truthy) {return 1.;} else {return 0.;}
+}
+
+#pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
+#pragma glslify: packFloat = require('glsl-read-float')
+#pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
+
+const vec4 decoder = vec4(-1., 1. / 256. / 256., 1. / 256., 1.);
+
+float RGBAtoFloat2(in vec4 floater) {
+  float signo = 1.;
+  if (floater.r > 128.) {
+    signo = -1.;
+    floater.r -= 128.;
+  }
+  // value between -64 and 64. Usually will be zero!
+  float mantissa = pow(10., floater.r - 64.);
+  float pointless = dot(floater.gba, vec3(1., 256., 65026.));
+  return signo *  mantissa * pointless;
+}
+
+float RGBAtoFloat(in vec4 floater) {
+  // Scale values up by 256.
+  return 256. * dot(floater, decoder);
+}
+
+float texture_float_lookup(in sampler2D texture, in vec2 domain,
+                           in vec2 range,
+                           in float transform, in float attr,
+                           in float use_texture) {
+  if (transform == 4.0) {
+    // Literal transforms aren't looked up, just returned as is.
+    return attr;
+  }
+  float inrange = domainify(domain, transform, attr, true);
+  if (use_texture > 0.) {
+    vec4 encoded = texture2D(texture, vec2(0.5, inrange));
+    return RGBAtoFloat(encoded);
+  } else {
+    return mix(range.x, range.y, inrange);
+  }
+}
+
 vec2 calculate_position(in vec2 position, in float x_scale_type,
-                        in vec2 x_domain, in float y_scale_type,
-                        in vec2 y_domain, in mat3 window_scale,
-                        in mat3 zoom
+                        in vec2 x_domain, in vec2 x_range, in float y_scale_type,
+                        in vec2 y_domain, in vec2 y_range, in mat3 window_scale,
+                        in mat3 zoom, in sampler2D x_map, in float x_needs_map,
+                        in sampler2D y_map, in float y_needs_map
                         ) {
+    float x;
+    float y;
 
-    vec3 pos2d = vec3(position, 1.0) * window_scale * zoom;
-
-    if (x_scale_type <= 4. && y_scale_type <= 4.) {
-      pos2d = pos2d * pixelspace_to_glspace;
+    if (x_scale_type < 4.0) {
+      x = texture_float_lookup(x_map, x_domain, x_range,
+        x_scale_type,
+        position.x, x_needs_map
+        );
+    } else {
+      x = position.x;
     }
+
+    if (x_scale_type < 4.0) {
+      y = texture_float_lookup(y_map, y_domain, y_range, y_scale_type,
+        position.y, y_needs_map
+        );
+    } else {
+      y = position.y;
+    }
+
+    vec3 pos2d = vec3(x, y, 1.0) * window_scale * zoom * pixelspace_to_glspace;
     return pos2d.xy;
 }
 
@@ -234,29 +340,11 @@ float cubicInOut(float t) {
 }
 
 
-#pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
-#pragma glslify: packFloat = require('glsl-read-float')
-#pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
-
-const vec4 decoder = vec4(-1., 1. / 256. / 256., 1. / 256., 1.);
-
-float RGBAtoFloat(in vec4 floater) {
-  // Scale values up by 256.
-  return 256. * dot(floater, decoder);
-}
-
 vec4 ixToRGBA(in float ix)  {
   float min = fract(ix / 256.);
   float mid = fract((ix - min) / 256.);
   float high = fract((ix - min - mid * 256.) / (256.) / 256.);
   return vec4(min, mid, high, 1.);
-}
-
-float texture_float_lookup(in sampler2D texture, in vec2 domain,
-                           in float transform, in float attr) {
-  float inrange = domainify(domain, transform, attr, true);
-  vec4 encoded = texture2D(texture, vec2(0.5, inrange));
-  return RGBAtoFloat(encoded);
 }
 
 vec2 unpack2(in float number, in float mod_n) {
@@ -296,19 +384,28 @@ vec2 circle_jitter(in float ix, in float aspect_ratio, in float time,
 vec2 calculate_jitter(
   in float jitter_type,
   in float ix, // distinguishing index
-  in sampler2D jitter_radius_map, in vec2 jitter_radius_domain, in float jitter_radius_transform,
+  in sampler2D jitter_radius_map, in vec2 jitter_radius_domain,
+  in vec2 jitter_radius_range,
+  in float jitter_radius_transform,
   in float jitter_radius,
-  in sampler2D jitter_speed_map, in vec2 jitter_speed_domain, in float jitter_speed_transform, in float jitter_speed
-
+  in sampler2D jitter_speed_map, in vec2 jitter_speed_domain,
+  in vec2 jitter_speed_range,
+  in float jitter_speed_transform, in float jitter_speed,
+  in float jitter_radius_needs_map,
+  in float jitter_speed_needs_map
 ) {
   if (jitter_type == 0.) {
     // No jitter
     return vec2(0., 0.);
   }
 
-  float jitter_r = texture_float_lookup(jitter_radius_map, jitter_radius_domain,
-                                        jitter_radius_transform, jitter_radius);
-  if (jitter_type == 3.) {
+  float jitter_r = texture_float_lookup(
+    jitter_radius_map, jitter_radius_domain,
+    jitter_radius_range,
+    jitter_radius_transform, jitter_radius,
+    jitter_radius_needs_map);
+
+if (jitter_type == 3.) {
     // normally distributed on x and y.
     return jitter_r * box_muller(ix, 1.) * vec2(1., u_width/u_height);
   }
@@ -323,7 +420,9 @@ vec2 calculate_jitter(
 
   float p_jitter_speed =
       texture_float_lookup(jitter_speed_map, jitter_speed_domain,
-                          jitter_speed_transform, jitter_speed);
+                          jitter_speed_range,
+                          jitter_speed_transform, jitter_speed,
+                          jitter_speed_needs_map);
 
   if (jitter_type == 1.) {
     return logarithmic_spiral_jitter(
@@ -350,15 +449,17 @@ vec2 calculate_jitter(
   }
 }
 
-
 void main() {
+
   pixelspace_to_glspace = mat3(
       2. / u_width, 0., -1.,
       0., - 2. / u_height, 1.,
       0., 0., 1.
   );
+
   float interpolation =
     interpolate(u_update_time, 0., u_transition_duration);
+
   float ease = interpolation;
 //  float ease = easeCubic(interpolation);
 //  from_coord_to_gl = u_window_scale * u_zoom * pixelspace_to_glspace;
@@ -372,65 +473,83 @@ void main() {
   }
 
   vec2 position = vec2(a_x, a_y);
+
+
+
   vec2 old_position = vec2(a_last_x, a_last_y);
+  old_position = calculate_position(old_position, u_last_x_transform,
+     u_last_x_domain, u_last_x_range,
+     u_last_y_transform, u_last_y_domain, u_last_y_range,
+     u_last_window_scale,
+     u_zoom, u_last_x_map, u_last_x_needs_map, u_last_y_map,
+     u_last_y_needs_map);
 
-  position = calculate_position(position, u_x_transform, u_x_domain,
-    u_y_transform, u_y_domain, u_window_scale, u_zoom);
+  bool plot_actual_position = u_grid_mode < .5;
 
-  old_position = calculate_position(old_position, u_last_x_transform, u_last_x_domain,
-      u_last_y_transform, u_last_y_domain, u_last_window_scale, u_zoom);
+  if (plot_actual_position) {
+    position = calculate_position(position, u_x_transform,
+      u_x_domain, u_x_range,
+      u_y_transform, u_y_domain, u_y_range, u_window_scale, u_zoom, u_x_map,
+      u_x_needs_map, u_y_map, u_y_needs_map);
 
-  float xpos = clamp((1. + position.x) / 2., 0., 1.);
-  float randy = ix_to_random(ix, 13.76);
-  float delay = xpos + randy * .1;
+    float xpos = clamp((1. + position.x) / 2., 0., 1.);
+    float randy = ix_to_random(ix, 13.76);
+    float delay = xpos + randy * .1;
 
-  delay = delay * 3.;
-  // delay = 0.;
-  float frac = interpolate(
-    u_update_time,
-    delay,
-    u_transition_duration + delay
-  );
-
-  if (u_position_interpolation_mode > 0.) {
-    // If it's a continuous loop, just choose a random point along that loop.
-    frac = fract(u_update_time/u_transition_duration);
-    frac = fract(frac + randy);
-  }
-
-  frac = easeCubic(frac);
-
-  if (frac <= 0.) {
-    position = old_position;
-  } else if (frac < 1.) {
-    // position = mix(old_position, position, u_interpolation);
-    frac = fract(frac);
-    vec2 midpoint = box_muller(ix, 3.) * .05 *
-       dot(old_position - position, old_position - position)
-       + old_position / 2. + position / 2.;
-
-    position = mix(
-      mix(old_position, midpoint, frac),
-      mix(midpoint, position, frac),
-      frac);
-    //position = mix(old_position, position, frac);
-  } // else position just is what it is.
-
-  if (u_colors_as_grid > 0.) {
-    vec2 jitterspec = vec2(
-      ix_to_random(ix, 3.),
-      ix_to_random(ix, 1.)
+    delay = delay * 3.;
+    // delay = 0.;
+    float frac = interpolate(
+      u_update_time,
+      delay,
+      u_transition_duration + delay
     );
-    position =
-      vec2(
-        floor(a_color / 4096. * 64.)/64.,
-        //floor(a_color/1024.*32.)/32.,
-        mod(a_color, 64.)/64.
-      ) + jitterspec / 64.;
-  //  position = jitterspec;
-    position = position * 2. - 1.;
+
+    if (u_position_interpolation_mode > 0.) {
+      // If it's a continuous loop, just choose a random point along that loop.
+      frac = fract(u_update_time/u_transition_duration);
+      frac = fract(frac + randy);
+    }
+
+    frac = easeCubic(frac);
+
+    if (frac <= 0.) {
+      position = old_position;
+    } else if (frac < 1.) {
+      // position = mix(old_position, position, u_interpolation);
+      frac = fract(frac);
+      vec2 midpoint = box_muller(ix, 3.) * .05 *
+         dot(old_position - position, old_position - position)
+         + old_position / 2. + position / 2.;
+
+      position = mix(
+        mix(old_position, midpoint, frac),
+        mix(midpoint, position, frac),
+        frac);
+      //position = mix(old_position, position, frac);
+    } // else position just is what it is.
+
+  } else {
+    // In grid mode, the 'old' position is used to store
+    // the actual position; we make sure here the
+    // point is actually visible right now.
+    if (old_position.x < -1. ||
+        old_position.y < -1. ||
+        old_position.x > 1. ||
+        old_position.y > 1.) {
+//          gl_Position = discard_me;
+          //return;
+        }
+    position.x = -1. + 2. * linscale(u_x_domain, position.x);
+    //position.y = -1.0;
+    vec2 jitterspec = vec2(
+      (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,
+      (ix_to_random(ix, 1.5) * a_jitter_speed ) * 2.
+    );
+
+    position = position + jitterspec;
+    //position.y = jitterspec.y;
   }
-  float r = ix_to_random(ix, 4.);
+
   //position = vec2(2. * frac - 1., position.y);
 
   if (debug_mode > 0.) {
@@ -441,13 +560,27 @@ void main() {
     return;
   }
 
+  float my_filter;
+  float last_filter;
 
-  float my_filter = texture_float_lookup(u_filter_map, u_filter_domain,
-                                      u_filter_transform, a_filter);
-
-  float last_filter = texture_float_lookup(u_last_filter_map, u_last_filter_domain,
-                                      u_last_filter_transform, a_last_filter);
-
+  if (u_filter_numeric.r < 0.5) {
+    my_filter = texture_float_lookup(u_filter_map, vec2(-2047., 2047.),
+                                        vec2(0., 1.),
+                                        0., a_filter,
+                                        1.);
+  } else {
+    my_filter = run_filter(a_filter,
+       u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
+  }
+  if (u_filter_last_numeric.r < 0.5) {
+    last_filter = texture_float_lookup(
+      u_last_filter_map, u_last_filter_domain, vec2(0., 1.),
+      u_last_filter_transform, a_last_filter, 0.);
+  } else {
+    last_filter = run_filter(a_last_filter,
+      u_filter_last_numeric.r, u_filter_last_numeric.g, u_filter_last_numeric.b);
+  }
+  // Progress through the filters at different rates.
   if (ix_to_random(ix, 13.5) > ease) {
     my_filter = last_filter;
   }
@@ -457,11 +590,15 @@ void main() {
     return;
   }
 
+
   //////////////// ALPHA /////////////////////////
-  float alpha = texture_float_lookup(u_alpha_map, u_alpha_domain,
-                                     u_alpha_transform, a_alpha);
-  float last_alpha = texture_float_lookup(u_last_alpha_map, u_last_alpha_domain,
-                                     u_last_alpha_transform, a_last_alpha);
+  float alpha = texture_float_lookup(u_alpha_map, u_alpha_domain, u_alpha_range,
+                                     u_alpha_transform, a_alpha, u_alpha_needs_map);
+  float last_alpha = texture_float_lookup(
+    u_last_alpha_map, u_last_alpha_domain,
+    u_last_alpha_range,
+    u_last_alpha_transform, a_last_alpha, u_last_alpha_needs_map);
+
   alpha = mix(last_alpha, alpha, ease);
 
   if (alpha < 1. / 255.) {
@@ -470,11 +607,14 @@ void main() {
   }
 
 
-  float size_multiplier = texture_float_lookup(u_size_map, u_size_domain,
-                                             u_size_transform, a_size);
+  float size_multiplier = texture_float_lookup(
+    u_size_map, u_size_domain, u_size_range,
+    u_size_transform, a_size, u_size_needs_map);
 
-  float last_size_multiplier = texture_float_lookup(u_last_size_map, u_last_size_domain,
-                                              u_last_size_transform, a_last_size);
+  float last_size_multiplier = texture_float_lookup(
+    u_last_size_map, u_last_size_domain, u_last_size_range,
+                                              u_last_size_transform, a_last_size,
+                                              u_last_size_needs_map);
 
   size_multiplier = mix(last_size_multiplier, size_multiplier, ease);
 
@@ -484,26 +624,44 @@ void main() {
 
   gl_PointSize = point_size_adjust * size_multiplier;
 
+  if (plot_actual_position && (u_jitter > 0. || u_last_jitter > 0.)) {
 
-  /* JITTER */
-  vec2 jitter = calculate_jitter(
-    u_jitter, ix, u_jitter_radius_map, u_jitter_radius_domain,u_jitter_radius_transform,
-    a_jitter_radius,
-    u_jitter_speed_map, u_jitter_speed_domain, u_jitter_speed_transform, a_jitter_speed
-  );
+    /* JITTER */
+    vec2 jitter = calculate_jitter(
+      u_jitter, ix, u_jitter_radius_map,
+      u_jitter_radius_domain,
+      u_jitter_radius_range,
+      u_jitter_radius_transform,
+      a_jitter_radius,
+      u_jitter_speed_map, u_jitter_speed_domain,
+      u_jitter_speed_range,
+       u_jitter_speed_transform, a_jitter_speed,
+       u_jitter_radius_needs_map,
+       u_jitter_speed_needs_map
+    );
 
-  vec2 last_jitter = calculate_jitter(
-    //u_jitter,
-    0., ix, u_last_jitter_radius_map, u_last_jitter_radius_domain,u_last_jitter_radius_transform,
-    a_last_jitter_radius,
-    u_jitter_speed_map, u_jitter_speed_domain, u_jitter_speed_transform, a_jitter_speed
-  );
+    vec2 last_jitter = calculate_jitter(
+      //u_jitter,
+      u_last_jitter, ix, u_last_jitter_radius_map,
+       u_last_jitter_radius_domain,
+       u_last_jitter_radius_range,
+       u_last_jitter_radius_transform,
+      a_last_jitter_radius,
+      u_jitter_speed_map, u_jitter_speed_domain,
+      u_jitter_speed_range,
+       u_jitter_speed_transform, a_jitter_speed,
+      u_last_jitter_radius_needs_map,
+      u_last_jitter_speed_needs_map
+    );
 
-  if (ease < 1.) {
-    jitter = mix(last_jitter, jitter, ease);
+    if (ease < 1.) {
+      jitter = mix(last_jitter, jitter, ease);
+    }
+    gl_Position = vec4(position + jitter * point_size_adjust, 0., 1.);
+
+  } else {
+    gl_Position = vec4(position, 0., 1.);
   }
-  gl_Position = vec4(position + jitter * point_size_adjust, 0., 1.);
-
   // Plot a single tick of alpha.
   if (u_only_color >= -1.5) {
     if (u_only_color > -.5 && a_color != u_only_color) {
@@ -517,32 +675,27 @@ void main() {
   } else if (u_color_picker_mode > 0.) {
     fill = packFloat(ix);
   } else {
-    float fractional_color = linstep(u_color_domain, a_color);
     // fractional_color = 0.;
-    fill = texture2D(u_color_map, vec2(0., fractional_color));
-    fill = vec4(fill.rgb, alpha);
-
-
-    /*if (ease < ix_to_random(ix, 3.)) {
-      float last_fractional = linstep(u_last_color_domain, a_last_color);
-      vec4 last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
-
-      // Alpha channel interpolation already happened.
-      fill = vec4(last_fill.rgb, alpha);
-
-    }*/
+    if (u_constant_color.r > -1.) {
+      fill = vec4(u_constant_color.rgb, alpha);
+    } else {
+      float fractional_color = linstep(u_color_domain, a_color);
+      fill = texture2D(u_color_map, vec2(0., fractional_color));
+      fill = vec4(fill.rgb, alpha);
+    }
     if (ease < 1.) {
-      float last_fractional = linstep(u_last_color_domain, a_last_color);
-      vec4 last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
-
-      // Alpha channel interpolation already happened.
-      last_fill = vec4(last_fill.rgb, alpha);
-
+      vec4 last_fill;
+      if (u_constant_last_color.r > 0.) {
+        last_fill = vec4(u_constant_last_color.rgb, alpha);
+      } else {
+        float last_fractional = linstep(u_last_color_domain, a_last_color);
+        last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
+        // Alpha channel interpolation already happened.
+        last_fill = vec4(last_fill.rgb, alpha);
+      }
       // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
       // instead?
       fill = mix(last_fill, fill, ease);
+    }
   }
-
-  }
-
 }
