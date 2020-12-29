@@ -22,7 +22,9 @@ constructor(selector, tileSet, scatterplot) {
   this.regl = wrapREGL(
     {
 //      extensions: 'angle_instanced_arrays',
-      optionalExtensions: ["OES_element_index_uint"],
+      optionalExtensions: [
+        "OES_element_index_uint",
+        "OES_texture_float"],
       canvas: this.canvas.node(),
     }
   );
@@ -295,7 +297,7 @@ render_all(props) {
       this.geolines.render(props)
     })
   }
-  if (this.geo_polygons.length) {
+  if (this.geo_polygons && this.geo_polygons.length) {
     this.fbos.lines.use( () => {
       regl.clear({color: [0, 0, 0, 0]});
       for (let handler of this.geo_polygons) {
@@ -535,7 +537,7 @@ plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
       domain: [-2047, -2020]
 
     } : {constant : -1},
-    alpha: 1/255 * 10,
+//    alpha: 1/255 * 10,
     size: 33,
     color: {
       constant: [0, 0, 0],
@@ -635,19 +637,6 @@ count_colors(field) {
 }
 
 n_visible(only_color = -1) {
-  /*const backup_aes = this.aesthetic;
-  const {scatterplot, regl, tileSet} = this.aesthetic;
-  this.aesthetic = new AestheticSet(scatterplot, regl, tileSets)
-
-  this.aesthetic.filter = backup_aes.aesthetic.filter;
-  const local_aes = {
-    size: {constant: 1},
-    color: {constant: [0, 0, 0, 1/255]},
-
-  }
-
-  this.aesthetic.update
-  */
   let {width, height} = this;
   width = Math.floor(width)
   height = Math.floor(height)
@@ -661,6 +650,9 @@ n_visible(only_color = -1) {
     // read onto the contour vals.
     this.render_points(props)
     this.regl.read(this.contour_vals);
+    // Could be done faster on the GPU itself.
+    // But would require writing to float textures, which
+    // can be hard.
     v = sum(this.contour_vals);
   })
   return v;
@@ -880,10 +872,7 @@ remake_renderer() {
       },
       u_window_scale: regl.prop('webgl_scale'),
       u_last_window_scale: regl.prop('last_webgl_scale'),
-      u_time: function(context, props) {
-        return props.time;
-      },
-
+      u_time: ({time}, props) => time,
       u_filter_numeric: function(context, props) {
         return this.aes.filter.current.ops_to_array()
       },
@@ -891,7 +880,8 @@ remake_renderer() {
       u_filter_last_numeric: function(context, props) {
         return this.aes.filter.last.ops_to_array()
       },
-
+      u_current_alpha: (_, props) => props.prefs.alpha || .5,
+      u_last_alpha: (_, props) => props.prefs.last_alpha || .5,
       u_zoom: function(context, props) {
         return props.zoom_matrix;
       }
@@ -904,7 +894,7 @@ remake_renderer() {
   }
 
   for (let k of ['x', 'y', 'color', 'jitter_radius',
-                 'jitter_speed', 'size', 'alpha', 'filter'
+                 'jitter_speed', 'size', 'filter'
                ]) {
 
 //    const aes = this.aes[k]
@@ -913,7 +903,7 @@ remake_renderer() {
       const temporal = time == "current" ? "" : "last_";
 
       parameters.uniforms[`u_${temporal}${k}_map`] = () => {
-        return this.aes[k][time].textures[1]
+        return this.aes[k][time].textures.one_d
       }
 
       if (k == 'filter' && temporal == 'last') {
@@ -927,9 +917,25 @@ remake_renderer() {
         return this.aes[k][time].use_map_on_regl
       }
 
+      if (k == 'jitter_radius') {
+        const base_string = "u_" + temporal + k + "_lookup"
+        parameters.uniforms[base_string] = () =>
+          this.aes[k][time].lookup_texture.texture.texture
+        parameters.uniforms[base_string + "_map"] = () =>
+          this.aes[k][time].lookup_texture.texture.texture
+        parameters.uniforms[base_string + "_y_constant"] = () =>
+          this.aes[k][time].lookup_texture.value || 0
+        console.log(this.aes[k][time].lookup_texture)
+//        parameters.uniforms[base_string + "_x_domain"] = () =>
+//            [this.aes[k][time].lookup_tables.shape[0] - 2047,
+//             this.aes[k][time].lookup_tables.shape[1] - 2047]
+        parameters.uniforms[base_string + "_y_domain"] = () =>
+          this.aes[k][time].lookup_texture.domain
+
+      }
+
       parameters.uniforms["u_" + temporal + k + "_domain"] = (state, props) => {
         // wrap as function to clue regl that it might change.
-        if (k === "size") {return [1, 1]}
         return this.aes[k][time].domain
       }
 

@@ -76,9 +76,8 @@ export default class FeatureHandler {
     render(props) {
       const prop_list = []
       for (let feature of this.features) {
-        feature.alpha = feature.alpha || .7 + Math.random() * .15
-        feature.color = feature.color || [.5 + .05 * Math.random(), .5 + .05 * Math.random(),
-        .5 + .05 * Math.random() ]
+        feature.alpha = 1 //;feature.alpha || .7 + Math.random() * .15
+        feature.color = [.2, .2, .2];
         const el = {
           centroid: [feature.properties.centroid_x, feature.properties.centroid_y],
           color: feature.color ? feature.color : [.5, .5, .5],

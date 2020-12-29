@@ -89,11 +89,11 @@ export const default_aesthetics = {
     range: [.5, 5],
     transform: "sqrt"
   },
-  "alpha": {
+/*  "alpha": {
     constant: 1,
     range: [0, 1],
     transform: "linear"
-  },
+  },*/
   "filter": {
     constant: 1, // Necessary though meaningless.
     range: [0, 1],
@@ -166,6 +166,7 @@ class Aesthetic {
   }
 
   default_data() {
+    return Array(this.texture_size).fill(this.default_val)
     return encodeFloatsRGBA(Array(this.texture_size)
       .fill(this.default_val))
   }
@@ -189,26 +190,29 @@ class Aesthetic {
     return point[this.field];
   }
 
+  create_lookup_texture(x, y, z) {
+
+  }
+
   create_textures() {
 
-    this.texture_buffer = new Uint8Array(this.texture_size * 4)
+    //this.texture_buffer = new Uint8Array(this.texture_size * 4)
+    this.texture_buffer = new Float32Array(this.texture_size)
+    // console.log(this.default_data(), this.texture_buffer)
     this.texture_buffer.set(this.default_data())
 
     const params = {
       width: 1,
       height: this.texture_size,
-      type: 'uint8',
-      format: 'rgba',
+      type: 'float',//uint8',
+      format: 'alpha',//'rgba',
       data: this.default_data()
     }
 
     // Store the current and the last values for transitions.
-    this.textures = [
-      this.regl.texture(params),
-      this.regl.texture(params)
-    ]
-    this.post_to_regl_buffer(0)
-    this.post_to_regl_buffer(1)
+    this.textures = {one_d:
+      this.regl.texture(params)}
+    this.post_to_regl_buffer("one_d")
 
     return this.textures;
   }
@@ -222,8 +226,8 @@ class Aesthetic {
     return this.field + this.domain + this.range + this.transform
   }
 
-  post_to_regl_buffer(buffer_index) {
-    this.textures[buffer_index].subimage({
+  post_to_regl_buffer(buffer_name) {
+    this.textures[buffer_name].subimage({
       data: this.texture_buffer,
       width: 1,
       height: this.texture_size
@@ -231,17 +235,58 @@ class Aesthetic {
   }
 
   clear() {
-    // cache last values.
-//    this.reset_last_entries()
     this.texture_buffer.set(this.default_data())
-    this.post_to_regl_buffer(1)
+    this.post_to_regl_buffer("one_d")
+    this.lookup = undefined
     this.field = undefined;
     this._domain = undefined;
     this._range = undefined;
     this._transform = undefined;
   }
 
+  get lookup_texture() {
 
+
+    const { lookup } = this;
+
+
+    console.log("Lookup field is", lookup)
+    if (lookup === undefined) {
+      return null;
+    }
+
+    // These are the possible elements of the lookup.
+    //console.log("GAH", encoding)
+    const {table, value, y, z} = lookup;
+    console.log({encoding, y, z})
+
+    if (!y.constant) {
+      throw "Only constant lookups for the secondary dimension are supported."
+    }
+
+    const dimensions = {
+      x: encoding.field,
+      y: y.field,
+      z: z.field
+    }
+
+    let lookup_handler = this.scatterplot.lookup_tables.get(table);
+
+    // Wrap as a function to avoid unnecessary execution. Yuck.
+    const x_names = () => this.arrow_column().data.dictionary.toArray();
+
+    const {
+      texture, y_domain, x_domain, shape
+    } = lookup_handler.get_cached_crosstab_texture(
+      dimensions, {x: x_names}, this.regl)
+
+    return {
+      value: y.constant,
+      texture, // {'type', 'format: alpha', data: crosstabs.}
+      shape,
+      domain: y_domain
+    }
+  }
 
   update(encoding) {
 
@@ -268,6 +313,13 @@ class Aesthetic {
 
     this.stringversion = JSON.parse(JSON.stringify(encoding));
 
+    if (encoding.field === this.field &&
+        encoding.op) {
+          // op functions don't need any more caching than just the JSON.
+          return;
+        }
+    
+
     if (typeof(encoding) == "string") {
       encoding = parseLambdaString(encoding, false)
       if (this.label === 'filter') {
@@ -275,6 +327,7 @@ class Aesthetic {
         encoding.domain = [-2047, 2047]
       }
     }
+
 
     // Numbers or arrays treated as constants.
     if (typeof(encoding) == "number" || encoding.length) {
@@ -284,61 +337,19 @@ class Aesthetic {
       }
     }
 
-
-  if (encoding.lookup !== undefined) {
-    // These are the possible elements of the lookup.
-    //console.log("GAH", encoding)
-    const {table, value, filter} = encoding.lookup;
-    //console.log("BARH", encoding)
-    const key = encoding.field;
-    if (key === undefined) {
-      //console.log
-    }
-    let filter_func, data_func, key_func;
-    const lookup = new Map();
-
-    if (filter) {
-      // Pass a function that filters each row.
-      filter_func = parseLambdaString(filter, true)
-    } else {
-      filter_func = () => true
-    }
-    if (value) {
-      data_func = parseLambdaString(value, true)
-    } else {
-      data_func = function(row) {
-        return row[this.label]
-      }
-    }
-    key_func = function(row) {
-      // Should allow alternate keys.
-      return row[encoding.field]
-    }
-//    console.log("SCATTERPLOT", this.scatterplot)
-    //console.log("TRYING TO GET", table, this.scatterplot.lookup_tables)
-    const t = this.scatterplot.lookup_tables.get(table);
-    //console.log(t)
-    for (let row of t) {
-      if (!filter_func(row)) {
-        continue
-      }
-      if (Math.random() < -0.01) {
-        console.log(row)
-        console.log(key_func(row))
-        console.log(data_func(row))
-      }
-      lookup.set(key_func(row), data_func(row))
-    }
-    encoding.lambda = (value) => {
-      // if (Math.random() < .01) {console.log(value, lookup.get(value))}
-      return this.scale(lookup.get(value))
-    }
-  }
-
   if (encoding.lambda && typeof(encoding.lambda) == "string")  {
     // May overwrite 'field!!'
     Object.assign(encoding, parseLambdaString(encoding.lambda, false))
   }
+
+  console.log("lookup", encoding.lookup)
+  this.lookup = encoding.lookup;
+  this.field = encoding.field;
+  this._domain = safe_expand(encoding.domain)
+  this._range = safe_expand(encoding.range)
+  this._constant = encoding.constant
+
+
 
   const {
     label
@@ -351,11 +362,7 @@ class Aesthetic {
 
   // Store the last and current values.
 
-  this.field = field
-  this._domain = safe_expand(encoding.domain)
-  this._range = safe_expand(encoding.range)
 
-  this._constant = encoding.constant
   // resets to default if undefined
 
   this._transform = encoding.transform || this.default_transform;
@@ -372,7 +379,6 @@ class Aesthetic {
 
   // Set up the 'previous' value from whatever's currently
   // being used.
-  this.post_to_regl_buffer(0)
 
   if (lambda) {
     this.apply_function_to_textures(field, this.domain, lambda)
@@ -380,7 +386,8 @@ class Aesthetic {
     this.encode_for_textures(this.range)
   }
 
-  this.post_to_regl_buffer(1)}
+  this.post_to_regl_buffer("one_d")
+}
 
   encode_for_textures(range) {
 
@@ -394,14 +401,18 @@ class Aesthetic {
       values[i] = this.scaleFunc(i)
     }
 
-    this.texture_buffer.set(
-      encodeFloatsRGBA(values, this.texture_buffer)
-    );
+    this.texture_buffer.set(values)//
+  //    encodeFloatsRGBA(values, this.texture_buffer)
+  //  );
 
   }
 
   arrow_column() {
-    return this.tileSet.table.getColumn(this.field)
+    const c = this.tileSet.table.getColumn(this.field)
+    if (c === null) {
+      throw `No column ${this.field} on arrow table for aesthetic ${this.label}`
+    }
+    return c
   }
 
   is_dictionary() {
@@ -441,10 +452,12 @@ class Aesthetic {
       .domain([0, this.texture_size - 1])
     let input = arange(this.texture_size)
     if (field === undefined || this.tileSet.table == undefined) {
-      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
+      this.texture_buffer.set(arange(this.texture_size).map(i => 1))
+//      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return
     }
-    const column = this.arrow_column()
+
+
     if (!column) {
       throw(`Column ${field} does not exist on table.`)
     }
@@ -498,9 +511,9 @@ class Y extends X {
 
 }
 
-class Alpha extends Aesthetic {
+/*class Alpha extends Aesthetic {
   get default_val() {return 1};
-}
+}*/
 
 class Filter extends Aesthetic {
   get default_val() {
@@ -572,6 +585,29 @@ class Color extends Aesthetic {
     return color_palettes.viridis
   }
 
+  create_textures() {
+
+    this.texture_buffer = new Uint8Array(this.texture_size * 4)
+//    console.log(this.default_data(), this.texture_buffer)
+    this.texture_buffer.set(this.default_data())
+
+    const params = {
+      width: 1,
+      height: this.texture_size,
+      type: 'uint8',//uint8',
+      format: 'rgba',//'rgba',
+      data: this.default_data()
+    }
+
+    // Store the current and the last values for transitions.
+    this.textures = {one_d:
+      this.regl.texture(params)}
+    this.post_to_regl_buffer("one_d")
+
+    return this.textures;
+  }
+
+
   get constant() {
     // Perform color conversion.
     if (this._constant === undefined) {return undefined}
@@ -631,7 +667,7 @@ float RGBAtoFloat(in vec4 floater) {
 
 
 export const dimensions = {
-  Size, Alpha, Jitter_speed, Jitter_radius, Color, Filter, X, Y
+  Size, Jitter_speed, Jitter_radius, Color, Filter, X, Y
 };
 
 export class StatefulAesthetic {
@@ -689,6 +725,7 @@ export class StatefulAesthetic {
 function parseLambdaString(lambdastring, materialize = false) {
   // Materialize an arrow function from its string.
   // Note that this *does* reassign 'this'.
+  console.log(lambdastring)
   let [field, lambda] = lambdastring.split("=>").map(d => d.trim())
   if (lambda === undefined) {
     throw `Couldn't parse ${lambdastring} into a function`

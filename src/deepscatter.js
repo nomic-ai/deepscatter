@@ -8,6 +8,7 @@ import {max, range} from 'd3-array';
 import { Table } from 'apache-arrow';
 import merge from 'lodash.merge';
 
+import ArrowMetaTable from './lookup_textures_from_arrow.js'
 import GeoLines from './geo_lines.js'
 import FeatureHandler from './geo_poly.js'
 
@@ -110,14 +111,15 @@ export default class Scatterplot {
     }
   }
 
-  registerPolygonMap(url) {
+  registerPolygonMap(definition) {
+    const {file, color} = definition
      if (!this.feather_features) {
        this.feather_features = {}
        this._renderer.geo_polygons = []
      }
-     if (!this.feather_features[url]) {
-       this.feather_features[url] = "in progress"
-       const promise = fetch(url)
+     if (!this.feather_features[file]) {
+       this.feather_features[file] = "in progress"
+       const promise = fetch(file)
              .then(response => response.arrayBuffer())
              .then(response => {
                let table = Table.from(response);
@@ -154,8 +156,15 @@ export default class Scatterplot {
 
   update_prefs(prefs) {
 
+    if (prefs.encoding && prefs.encoding.alpha) {
+      console.warn("Setting alpha through encoding--deprecated.")
+      /// DEPRECATED
+      prefs.alpha = prefs.encoding.alpha
+    }
     // Stash the previous jitter.
-    prefs.last_jitter = this.prefs.jitter || undefined;
+    for (let k in ["jitter", "alpha", "max_points"]) {
+        prefs['last_' + k] = this.prefs[k] || undefined;
+    }
 
     merge(this.prefs, prefs)
   }
@@ -165,18 +174,13 @@ export default class Scatterplot {
     if (this.lookup_promises.get(item)) {
       return this.lookup_promises.get(item)
     } else {
-      const url = `${this.prefs.source_url}/${item}.feather`
-      const promise = fetch(url)
-            .then(response => response.arrayBuffer())
-            .then(response => {
-              let table = Table.from(response);
-              this.lookup_tables.set(item, table)
-              return "complete"
-            })
-      this.lookup_promises.set(item, promise)
-      return promise
+      const metaTable = new ArrowMetaTable(this.prefs, item)
+        metaTable.load().then( () => this.lookup_tables.set(item, metaTable))
+      this.lookup_promises.set(item, metaTable.load())
     }
   }
+
+
 
   async plotAPI(prefs = {}) {
 
@@ -215,9 +219,16 @@ export default class Scatterplot {
     }
 
     if (prefs.basemap_gleofeather) {
-      this.registerPolygonMap(prefs.basemap_gleofeather)
+      // Deprecated.
+      prefs.polygons = [{"file": prefs.basemap_gleofeather}]
     }
 
+    if (prefs.polygons) {
+      for (let polygon of prefs.polygons) {
+        this.registerPolygonMap(polygon)
+      }
+
+    }
 
     await this._root.promise
 
@@ -243,6 +254,13 @@ export default class Scatterplot {
     if (this._renderer.apply_webgl_scale) {
       this._renderer.apply_webgl_scale(prefs)
     }
+    if (this._renderer.reglframe) {
+      this._renderer.reglframe.cancel()
+    }
+    this._renderer.reglframe = this._renderer.regl.frame(() => {
+      this._renderer.tick()
+    })
+
     this._zoom.restart_timer(60000)
   }
 

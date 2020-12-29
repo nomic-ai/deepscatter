@@ -10,6 +10,7 @@ import json
 from numpy import random as nprandom
 from collections import defaultdict, Counter
 from typing import DefaultDict, Dict, List, Tuple, Set
+import numpy as np
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -50,6 +51,23 @@ def parse_args():
 # First, we guess at the schema using pyarrow's own type hints.
 
 # This could be overridden by user args.
+
+def refine_schema(schema : pa.Schema) -> Dict[str,pa.Schema]:
+    fields = {}
+    for el in schema:
+        if isinstance(el.type, pa.DictionaryType) and pa.types.is_string(el.type.value_type):
+            t = pa.dictionary(pa.int16(), pa.utf8())
+            fields[el.name] = t
+#            el = pa.field(el.name, t)
+        elif pa.types.is_float64(el.type):
+            fields[el.name] = pa.float32()
+#            el = pa.field(el.name, pa.float32())
+        elif el.name == "ix":
+            fields[el.name] = pa.uint32()
+        else:
+            fields[el.name] = el.type
+            #fields.append(el)
+    return fields
 
 def determine_schema(args):
     vals = csv.open_csv(args.files[0],
@@ -167,20 +185,27 @@ def main():
     else:
         rewritten_files = args.files
         if args.limits[0] > 1e8:
-            raise TypeError("If passing arrow files, you must also pass limits on the command line.")
-        extent = {
-            "x": [args.limits[0], args.limits[2]],
-            "y": [args.limits[1], args.limits[3]]
-        }
+            if len(args.files) > 1:
+                logging.warn("Checking limits for bounding box but only on first passed file, i.e., " + args.files[0])
+            xy = feather.read_feather(args.files[0], columns=["x", "y"])
+            mins = xy.min(skipna=True)
+            maxes = xy.max(skipna = True)
+            extent = {
+                "x": [float(mins['x']), float(maxes['x'])],
+                "y": [float(mins['y']), float(maxes['y'])]
+            }
+        else:
+            extent = {
+                "x": [args.limits[0], args.limits[2]],
+                "y": [args.limits[1], args.limits[3]]
+            }
+
         logging.info("extent")
         logging.info(extent)
-<<<<<<< HEAD
         raw_schema = pa.ipc.RecordBatchFileReader(args.files[0]).schema
+        schema = refine_schema(raw_schema)
+        raw_schema = pa.schema([pa.field(name, type) for name, type in schema.items()])
 
-=======
-        raw_schema : pa.Schema = pa.ipc.RecordBatchFileReader(args.files[0]).schema
-
->>>>>>> 8de87812129e385a98397b239170ea76bb7b301a
     tiler = Tile(extent, [0, 0, 0], args, raw_schema)
 
     logging.info("Starting.")
@@ -190,19 +215,29 @@ def main():
     for i, arrow_block in enumerate(rewritten_files):
         logging.info(f"Reading block {i} of {len(rewritten_files) - 1}")
         d = feather.read_feather(arrow_block)
+
+        # Drop missing x values, silently.
         d = d[pd.notna(d['x'])]
         if args.randomize > 0:
             d['x'] = d['x'] + nprandom.normal(0, args.randomize, d.shape[0])
             d['y'] = d['y'] + nprandom.normal(0, args.randomize, d.shape[0])
 
+
+
         logging.info(f"{len(memory_tiles_open)} partially filled tiles buffered in memory and {len(files_open)} flushing overflow directly to disk.")
         remaining_tiles = args.max_files - len(memory_tiles_open) - len(files_open)
         logging.info(f"Inserting block {i} of {len(rewritten_files) - 1}")
-        tiler.insert(d, remaining_tiles)
+
+        # Recode null values since GPUs can't handle them.
+
         for name, col in schema.items():
             if pa.types.is_dictionary(col):
+                d[name].cat.add_categories("<NA>", inplace = True)
+                d[name].fillna("<NA>", inplace = True)
                 col_values = d[name].to_list()
                 count_holder[name].update(col_values)
+
+        tiler.insert(d, remaining_tiles)
         logging.info(f"Done inserting block {i} of {len(rewritten_files) - 1}")
 
     final_dictionaries = make_final_dictionaries(count_holder)
@@ -217,7 +252,7 @@ def main():
 
 
     # Reflush every tile.
-    tiler.map_tiles(lambda tile: tile.final_flush(final_dictionaries))
+    tiler.map_tiles(lambda tile: tile.final_flush(final_dictionaries, schema))
 
     count = 0
     flushed = 0
@@ -229,12 +264,7 @@ def main():
     logging.info(f"{count} added, {flushed} flushed")
     logging.debug(memory_tiles_open)
 
-<<<<<<< HEAD
-def partition(table, midpoint):
-=======
-
 def partition(table: pd.DataFrame, midpoint: Tuple[str, float]) -> List[pd.DataFrame]:
->>>>>>> 8de87812129e385a98397b239170ea76bb7b301a
     # Divide a table in two based on a midpoint
     key, pivot = midpoint
     criterion = table[key] < pivot
@@ -245,14 +275,17 @@ def partition(table: pd.DataFrame, midpoint: Tuple[str, float]) -> List[pd.DataF
 def make_final_dictionaries(count_holder: dict) -> Dict[str, Tuple[list, defaultdict]]:
     final_dicts = {}
     for name, counts in count_holder.items():
-        keys : List[str] = [l[0] for l in counts.most_common(4094)]
+        keys : List[str] = [
+            l[0] for l in counts.most_common(4094) ]
         length = len(keys)
-        reverse_lookup : DefaultDict[str, int] = defaultdict(lambda x: length) # Returns one more
+        reverse_lookup : DefaultDict[str, int] = \
+          defaultdict(lambda: length) # Returns one more
         if length==4094:
             keys += ["Other"]
         for i, k in enumerate(keys):
             reverse_lookup[k] = i
-        final_dicts[name] = (pa.array(keys, pa.utf8()), reverse_lookup)
+        final_dicts[name] = \
+          (pa.array(keys, pa.utf8()), reverse_lookup)
     return final_dicts
 
 class Tile():
@@ -330,22 +363,21 @@ class Tile():
         self.flush_data(destination, {}, "lz4")
         memory_tiles_open.remove(self.filename)
 
-    def final_flush(self, final_dictionaries) -> None:
+    def final_flush(self, final_dictionaries, schema : pa.Schema) -> None:
         """
         At the end, we can see which tiles have children and append that
         to the metadata.
         """
         self.total_points = 0
-
+        logging.debug(f"Writing final version of {self.coords}")
         metadata = {
             "extent": json.dumps(self.extent),
         }
-
         if self._children is None:
             metadata["children"] = "[]"
         else:
             for child in self._children:
-                child.final_flush(final_dictionaries)
+                child.final_flush(final_dictionaries, schema)
                 self.total_points += child.total_points
             populated_kids = [c.id for c in self._children if c.total_points > 0]
             metadata["children"] = json.dumps(populated_kids)
@@ -363,42 +395,54 @@ class Tile():
             self.data.clear()
 
         for i in range(tab.num_record_batches):
-            raw = tab.get_batch(i)
+            batch = tab.get_batch(i)
             cols : List[pa.Array] = []
-            for (name, col) in zip(raw.schema.names, raw):
+            for i, col in enumerate(batch.columns):
+                name = batch.schema.names[i]
                 if pa.types.is_dictionary(col.type):
                     labels, lookup = final_dictionaries[name]
-                    indices = pa.array([lookup[k] for k in col.to_pylist()], pa.int16())
+                    indices = col.indices.to_numpy()
+                    replacements = np.zeros_like(indices)
+                    loc_lookup = {}
+                    for i in range(len(indices)):
+                        try:
+                            replacements[i] = loc_lookup[indices[i]]
+                        except KeyError:
+                            loc_lookup[indices[i]] = lookup[col.dictionary[indices[i]]]
+                            replacements[i] = loc_lookup[indices[i]]
+                    indices = pa.array(replacements, pa.int16())
                     col = pa.DictionaryArray.from_arrays(indices, labels)
                 cols.append(col)
-
-            batch = pa.RecordBatch.from_arrays(cols, raw.schema.names)
-            self.data.append(batch)
+            self.data.append(pa.RecordBatch.from_arrays(cols, batch.schema.names))
 
 
-
+        self.total_points = 0
         # Flush will remove the tile--bookkeeping.
         for batch in self.data:
             self.total_points += batch.num_rows
 
         metadata["total_points"] = str(self.total_points)
-        self.flush_data(self.filename, metadata, "uncompressed", self.data[0].schema)
+        schema = pa.schema(schema, metadata = metadata)
+#        self.data = pa.Table.from_arrays(cols, schema=schema)
+
+        self.flush_data(self.filename, metadata, "uncompressed", schema, expect_table = False)
+        logging.debug(f"Written final version of {self.coords}")
+
         # unclean_path.unlink()
 
 
-    def flush_data(self, destination, metadata, compression, schema = None):
+    def flush_data(self, destination, metadata, compression, schema = None, expect_table = False):
         if self.data is None:
             return
-        if schema is None:
-            schema = self.schema
-        schema_copy = pa.schema(self.data[0].schema, metadata = metadata)
-        #try:
-        frame = pa.Table.from_batches(self.data, schema_copy).combine_chunks()
-        #except:
-            # Round trip to pandas while
-            # `pyarrow.lib.ArrowNotImplementedError: Concat with dictionary unification NYI`
-        #    frame = pa.Table.from_batches(self.data, schema_copy).to_pandas()
-        #    frame = pa.Table.from_pandas(frame, schema_copy)
+
+        if expect_table:
+            frame = self.data
+        else:
+            if schema is None:
+                schema = self.schema
+            schema_copy = pa.schema(self.data[0].schema, metadata = metadata)
+            frame = pa.Table.from_batches(self.data, schema_copy).combine_chunks()
+
         feather.write_feather(frame, destination, compression = compression)
         self.data = None
 

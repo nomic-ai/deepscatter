@@ -1,10 +1,13 @@
 import {Table} from 'apache-arrow';
+import {range, extent} from 'd3-array';
 
-export class ArrowMetaTable {
+export default class ArrowMetaTable {
   constructor(prefs, table_name) {
     this.table_name = table_name
     this.prefs = prefs
     this.table = undefined
+
+    this.textures = new Map()
   }
 
   load() {
@@ -22,6 +25,37 @@ export class ArrowMetaTable {
     return this._promise
   }
 
+  get_cached_crosstab_texture(dimensions, orders, regl) {
+    const {x, y, z} = dimensions;
+    const id = `${x}-${y}-${z}`
+    if (this.textures.get(id)) {
+      return this.textures.get(id)
+    }
+
+    const {
+      crosstabs, y_domain, x_domain, shape
+    } = this.crosstab_array(dimensions, orders)
+
+    console.log({shape, crosstabs})
+    this.textures[id] = {
+      texture: regl.texture(
+      {
+        type: 'float',
+        format: 'alpha',
+        width: shape[0],
+        height: shape[1],
+        data: crosstabs
+      }),
+      x_domain,
+      y_domain,
+      shape
+    }
+
+    return this.textures[id]
+
+
+  }
+
   crosstab_array(dimensions, orders = {}) {
     /* x is the rows of the texture, y the columns, and
     z a value encoded as a floating point. eg:
@@ -33,8 +67,12 @@ export class ArrowMetaTable {
     const y_indices = new IncrementalDict()
     const {x, y, z} = dimensions
 
+    const tab = this.table;
+
     // This assumes that y will be a date field, and
     // x will produce strings.
+    console.log(x, y, z)
+    console.log(tab.schema.fields.map(d => d.name))
     const y_values = tab.getColumn(y).data.values
     const x_values = tab.getColumn(x).toArray()
     const z_values = tab.getColumn(z).toArray()
@@ -44,25 +82,32 @@ export class ArrowMetaTable {
     // if present.
 
     if (orders.x) {
-      x_indices.prepopulate(orders.x, false)
+      x_indices.prepopulate(orders.x(), false)
     }
     if (orders.y) {
-      y_indices.prepopulate(orders.y, false)
+      y_indices.prepopulate(orders.y(), false)
     }
     x_indices.prepopulate(x_values)
     y_indices.prepopulate(y_values)
 
-    const crosstabs = []
+    // Pre-create empty arrays
+    const crosstabs = range(x_indices.size)
+       .map(i => new Array(y_indices.size).fill(0))
 
     for (let i = 0; i < tab.length; i++) {
       const x_ = x_indices.get(x_values[i])
       const y_ = y_indices.get(y_values[i])
       const z_ = z_values[i]
-      if (Math.random() < .0001) {console.log(x_, y_, z_)}
-      crosstabs[x_ + y_*y_indices.size] = z_
+      if (Math.random() < .00001) {console.log(x_, y_, z_)}
+      crosstabs[x_][y_] = z_
     }
 
-    return crosstabs
+    return {
+      crosstabs,
+      shape: [x_indices.size, y_indices.size],
+      x_domain: extent(x_values),
+      y_domain: extent(y_values)
+    }
   }
 
 

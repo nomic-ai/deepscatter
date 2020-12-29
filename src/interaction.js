@@ -411,7 +411,7 @@ export default class Zoom {
 
     for (let renderer of this.renderers.values()) {
       try {
-        renderer.tick()
+        // renderer.tick()
       } catch(err) {
         this._timer.stop()
         throw err

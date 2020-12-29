@@ -3,7 +3,6 @@ precision mediump float;
 varying float pic_mode;
 varying vec4 fill;
 varying vec4 stroke;
-varying vec2 letter_pos;
 uniform float u_only_color;
 uniform float u_color_picker_mode;
 uniform sampler2D u_sprites;
@@ -37,7 +36,6 @@ void main() {
     return;
   }
 
-  if (pic_mode < 0.5 ) {
     // Drop parts of the rectangle outside the unit circle.
     // I took this from observable.
     if (out_of_circle(gl_PointCoord)) {
@@ -57,11 +55,4 @@ void main() {
       // Pre-blend the alpha channel.
       gl_FragColor = vec4(fill.rgb * fill.a, fill.a);
     }
-  } else {
-    vec2 coords = letter_pos + gl_PointCoord/4096.*28.;
-    vec4 letter = texture2D(u_sprites, coords);
-    if (letter.a <= 0.03) discard;
-    gl_FragColor = mix(fill, vec4(0.25, 0.1, 0.2, 1.0), 1.0 - letter.a);
-    // gl_FragColor = vec4(fill.xyz, letter.a);
-  }
 }
