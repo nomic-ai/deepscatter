@@ -1,6 +1,7 @@
 import { sum, range as arange, shuffle, extent } from 'd3-array';
 import { scaleLinear, scaleSqrt, scaleLog, scaleIdentity } from 'd3-scale'
 import { rgb } from 'd3-color';
+import { encodeFloatsRGBA } from './util';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool
  } from 'd3-scale-chromatic';
 
@@ -30,7 +31,9 @@ function materialize_color_interplator(interpolator) {
   return to_buffer(rawValues)
 }
 
-const color_palettes = {}
+const color_palettes = {
+  white : d3.range(palette_size).map(i => [255, 255, 255, 255])
+}
 
 for (let [k, v] of Object.entries(d3Chromatic)) {
   if (k.startsWith("scheme") && typeof(v[0]) == "string") {
@@ -43,7 +46,6 @@ for (let [k, v] of Object.entries(d3Chromatic)) {
       colors[i] = scheme[i % v.length]
     }
     const name = k.replace("scheme", "").toLowerCase()
-
     color_palettes[name] = to_buffer(colors)
   }
   if (k.startsWith("interpolate")) {
@@ -70,8 +72,8 @@ export const default_aesthetics = {
     transform: "literal"
   },
   "color": {
-    constant: [.5, .5, .5],
-    range: color_palettes.viridis,
+    constant: [1, 1, 1],
+    range: color_palettes.white,
     transform: "linear"
   },
   "jitter_radius": {
@@ -119,7 +121,6 @@ class Aesthetic {
     this.needs_transitions = true;
 
     this._domains = {}
-    this.create_textures()
   }
 
   get default_val() {
@@ -194,27 +195,51 @@ class Aesthetic {
 
   }
 
-  create_textures() {
+  get texture_buffer() {
+    if (this._texture_buffer) {
+      return this._texture_buffer
+    }
 
-    //this.texture_buffer = new Uint8Array(this.texture_size * 4)
-    this.texture_buffer = new Float32Array(this.texture_size)
-    // console.log(this.default_data(), this.texture_buffer)
-    this.texture_buffer.set(this.default_data())
+    this._texture_buffer = new Float32Array(this.texture_size)
+
+    this._texture_buffer.set(this.default_data())
+
+
+    return this._texture_buffer
+
+  }
+
+  get textures() {
+
+    if (this._textures) {
+      return this._textures
+    }
+
+
+
+    this.texture_type = this.regl.hasExtension("OES_texture_float") ?
+      "float" : this.regl.hasExtension("OES_texture_half_float") ?
+      "half float" : "uint8"
+
+    this.texture_format = this.texture_type === "uint8" ? "rgba": "alpha"
 
     const params = {
       width: 1,
       height: this.texture_size,
-      type: 'float',//uint8',
-      format: 'alpha',//'rgba',
+      type: this.texture_type,
+      format: this.texture_format,
       data: this.default_data()
     }
 
     // Store the current and the last values for transitions.
-    this.textures = {one_d:
-      this.regl.texture(params)}
-    this.post_to_regl_buffer("one_d")
+    this._textures = {
+      one_d: this.regl.texture(params)
+    }
 
-    return this.textures;
+    // Don't need this posting.
+    // this.post_to_regl_buffer("one_d")
+
+    return this._textures;
   }
 
   summary() {
@@ -244,28 +269,30 @@ class Aesthetic {
     this._transform = undefined;
   }
 
+
+  get use_lookup() {
+    const { lookup } = this;
+    return lookup ? 1 : 0
+  }
+
   get lookup_texture() {
 
-
     const { lookup } = this;
-
-
-    console.log("Lookup field is", lookup)
     if (lookup === undefined) {
       return null;
     }
 
+    const { field } = this
+
     // These are the possible elements of the lookup.
-    //console.log("GAH", encoding)
     const {table, value, y, z} = lookup;
-    console.log({encoding, y, z})
 
     if (!y.constant) {
-      throw "Only constant lookups for the secondary dimension are supported."
+      throw "Only constant lookups for the secondary dimension are currently supported."
     }
 
     const dimensions = {
-      x: encoding.field,
+      x: field,
       y: y.field,
       z: z.field
     }
@@ -275,16 +302,33 @@ class Aesthetic {
     // Wrap as a function to avoid unnecessary execution. Yuck.
     const x_names = () => this.arrow_column().data.dictionary.toArray();
 
+    let actual_values;
+    if (lookup_handler === undefined) {
+        console.log("Using temporary null lookup.")
+        actual_values = {
+          texture: this.textures["one_d"],
+          y_domain: [-1, 1],
+          z_domain: [-1, 1],
+          x_domain: [-1, 1]
+        }
+      } else {
+        actual_values = lookup_handler.get_cached_crosstab_texture(
+          dimensions, {x: x_names}, this.regl)
+      }
     const {
-      texture, y_domain, x_domain, shape
-    } = lookup_handler.get_cached_crosstab_texture(
-      dimensions, {x: x_names}, this.regl)
+      texture, z_domain, y_domain, x_domain, shape,
+    crosstabs } = actual_values;
+
+    //console.log("YOOOOO", z_domain, x_domain, y_domain, shape)
 
     return {
-      value: y.constant,
-      texture, // {'type', 'format: alpha', data: crosstabs.}
+      value: y.constant || 0,
+      crosstabs,
+      texture,
       shape,
-      domain: y_domain
+      x_domain,
+      y_domain,
+      z_domain
     }
   }
 
@@ -305,11 +349,6 @@ class Aesthetic {
                     set to the window scale.`)
     }
 
-//    const stringversion = JSON.parse(JSON.stringify(encoding))
-//    if (objectEqual(stringversion, this.stringversion)) {
-//      this.needs_transitions = false;
-//      return;
-//    }
 
     this.stringversion = JSON.parse(JSON.stringify(encoding));
 
@@ -318,7 +357,7 @@ class Aesthetic {
           // op functions don't need any more caching than just the JSON.
           return;
         }
-    
+
 
     if (typeof(encoding) == "string") {
       encoding = parseLambdaString(encoding, false)
@@ -343,10 +382,13 @@ class Aesthetic {
   }
 
   console.log("lookup", encoding.lookup)
+
   this.lookup = encoding.lookup;
   this.field = encoding.field;
+
   this._domain = safe_expand(encoding.domain)
   this._range = safe_expand(encoding.range)
+
   this._constant = encoding.constant
 
 
@@ -387,6 +429,7 @@ class Aesthetic {
   }
 
   this.post_to_regl_buffer("one_d")
+
 }
 
   encode_for_textures(range) {
@@ -573,8 +616,50 @@ class Jitter_speed extends Aesthetic {
   get default_val() {return .1};
 }
 
+function encode_jitter_to_int(jitter) {
+  if (jitter == "spiral") {
+    // animated in a logarithmic spiral.
+    return 1
+  } else if (jitter == "uniform") {
+    // Static jitter inside a circle
+    return 2
+  } else if (jitter == "normal") {
+    // Static, normally distributed, standard deviation 1.
+    return 3
+  } else if (jitter == "circle") {
+    // animated, evenly distributed in a circle with radius 1.
+    return 4
+  } else {
+    return 0
+  }
+}
+
 class Jitter_radius extends Aesthetic {
+  constructor(...args) {
+    super(...args)
+    this.method = "None"
+  }
+
   get default_val() {return .05};
+
+  update(encoding) {
+    if (encoding.method) {
+      this.method = encoding.method;
+    } else if (this.partner.method) {
+      this.method = this.partner.method;
+    }
+
+    if (encoding.method === null) {
+      this.method = "None"
+    }
+
+    super.update(encoding)
+  }
+
+  get jitter_int_format() {
+    return encode_jitter_to_int(this.method)
+  }
+
 }
 
 class Color extends Aesthetic {
@@ -585,26 +670,36 @@ class Color extends Aesthetic {
     return color_palettes.viridis
   }
 
-  create_textures() {
+  get texture_buffer() {
+    if (this._texture_buffer) {
+      return this._texture_buffer
+    }
+    this._texture_buffer = new Uint8Array(this.texture_size * 4)
+    this._texture_buffer.set(this.default_data())
 
-    this.texture_buffer = new Uint8Array(this.texture_size * 4)
-//    console.log(this.default_data(), this.texture_buffer)
-    this.texture_buffer.set(this.default_data())
+    return this._texture_buffer
+
+  }
+
+  get textures() {
+    if (this._textures) {return this._textures}
 
     const params = {
       width: 1,
       height: this.texture_size,
-      type: 'uint8',//uint8',
-      format: 'rgba',//'rgba',
+      type: 'uint8',
+      format: 'rgba',
       data: this.default_data()
     }
 
     // Store the current and the last values for transitions.
-    this.textures = {one_d:
-      this.regl.texture(params)}
+    this._textures = {
+      one_d: this.regl.texture(params)
+    }
+
     this.post_to_regl_buffer("one_d")
 
-    return this.textures;
+    return this._textures;
   }
 
 
@@ -632,40 +727,6 @@ class Color extends Aesthetic {
 
 }
 
-
-// A really stupid way to encode floats into rgb values.
-// Stores numbers from -255.98 to 255.98 with a resolution of
-// 1/255/255.
-function encodeFloatsRGBA(values, array) {
-  if (array == undefined) {
-    array = new Uint8Array(values.length * 4)
-  }
-  if (typeof(values[0])=="boolean") {
-    // true, false --> 1, 0
-    values = values.map(d => +d)
-  }
-  let p = 0
-  for (let value of values) {
-    const logged = Math.log(value)
-    if (value < 0) {
-      array[p] = 1; value = -value;
-    } else {
-      array[p] = 0
-    }
-    array[p + 1] = (value % (1/256)) * 256 * 256
-    array[p + 2] = (value % 1 - value % (1/256)) * 256
-    array[p + 3] = value;
-    p += 4
-   }
-  return array
-}/*
-float RGBAtoFloat(in vec4 floater) {
-  decoder = vec4(-1., 1./255./255., 1./255., 1.]);
-  return dot(floater, decoder);
-}
-*/
-
-
 export const dimensions = {
   Size, Jitter_speed, Jitter_radius, Color, Filter, X, Y
 };
@@ -679,15 +740,21 @@ export class StatefulAesthetic {
     this.states = []
     const lower = label.toLowerCase()
     const Factory = dimensions[label]
+
     for (let _ of [1, 2]) {
       this.states.push(
         new Factory(lower, scatterplot, regl, tile)
       )
     }
+
+    this.states[0].partner = this.states[1]
+    this.states[1].partner = this.states[0]
+
     for (let state of this.states) {
       state.update({constant: default_aesthetics[lower].constant})
     }
 
+    // Allow them to peek at each other.
     this.current_encoding = JSON.stringify(
       {constant: default_aesthetics[lower].constant})
 
@@ -696,6 +763,7 @@ export class StatefulAesthetic {
   get current() {
     return this.states[0]
   }
+
   get last() {
     return this.states[1]
   }

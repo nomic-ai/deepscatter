@@ -51,7 +51,7 @@ export default class Scatterplot {
 //    this.encoding.x = {'field': 'x'}
 //    this.encoding.y = {'field': 'y'}
     this.prefs = {
-      'zoom_balance': 0.25,
+      'zoom_balance': 0.35,
       "duration": 2
     }
 
@@ -161,6 +161,12 @@ export default class Scatterplot {
       /// DEPRECATED
       prefs.alpha = prefs.encoding.alpha
     }
+
+    if (prefs.jitter) {
+      console.warn("Setting jitter type through base argument--deprectated")
+      prefs.encoding.jitter_radius.method = prefs.jitter
+    }
+
     // Stash the previous jitter.
     for (let k in ["jitter", "alpha", "max_points"]) {
         prefs['last_' + k] = this.prefs[k] || undefined;
@@ -173,11 +179,17 @@ export default class Scatterplot {
     this.lookup_tables = this.lookup_tables || new Map()
     if (this.lookup_promises.get(item)) {
       return this.lookup_promises.get(item)
+    } else if (this.lookup_promises.get(item) === null) {
+      return undefined
     } else {
+      // Temporarily set as null to avoid multiple writes.
+      this.lookup_promises.set(item, null)
       const metaTable = new ArrowMetaTable(this.prefs, item)
-        metaTable.load().then( () => this.lookup_tables.set(item, metaTable))
-      this.lookup_promises.set(item, metaTable.load())
+        metaTable.load().then(
+          () => this.lookup_tables.set(item, metaTable))
+          this.lookup_promises.set(item, metaTable.load())
     }
+    return undefined
   }
 
 

@@ -9,6 +9,7 @@ uniform float u_transition_duration;
 
 //uniform float u_jitter_radius;
 uniform float u_jitter;
+
 uniform float u_last_jitter;
 // Whether to plot only a single category.
 uniform float u_only_color;
@@ -97,9 +98,12 @@ uniform vec2 u_jitter_radius_range;
 uniform sampler2D u_jitter_radius_map;
 uniform float u_jitter_radius_needs_map;
 
+uniform float u_jitter_radius_lookup;
 uniform sampler2D u_jitter_radius_lookup_map;
 uniform float u_jitter_radius_lookup_y_constant;
 uniform vec2 u_jitter_radius_lookup_y_domain;
+uniform vec2 u_jitter_radius_lookup_z_domain;
+uniform vec2 u_jitter_radius_lookup_x_domain;
 
 
 attribute float a_last_jitter_radius;
@@ -284,23 +288,12 @@ float run_filter(in float a_filter,
 #pragma glslify: packFloat = require('glsl-read-float')
 #pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
 
-const vec4 decoder = vec4(-1., 1. / 256. / 256., 1. / 256., 1.);
-
-float RGBAtoFloat2(in vec4 floater) {
-  float signo = 1.;
-  if (floater.r > 128.) {
-    signo = -1.;
-    floater.r -= 128.;
-  }
-  // value between -64 and 64. Usually will be zero!
-  float mantissa = pow(10., floater.r - 64.);
-  float pointless = dot(floater.gba, vec3(1., 256., 65026.));
-  return signo *  mantissa * pointless;
-}
+const vec4 decoder = vec4(1./256./256./256., 1. / 256. / 256., 1. / 256., 1.);
 
 float RGBAtoFloat(in vec4 floater) {
+  //return 0.05;
   // Scale values up by 256.
-  return 256. * dot(floater, decoder);
+  return dot(floater, decoder);
 }
 
 
@@ -325,6 +318,7 @@ float texture_float_lookup(in sampler2D texture,
     return mix(range.x, range.y, inrange);
   }
 }
+
 float texture_float_lookup(in sampler2D texture,
                            in vec2 domain,
                            in vec2 range,
@@ -383,11 +377,6 @@ vec4 ixToRGBA(in float ix)  {
   return vec4(min, mid, high, 1.);
 }
 
-vec2 unpack2(in float number, in float mod_n) {
-  float a = mod(number, mod_n);
-  return vec2((number - a) / mod_n, a);
-}
-
 vec2 circle_jitter(in float ix, in float aspect_ratio, in float time,
                    in float radius, in float speed) {
   vec2 two_gaussians = box_muller(ix, 12.);
@@ -427,7 +416,8 @@ vec2 calculate_jitter(
   in float jitter_radius,
   in sampler2D jitter_speed_map, in vec2 jitter_speed_domain,
   in vec2 jitter_speed_range,
-  in float jitter_speed_transform, in float jitter_speed,
+  in float jitter_speed_transform,
+  in float jitter_speed,
   in float jitter_radius_needs_map,
   in float jitter_speed_needs_map
 ) {
@@ -440,7 +430,9 @@ vec2 calculate_jitter(
     jitter_radius_map, jitter_radius_domain,
     jitter_radius_range,
     jitter_radius_transform, jitter_radius,
-    jitter_radius_needs_map, 1., vec2(0., 2.));
+    jitter_radius_needs_map,
+    1.,
+    vec2(0., 2.));
 
 if (jitter_type == 3.) {
     // normally distributed on x and y.
@@ -484,6 +476,43 @@ if (jitter_type == 3.) {
     // circle
     return circle_jitter(ix, u_width/u_height, u_time, jitter_r, p_jitter_speed);
   }
+}
+void run_color_fill(in float ease) {
+if (u_only_color >= -1.5) {
+  if (u_only_color > -.5 && a_color != u_only_color) {
+    gl_Position = discard_me;
+    return;
+  } else {
+    // -1 is a special value meaning 'plot everything'.
+    fill = vec4(0., 0., 0., 1. / 255.);
+    gl_PointSize = 1.;
+  }
+} else if (u_color_picker_mode > 0.) {
+  fill = packFloat(ix);
+} else {
+  // fractional_color = 0.;
+  if (u_constant_color.r > -1.) {
+    fill = vec4(u_constant_color.rgb, u_current_alpha);
+  } else {
+    float fractional_color = linstep(u_color_domain, a_color);
+    fill = texture2D(u_color_map, vec2(0., fractional_color));
+    fill = vec4(fill.rgb, u_current_alpha);
+  }
+  if (ease < 1.) {
+    vec4 last_fill;
+    if (u_constant_last_color.r > 0.) {
+      last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);
+    } else {
+      float last_fractional = linstep(u_last_color_domain, a_last_color);
+      last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
+      // Alpha channel interpolation already happened.
+      last_fill = vec4(last_fill.rgb, u_last_alpha);
+    }
+    // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
+    // instead?
+    fill = mix(last_fill, fill, ease);
+  }
+}
 }
 
 void main() {
@@ -638,17 +667,48 @@ void main() {
     /* JITTER */
 
     float jitter_radius_value = a_jitter_radius;
-/*
-    jitter_radius_value = texture_float_lookup(
-      u_jitter_radius_lookup_map,
-      u_jitter_radius_lookup_x_domain,
-      vec2(-2047., 2047.),
-      1.,
-      a_jitter_radius,
-      1.,
-      u_jitter_radius_y_constant,
-      vec2(-2047., 2047.)
-    );*/
+
+    float jitter_radius_fraction;
+
+    if (u_jitter_radius_lookup > 0.) {
+
+      /*if (a_jitter_radius > -2020.) {
+        gl_Position = discard_me;
+        return;
+      }*/
+
+      float y_frac =
+        linstep(u_jitter_radius_lookup_y_domain,
+        u_jitter_radius_lookup_y_constant);
+      float x_frac = linstep(u_jitter_radius_lookup_x_domain, a_jitter_radius);
+
+      //x_frac = 0.;
+      //y_frac = .8;
+
+      vec4 jitter_radius_texel = texture2D(
+        u_jitter_radius_lookup_map,
+        vec2(
+          // Reversed cause of the way it's fed in.
+          y_frac, x_frac
+        )
+        );
+
+
+        if (y_frac >= 1.) {
+          fill = vec4(1., 0., 0., 1.);
+        }
+
+        jitter_radius_fraction = RGBAtoFloat(jitter_radius_texel);
+
+        jitter_radius_value = mix(
+          u_jitter_radius_lookup_z_domain.x,
+          u_jitter_radius_lookup_z_domain.y,
+          jitter_radius_fraction
+        );
+    } else {
+      gl_Position = discard_me;
+      return;
+    }
 
 
     vec2 jitter = calculate_jitter(
@@ -666,14 +726,16 @@ void main() {
 
     vec2 last_jitter = calculate_jitter(
       //u_jitter,
-      u_last_jitter, ix, u_last_jitter_radius_map,
-       u_last_jitter_radius_domain,
-       u_last_jitter_radius_range,
-       u_last_jitter_radius_transform,
+      u_last_jitter,
+      ix,
+      u_last_jitter_radius_map,
+      u_last_jitter_radius_domain,
+      u_last_jitter_radius_range,
+      u_last_jitter_radius_transform,
       a_last_jitter_radius,
-      u_jitter_speed_map, u_jitter_speed_domain,
-      u_jitter_speed_range,
-       u_jitter_speed_transform, a_jitter_speed,
+      u_last_jitter_speed_map, u_last_jitter_speed_domain,
+      u_last_jitter_speed_range,
+      u_last_jitter_speed_transform, a_last_jitter_speed,
       u_last_jitter_radius_needs_map,
       u_last_jitter_speed_needs_map
     );
@@ -681,45 +743,14 @@ void main() {
     if (ease < 1.) {
       jitter = mix(last_jitter, jitter, ease);
     }
-    gl_Position = vec4(position + jitter * point_size_adjust, 0., 1.);
 
+    gl_Position = vec4(position + jitter * point_size_adjust, 0., 1.);
+    //gl_Position = vec4(jitter, 0., 1.);
   } else {
     gl_Position = vec4(position, 0., 1.);
   }
+
+
+  run_color_fill(ease);
   // Plot a single tick of alpha.
-  if (u_only_color >= -1.5) {
-    if (u_only_color > -.5 && a_color != u_only_color) {
-      gl_Position = discard_me;
-      return;
-    } else {
-      // -1 is a special value meaning 'plot everything'.
-      fill = vec4(0., 0., 0., 1. / 255.);
-      gl_PointSize = 1.;
-    }
-  } else if (u_color_picker_mode > 0.) {
-    fill = packFloat(ix);
-  } else {
-    // fractional_color = 0.;
-    if (u_constant_color.r > -1.) {
-      fill = vec4(u_constant_color.rgb, u_current_alpha);
-    } else {
-      float fractional_color = linstep(u_color_domain, a_color);
-      fill = texture2D(u_color_map, vec2(0., fractional_color));
-      fill = vec4(fill.rgb, u_current_alpha);
-    }
-    if (ease < 1.) {
-      vec4 last_fill;
-      if (u_constant_last_color.r > 0.) {
-        last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);
-      } else {
-        float last_fractional = linstep(u_last_color_domain, a_last_color);
-        last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
-        // Alpha channel interpolation already happened.
-        last_fill = vec4(last_fill.rgb, u_last_alpha);
-      }
-      // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
-      // instead?
-      fill = mix(last_fill, fill, ease);
-    }
-  }
 }

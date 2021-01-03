@@ -24,7 +24,9 @@ constructor(selector, tileSet, scatterplot) {
 //      extensions: 'angle_instanced_arrays',
       optionalExtensions: [
         "OES_element_index_uint",
-        "OES_texture_float"],
+        "OES_texture_float",
+        "OES_texture_half_float"
+      ],
       canvas: this.canvas.node(),
     }
   );
@@ -283,9 +285,13 @@ blur(fbo1, fbo2, passes = 3) {
   }
 }
 
+
+
+
 render_all(props) {
 
   const { regl } = this;
+
   this.fbos.points.use( () => {
     regl.clear({color: [0, 0, 0, 0]});
     this.render_points(props)
@@ -297,6 +303,7 @@ render_all(props) {
       this.geolines.render(props)
     })
   }
+
   if (this.geo_polygons && this.geo_polygons.length) {
     this.fbos.lines.use( () => {
       regl.clear({color: [0, 0, 0, 0]});
@@ -310,10 +317,10 @@ render_all(props) {
 
   regl.clear({color: [0, 0, 0, 0]});
 
-
   // Copy the points buffer to the main buffer.
   for (let layer of [this.fbos.lines, this.fbos.points]) {
     regl({
+      profile: true,
       blend: {
         enable: true,
         func: {
@@ -343,7 +350,7 @@ render_all(props) {
         }
       `,
       attributes: {
-        position: [ -4, -4, 4, -4, 0, 4 ]
+        position: this.fill_buffer
       },
       depth: { enable: false },
       count: 3,
@@ -355,6 +362,8 @@ render_all(props) {
     })()
   }
 }
+
+
 
 set_image_data(tile, ix) {
   // Stores a *single* image onto the texture.
@@ -417,18 +426,6 @@ spritesheet_setter(word) {
 
 initialize_textures() {
   const { regl } = this;
-
-    // RGBA color.
-
-  for (let k of aesthetic_variables) {
-    console.log(k)
-    const v = this.aes[k]
-
-    v.current.create_textures()
-    v.last.create_textures()
-/*      [this.aesthetic_maps[`last_${k}`],
-     this.aesthetic_maps[k]] = this.aes[k].create_textures();*/
-  }
 
   this.fbos = this.fbos || {}
 
@@ -543,7 +540,11 @@ plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
       constant: [0, 0, 0],
       transform: "literal"
     },
-    jitter_radius: 1/256 * 10, // maps to x jitter
+    jitter_radius: {
+      constant: 1/256 * 10, // maps to x jitter
+      method: "xy" // Means x in radius and y in speed.
+    },
+
     jitter_speed: y_field === undefined ? 1 : 1/256 // maps to y jitter
   }
   console.log(`map.plotAPI({encoding: ${JSON.stringify(encoding)}})`)
@@ -557,7 +558,6 @@ plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
   const props = this.props
   props.block_for_buffers = true;
   props.grid_mode = 1;
-  props.prefs.jitter = false
 
 
   const minilist = new Uint8Array(width * height * 4);
@@ -586,8 +586,6 @@ count_colors(field) {
   }
 
   props.only_color = -1;
-  props.prefs.jitter = null;
-  props.prefs.last_jitter = null;
   props.colors_as_grid = 1.0;
   props.block_for_buffers = true;
 
@@ -730,6 +728,14 @@ color_pick(x, y, verbose = false) {
     }
   })
 }*/
+get fill_buffer() {
+  if (!this._fill_buffer) {
+    const { regl } = this;
+    this._fill_buffer = regl.buffer(
+      {data: [ -4, -4, 4, -4, 0, 4 ]})
+  }
+  return this._fill_buffer
+}
 
 draw_contour_buffer(field, ix) {
 
@@ -782,6 +788,8 @@ draw_contour_buffer(field, ix) {
 }
 
 remake_renderer() {
+
+  console.log("Remaking renderers")
 
   const { regl, width, height, zoom, prefs } = this;
   // This should be scoped somewhere to allow resizing.
@@ -857,12 +865,6 @@ remake_renderer() {
         return props.sprites ?
         props.sprites : this.fbos.dummy
       },
-      u_last_jitter: function (context, props) {
-        return encode_jitter_to_int(props.prefs.last_jitter);
-      },
-      u_jitter: function(context, props) {
-        return encode_jitter_to_int(props.prefs.jitter);
-      },
       u_zoom_balance: regl.prop('zoom_balance'),
       u_maxix: function(context, props) {
         return props.max_ix;
@@ -882,11 +884,14 @@ remake_renderer() {
       },
       u_current_alpha: (_, props) => props.prefs.alpha || .5,
       u_last_alpha: (_, props) => props.prefs.last_alpha || .5,
+      u_jitter: () => this.aes.jitter_radius.current.jitter_int_format,
+      u_last_jitter: () => this.aes.jitter_radius.last.jitter_int_format,
       u_zoom: function(context, props) {
         return props.zoom_matrix;
       }
     }
   }
+
   for (let k of ['ix']) {
     parameters.attributes[k] = function(state, props) {
       return props.manager.regl_elements.get(k)
@@ -901,6 +906,7 @@ remake_renderer() {
 
     for (let time of ["current", "last"]) {
       const temporal = time == "current" ? "" : "last_";
+
 
       parameters.uniforms[`u_${temporal}${k}_map`] = () => {
         return this.aes[k][time].textures.one_d
@@ -917,20 +923,25 @@ remake_renderer() {
         return this.aes[k][time].use_map_on_regl
       }
 
-      if (k == 'jitter_radius') {
+
+      if (k == 'jitter_radius' && temporal == "") {
         const base_string = "u_" + temporal + k + "_lookup"
-        parameters.uniforms[base_string] = () =>
-          this.aes[k][time].lookup_texture.texture.texture
+
+        parameters.uniforms[base_string] = () => {
+          return 1;
+          return this.aes[k][time].use_lookup ? 1 : 0;
+        }
         parameters.uniforms[base_string + "_map"] = () =>
-          this.aes[k][time].lookup_texture.texture.texture
-        parameters.uniforms[base_string + "_y_constant"] = () =>
-          this.aes[k][time].lookup_texture.value || 0
-        console.log(this.aes[k][time].lookup_texture)
-//        parameters.uniforms[base_string + "_x_domain"] = () =>
-//            [this.aes[k][time].lookup_tables.shape[0] - 2047,
-//             this.aes[k][time].lookup_tables.shape[1] - 2047]
-        parameters.uniforms[base_string + "_y_domain"] = () =>
-          this.aes[k][time].lookup_texture.domain
+          this.aes[k][time].lookup_texture.texture
+        parameters.uniforms[base_string + "_y_constant"] = () => {
+          return +this.aes[k][time].lookup_texture.value || .5
+        }
+          parameters.uniforms[base_string + "_y_domain"] = () =>
+            this.aes[k][time].lookup_texture.y_domain
+        parameters.uniforms[base_string + "_z_domain"] = () =>
+          this.aes[k][time].lookup_texture.z_domain
+        parameters.uniforms[base_string + "_x_domain"] = () =>
+          this.aes[k][time].lookup_texture.x_domain
 
       }
 
@@ -1140,7 +1151,7 @@ constructor(regl, buffer_size) {
 
 generate_new_buffer() {
   // Adds to beginning of list.
-  // console.log(`Creating buffer number ${this.buffers.length}`)
+  console.log(`Creating buffer number ${this.buffers.length}`)
   if (this.pointer) {this.buffer_offsets.unshift(this.pointer)}
   this.pointer = 0
   this.buffers.unshift(
@@ -1168,24 +1179,5 @@ allocate_block(items, bytes_per_item) {
   }
   this.pointer += items * bytes_per_item
   return value
-}
-}
-
-
-function encode_jitter_to_int(jitter) {
-if (jitter == "spiral") {
-  // animated in a logarithmic spiral.
-  return 1
-} else if (jitter == "uniform") {
-  // Static jitter inside a circle
-  return 2
-} else if (jitter == "normal") {
-  // Static, normally distributed, standard deviation 1.
-  return 3
-} else if (jitter == "circle") {
-  // animated, evenly distributed in a circle with radius 1.
-  return 4
-} else {
-  return 0
 }
 }
