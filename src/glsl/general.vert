@@ -672,11 +672,6 @@ void main() {
 
     if (u_jitter_radius_lookup > 0.) {
 
-      /*if (a_jitter_radius > -2020.) {
-        gl_Position = discard_me;
-        return;
-      }*/
-
       float y_frac =
         linstep(u_jitter_radius_lookup_y_domain,
         u_jitter_radius_lookup_y_constant);
@@ -690,13 +685,8 @@ void main() {
         vec2(
           // Reversed cause of the way it's fed in.
           y_frac, x_frac
-        )
-        );
+        ));
 
-
-        if (y_frac >= 1.) {
-          fill = vec4(1., 0., 0., 1.);
-        }
 
         jitter_radius_fraction = RGBAtoFloat(jitter_radius_texel);
 
@@ -706,10 +696,11 @@ void main() {
           jitter_radius_fraction
         );
     } else {
-      gl_Position = discard_me;
-      return;
+      if (u_jitter == 0.) {
+        jitter_radius_value = 0.;
+      }
     }
-
+    jitter_radius_value = 0.;
 
     vec2 jitter = calculate_jitter(
       u_jitter, ix, u_jitter_radius_map,
@@ -724,23 +715,24 @@ void main() {
        u_jitter_speed_needs_map
     );
 
-    vec2 last_jitter = calculate_jitter(
-      //u_jitter,
-      u_last_jitter,
-      ix,
-      u_last_jitter_radius_map,
-      u_last_jitter_radius_domain,
-      u_last_jitter_radius_range,
-      u_last_jitter_radius_transform,
-      a_last_jitter_radius,
-      u_last_jitter_speed_map, u_last_jitter_speed_domain,
-      u_last_jitter_speed_range,
-      u_last_jitter_speed_transform, a_last_jitter_speed,
-      u_last_jitter_radius_needs_map,
-      u_last_jitter_speed_needs_map
-    );
-
     if (ease < 1.) {
+
+      vec2 last_jitter = calculate_jitter(
+        //u_jitter,
+        u_last_jitter,
+        ix,
+        u_last_jitter_radius_map,
+        u_last_jitter_radius_domain,
+        u_last_jitter_radius_range,
+        u_last_jitter_radius_transform,
+        a_last_jitter_radius,
+        u_last_jitter_speed_map, u_last_jitter_speed_domain,
+        u_last_jitter_speed_range,
+        u_last_jitter_speed_transform, a_last_jitter_speed,
+        u_last_jitter_radius_needs_map,
+        u_last_jitter_speed_needs_map
+      );
+
       jitter = mix(last_jitter, jitter, ease);
     }
 
@@ -749,6 +741,7 @@ void main() {
   } else {
     gl_Position = vec4(position, 0., 1.);
   }
+  // gl_Position = vec4(position, 0., 1.);
 
 
   run_color_fill(ease);

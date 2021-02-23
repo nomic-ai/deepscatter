@@ -1,7 +1,7 @@
 import { sum, range as arange, shuffle, extent } from 'd3-array';
 import { scaleLinear, scaleSqrt, scaleLog, scaleIdentity } from 'd3-scale'
 import { rgb } from 'd3-color';
-import { encodeFloatsRGBA } from './util';
+import { encodeFloatsRGBArange } from './util';
 import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool
  } from 'd3-scale-chromatic';
 
@@ -15,7 +15,7 @@ const scales = {
   literal: scaleIdentity
 }
 
-const palette_size = 4096
+const palette_size = 4095
 
 function to_buffer(data) {
   const output = new Uint8Array(4 * palette_size)
@@ -32,7 +32,7 @@ function materialize_color_interplator(interpolator) {
 }
 
 const color_palettes = {
-  white : d3.range(palette_size).map(i => [255, 255, 255, 255])
+  white : arange(palette_size).map(i => [255, 255, 255, 255])
 }
 
 for (let [k, v] of Object.entries(d3Chromatic)) {
@@ -128,7 +128,7 @@ class Aesthetic {
   };
 
   get texture_size() {
-    return 4096
+    return 4095
   }
 
   get transform() {
@@ -146,6 +146,10 @@ class Aesthetic {
       .range(this.range)
   }
 
+  get column() {
+    return this.tileSet.table.getColumn(this.field)
+  }
+
   get default_domain() {
 
     if (this.field == undefined) {
@@ -156,7 +160,7 @@ class Aesthetic {
     } else {
       // Maybe the table is checked out
       if (!this.tileSet.table) {return [1,1]}
-      const column = this.tileSet.table.getColumn(this.field)
+      const column = this.column
       if (column.type.dictionary) {
         this._domains[this.field] = [0, this.texture_size - 1]
       } else {
@@ -168,8 +172,8 @@ class Aesthetic {
 
   default_data() {
     return Array(this.texture_size).fill(this.default_val)
-    return encodeFloatsRGBA(Array(this.texture_size)
-      .fill(this.default_val))
+    return encodeFloatsRGBArange(Array(this.texture_size)
+      .fill(this.default_val)).array
   }
 
 
@@ -252,6 +256,7 @@ class Aesthetic {
   }
 
   post_to_regl_buffer(buffer_name) {
+    console.log("Posting to buffer from ", buffer_name, this.field)
     this.textures[buffer_name].subimage({
       data: this.texture_buffer,
       width: 1,
@@ -260,6 +265,7 @@ class Aesthetic {
   }
 
   clear() {
+    console.log("Clearing", this.field)
     this.texture_buffer.set(this.default_data())
     this.post_to_regl_buffer("one_d")
     this.lookup = undefined
@@ -279,7 +285,13 @@ class Aesthetic {
 
     const { lookup } = this;
     if (lookup === undefined) {
-      return null;
+      return {
+        texture: this.textures["one_d"],
+        y_domain: [-1, 1],
+        x_domain: [-1, 1],
+        z_domain: [-1, 1],
+        y_constant: 0
+      }
     }
 
     const { field } = this
@@ -381,8 +393,6 @@ class Aesthetic {
     Object.assign(encoding, parseLambdaString(encoding.lambda, false))
   }
 
-  console.log("lookup", encoding.lookup)
-
   this.lookup = encoding.lookup;
   this.field = encoding.field;
 
@@ -425,10 +435,12 @@ class Aesthetic {
   if (lambda) {
     this.apply_function_to_textures(field, this.domain, lambda)
   } else {
-    this.encode_for_textures(this.range)
+    if (encoding.range) {
+      this.encode_for_textures(this.range)
+      this.post_to_regl_buffer("one_d")
+    }
   }
 
-  this.post_to_regl_buffer("one_d")
 
 }
 
@@ -499,7 +511,8 @@ class Aesthetic {
 //      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return
     }
-
+    console.log(input)
+    const column = this.column
 
     if (!column) {
       throw(`Column ${field} does not exist on table.`)
@@ -513,9 +526,11 @@ class Aesthetic {
     } else {
       input = input.map(d => this.scaleFunc(d))
     }
-    //console.log(func)
+
     const values = input.map(i => +func(i))
-    this.texture_buffer.set(encodeFloatsRGBA(values))
+    console.log(values)
+    console.log(encodeFloatsRGBArange(values))
+    this.texture_buffer.set(encodeFloatsRGBArange(values).array)
   }
 }
 
@@ -566,6 +581,35 @@ class Filter extends Aesthetic {
   get domain() {
     return this.is_dictionary() ?
     [-2047, 2047] : [0, 1]
+  }
+
+  get_function() {
+    let input = this.stringversion
+
+    if (input && input.op) {
+      if (input.op == "gt") {
+        return d => d > input.a
+      }
+      if (input.op == "lt") {
+        return d => d < input.a
+      }     
+      if (input.op == "eq") {
+        return d => d == input.a
+      }
+      if (input.op == "within") {
+        return d => Math.abs(d - input.a) <= input.b
+      }
+    }
+    if (!this.encoding) {
+      return () => true
+    }
+    const {
+      lambda,
+      field
+    } = this.encoding;
+
+    if (!lambda) {return d => true}
+    return d => lambda(d[field])
   }
 
   ops_to_array() {
@@ -643,16 +687,22 @@ class Jitter_radius extends Aesthetic {
   get default_val() {return .05};
 
   update(encoding) {
+
+    // The jitter method is buried in here.
+    if (typeof(encoding) == "number") {
+      encoding = {constant: encoding}
+    }
     if (encoding.method) {
       this.method = encoding.method;
     } else if (this.partner.method) {
       this.method = this.partner.method;
     }
 
+
     if (encoding.method === null) {
       this.method = "None"
     }
-
+    console.log(encoding, "ENCODING")
     super.update(encoding)
   }
 

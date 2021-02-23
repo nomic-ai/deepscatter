@@ -1,6 +1,7 @@
 import pyarrow as pa
 from pyarrow import csv, feather
-import pandas as pd
+import pyarrow.compute as pc
+#import pandas as pd
 import logging
 import shutil
 from pathlib import Path
@@ -63,7 +64,7 @@ def refine_schema(schema : pa.Schema) -> Dict[str,pa.Schema]:
             fields[el.name] = pa.float32()
 #            el = pa.field(el.name, pa.float32())
         elif el.name == "ix":
-            fields[el.name] = pa.uint32()
+            fields[el.name] = pa.uint64()
         else:
             fields[el.name] = el.type
             #fields.append(el)
@@ -187,12 +188,12 @@ def main():
         if args.limits[0] > 1e8:
             if len(args.files) > 1:
                 logging.warn("Checking limits for bounding box but only on first passed file, i.e., " + args.files[0])
-            xy = feather.read_feather(args.files[0], columns=["x", "y"])
-            mins = xy.min(skipna=True)
-            maxes = xy.max(skipna = True)
+            xy = feather.read_table(args.files[0], columns=["x", "y"])
+            x = pc.min_max(xy['x']).as_py()
+            y = pc.min_max(xy['y']).as_py()
             extent = {
-                "x": [float(mins['x']), float(maxes['x'])],
-                "y": [float(mins['y']), float(maxes['y'])]
+                "x": [x['min'], x['max']],
+                "y": [y['min'], y['max']]
             }
         else:
             extent = {
@@ -206,41 +207,45 @@ def main():
         schema = refine_schema(raw_schema)
         raw_schema = pa.schema([pa.field(name, type) for name, type in schema.items()])
 
-    tiler = Tile(extent, [0, 0, 0], args, raw_schema)
+    tiler = Tile(extent, [0, 0, 0], args)
 
     logging.info("Starting.")
 
     count_holder = defaultdict(Counter)
 
+    recoders = dict()
+
+    for field in raw_schema:
+        if (pa.types.is_dictionary(field.type)):
+            recoders[field.name] = get_recoding_arrays(rewritten_files, field.name)
+
     for i, arrow_block in enumerate(rewritten_files):
         logging.info(f"Reading block {i} of {len(rewritten_files) - 1}")
-        d = feather.read_feather(arrow_block)
+        tab = feather.read_table(arrow_block)
+        # tab = tab.filter(pc.invert(pc.is_null(tab['x'])))
 
-        # Drop missing x values, silently.
-        d = d[pd.notna(d['x'])]
+        # Drop missing x values, silently
+        d = dict()
+        for t in tab.schema.names:
+            if t in recoders:
+                d[t] = remap_all_dicts(tab[t], *recoders[t])
+            d[t] = tab[t]
+
         if args.randomize > 0:
-            d['x'] = d['x'] + nprandom.normal(0, args.randomize, d.shape[0])
-            d['y'] = d['y'] + nprandom.normal(0, args.randomize, d.shape[0])
+            d['x'] = pc.add(d['x'], nprandom.normal(0, args.randomize, tab.shape[0]))
+            d['y'] = pc.add(d['y'], nprandom.normal(0, args.randomize, tab.shape[0]))
 
 
+        tab = pa.table(d)
 
         logging.info(f"{len(memory_tiles_open)} partially filled tiles buffered in memory and {len(files_open)} flushing overflow directly to disk.")
         remaining_tiles = args.max_files - len(memory_tiles_open) - len(files_open)
         logging.info(f"Inserting block {i} of {len(rewritten_files) - 1}")
 
-        # Recode null values since GPUs can't handle them.
-
-        for name, col in schema.items():
-            if pa.types.is_dictionary(col):
-                d[name].cat.add_categories("<NA>", inplace = True)
-                d[name].fillna("<NA>", inplace = True)
-                col_values = d[name].to_list()
-                count_holder[name].update(col_values)
-
-        tiler.insert(d, remaining_tiles)
+        tiler.insert(tab, remaining_tiles)
         logging.info(f"Done inserting block {i} of {len(rewritten_files) - 1}")
 
-    final_dictionaries = make_final_dictionaries(count_holder)
+#    final_dictionaries = make_final_dictionaries(count_holder)
 
     logging.info("Initial partition complete--proceeding to children.")
 
@@ -252,7 +257,7 @@ def main():
 
 
     # Reflush every tile.
-    tiler.map_tiles(lambda tile: tile.final_flush(final_dictionaries, schema))
+    tiler.map_tiles(lambda tile: tile.final_flush())
 
     count = 0
     flushed = 0
@@ -264,34 +269,18 @@ def main():
     logging.info(f"{count} added, {flushed} flushed")
     logging.debug(memory_tiles_open)
 
-def partition(table: pd.DataFrame, midpoint: Tuple[str, float]) -> List[pd.DataFrame]:
+def partition(table: pa.Table, midpoint: Tuple[str, float]) -> List[pa.Table]:
     # Divide a table in two based on a midpoint
     key, pivot = midpoint
-    criterion = table[key] < pivot
-    splitted = [table[criterion], table[~criterion]]
+    criterion = pc.less(table[key], np.float32(pivot))
+    splitted = [pc.filter(table, criterion), pc.filter(table, pc.invert(criterion))]
     return splitted
 
-
-def make_final_dictionaries(count_holder: dict) -> Dict[str, Tuple[list, defaultdict]]:
-    final_dicts = {}
-    for name, counts in count_holder.items():
-        keys : List[str] = [
-            l[0] for l in counts.most_common(4094) ]
-        length = len(keys)
-        reverse_lookup : DefaultDict[str, int] = \
-          defaultdict(lambda: length) # Returns one more
-        if length==4094:
-            keys += ["Other"]
-        for i, k in enumerate(keys):
-            reverse_lookup[k] = i
-        final_dicts[name] = \
-          (pa.array(keys, pa.utf8()), reverse_lookup)
-    return final_dicts
 
 class Tile():
     # some prep to make OCT_TREE SAFE--METHODS that support only quads
     # listed as QUAD_ONLY
-    def __init__(self, extent, coords, args, schema):
+    def __init__(self, extent, coords, args):
         global memory_tiles_open
 
         self.coords = coords
@@ -300,14 +289,14 @@ class Tile():
         self.basedir = args.destination
         self.first_tile_size = args.first_tile_size
         self.tile_size = args.tile_size
-        self.schema = schema
+        self.schema = None
 
         # Wait to actually create the directories until needed.
         self._filename = None
         self._children = None
         self._overflow_buffer = None
         # Unwritten records for myself.
-        self.data : List[Union[pa.RecordBatch, pd.DataFrame]] = []
+        self.data : List[pa.RecordBatch] = []
         # Unwritten records for my children.
         self.hold_for_children = []
 
@@ -363,13 +352,13 @@ class Tile():
         self.flush_data(destination, {}, "lz4")
         memory_tiles_open.remove(self.filename)
 
-    def final_flush(self, final_dictionaries, schema : pa.Schema) -> None:
+    def final_flush(self) -> None:
         """
         At the end, we can see which tiles have children and append that
         to the metadata.
         """
         self.total_points = 0
-        logging.debug(f"Writing final version of {self.coords}")
+        #logging.debug(f"Writing final version of {self.coords}")
         metadata = {
             "extent": json.dumps(self.extent),
         }
@@ -377,7 +366,7 @@ class Tile():
             metadata["children"] = "[]"
         else:
             for child in self._children:
-                child.final_flush(final_dictionaries, schema)
+                child.final_flush()
                 self.total_points += child.total_points
             populated_kids = [c.id for c in self._children if c.total_points > 0]
             metadata["children"] = json.dumps(populated_kids)
@@ -388,48 +377,18 @@ class Tile():
         except FileNotFoundError:
             return
 
-        # Ensure it's empty (it should be.)
-        if self.data is None:
-            self.data = []
-        else:
-            self.data.clear()
-
-        for i in range(tab.num_record_batches):
-            batch = tab.get_batch(i)
-            cols : List[pa.Array] = []
-            for i, col in enumerate(batch.columns):
-                name = batch.schema.names[i]
-                if pa.types.is_dictionary(col.type):
-                    labels, lookup = final_dictionaries[name]
-                    indices = col.indices.to_numpy()
-                    replacements = np.zeros_like(indices)
-                    loc_lookup = {}
-                    for i in range(len(indices)):
-                        try:
-                            replacements[i] = loc_lookup[indices[i]]
-                        except KeyError:
-                            loc_lookup[indices[i]] = lookup[col.dictionary[indices[i]]]
-                            replacements[i] = loc_lookup[indices[i]]
-                    indices = pa.array(replacements, pa.int16())
-                    col = pa.DictionaryArray.from_arrays(indices, labels)
-                cols.append(col)
-            self.data.append(pa.RecordBatch.from_arrays(cols, batch.schema.names))
-
+        self.data = [tab.get_batch(i) for i in range(tab.num_record_batches)]
 
         self.total_points = 0
         # Flush will remove the tile--bookkeeping.
         for batch in self.data:
             self.total_points += batch.num_rows
-
         metadata["total_points"] = str(self.total_points)
-        schema = pa.schema(schema, metadata = metadata)
-#        self.data = pa.Table.from_arrays(cols, schema=schema)
+        schema = pa.schema(self.schema, metadata = metadata)
 
         self.flush_data(self.filename, metadata, "uncompressed", schema, expect_table = False)
-        logging.debug(f"Written final version of {self.coords}")
-
-        # unclean_path.unlink()
-
+        if self.coords[0] < 8:
+            logging.debug(f"{' ' * self.coords[0]}Written final version of {self.coords}")
 
     def flush_data(self, destination, metadata, compression, schema = None, expect_table = False):
         if self.data is None:
@@ -460,7 +419,7 @@ class Tile():
         files_open.add(fname)
         return self._overflow_buffer
 
-    def partition_to_children(self, table) -> List[pd.DataFrame]:
+    def partition_to_children(self, table) -> List[pa.Table]:
         # Coerce to a list in quadtree/octree order.
         frames = [table]
         pivot_dim : Tuple[str, float]
@@ -498,7 +457,7 @@ class Tile():
                 ylim.sort()
                 extent = {"x": xlim, "y": ylim}
                 coords = self.coords[0] + 1, self.coords[1]*2 + i, self.coords[2]*2 + j
-                child = Tile(extent, coords, self.args, self.schema)
+                child = Tile(extent, coords, self.args)
                 self._children.append(child)
         return self._children
 
@@ -553,33 +512,44 @@ class Tile():
             self.make_children()
 
             logging.debug(f"Flushing {fin.num_record_batches} batches from {self.coords} with budget of {tile_budget} ({len(files_open)} memory, {len(memory_tiles_open)} tiles waiting to flush in memory)")
+
             for i in range(fin.num_record_batches):
-                self.insert(fin.get_batch(i).to_pandas(), tile_budget)
+                self.insert(pa.Table.from_batches([fin.get_batch(i)]), tile_budget)
             fname.unlink()
             self._overflow_buffer = None
             # Now we're writing to this tile again.
             self.map_tiles(lambda tile: tile.first_flush())
 
+    def check_schema(self, table):
+        if (self.schema is None):
+            self.schema = table.schema
+            return
+        if not self.schema.equals(table.schema):
+            raise TypeError("Attempted to insert a table with a different schema.")
 
-    def insert(self, pdframe, tile_budget = float("Inf")):
+    def insert(self, table, tile_budget = float("Inf")):
+        self.check_schema(table)
         #logging.debug(f"Inserting to {self.coords} with budget of {tile_budget}")
         insert_n_locally = self.TILE_SIZE - self.n_data_points
         if (insert_n_locally > 0):
-            head = pdframe.iloc[:insert_n_locally,]
+            local_mask = np.zeros((table.shape[0]), np.bool)
+            local_mask[:insert_n_locally] = True
+            head = pc.filter(table, local_mask)
             if head.shape[0]:
-                self.data.append(pa.record_batch(head, self.schema))
+                for batch in head.to_batches():
+                    self.data.append(batch)
                 self.n_data_points += head.shape[0]
-            tail = pdframe.iloc[insert_n_locally:,]
+            table = table.filter(pc.invert(local_mask))
         else:
-            tail = pdframe
+            pass
 
         children_per_tile = 2**(len(self.coords) - 1)
         if tile_budget >= children_per_tile or self._children is not None:
             # If we can afford to create children, do so.
-            total_records = tail.shape[0]
+            total_records = table.shape[0]
             if total_records == 0:
                 return
-            partitioning = self.partition_to_children(tail)
+            partitioning = self.partition_to_children(table)
             tiles_allowed_overflow = 0
             # The next block creates children and uses up some of the budget:
             # This one accounts for it.
@@ -602,9 +572,43 @@ class Tile():
                 self.first_flush()
             return
         else:
-            self.overflow_buffer.write_batch(
-                pa.record_batch(tail, self.schema)
-            )
+            for batch in table.to_batches():
+                self.overflow_buffer.write_batch(
+                    batch
+                )
+def get_better_codes(col, counter = Counter()):
+    for a in pc.value_counts(col):
+        counter[a['values'].as_py()] += a['counts'].as_py()
+    return counter
 
+def get_recoding_arrays(files, col_name):
+    countered = Counter()
+    for file in files:
+        col = pa.feather.read_table(file, columns=[col_name])[col_name]
+        countered = get_better_codes(col, countered)
+    new_order = [pair[0] if pair[0] else "<NA>" for pair in countered.most_common(4094)]
+    if len(new_order) == 4094:
+        new_order.append("<Other>")
+    new_order_dict = dict(zip(new_order, range(len(new_order))))
+    return new_order, new_order_dict
+
+def remap_dictionary(chunk, new_order_dict, new_order):
+    # Switch a dictionary to use a pre-assigned set of keys. returns a new chunked dictionary array.
+    index_map = pa.array([new_order_dict[str(k)] if str(k) in new_order_dict else len(new_order_dict) - 1 for k in chunk.dictionary], pa.uint16())
+    if chunk.indices.null_count > 0:
+        try:
+            new_indices = pc.fill_null(pc.take(index_map, chunk.indices), new_order_dict["<NA>"])
+        except KeyError:
+            new_indices = pc.fill_null(pc.take(index_map, chunk.indices), new_order_dict["<Other>"])
+    else:
+        new_indices = pc.take(index_map, chunk.indices)
+
+    return pa.DictionaryArray.from_arrays(new_indices, new_order)
+
+def remap_all_dicts(col, new_order, new_order_dict):
+    if (isinstance(col, pa.ChunkedArray)):
+        return pa.chunked_array(remap_dictionary(chunk, new_order_dict, new_order) for chunk in col.chunks)
+    else:
+        return remap_dictionary(col, new_order_dict, new_order)
 if __name__=="__main__":
     main()

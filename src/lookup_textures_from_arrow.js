@@ -1,7 +1,7 @@
-import {Table} from 'apache-arrow';
+import {Table} from '@apache-arrow/esnext-cjs';
 import {range, extent} from 'd3-array';
 import { scaleLinear } from 'd3-scale';
-import { encodeFloatsRGBA } from './util'
+import { encodeFloatsRGBArange } from './util'
 export default class ArrowMetaTable {
   constructor(prefs, table_name) {
     this.table_name = table_name
@@ -33,29 +33,26 @@ export default class ArrowMetaTable {
       return this.textures.get(id)
     }
     const {
-      crosstabs, y_domain, x_domain, shape, z_domain
+      crosstabs, y_domain, x_domain, shape
     } = this.crosstab_array(dimensions, orders)
 
-    let crosstabs_XXX = crosstabs
-//    console.log(crosstabs)
-    const rgba = encodeFloatsRGBA(crosstabs_XXX.flat(3))
-    console.log("GAAAA", {shape, crosstabs_XXX, rgba, y_domain})
+    const z_data = encodeFloatsRGBArange(crosstabs)
+
     this.textures.set(id, {
       texture: regl.texture(
       {
         type: 'uint8',
         format: 'rgba',
-        data: rgba,
+        data: z_data.array,
         height: shape[0],
-        width: crosstabs[0].length///XXX
-         //data: [[0, 0, 0, 127], [0, 0, 0, 10]], shape: [1, 2, 4]
+        width: crosstabs[0].length
       }),
       x_domain,
       y_domain,
-      z_domain,
-      shape,
-      crosstabs_XXX
+      z_domain: z_data.extent,
+      shape
     })
+    console.log(z_data.extent, z_data.array)
     return this.textures.get(id)
 
 
@@ -82,11 +79,6 @@ export default class ArrowMetaTable {
     const x_values = tab.getColumn(x).toArray()
     const z_values = tab.getColumn(z).toArray()
 
-
-
-    const z_domain = extent(z_values);
-    const scaler = scaleLinear().domain(z_domain).range([0, 1])
-
     // First assign indices based on the passed parameters,
     // if present.
 
@@ -111,25 +103,17 @@ export default class ArrowMetaTable {
       const x_ = x_indices.get(x_values[i])
       const y_ = y_indices.get(y_values[i])
       const z_ = z_values[i]
-      if (Math.random() < .00001) {console.log(x_, y_, z_, scaler(z_))}
-      crosstabs[x_][y_] = scaler(z_)
+      crosstabs[x_][y_] = z_
     }
 
-    console.log({
-      x_indices,
-      crosstabs,
-      z_domain
-      }
-    )
     return {
       crosstabs,
       shape: [x_indices.size, y_indices.size],
       // Erg. Factors are encoded 2047 down to guarantee
       // precision.
       x_domain: extent(x_indices.values()).map(d => d - 2047),
-      y_domain: extent(y_values),
-      z_domain
-    }
+      y_domain: extent(y_values)
+        }
   }
 
 

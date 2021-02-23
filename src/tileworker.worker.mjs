@@ -1,7 +1,7 @@
 import * as Comlink from "comlink";
-import { Table, Column, Vector, Utf8, Float32, Uint32, Int32, Int64, Dictionary } from 'apache-arrow';
+import { Table, Column, Vector, Utf8, Float32,
+         Uint32, Int32, Int64, Dictionary } from '@apache-arrow/esnext-cjs';
 // import ArrowTree from './ArrowTree';
-
 
 function compose_functions(val) {
   if (typeof val === "string") {
@@ -50,11 +50,12 @@ const WorkerTile = {
       .then(response => {
         let table = Table.from(response);
         const metadata = table.schema.metadata;
-        const tile = url.split("/").slice(-3).join("/")
-        mutations['tile_key'] = `return "${tile}"`;
+        // const tile = url.split("/").slice(-3).join("/")
+        // mutations['tile_key'] = `return "${tile}"`;
 
         let buffer;
-        if (Object.keys(mutations).length) {
+        // For now, always mutate to ensure dict indexes are cast.
+        if (Object.keys(mutations).length || true) {
           buffer = mutate(mutations, response)
         } else {
           buffer = response
@@ -89,9 +90,9 @@ const WorkerTile = {
 function get_dictionary_codes(buffer) {
   // Too expensive to do on the client.
   const table = Table.from(buffer)
-
   const dicts = {}
   for (const field of table.schema.fields) {
+//    console.log({name: field.name, field})
     if (field.type.dictionary) {
       dicts[field.name] = new Map()
       const c = table.getColumn(field.name)
@@ -151,6 +152,7 @@ function mutate(map, table_buffer) {
 
         // Translate to float versions here to avoid casting in the main thread.
         if (col.dictionary) {
+          console.log(col.name)
           const float_version = new Float32Array(table.length)
           for (let i = 0; i < table.length; i++) {
             // At half precision, -2047 to 2047 is the

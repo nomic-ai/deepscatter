@@ -2,11 +2,11 @@ import { select } from 'd3-selection';
 export class Renderer {
   // A renderer handles drawing to a display element.
   constructor(selector, tileSet, scatterplot) {
+    console.log("YOOHOO")
     this.scatterplot = scatterplot;
     this.holder = select(selector);
-    console.log(this.holder.node())
+    console.log(this.holder, selector)
     this.canvas = select(this.holder.node().firstElementChild)
-    console.log(this.canvas.node())
     this.tileSet = tileSet;
     this.prefs = scatterplot.prefs;
     this.width = +this.canvas.attr("width");
@@ -30,6 +30,8 @@ export class Renderer {
     return p_in_rect(point, this._zoom.current_corners) &&
     point.ix < this.prefs.max_points * this._zoom.k
   }
+
+
 
   visible_tiles() {
     // yield the currently visible tiles based on the zoom state

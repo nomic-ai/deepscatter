@@ -5,7 +5,7 @@ import {select} from 'd3-selection';
 import {geoPath, geoIdentity} from 'd3-geo';
 import {json as d3json } from 'd3-fetch';
 import {max, range} from 'd3-array';
-import { Table } from 'apache-arrow';
+import { Table } from '@apache-arrow/esnext-cjs';
 import merge from 'lodash.merge';
 
 import ArrowMetaTable from './lookup_textures_from_arrow.js'
@@ -40,9 +40,15 @@ export default class Scatterplot {
     this.height = height
 
     this.div = select(selector);
-
+    if (this.div.empty()) {
+      console.error(selector)
+      throw "Must pass a valid div selector"
+    }
+    console.log(this.div, selector)
     this.elements = []
     this.filters = new Map();
+
+    this.d3 = {select};
 
 //    this.encoding = {}
 //    for (let k of Object.keys(default_aesthetics)) {
@@ -57,13 +63,13 @@ export default class Scatterplot {
 
     for (const d of base_elements) {
       const container =
-      this.div
-       .append("div")
-       .attr("id", "container-for-" + d.id)
-       .style("position", "fixed")
-       .style("top", 0)
-       .style("left", 0)
-       .style("pointer-events", d.id == "deepscatter-svg" ? "auto":"none")
+        this.div
+        .append("div")
+        .attr("id", "container-for-" + d.id)
+        .style("position", "fixed")
+        .style("top", 0)
+        .style("left", 0)
+        .style("pointer-events", d.id == "deepscatter-svg" ? "auto":"none")
 
      container
        .append(d.nodetype)
@@ -75,9 +81,10 @@ export default class Scatterplot {
     }
   }
 
-  reinitialize() {
+  async reinitialize() {
     const { prefs } = this;
     this._root = new Tile(this.source_url, prefs);
+    await this._root.download()
     this._renderer = new ReglRenderer(
       "#container-for-webgl-canvas",
       this._root,
@@ -164,6 +171,11 @@ export default class Scatterplot {
 
     if (prefs.jitter) {
       console.warn("Setting jitter type through base argument--deprectated")
+      if (typeof(prefs.encoding.jitter_radius) == "number") {
+        prefs.encoding.jitter_radius = {
+          constant: prefs.encoding.jitter_radius
+        }
+      }
       prefs.encoding.jitter_radius.method = prefs.jitter
     }
 
@@ -199,10 +211,6 @@ export default class Scatterplot {
     if (prefs === undefined || prefs === null) {return Promise.resolve(1)}
 
     this.update_prefs(prefs);
-    /*
-    if (!this._root) {
-      return this.reinitialize().then(this.plotAPI(prefs))
-    } */
 
     // Some things have to be done *before* we can actually run this;
     // this is a spot to defer the tasks.
@@ -274,6 +282,22 @@ export default class Scatterplot {
     })
 
     this._zoom.restart_timer(60000)
+  }
+
+  top_n_points(n = 20) {
+    const {_root, _renderer} = this;
+
+    const current_corners = _renderer.zoom.current_corners()
+    console.log(current_corners)
+    const output = []
+    const filter = _renderer.aes.filter.current.get_function();
+    for (let p of _root.points(current_corners, true)) {
+      if (filter(p)) {
+        output.push(p)
+      }
+      if (output.length >= n) {return output}
+    }
+    return output
   }
 
   drawContours(contours, drawTo) {

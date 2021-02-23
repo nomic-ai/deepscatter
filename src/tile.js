@@ -1,17 +1,17 @@
-import { json as d3Json, csv as d3Csv } from 'd3-fetch';
-import { quadtree } from 'd3-quadtree';
-import { scaleLinear } from 'd3-scale';
-import {contourDensity} from 'd3-contour';
-import {geoPath} from 'd3-geo';
-import {extent, range, shuffle, group, rollup, bisectLeft} from 'd3-array';
+// import { json as d3Json, csv as d3Csv } from 'd3-fetch';
+// import { quadtree } from 'd3-quadtree';
+// import { scaleLinear } from 'd3-scale';
+// import {contourDensity} from 'd3-contour';
+// import {geoPath} from 'd3-geo';
+import {extent, range, shuffle, group, rollup, min, max, bisectLeft} from 'd3-array';
 // Shouldn't be here, just while contours are.
 import {select} from 'd3-selection';
 import 'regenerator-runtime/runtime'
-import { Table, Column, Dictionary, Vector, Utf8, Int32, Float32Vector } from 'apache-arrow';
-import ArrowTree from './ArrowTree';
+import { Table, Column, Dictionary, Vector, Utf8, Int32, Float32Vector } from '@apache-arrow/esnext-cjs';
+//import ArrowTree from './ArrowTree';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
-
+import TileWorker from './tileworker.worker.mjs';
 class BaseTile {
   // Can this usefully do anything?
 }
@@ -28,13 +28,12 @@ class Tile extends BaseTile {
     }
     this.key = key
     this.codes = this.key.split("/").map(t => parseInt(t))
-    this.min_ix = undefined;
+    this.min_ix = parent ? parent.max_ix : undefined;
     this.max_ix = undefined;
 
     this.promise = Promise.resolve(1)
-    // Start a download process immediately.
-    // populates this.download
-    this.extend_promise(() => this.download())
+
+    this.download_state = "Unattempted"
 
     this.class = new.target
   }
@@ -44,21 +43,6 @@ class Tile extends BaseTile {
     return this.parent.dictionary_lookups
   }
 
-
-  smoothed_density_estimates(depth, width = 128, height = 128) {
-    // Not implemented.
-    // The idea is to use a Gaussian blur on
-
-    const n_pixels = width * height;
-
-    const rawValues = new Uint16Array(new ArrayBuffer(2 * width * height));
-
-    for (let row of this.values()) {
-      // set the relevant pixel of count += 1
-    }
-  }
-
-
   is_visible(max_ix, viewport_limits) {
     // viewport_limits is in coordinate points.
     // Will typically be got by calling current_corners.
@@ -66,7 +50,7 @@ class Tile extends BaseTile {
     // Top tile is always visible (even if offscreen).
     // if (!this.parent) {return true}
 
-    if (this.min_ix == undefined || this.max_ix == undefined) {
+    if (this.min_ix == undefined) {
       return false
     }
     if (this.min_ix > max_ix) {
@@ -82,13 +66,51 @@ class Tile extends BaseTile {
         c.x[1] < viewport_limits.x[0] ||
         c.y[0] > viewport_limits.y[1] ||
         c.y[1] < viewport_limits.y[0]))
-
   }
+
+  check_overlap(corners) {
+    function area(rect) {
+      return (rect.x[1] - rect.x[0])*(rect.y[1] - rect.y[0])
+    }
+    const c = this.extent
+    const combined_area = area(c) + area(corners)
+    if (
+      (c.x[0] > corners.x[1] ||
+        c.x[1] < corners.x[0] ||
+        c.y[0] > corners.y[1] ||
+        c.y[1] < corners.y[0])) {
+          return 0
+    }
+
+    const intersection = {
+      x: [max([corners.x[0], c.x[0]]),
+          min([corners.x[1], c.x[1]])
+        ],
+      y: [
+        max([corners.y[0], c.y[0]]),
+        min([corners.y[1], c.y[1]])
+      ],
+    }
+
+    return area(intersection)/combined_area
+  }
+
 
   download_to_depth(depth, corners = {"x":[-1, 1], "y": [-1, 1]}, recurse=false) {
     // First, execute the download to populate this.max_ix
+
     if (this.max_ix < depth && this.is_visible(depth, corners) && !recurse) {
-        return this.children().map(child => child.download_to_depth(depth, corners, false))
+        const promises = this.children.map(child => child.download());
+        if (this._children) {
+          // Already-downloaded children must also launch downloads.
+          for (let child of this._children) {
+            promises.concat(
+              child.download_to_depth(depth, corners, false)
+            )
+          }
+        }
+        return Promise.all(promises)
+        //return this.children().map(child => child.download_to_depth(depth, corners, false))
     }
 
     return this.download()
@@ -97,9 +119,8 @@ class Tile extends BaseTile {
       if (this.max_ix < depth &&
         this.is_visible(depth, corners) && recurse
       ) {
-        // Create the children. (Be careful about this, because a '.children()'
-        // call actually generates a bunch of fetch promises.
-        const child_processes = this.children()
+        // Create the children.
+        const child_processes = this.children
         // Filter to visible. Newly generated children
         // will return invisible.
               .map(child => child.download_to_depth(depth, corners))
@@ -177,7 +198,7 @@ class Tile extends BaseTile {
   *points(bounding = undefined, sorted = false) {
 
     for (let p of this) {
-      if (p_in_rect(bounding)) {
+      if (p_in_rect([p.x, p.y], bounding)) {
         yield p
       }
     }
@@ -199,18 +220,25 @@ class Tile extends BaseTile {
             continue
           }
           for (const p of child.points(bounding, sorted)) {
-            yield p
+            if (p_in_rect([p.x, p.y], bounding)) {
+              yield p
+            }
           }
         }
       } else {
         children.sort((a,b) => a.next.value.ix - b.next.value.ix)
         if (children) {
           while (children.length > 0) {
-            if (children[0].next.done) {
+            if (children[0].next.done)
+              {
                 children = children.slice(1)
               } else {
                 children.sort((a,b) => a.next.value.ix - b.next.value.ix)
-                if (p_in_rect(children[0].next, bounding)) {
+                if (children[0].next === undefined) {
+                  children = children.slice(1)
+                  continue
+                }
+                if (p_in_rect([children[0].next.x, children[0].next.y], bounding)) {
                   yield children[0].next
                 }
                 children[0].next = children[0].iterator.next()
@@ -230,7 +258,7 @@ class Tile extends BaseTile {
     }
   }
 
-  children() {
+  get children() {
     // create or return children.
     if (this._children !== undefined) {
       return this._children;
@@ -299,28 +327,40 @@ class Tile extends BaseTile {
 
     const url = `${window.location.origin}/${this.url}/${this.key}.feather`
 
+    this.download_state = "In progress"
+
     this._download = this.tileWorker
         .fetch(url, this.needed_mutations)
+        .catch((err) => {
+          this.download_state = "Errored"
+          throw err
+        })
         .then(([buffer, metadata, codes]) => {
+          this.download_state = "Complete"
+
           // metadata is passed separately b/c I dont know
           // how to fix it on the table in javascript, just python.
           this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations))
           this._table_buffer = buffer
-          this.extent = JSON.parse(metadata.get("extent"));
+          this._extent = JSON.parse(metadata.get("extent"));
           this.child_locations = JSON.parse(metadata.get("children"))
           this.min_ix = this.table.getColumn("ix").get(0)
           this.max_ix = this.table.getColumn("ix").get(this.table.length - 1)
           this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations))
-          this.setDataTypes()
+      //    this.setDataTypes()
 
           this.local_dictionary_lookups = codes
           this.update_master_dictionary_lookups()
-
           return this.table
         })
     return this._download
   }
 
+  get schema() {
+    return this.download().then(
+      results => this._schema
+    )
+  }
 
   extend_promise(callback) {
     this.promise = this.promise.then(() => callback())
@@ -412,88 +452,50 @@ class Tile extends BaseTile {
     return candidate;
   }
 
-  setDataTypes() {
+  get _schema() {
     // Infer datatypes from the first file.
+    if (this.__schema) {
+      return this.__schema
+    }
+    const attributes = []
 
-    const attributes = {}
-    const attr_list = []
-
-
-    // Note that x and y are also registered *separately*.
-    // I don't think there's any major cost to this, but who knows.
-
-    let offset = 0;
-    const table = this.table
-    for (let field of table.schema.fields) {
+    for (let field of this.table.schema.fields) {
       const { name, type, nullable} = field
       if (type && type.typeId == 5) {
         // character
-        continue
+        attributes.push({
+          name, type: "string"
+        })
       }
-      attributes[name] = {
-        offset: offset * 4,
-        // Everything is packed as a float.
-        dtype: 'float',
-        name: name
+      if (type && type.dictionary) {
+        attributes.push({name, type: "dictionary", 
+        keys: this.table.getColumn(name).data.dictionary.toArray(),
+        extent: [-2047, this.table.getColumn(name).data.dictionary.length - 2047]
+
+      })
       }
-      attr_list.push(attributes[name])
-      offset++;
+      if (type && type.typeId==8) {
+        attributes.push({
+          name, type: "date",
+          extent: extent(this.table.getColumn(name).data.values)
+        })
+      }
+      if (type && type.typeId==3) {
+        attributes.push({
+          name, type: "float",  extent: extent(this.table.getColumn(name).data.values)
+        })
+      }
     }
-
-    attributes['position'] = {
-      offset: attributes['x']['offset'],
-      dtype: "vec2",
-      name: "position",
-    }
-
-    attr_list.push(attributes['position'])
-
-    // Whatever number we've come up with is the stride.
-    attr_list.forEach(attr => {
-      attr.stride = (attr_list.length - 1) * 4
-    })
-
-    if (attributes.x.offset != (attributes.y.offset - 4)) {
-      console.error("PLOTTING IS BROKEN BECAUSE X AND Y ARE NOT IN ORDER")
-    }
-
-    // store position as a vec2.
-
-    // Store it both non-asynchronously and asynchronously
-    this._datatypes = attributes;
+    this.__schema = attributes;
+    return attributes;
   }
 
   *yielder() {
-
-    /*const batch_size = 1000;
-    const field_names = this.table.schema.fields.map(d => d.name)
-    const yieldable = new Object()
-    for (let field_name of field_names) {
-      yieldable[field_name] = undefined
-    }
-
-    let start_ix = 0;
-    while (start_ix < this.table.length) {
-      const buffer = {}
-      for (let col of range(field_names.length)) {
-        buffer[field_names[col]] = this.table.getColumnAt(col).slice(start_ix, start_ix + batch_size).toArray()
-      }
-      for (let i of range(buffer.ix.length)) {
-        for (let j of range(field_names.length)) {
-          yieldable[field_names[j]] = buffer[field_names[j]][i]
-        }
-        yield yieldable
-      }
-      start_ix
-    }
-    map._root._data.getColumnAt(3).toArray()
-    */
     for (let row of this.table) {
       if (row) {
         yield row
       }
     }
-
   }
 
   update_master_dictionary_lookups() {
@@ -519,6 +521,21 @@ class Tile extends BaseTile {
     this.dictionary_lookups
   }
 
+  get extent() {
+    if (this._extent) {
+      return this._extent
+    } else {
+      const base = this.root_extent
+      const x_step = base.x[1] - base.x[0]
+      const y_step = base.y[1] - base.y[0]
+      const [z, x, y] = this.codes;
+      return {
+        'x': [base.x[0] + x/(2**z) * x_step, base.x[0] + (x + 1)/(2**z) * x_step],
+        'y': [base.y[0] + y/(2**z) * y_step, base.y[0] + (y + 1)/(2**z) * y_step]
+      }
+    }
+  }
+
   get mutations() {
     return this.parent.mutations
   }
@@ -540,6 +557,10 @@ class Tile extends BaseTile {
       counts.inc(...k)
     }
     return counts
+  }
+
+  get root_extent() {
+    return this.parent.extent
   }
 
 }
@@ -565,10 +586,68 @@ export default class RootTile extends Tile {
     }
     console.log(base_url, key, undefined, prefs)
     super(base_url, key, undefined, prefs)
-
+    // The root tile must be downloaded immediately.
+    this.extend_promise(() => this.download())
   }
 
-  children() {
+
+
+  get root_extent() {
+    // this is the extent
+    if (this._extent) {
+      return this._extent
+    } else {
+      // avoid infinite doom loop.
+      return undefined
+    }
+  }
+
+  download_most_needed_tiles(bbox, max_ix, queue_length = 3) {
+    /*
+      Browsing can spawn a  *lot* of download requests that persist on
+      unneeded parts of the database. So the tile handles its own queue for dispatching
+      downloads in case tiles have slipped from view while parents were requested.
+    */
+
+    if (!this._download_queue) {
+      this._download_queue = new Set()
+    }
+
+    const queue = this._download_queue
+
+    if (queue.length >= queue_length) {
+      return
+    }
+
+    const scores = []
+    const callback = (tile) => {
+      if (tile.download_state === "Unattempted") {
+        scores.push([tile.check_overlap(bbox), tile])
+      }
+    }
+
+    this.visit(
+      callback,
+      false,
+      (tile) => tile.is_visible(max_ix, bbox) > 0
+    )
+
+    scores.sort((a, b) => a[0] - b[0])
+    while (scores.length && queue.size < queue_length) {
+
+      const [distance, tile] = scores.pop()
+      queue.add(tile.key)
+      tile.download()
+      .catch((err) => {
+        console.warn("Error on", tile.key)
+        queue.delete(tile.key)
+        throw(err)
+      })
+      .then(() => queue.delete(tile.key))
+    }
+  }
+
+  get children() {
     // create or return children.
     if (this._children !== undefined) {
       return this._children;
@@ -578,7 +657,9 @@ export default class RootTile extends Tile {
     for (let key of this.child_locations) {
       this._children.push(new Tile(this.url, key, this))
     }
+
     return this._children
+
   }
 
   get mutations() {
@@ -638,6 +719,7 @@ export default class RootTile extends Tile {
 
   get tileWorker() {
     const NUM_WORKERS = 8
+    
     if (this._tileWorkers !== undefined) {
       // Apportion the workers randomly whener one is asked for.
       // Might be a way to have a promise queue that's a little more
@@ -649,7 +731,7 @@ export default class RootTile extends Tile {
     for (let i of range(NUM_WORKERS)) {
       console.log(`Allocating worker ${i}`)
       this._tileWorkers.push(
-        Comlink.wrap(new Worker('./tileworker.worker.js', { type: 'module' }))
+        Comlink.wrap(new TileWorker())
       )
     }
 
@@ -664,12 +746,13 @@ export default class RootTile extends Tile {
     return q
   }
 
-  visit(callback, after = false) {
+  visit(callback, after = false, filter = () =>  true) {
     // Visit all children with a callback function.
     // The general architecture here is taken from the
     // d3 quadtree functions. That's why, for example, it doesn't
     // recurse.
 
+    // filter is a condition to stop descending a node.
     const stack = [this]
     const after_stack = []
     let current;
@@ -679,10 +762,12 @@ export default class RootTile extends Tile {
       } else {
         after_stack.push(current)
       }
-
-      // Only walk actually existing children; don't create new ones.
-      if (current._children) {
-        stack.push(...current._children)
+      if (!filter(current)) {
+        continue
+      }
+      // Only create children for downloaded tiles.
+      if (current.download_state == "Complete") {
+        stack.push(...current.children)
       }
     }
     if (after) {
@@ -694,10 +779,8 @@ export default class RootTile extends Tile {
 }
 
 function setsAreEqual(a, b) {
-
   return a.size === b.size && [...a].every(value => b.has(value))
 }
-
 
 function corner_distance(corners, x, y) {
   if (corners === undefined) {
@@ -708,7 +791,6 @@ function corner_distance(corners, x, y) {
   var dy = Math.max(corners.y[0] - y, 0, y - corners.y[1]);
   return Math.sqrt(dx*dx + dy*dy);
 }
-
 
 function p_in_rect(p, rect) {
     if (rect === undefined) {return true}

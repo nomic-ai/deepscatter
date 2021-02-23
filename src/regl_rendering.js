@@ -1,17 +1,13 @@
 import wrapREGL from 'regl';
 import { select, create } from 'd3-selection';
 import { range, sum, max } from 'd3-array';
-import { rgb } from 'd3-color';
-import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
 import { Zoom, window_transform } from './interaction.js';
 // import { aesthetic_variables } from './shaders';
 import { Renderer } from './rendering.js';
-import GLBench from 'gl-bench/dist/gl-bench';
 import {contours} from 'd3-contour';
 import gaussian_blur from './glsl/gaussian_blur.frag';
 import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
-import {easeSinInOut, easeCubicInOut} from 'd3-ease';
 import unpackFloat from "glsl-read-float";
 import { aesthetic_variables, AestheticSet } from './AestheticSet.js'
 
@@ -31,31 +27,7 @@ constructor(selector, tileSet, scatterplot) {
     }
   );
 
-  /* BOILERPLATE */
-  let gl = this.canvas.node().getContext('webgl') || this.canvas.node().getContext('experimental-webgl');
 
-  const benchmark = false;
-  if (benchmark) {
-    let bench = new GLBench(gl, {
-      // css: 'position:absolute;top:120;',
-      withoutUI: false,
-      trackGPU: false,      // don't track GPU load by default
-      chartHz: 20,          // chart update speed
-      chartLen: 20,
-    }
-    );
-
-    function draw(now) {
-      bench.begin('Drawing speed');
-      // some bottleneck
-      bench.end('');
-      bench.nextFrame(now);
-      requestAnimationFrame(draw);
-    }
-
-    requestAnimationFrame(draw);
-    /* END BOILERPLATE */
-    }
   this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
 
   // allocate buffers in 64 MB blocks.
@@ -208,7 +180,8 @@ tick(force = false) {
 
   // Set a download call in motion.
   if (this._use_scale_to_download_tiles) {
-    tileSet.download_to_depth(this.props.max_ix, this.zoom.current_corners())
+    tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix)
+//    tileSet.download_to_depth(this.props.max_ix, this.zoom.current_corners())
   } else {
     tileSet.download_to_depth(prefs.max_points)
   }
@@ -534,7 +507,6 @@ plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
       domain: [-2047, -2020]
 
     } : {constant : -1},
-//    alpha: 1/255 * 10,
     size: 33,
     color: {
       constant: [0, 0, 0],
@@ -882,7 +854,7 @@ remake_renderer() {
       u_filter_last_numeric: function(context, props) {
         return this.aes.filter.last.ops_to_array()
       },
-      u_current_alpha: (_, props) => props.prefs.alpha || .5,
+      u_current_alpha: (_, props) => {return props.prefs.alpha || .5},
       u_last_alpha: (_, props) => props.prefs.last_alpha || .5,
       u_jitter: () => this.aes.jitter_radius.current.jitter_int_format,
       u_last_jitter: () => this.aes.jitter_radius.last.jitter_int_format,
@@ -928,7 +900,7 @@ remake_renderer() {
         const base_string = "u_" + temporal + k + "_lookup"
 
         parameters.uniforms[base_string] = () => {
-          return 1;
+          // return 1;
           return this.aes[k][time].use_lookup ? 1 : 0;
         }
         parameters.uniforms[base_string + "_map"] = () =>
@@ -1095,9 +1067,14 @@ create_buffer_data(key) {
     throw "Tile table not present."
   }
   const column = tile.table.getColumn(key + "_dict_index") || tile.table.getColumn(key)
+
   if (key == "position") {
     console.warn("CREATING POSITION BUFFER (DEPRECATED)")
     return this.create_position_buffer()
+  }
+  if (!column) {
+    const col_names = tile.table.schema.fields.map(d => d.name)
+    throw `Requested ${key} but table has columns ${col_names.join(", ")}`
   }
   if (column.dictionary) {
     const buffer = new Float32Array(tile.table.length)
