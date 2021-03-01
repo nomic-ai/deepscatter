@@ -256,8 +256,8 @@ def main():
     tiler.map_tiles(lambda tile: tile.retry_overflown_buffers(max_tiles = args.max_files))
 
 
-    # Reflush every tile.
-    tiler.map_tiles(lambda tile: tile.final_flush())
+    # Reflush every tile; starts at the root, moves out to the leaves.
+    tiler.final_flush()
 
     count = 0
     flushed = 0
@@ -349,7 +349,7 @@ class Tile():
             memory_tiles_open.remove(self.filename)
             return
         destination = self.filename.with_suffix(".needs_metadata.feather")
-        self.flush_data(destination, {}, "lz4")
+        self.flush_data(destination, {}, "zstd", expect_table = False)
         memory_tiles_open.remove(self.filename)
 
     def final_flush(self) -> None:
@@ -358,10 +358,10 @@ class Tile():
         to the metadata.
         """
         self.total_points = 0
-        #logging.debug(f"Writing final version of {self.coords}")
         metadata = {
             "extent": json.dumps(self.extent),
         }
+
         if self._children is None:
             metadata["children"] = "[]"
         else:
@@ -372,30 +372,33 @@ class Tile():
             metadata["children"] = json.dumps(populated_kids)
 
         unclean_path = self.filename.with_suffix(".needs_metadata.feather")
+
+
         try:
-            tab = pa.ipc.RecordBatchFileReader(unclean_path)
+            self.data = feather.read_table(unclean_path)
+
         except FileNotFoundError:
-            return
-
-        self.data = [tab.get_batch(i) for i in range(tab.num_record_batches)]
-
-        self.total_points = 0
-        # Flush will remove the tile--bookkeeping.
-        for batch in self.data:
-            self.total_points += batch.num_rows
+            if self._children == None:
+                return
+            else:
+                raise FileNotFoundError("Couldn't find file even though children exist.")
+#        for batch in self.data:
+#            self.total_points += batch.num_rows
+        self.total_points += self.data.shape[0]
         metadata["total_points"] = str(self.total_points)
         schema = pa.schema(self.schema, metadata = metadata)
-
-        self.flush_data(self.filename, metadata, "uncompressed", schema, expect_table = False)
-        if self.coords[0] < 8:
-            logging.debug(f"{' ' * self.coords[0]}Written final version of {self.coords}")
+        self.flush_data(self.filename, metadata, "uncompressed", schema, expect_table = True)
+        share = self.coords[1] / (2**self.coords[0])
+        share_rep = int(share * 80)
+        print(f"Final Flush: {'=' * share_rep}{'-'*(80-share_rep)} {self.coords}", end = "\r")
+        unclean_path.unlink()
 
     def flush_data(self, destination, metadata, compression, schema = None, expect_table = False):
         if self.data is None:
             return
 
         if expect_table:
-            frame = self.data
+            frame = self.data.replace_schema_metadata(metadata)
         else:
             if schema is None:
                 schema = self.schema
@@ -532,7 +535,7 @@ class Tile():
         #logging.debug(f"Inserting to {self.coords} with budget of {tile_budget}")
         insert_n_locally = self.TILE_SIZE - self.n_data_points
         if (insert_n_locally > 0):
-            local_mask = np.zeros((table.shape[0]), np.bool)
+            local_mask = np.zeros((table.shape[0]), bool)
             local_mask[:insert_n_locally] = True
             head = pc.filter(table, local_mask)
             if head.shape[0]:
