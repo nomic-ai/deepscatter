@@ -187,7 +187,7 @@ def main():
         rewritten_files = args.files
         if args.limits[0] > 1e8:
             if len(args.files) > 1:
-                logging.warn("Checking limits for bounding box but only on first passed file, i.e., " + args.files[0])
+                logging.warning("Checking limits for bounding box but only on first passed file, i.e., " + args.files[0])
             xy = feather.read_table(args.files[0], columns=["x", "y"])
             x = pc.min_max(xy['x']).as_py()
             y = pc.min_max(xy['y']).as_py()
@@ -236,7 +236,7 @@ def main():
             d['y'] = pc.add(d['y'], nprandom.normal(0, args.randomize, tab.shape[0]))
 
 
-        tab = pa.table(d)
+        tab = pa.table(d).combine_chunks()
 
         logging.info(f"{len(memory_tiles_open)} partially filled tiles buffered in memory and {len(files_open)} flushing overflow directly to disk.")
         remaining_tiles = args.max_files - len(memory_tiles_open) - len(files_open)
@@ -253,10 +253,10 @@ def main():
     tiler.map_tiles(lambda tile: tile.first_flush())
 
     # Works recursively lower down, including first flush for all newly created children.
-    tiler.map_tiles(lambda tile: tile.retry_overflown_buffers(max_tiles = args.max_files))
+    # Top down recursion.
+    tiler.retry_overflown_buffers(args.max_files)
 
-
-    # Reflush every tile; starts at the root, moves out to the leaves.
+    # Reflush every tile; bottom-up recursion.
     tiler.final_flush()
 
     count = 0
@@ -493,13 +493,14 @@ class Tile():
 
 
 
-    def retry_overflown_buffers(self, max_tiles = 1024):
+    def retry_overflown_buffers(self, absolute_max_files):
         # Find all overflown buffers and flush them out.
         # Recursive.
 
         # Reinsert from a node that has been closed to children.
+        self.close_overflow_buffers()
+
         if self._overflow_buffer:
-            self.close_overflow_buffers()
             # If there's an overflow buffer, _children will have been
             # banned.
             self._children = []
@@ -508,20 +509,33 @@ class Tile():
 
             # Force child creation, even if we've got a few too many open right now.
 
-            tile_budget = max_tiles - len(memory_tiles_open) - len(files_open)
+            tile_budget = absolute_max_files - len(memory_tiles_open) - len(files_open)
             if tile_budget < 4:
                 logging.warning(f"Warning--overriding tile budget on {self.coords} to force child creation.")
                 tile_budget = 4
             self.make_children()
 
             logging.debug(f"Flushing {fin.num_record_batches} batches from {self.coords} with budget of {tile_budget} ({len(files_open)} memory, {len(memory_tiles_open)} tiles waiting to flush in memory)")
-
+            current_batches = []
+            current_size = 0
             for i in range(fin.num_record_batches):
-                self.insert(pa.Table.from_batches([fin.get_batch(i)]), tile_budget)
+                batch = fin.get_batch(i)
+                current_batches.append(batch)
+                current_size += batch.nbytes
+                # Flush the last time, and every 256 megabytes. number chosen arbitrarily.
+                if i == fin.num_record_batches - 1 or current_size > (256 * 1024 * 1024):
+                    self.insert(pa.Table.from_batches(current_batches).combine_chunks(), tile_budget)
+                    current_batches = []
+                    current_size = 0
             fname.unlink()
             self._overflow_buffer = None
             # Now we're writing to this tile again.
+        if self._children:
             self.map_tiles(lambda tile: tile.first_flush())
+
+            for child in self._children:
+                tile_budget = absolute_max_files - len(memory_tiles_open) - len(files_open)
+                child.retry_overflown_buffers(absolute_max_files)
 
     def check_schema(self, table):
         if (self.schema is None):
@@ -543,6 +557,9 @@ class Tile():
                     self.data.append(batch)
                 self.n_data_points += head.shape[0]
             table = table.filter(pc.invert(local_mask))
+            if self.n_data_points == self.TILE_SIZE:
+                # We've only just completed. Flush.
+                self.first_flush()
         else:
             pass
 
@@ -570,9 +587,6 @@ class Tile():
                 tiles_allowed_overflow = tiles_allowed % children_per_tile
 
                 child_tile.insert(subset, tiles_allowed - tiles_allowed_overflow)
-            if insert_n_locally > 0 and self.n_data_points == self.TILE_SIZE:
-                # We've only just completed. Flush.
-                self.first_flush()
             return
         else:
             for batch in table.to_batches():
