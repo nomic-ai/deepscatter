@@ -25,11 +25,15 @@ export class AestheticSet {
         this[aes.toLowerCase()] = new StatefulAesthetic(...args)
       }
     }
+
     const starting_aesthetics = {};
+    
     for (let [k, v] of Object.entries(default_aesthetics)) {
       starting_aesthetics[k] = v.constant || v;
     }
+    
     this.encoding = JSON.parse(JSON.stringify(starting_aesthetics))
+    
     this.apply_encoding(this.encoding)
   }
 

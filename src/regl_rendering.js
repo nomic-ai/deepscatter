@@ -88,7 +88,6 @@ apply_webgl_scale() {
 get props() {
   const prefs = this.prefs
   const { transform } = this.zoom;
-  const {k} = transform;
   const props = {
     // Copy the aesthetic as a string.
     aes: {"encoding": this.aes.encoding},
@@ -168,7 +167,7 @@ render_points(props) {
 
 }
 
-tick(force = false) {
+tick(message = "No message", force = false) {
   const { prefs } = this;
   const { regl, tileSet, canvas, width, height } = this;
   const { transform } = this.zoom;
@@ -180,6 +179,7 @@ tick(force = false) {
 
   // Set a download call in motion.
   if (this._use_scale_to_download_tiles) {
+//    console.log(JSON.stringify(this.zoom.current_corners()))
     tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix)
 //    tileSet.download_to_depth(this.props.max_ix, this.zoom.current_corners())
   } else {
@@ -469,6 +469,7 @@ counter(x_field) {
 
 
 plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
+  console.log("plotting as grid")
   const {scatterplot, regl, tileSet} = this.aes;
 
   const saved_aes = this.aes;
@@ -507,7 +508,7 @@ plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
       domain: [-2047, -2020]
 
     } : {constant : -1},
-    size: 33,
+    size: 1,
     color: {
       constant: [0, 0, 0],
       transform: "literal"
@@ -544,6 +545,7 @@ plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
 }
 
 count_colors(field) {
+  console.log("Counting colors")
   const { regl, props } = this;
   props.prefs.jitter = null;
   if (field !== undefined) {
@@ -615,6 +617,7 @@ n_visible(only_color = -1) {
   const props = this.props;
   props.only_color = only_color;
   let v;
+  console.log("Counting visible points")
   this.fbos.contour.use(() => {
     this.regl.clear({color: [0, 0, 0, 0]});
     // read onto the contour vals.
@@ -820,16 +823,16 @@ remake_renderer() {
       ],*/
       u_grid_mode: (_, {grid_mode}) => grid_mode,
       u_colors_as_grid: regl.prop("colors_as_grid"),
-      u_constant_color: function(context, props) {
-        return this.aes.color.current.constant !== undefined ?
+      u_constant_color: () => 
+        this.aes.color.current.constant !== undefined ?
         this.aes.color.current.constant:
         [-1, -1, -1]
-      },
-      u_constant_last_color: function(context, props) {
-        return this.aes.color.last.constant != undefined ?
+      ,
+      u_constant_last_color: () => 
+        this.aes.color.last.constant != undefined ?
         this.aes.color.last.constant:
-        [-1, -1, -1]
-      },
+        [-1, -1, -1],
+  
       u_width: ({viewportWidth}) => viewportWidth,
       u_height: ({viewportHeight}) => viewportHeight,
       u_aspect_ratio: ({viewportWidth, viewportHeight}) => viewportWidth/viewportHeight,
@@ -838,10 +841,11 @@ remake_renderer() {
         props.sprites : this.fbos.dummy
       },
       u_zoom_balance: regl.prop('zoom_balance'),
-      u_maxix: function(context, props) {
+      u_base_size: (_, {prefs}) => prefs.point_size,
+      u_maxix: function(_, props) {
         return props.max_ix;
       },
-      u_k: function(context, props) {
+      u_k: function(_, props) {
         return props.transform.k;
       },
       u_window_scale: regl.prop('webgl_scale'),
@@ -854,8 +858,8 @@ remake_renderer() {
       u_filter_last_numeric: function(context, props) {
         return this.aes.filter.last.ops_to_array()
       },
-      u_current_alpha: (_, props) => {return props.prefs.alpha || .5},
-      u_last_alpha: (_, props) => props.prefs.last_alpha || .5,
+      u_current_alpha: (_, props) => this.optimal_alpha,
+      u_last_alpha: (_, props) => this.optimal_alpha,
       u_jitter: () => this.aes.jitter_radius.current.jitter_int_format,
       u_last_jitter: () => this.aes.jitter_radius.last.jitter_int_format,
       u_zoom: function(context, props) {
@@ -973,9 +977,16 @@ remake_renderer() {
   }
   this._renderer = regl(parameters)
   return this._renderer
-}
-}
 
+  }
+
+  get discard_share() {
+    // If jitter is temporal, e.g., or filters are in place, 
+    // it may make sense to estimate the number of hidden points.
+    return 0;
+  }
+}
+ 
 class TileBufferManager {
 // Handle the interactions of a tile with a regl state.
 

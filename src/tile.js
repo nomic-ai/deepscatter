@@ -27,8 +27,7 @@ class Tile extends BaseTile {
       this._mutations = prefs.mutate
     }
     this.key = key
-    this.codes = this.key.split("/").map(t => parseInt(t))
-    this.min_ix = parent ? parent.max_ix : undefined;
+    this.codes = this.key.split("/").map(t => +t)
     this.max_ix = undefined;
 
     this.promise = Promise.resolve(1)
@@ -50,9 +49,6 @@ class Tile extends BaseTile {
     // Top tile is always visible (even if offscreen).
     // if (!this.parent) {return true}
 
-    if (this.min_ix == undefined) {
-      return false
-    }
     if (this.min_ix > max_ix) {
       return false;
     }
@@ -60,39 +56,14 @@ class Tile extends BaseTile {
     if (viewport_limits === undefined) {
       return false
     }
+
     const c = this.extent;
+
     return (
       !(c.x[0] > viewport_limits.x[1] ||
         c.x[1] < viewport_limits.x[0] ||
         c.y[0] > viewport_limits.y[1] ||
         c.y[1] < viewport_limits.y[0]))
-  }
-
-  check_overlap(corners) {
-    function area(rect) {
-      return (rect.x[1] - rect.x[0])*(rect.y[1] - rect.y[0])
-    }
-    const c = this.extent
-    const combined_area = area(c) + area(corners)
-    if (
-      (c.x[0] > corners.x[1] ||
-        c.x[1] < corners.x[0] ||
-        c.y[0] > corners.y[1] ||
-        c.y[1] < corners.y[0])) {
-          return 0
-    }
-
-    const intersection = {
-      x: [max([corners.x[0], c.x[0]]),
-          min([corners.x[1], c.x[1]])
-        ],
-      y: [
-        max([corners.y[0], c.y[0]]),
-        min([corners.y[1], c.y[1]])
-      ],
-    }
-
-    return area(intersection)/combined_area
   }
 
 
@@ -196,26 +167,17 @@ class Tile extends BaseTile {
 
 
   *points(bounding = undefined, sorted = false) {
-
+    if (!this.is_visible(1e100, bounding)) {
+      return
+    }
     for (let p of this) {
       if (p_in_rect([p.x, p.y], bounding)) {
         yield p
       }
     }
-
-    if (this._children) {
-      let children = this._children
-        .filter(d => d.table && (bounding === undefined || d.is_visible(1e100, bounding)))
-        .map(tile => {
-          const f = {
-            t: tile,
-            iterator: tile.points()
-          }
-          f.next = f.iterator.next()
-          return f
-        })
-      if (!sorted) {
-        for (const child of this._children) {
+//    console.log("Exhausted points on ", this.key)
+      if (sorted == false) {
+        for (const child of this.children) {
           if (!child.ready) {
             continue
           }
@@ -226,29 +188,31 @@ class Tile extends BaseTile {
           }
         }
       } else {
-        children.sort((a,b) => a.next.value.ix - b.next.value.ix)
-        if (children) {
-          while (children.length > 0) {
-            if (children[0].next.done)
-              {
-                children = children.slice(1)
-              } else {
-                children.sort((a,b) => a.next.value.ix - b.next.value.ix)
-                if (children[0].next === undefined) {
-                  children = children.slice(1)
-                  continue
-                }
-                if (p_in_rect([children[0].next.x, children[0].next.y], bounding)) {
-                  yield children[0].next
-                }
-                children[0].next = children[0].iterator.next()
-              }
+        let children = this.children
+          .map(tile => {
+            const f = {
+              t: tile,
+              iterator: tile.points(bounding, sorted)
             }
+            f.next = f.iterator.next()
+            return f
+          })
+        children = children.filter(d => d.next.value)
+        while (children.length > 0) {
+          let mindex = 0;
+          for (let i = 1; i < children.length; i++) {
+            if (children[i].next.value.ix < children[mindex].next.value.ix) {
+              mindex = i;
+            }
+          }
+          yield children[mindex].next.value
+          children[mindex].next = children[mindex].iterator.next()
+          if (children[mindex].next.done) {
+              children = children.splice(mindex, 1)
+          }
         }
       }
-    }
-}
-
+  }
   forEach(callback) {
     for (let p of this.points()) {
       if (p === undefined) {
@@ -258,18 +222,36 @@ class Tile extends BaseTile {
     }
   }
 
+  set highest_known_ix(val) {
+    // Do nothing if it isn't actually higher.
+    if (this._highest_known_ix == undefined || this._highest_known_ix < val) {
+      this._highest_known_ix = val;
+      if (this.parent) {
+        // bubble value to parent.
+        this.parent.highest_known_ix = val
+      }
+    }
+  }
+
+  get highest_known_ix() {
+    return this._highest_known_ix
+  }
+
   get children() {
     // create or return children.
     if (this._children !== undefined) {
       return this._children;
     }
+    if (this.download_state !== "Complete") {
+      return []
+    }
     this._children = []
 
-      for (let key of this.child_locations) {
-        this._children.push(new this.class(this.url, key, this))
-      }
-      //}
+    for (let key of this.child_locations) {
+      this._children.push(new this.class(this.url, key, this))
+    }
     //}
+  //}
     return this._children;
   }
 
@@ -316,6 +298,17 @@ class Tile extends BaseTile {
 
   }
 
+  get min_ix() {
+
+    if (this._min_ix !== undefined) {
+      return this._min_ix
+    }
+    if (this.parent) {
+      return this.parent.max_ix + 1
+    }
+    return undefined
+  }
+
   download() {
     // This should only be called once per tile.
     if (this._download) {return this._download}
@@ -344,8 +337,9 @@ class Tile extends BaseTile {
           this._table_buffer = buffer
           this._extent = JSON.parse(metadata.get("extent"));
           this.child_locations = JSON.parse(metadata.get("children"))
-          this.min_ix = this.table.getColumn("ix").get(0)
+          this._min_ix = this.table.getColumn("ix").get(0)
           this.max_ix = this.table.getColumn("ix").get(this.table.length - 1)
+          this.highest_known_ix = this.max_ix;
           this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations))
       //    this.setDataTypes()
 
@@ -375,50 +369,6 @@ class Tile extends BaseTile {
     return this._table_buffer && this._table_buffer.byteLength > 0
   }
 
-  /*buffer() {
-    const table = this.table
-
-    if (table == undefined) {return undefined}
-    if (this._buffer) {
-      return this._buffer;
-    }
-
-    const columns = Object.keys(this._datatypes);
-    // One fewer than columns.length because
-    // we double count position, x, and y.
-
-    // and over-allocate 4 floats for characters, etc.
-    const n_col = (columns.length - 1);
-    const buffer = new Float32Array(n_col * table.length);
-    let offset = -1;
-
-    for (let column of columns) {
-      // Just an alias for x, y--not passed separately
-      if (column == "position") continue
-
-      offset += 1;
-
-      const c = table.getColumn(column)
-      let row = 0;
-
-      let reverse_lookup = undefined
-
-      if (c.dictionary) {
-        for (let val of c.data.values) {
-          const char_value = this.local_dictionary_lookups[column].get(val)
-          buffer[offset + row * n_col] = this.dictionary_lookups[column].get(char_value)
-          row += 1;
-        }
-      } else {
-        for (let val of c.data.values) {
-          buffer[offset + row * n_col] = val;
-          row += 1;
-        }
-      }
-    }
-    this._buffer = buffer
-    return buffer
-  }*/
 
   find_closest(p, dist = Infinity, filter) {
     let my_dist = dist;
@@ -521,18 +471,28 @@ class Tile extends BaseTile {
     this.dictionary_lookups
   }
 
+  get theoretical_extent() {
+    const base = this.root_extent
+    const [z, x, y] = this.codes;
+
+    const x_step = base.x[1] - base.x[0]
+    const each_x = x_step / (2 ** z)
+    
+    const y_step = base.y[1] - base.y[0]
+    const each_y = y_step / (2 ** z)
+//    console.log({key: this.key, each_y, pow: 2**z})
+    
+    return {
+      'x': [base.x[0] + x * each_x, base.x[0] + (x + 1) * each_x],
+      'y': [base.y[0] + y * each_y, base.y[0] + (y + 1) * each_y]
+    }
+  }
+
   get extent() {
     if (this._extent) {
-      return this._extent
+      return this._extent;
     } else {
-      const base = this.root_extent
-      const x_step = base.x[1] - base.x[0]
-      const y_step = base.y[1] - base.y[0]
-      const [z, x, y] = this.codes;
-      return {
-        'x': [base.x[0] + x/(2**z) * x_step, base.x[0] + (x + 1)/(2**z) * x_step],
-        'y': [base.y[0] + y/(2**z) * y_step, base.y[0] + (y + 1)/(2**z) * y_step]
-      }
+      return this.theoretical_extent;
     }
   }
 
@@ -560,7 +520,7 @@ class Tile extends BaseTile {
   }
 
   get root_extent() {
-    return this.parent.extent
+    return this.parent.root_extent
   }
 
 }
@@ -578,16 +538,14 @@ export default class RootTile extends Tile {
     if (base_url.match(/(\/[0-9]+){3}/)) {
       const sections = base_url.split("/")
       base_url = sections.slice(0, -3).join("/")
-      // this.codes = sections.slice(-3).map(d => parseInt(d))
       key = sections.slice(-3).join("/")
     } else {
       key = "0/0/0"
-      //this.codes = [0, 0, 0]
     }
-    console.log(base_url, key, undefined, prefs)
     super(base_url, key, undefined, prefs)
     // The root tile must be downloaded immediately.
     this.extend_promise(() => this.download())
+    this._min_ix = 1
   }
 
 
@@ -602,7 +560,35 @@ export default class RootTile extends Tile {
     }
   }
 
-  download_most_needed_tiles(bbox, max_ix, queue_length = 3) {
+
+  log_tiles(depth = 1, f = tile => "" + tile.children.length) {
+    const array = []
+    const w = range(2**depth)
+    for (let i of w) {
+      array[i] = []
+      for (let j of w) {
+        array[i][j] = " "
+      }
+      array[i][2**depth] = "|"
+    }
+    array[2**depth] = Array(2**depth + 1).fill("-")
+
+    this.visit((tile) => {
+
+      const [z, x, y] = tile.key.split("/").map(d => +d);
+      if (z == depth) {
+        array[y][x] = "_"
+//        if (tile.download_state == "Complete") {
+          array[y][x] = f(tile)
+//        }
+      }
+    })
+    const lines = array.map(a => a.join(""))
+    console.log(lines.join("\n"))
+    
+  }
+
+  download_most_needed_tiles(bbox, max_ix, queue_length = 4) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
       unneeded parts of the database. So the tile handles its own queue for dispatching
@@ -615,28 +601,53 @@ export default class RootTile extends Tile {
 
     const queue = this._download_queue
 
-    if (queue.length >= queue_length) {
+    if (queue.size >= queue_length) {
       return
     }
+/*
+    for (let child of this.children) {
+      console.log(check_overlap(child, this.extent), child.key, this.key)
 
-    const scores = []
-    const callback = (tile) => {
-      if (tile.download_state === "Unattempted") {
-        scores.push([tile.check_overlap(bbox), tile])
+      for (let child2 of child.children) {
+        console.log("   ", check_overlap(child2, child.extent), child2.key, child.key)
+        if (check_overlap(child2, child.extent) < .2) {
+        console.log("   ", area(child2.extent)*1e-15, child2.key)
+        }
+        for (let child3 of child2.children) {
+          console.log("      ", check_overlap(child3, child2.extent), child3.key, child2.key)
+        }
       }
+
+    }*/
+
+    let scores = []
+    const r = Math.random()
+    const callback = (tile) => {
+//      if (tile.download_state == "Unattempted") {
+        const distance = check_overlap(tile, bbox);
+        scores.push([distance, tile, bbox, tile.download_state])
+//      }
     }
 
     this.visit(
-      callback,
-      false,
-      (tile) => tile.is_visible(max_ix, bbox) > 0
-    )
-
+      callback
+      )
     scores.sort((a, b) => a[0] - b[0])
+    for (let [d, t, bb, state] of scores) {
+//      console.log({d, t, k: t.key, bb, state})
+    }
     while (scores.length && queue.size < queue_length) {
+      const [distance, tile, bbox, _] = scores.pop()
+      if (tile.min_ix > max_ix || distance < 0) {
+        continue
+      }
+      if (tile.download_state !== "Unattempted") {
+        continue
+      }
 
-      const [distance, tile] = scores.pop()
+//      console.log("Getting", {distance, tile: tile.key, bbox, abbox: area(bbox), a_tile: area(tile.extent), e: tile.extent})
       queue.add(tile.key)
+      console.log(distance, tile.key, max_ix, tile.min_ix)
       tile.download()
       .catch((err) => {
         console.warn("Error on", tile.key)
@@ -652,6 +663,10 @@ export default class RootTile extends Tile {
     if (this._children !== undefined) {
       return this._children;
     }
+    if (this.download_state !== "Complete") {
+      return []
+    }
+
     this._children = []
 
     for (let key of this.child_locations) {
@@ -799,4 +814,51 @@ function p_in_rect(p, rect) {
              p[0] > rect.x[0] &&
              p[1] < rect.y[1] &&
              p[1] > rect.y[0])
+}
+
+function area(rect) {
+  return (rect.x[1] - rect.x[0])*(rect.y[1] - rect.y[0])
+}
+
+const thrower = function(r)  {
+  if (r.x[1] < r.x[0]) {
+    throw "x"
+  }
+  if (r.y[1] < r.y[0]) {
+    throw "y"
+  }
+}
+
+function check_overlap(tile, bbox) {
+  /* the area of Intersect(tile, bbox) expressed
+     as a percentage of the area of bbox */
+  const c = tile.extent
+  thrower(c)
+  thrower(bbox)
+
+  if (c.x[0] > bbox.x[1] ||
+      c.x[1] < bbox.x[0] ||
+      c.y[0] > bbox.y[1] ||
+      c.y[1] < bbox.y[0]
+      ) {
+
+    }
+
+  const intersection = {
+    x: [max([bbox.x[0], c.x[0]]),
+        min([bbox.x[1], c.x[1]])
+      ],
+    y: [
+      max([bbox.y[0], c.y[0]]),
+      min([bbox.y[1], c.y[1]])
+    ],
+  }
+  const {x, y} = intersection
+  let disqualify = 0;
+  if (x[0] > x[1]) {disqualify -= 1}
+  if (y[0] > y[1] ) {disqualify -= 2}
+  if (disqualify < 0) {
+    return disqualify
+  }
+  return area(intersection)/area(bbox)
 }

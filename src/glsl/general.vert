@@ -31,7 +31,7 @@ uniform float u_maxix;           // The maximum index to plot.
 uniform float u_time;            // The current time.
 uniform float u_k;               // The d3-scale factor.
 uniform float u_color_picker_mode;
-
+uniform float u_base_size;
 uniform float u_current_alpha;
 uniform float u_last_alpha;
 
@@ -426,6 +426,19 @@ vec2 calculate_jitter(
     return vec2(0., 0.);
   }
 
+  if (jitter_type == 5.) {
+    float time_period = 60.;
+    float share = 1./20.;
+    float offset = ix_to_random(ix, 12.);
+    float fractional = fract((offset * time_period + u_time)/time_period);
+    if (fractional > share) {
+      return vec2(0., 0.);
+    }
+    float size = 0.5 * (1. - cos(2. * 3.1415926 * min(fractional/share, 1. - fractional/share)));
+    size = clamp(size, 0., 1.);
+    return vec2(size, 0.);
+  }
+
   float jitter_r = texture_float_lookup(
     jitter_radius_map, jitter_radius_domain,
     jitter_radius_range,
@@ -654,7 +667,7 @@ void main() {
                                               u_last_size_transform, a_last_size,
                                               u_last_size_needs_map);
 
-  size_multiplier = mix(last_size_multiplier, size_multiplier, ease);
+  size_multiplier = u_base_size * mix(last_size_multiplier, size_multiplier, ease);
 
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
@@ -733,16 +746,21 @@ void main() {
         u_last_jitter_speed_needs_map
       );
 
-      jitter = mix(last_jitter, jitter, ease);
+    }
+
+    if (u_jitter == 5.) {
+      gl_PointSize *= jitter.x;
+      jitter = vec2(0., 0.);
+      if (gl_PointSize < 0.05) {
+        gl_Position = discard_me;
+        return;
+      }
     }
 
     gl_Position = vec4(position + jitter * point_size_adjust, 0., 1.);
-    //gl_Position = vec4(jitter, 0., 1.);
   } else {
     gl_Position = vec4(position, 0., 1.);
   }
-  // gl_Position = vec4(position, 0., 1.);
-
 
   run_color_fill(ease);
   // Plot a single tick of alpha.

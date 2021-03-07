@@ -269,7 +269,7 @@ export default class Zoom {
 
   current_corners() {
     // The corners of the current zoom transform, in data coordinates.
-    const { width, height, transform } = this;
+    const { width, height } = this;
 
     // Use the rescaled versions of the scales.
     const scales = this.scales()
@@ -280,7 +280,7 @@ export default class Zoom {
 
     return {
       x: [x_.invert(0), x_.invert(width)],
-      y: [y_.invert(0), y_.invert(width)]
+      y: [y_.invert(0), y_.invert(height)]
     }
   }
 
@@ -288,8 +288,6 @@ export default class Zoom {
     // Restart the timer and run it for
     // run_at_least milliseconds or the current timeout,
     // whichever is greater.
-
-    const { tick, canvas } = this;
     let stop_at = Date.now() + run_at_least;
     if (this._timer) {
       if (this._timer.stop_at > stop_at) {

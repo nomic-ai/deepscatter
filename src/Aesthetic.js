@@ -1,11 +1,10 @@
-import { sum, range as arange, shuffle, extent } from 'd3-array';
+import { range as arange, shuffle, extent } from 'd3-array';
 import { scaleLinear, scaleSqrt, scaleLog, scaleIdentity } from 'd3-scale'
 import { rgb } from 'd3-color';
 import { encodeFloatsRGBArange } from './util';
-import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool
- } from 'd3-scale-chromatic';
+// import { interpolatePuOr, interpolateViridis, interpolateWarm, interpolateCool } from 'd3-scale-chromatic';
 
-import objectEqual from 'lodash.isequal';
+// import objectEqual from 'lodash.isequal';
 import * as d3Chromatic from 'd3-scale-chromatic';
 
 const scales = {
@@ -673,7 +672,10 @@ function encode_jitter_to_int(jitter) {
   } else if (jitter == "circle") {
     // animated, evenly distributed in a circle with radius 1.
     return 4
-  } else {
+  } else if (jitter == "time") {
+    // Cycle in and out.
+    return 5 
+  }else {
     return 0
   }
 }

@@ -34,7 +34,18 @@ const base_elements = [
 export default class Scatterplot {
 
   constructor(selector, width, height) {
-    console.warn("INITIALIZING")
+    this.bound = false;
+    if (selector === undefined) {
+      console.warn("Must bind to selector manually")
+    } else {
+      this.bind(selector, width, height)
+    }
+    this.d3 = {select};
+
+  }
+
+  bind(selector, width, height) {
+    // Binding is a permanent relationship.
 
     this.width = width
     this.height = height
@@ -44,21 +55,16 @@ export default class Scatterplot {
       console.error(selector)
       throw "Must pass a valid div selector"
     }
-    console.log(this.div, selector)
+    console.log(this.div)
     this.elements = []
-    this.filters = new Map();
 
-    this.d3 = {select};
 
-//    this.encoding = {}
-//    for (let k of Object.keys(default_aesthetics)) {
-//      this.encoding[k] = null;
-//    }
-//    this.encoding.x = {'field': 'x'}
-//    this.encoding.y = {'field': 'y'}
+
     this.prefs = {
       'zoom_balance': 0.35,
-      "duration": 2
+      "duration": 2,
+      "point_size": 1, // base size before aes modifications.
+      "alpha": 0.4 // Overall screen saturation target.
     }
 
     for (const d of base_elements) {
@@ -79,6 +85,7 @@ export default class Scatterplot {
 
       this.elements.push(container)
     }
+    this.bound = true;
   }
 
   async reinitialize() {
@@ -137,13 +144,14 @@ export default class Scatterplot {
   }
 
   visualize_tiles() {
+
     const map = this;
     const ctx = map.elements[2]
       .selectAll("canvas").node().getContext("2d");
 
     ctx.clearRect(0, 0, 10000, 10000)
     const {x_, y_} = map._zoom.scales()
-    ctx.strokeStyle = "#FFFFFF"
+    ctx.strokeStyle = "#888888"
     const tiles = map._root.map(t => t)
     for (let i of range(13)) {
       setTimeout(() => {
@@ -156,6 +164,9 @@ export default class Scatterplot {
           ctx.lineWidth = 8/Math.sqrt(depth)
           ctx.globalAlpha = 0.33
           ctx.strokeRect(x1, y1, x2-x1, y2-y1)
+          if (tile.download_state !== "Unattempted") {
+            ctx.fillRect(x1, y1, x2-x1, y2-y1)
+          }
           ctx.globalAlpha = 1
       }}, i * 400)
     }
@@ -203,7 +214,6 @@ export default class Scatterplot {
     }
     return undefined
   }
-
 
 
   async plotAPI(prefs = {}) {
@@ -268,6 +278,7 @@ export default class Scatterplot {
         this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration)
       }
     }
+
     this._renderer.most_recent_restart = Date.now()
     this._renderer.aes.apply_encoding(prefs.encoding)
 //    this._renderer.apply_webgl_scale()
@@ -278,17 +289,23 @@ export default class Scatterplot {
       this._renderer.reglframe.cancel()
     }
     this._renderer.reglframe = this._renderer.regl.frame(() => {
-      this._renderer.tick()
+      this._renderer.tick("Basic")
     })
 
     this._zoom.restart_timer(60000)
+  }
+
+  async root_table() {
+    if (!this._root) {
+      return false
+    }
+    return this._root.table;
   }
 
   top_n_points(n = 20) {
     const {_root, _renderer} = this;
 
     const current_corners = _renderer.zoom.current_corners()
-    console.log(current_corners)
     const output = []
     const filter = _renderer.aes.filter.current.get_function();
     for (let p of _root.points(current_corners, true)) {

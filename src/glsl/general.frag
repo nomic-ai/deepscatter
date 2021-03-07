@@ -42,13 +42,6 @@ void main() {
       discard;
       return;
     }
-/*    if (r > 0.85) {
-      gl_FragColor = vec4(30., 30., 30., 1.);
-    } */
-    /*if (out_of_triangle(gl_PointCoord)) {
-      discard;
-    }*/
-//    if (r < 0.75) discard;
     if (u_color_picker_mode > 0.5) {
       gl_FragColor = fill;
     } else {

@@ -1,4 +1,6 @@
 import { select } from 'd3-selection';
+import {  min } from 'd3-array';
+
 export class Renderer {
   // A renderer handles drawing to a display element.
   constructor(selector, tileSet, scatterplot) {
@@ -14,17 +16,50 @@ export class Renderer {
     this.deferred_functions = []
     this._use_scale_to_download_tiles = true
   }
+  get discard_share() {
+    // If jitter is temporal, e.g., or filters are in place, 
+    // it may make sense to estimate the number of hidden points.
+
+    // For now, I don't actually do it.
+    return 0;
+  }
+
+  get optimal_alpha() {
+      let {zoom_balance, alpha, point_size} = this.prefs;
+      const { max_ix, width, discard_share, height } = this;
+      const k = this.zoom.transform.k;
+      alpha = alpha === undefined ? .25 : alpha;
+      const target_share = alpha;
+      const fraction_of_total_visible = 1/k**2
+      const pixel_area = width * height
+      const total_intended_points = min([max_ix, this.tileSet.highest_known_ix]);
+      const total_points = total_intended_points * (1 - discard_share)
+      const area_of_point = 
+      (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2
+
+      // average_alpha * pixel_area = total_points * fraction_of_total_visible * 
+      // area_of_point * target_opacity
+      let target = (target_share * pixel_area) / 
+      (total_points * fraction_of_total_visible * area_of_point)
+
+      return target > 1 ? 1 : target < 1/255 ? 1/255 : target;
+      
+  }
 
   get max_ix() {
+    // By default, prefer dropping points to dropping alpha.
     const prefs = this.prefs;
     if (!this._use_scale_to_download_tiles) {
       return prefs.max_points;
     }
-    const {k} = this.zoom.transform
-    const point_size_adjust = Math.exp(Math.log(k) *
-      prefs.zoom_balance)
+    const { k } = this.zoom.transform
+
+//    const { point_size } = this.prefs;
+    const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
     return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
   }
+
+
 
   is_visible(point) {
     return p_in_rect(point, this._zoom.current_corners) &&
