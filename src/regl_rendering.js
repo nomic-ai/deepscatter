@@ -1,7 +1,7 @@
 import wrapREGL from 'regl';
-import { select, create } from 'd3-selection';
+import { create } from 'd3-selection';
 import { range, sum, max } from 'd3-array';
-import { Zoom, window_transform } from './interaction.js';
+import { window_transform } from './interaction.js';
 // import { aesthetic_variables } from './shaders';
 import { Renderer } from './rendering.js';
 import {contours} from 'd3-contour';
@@ -29,7 +29,6 @@ constructor(selector, tileSet, scatterplot) {
 
 
   this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
-
   // allocate buffers in 64 MB blocks.
   this.buffer_size = 1024 * 1024 * 64
 
@@ -62,7 +61,6 @@ data(dataset) {
   }
 }
 
-
 apply_webgl_scale() {
   // Should probably be attached to AestheticSet, not to this class.
 
@@ -80,6 +78,9 @@ apply_webgl_scale() {
     this._webgl_scale_history.unshift(webglscale);
     this._use_scale_to_download_tiles = false;
   } else {
+    if (!this._webgl_scale_history) {
+      this._webgl_scale_history = []
+    }
     // Use the default linked to the coordinates used to build the tree.
     this._webgl_scale_history.unshift(this.default_webgl_scale);
   }
@@ -88,6 +89,8 @@ apply_webgl_scale() {
 get props() {
   const prefs = this.prefs
   const { transform } = this.zoom;
+  const {aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num} = 
+    this.allocate_aesthetic_buffers()
   const props = {
     // Copy the aesthetic as a string.
     aes: {"encoding": this.aes.encoding},
@@ -106,8 +109,12 @@ get props() {
     last_webgl_scale: this._webgl_scale_history[1],
     use_scale_for_tiles: this._use_scale_to_download_tiles,
     grid_mode: 0,
+    buffer_num_to_variable,
+    aes_to_buffer_num, 
+    variable_to_buffer_num,
     color_picker_mode: 0 // whether to draw as a color picker.
   }
+
   props.zoom_matrix = [
     [props.transform.k, 0, props.transform.x],
     [0, props.transform.k, props.transform.y],
@@ -169,9 +176,7 @@ render_points(props) {
 
 tick(message = "No message", force = false) {
   const { prefs } = this;
-  const { regl, tileSet, canvas, width, height } = this;
-  const { transform } = this.zoom;
-  const {k} = transform;
+  const { regl, tileSet } = this;
   const {props} = this;
 
   this.tick_num = this.tick_num || 0;
@@ -179,9 +184,7 @@ tick(message = "No message", force = false) {
 
   // Set a download call in motion.
   if (this._use_scale_to_download_tiles) {
-//    console.log(JSON.stringify(this.zoom.current_corners()))
     tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix)
-//    tileSet.download_to_depth(this.props.max_ix, this.zoom.current_corners())
   } else {
     tileSet.download_to_depth(prefs.max_points)
   }
@@ -745,7 +748,6 @@ draw_contour_buffer(field, ix) {
 
   this.fbos.contour.use(() => {
     this.regl.read(this.contour_vals);
-    //console.log("blah")
     console.log(
       this.contour_vals.filter(d => d != 0)
       .map(d => d/6)
@@ -766,14 +768,14 @@ remake_renderer() {
 
   console.log("Remaking renderers")
 
-  const { regl, width, height, zoom, prefs } = this;
+  const { regl } = this;
   // This should be scoped somewhere to allow resizing.
 
   const parameters = {
     depth: { enable: false },
     stencil: { enable: false },
     blend: {
-      enable: function(state, {color_picker_mode}) {return color_picker_mode < 0.5},
+      enable: function(_, {color_picker_mode}) {return color_picker_mode < 0.5},
       func: {
         srcRGB: 'one',
         srcAlpha: 'one',
@@ -784,45 +786,36 @@ remake_renderer() {
     primitive: "points",
     frag: frag_shader,
     vert: vertex_shader,
-    count: function(context, props) {
+    count: function(_, props) {
       return props.manager.count
     },
-    attributes: {
-      a_image_locations: {
-        constant: [-1, -1]
-      }
-    },
+    attributes: {}, //Filled below.
     uniforms: {
       u_update_time: regl.prop('update_time'),
-      u_transition_duration: function(context, props) {
+      u_transition_duration: function(_, props) {
         //const fraction = (props.time)/props.prefs.duration;
         return props.prefs.duration;
       },
-      u_only_color: function(context, props) {
+      u_only_color: function(_, props) {
         if (props.only_color !== undefined) {
           return props.only_color
         }
         // Use -2 to disable color plotting. -1 is a special
         // value to plot all.
+        // Other values plot a specific value of the color-encoded field.
         return -2
       },
       u_color_picker_mode: regl.prop("color_picker_mode"),
-      u_position_interpolation_mode: function(context, props) {
+      u_position_interpolation_mode: function() {
         // 1 indicates that there should be a continuous loop between the two points.
         if (this.aes.position_interpolation) {
           return 1
         }
         return 0
       },
-      /*
-      u_corners: (context, props) => [
-        props.corners.x[0],
-        props.corners.x[1],
-        props.corners.y[0],
-        props.corners.y[1]
-      ],*/
       u_grid_mode: (_, {grid_mode}) => grid_mode,
       u_colors_as_grid: regl.prop("colors_as_grid"),
+
       u_constant_color: () => 
         this.aes.color.current.constant !== undefined ?
         this.aes.color.current.constant:
@@ -836,12 +829,14 @@ remake_renderer() {
       u_width: ({viewportWidth}) => viewportWidth,
       u_height: ({viewportHeight}) => viewportHeight,
       u_aspect_ratio: ({viewportWidth, viewportHeight}) => viewportWidth/viewportHeight,
-      u_sprites: function(context, props) {
+      u_sprites: function(_, props) {
         return props.sprites ?
         props.sprites : this.fbos.dummy
       },
       u_zoom_balance: regl.prop('zoom_balance'),
-      u_base_size: (_, {prefs}) => prefs.point_size,
+      u_base_size: (_, {prefs}) => {
+        return prefs.point_size
+      },
       u_maxix: function(_, props) {
         return props.max_ix;
       },
@@ -850,55 +845,49 @@ remake_renderer() {
       },
       u_window_scale: regl.prop('webgl_scale'),
       u_last_window_scale: regl.prop('last_webgl_scale'),
-      u_time: ({time}, props) => time,
-      u_filter_numeric: function(context, props) {
+      u_time: ({time}) => time,
+      u_filter_numeric: function() {
         return this.aes.filter.current.ops_to_array()
       },
-
-      u_filter_last_numeric: function(context, props) {
+      u_filter_last_numeric: function() {
         return this.aes.filter.last.ops_to_array()
       },
-      u_current_alpha: (_, props) => this.optimal_alpha,
-      u_last_alpha: (_, props) => this.optimal_alpha,
+      u_current_alpha: () => this.optimal_alpha,
+      u_last_alpha: () => this.optimal_alpha,
       u_jitter: () => this.aes.jitter_radius.current.jitter_int_format,
       u_last_jitter: () => this.aes.jitter_radius.last.jitter_int_format,
-      u_zoom: function(context, props) {
+      u_zoom: function(_, props) {
         return props.zoom_matrix;
       }
     }
   }
 
-  for (let k of ['ix']) {
-    parameters.attributes[k] = function(state, props) {
-      return props.manager.regl_elements.get(k)
+
+  // store needed buffers
+  for (let i of range(16)) {
+    parameters.attributes[`buffer_${i}`] = (_, {manager, buffer_num_to_variable}) => {
+      const c = manager.regl_elements.get(buffer_num_to_variable[i])
+      return c || {constant: 1}
     }
   }
-
+  
   for (let k of ['x', 'y', 'color', 'jitter_radius',
-                 'jitter_speed', 'size', 'filter'
-               ]) {
-
-//    const aes = this.aes[k]
+                 'jitter_speed', 'size', 'filter', 'character', 'x0', 'y0']) {
 
     for (let time of ["current", "last"]) {
-      const temporal = time == "current" ? "" : "last_";
 
+      const temporal = time == "current" ? "" : "last_";
 
       parameters.uniforms[`u_${temporal}${k}_map`] = () => {
         return this.aes[k][time].textures.one_d
       }
 
-      if (k == 'filter' && temporal == 'last') {
-        // Don't track the previous filter; not enough slots in webgl.
-        continue
-      }
-
       parameters.uniforms[`u_${temporal}${k}_needs_map`] =
-      (state, props) => {
+      () => {
         // Currently, a texture lookup is only used for dictionaries.
+
         return this.aes[k][time].use_map_on_regl
       }
-
 
       if (k == 'jitter_radius' && temporal == "") {
         const base_string = "u_" + temporal + k + "_lookup"
@@ -912,30 +901,27 @@ remake_renderer() {
         parameters.uniforms[base_string + "_y_constant"] = () => {
           return +this.aes[k][time].lookup_texture.value || .5
         }
-          parameters.uniforms[base_string + "_y_domain"] = () =>
+        parameters.uniforms[base_string + "_y_domain"] = () =>
             this.aes[k][time].lookup_texture.y_domain
         parameters.uniforms[base_string + "_z_domain"] = () =>
           this.aes[k][time].lookup_texture.z_domain
         parameters.uniforms[base_string + "_x_domain"] = () =>
           this.aes[k][time].lookup_texture.x_domain
-
       }
 
-      parameters.uniforms["u_" + temporal + k + "_domain"] = (state, props) => {
+      parameters.uniforms["u_" + temporal + k + "_domain"] = () => {
         // wrap as function to clue regl that it might change.
         return this.aes[k][time].domain
       }
 
       if (k != "filter" && k != "color") {
         parameters.uniforms["u_" + temporal + k + "_range"] =
-          (state, props) => {
-          // wrap as function to clue regl that it might change.
-          // console.log(k, aesthetic[temporal + "range"])
+          () => {
           return this.aes[k][time].range
         }
       }
 
-      parameters.uniforms[`u_${temporal}${k}_transform`] = (state, props) => {
+      parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
         const t = this.aes[k][time].transform
         if (t == "linear") return 1
         if (t == "sqrt") return 2
@@ -944,40 +930,78 @@ remake_renderer() {
         throw "Invalid transform"
       }
 
-      parameters.attributes[`a_${temporal}${k}`] = (state, props) => {
-
-        /*if (props.only_color > -2) {
-          return props.manager.regl_elements.get(
-            this.aes.encoding.color.field)
-        }*/
-
-        const val = this.aes[k][time].field
-        const regl_buffer = props.manager.regl_elements.get(val)
-        //console.log(props.manager.regl_elements.get(val))
-        if (regl_buffer) {
-            return regl_buffer
-        } else if (this.aes[k][time].constant !== undefined) {
-          //console.log([...props.manager.regl_elements.keys()])
-          //console.log(aesthetic[temporal + "constant"], "constant", k)
-          return {constant: this.aes[k][time].constant}
-        } else if (this.aes[k][time]) {
-          return {constant: this.aes[k][time].default_val}
+      parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
+        if (this.aes[k][time].constant !== undefined) {
+          return this.aes[k][time].constant
+        } else {
+          return this.aes[k][time].default_val
         }
-        // return {constant: 1}
-        throw `No defined field for ${temporal}${k}`
+      }
+
+      parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, {aes_to_buffer_num}) => {
+        const val = aes_to_buffer_num[`${k}--${time}`]
+        if (val == undefined) {return -1}
+        return val
+      }
     }
-
-
-
-    }
-
-
-
+    
     // Copy the parameters from the data name.
   }
   this._renderer = regl(parameters)
   return this._renderer
+  }
 
+  assign_aesthetic_buffer(manager, value) {
+    const regl_buffer = props.manager.regl_elements.get(val)
+  }
+
+  allocate_aesthetic_buffers() {
+    // There are only 15 attribute buffers available to use, once we pass in the index.
+
+    const buffers = []
+    const priorities = ["x", "y", "color", "size", "jitter_radius",
+    "jitter_speed", "character", "x0", "y0", "filter"]
+
+    for (let aesthetic of priorities) {
+        for (let time of ['current', 'last']) {
+          if (this.aes[aesthetic]){
+            if (this.aes[aesthetic][time].field) {
+              buffers.push({aesthetic, time, field: this.aes[aesthetic][time].field})
+            }
+          }
+        }
+      }
+
+    buffers.sort((a, b) => {
+      // Current values always come first.
+      if (a.time < b.time) {return -1} // current < last.
+      if (b.time < a.time) {return 1}
+      return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic)
+    })
+
+    const aes_to_buffer_num = {} // eg 'x' => 3
+
+    // Pre-allocate the 'ix' buffer.
+    const variable_to_buffer_num = {"ix": 0} // eg 'year' =>  3
+    let num = 0;
+    for (let {aesthetic, time, field} of buffers) {
+      const k = aesthetic + "--" + time
+      if (variable_to_buffer_num[field] !== undefined) {
+        aes_to_buffer_num[k] = variable_to_buffer_num[field]
+        continue
+      }
+      if (num++ < 16) {
+        aes_to_buffer_num[k] = num
+        variable_to_buffer_num[field] = num
+        continue
+      }
+      else {
+        // Don't use the lsat value, use the current value.
+        aes_to_buffer_num[k] = aes_to_buffer_num[aesthetic + '--current']
+      }
+    }
+    const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)]
+    return {aes_to_buffer_num, variable_to_buffer_num, buffer_num_to_variable};
   }
 
   get discard_share() {
@@ -1003,7 +1027,7 @@ constructor(regl, tile, renderer) {
 ready(prefs, block_for_buffers = false) {
   const { renderer, regl_elements } = this;
   const { aes } = renderer;
-  if (! aes.is_aesthetic_set) {
+  if (!aes.is_aesthetic_set) {
     throw "Aesthetic must be an aesthetic set"
   }
   let keys = [...Object.entries(aes)]
@@ -1014,14 +1038,13 @@ ready(prefs, block_for_buffers = false) {
       return []
     }
 
-//      if (k === undefined) {return}
     const needed = [];
     for (let aes of [v.current, v.last]) {
-//      if (!v || v === undefined) return needed;
       if (aes.field) needed.push(aes.field);
     }
     return needed
   })
+
   .flat()
 
   for (let key of keys.concat(["ix"])) {

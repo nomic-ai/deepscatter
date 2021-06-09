@@ -70,6 +70,16 @@ export const default_aesthetics = {
     range: [0, 500],
     transform: "literal"
   },
+  "x0": {
+    constant: 0,
+    range: [0, 500],
+    transform: "literal"
+  },
+  "y0": {
+    constant: 0,
+    range: [0, 500],
+    transform: "literal"
+  },
   "color": {
     constant: [1, 1, 1],
     range: color_palettes.white,
@@ -90,11 +100,6 @@ export const default_aesthetics = {
     range: [.5, 5],
     transform: "sqrt"
   },
-/*  "alpha": {
-    constant: 1,
-    range: [0, 1],
-    transform: "linear"
-  },*/
   "filter": {
     constant: 1, // Necessary though meaningless.
     range: [0, 1],
@@ -555,6 +560,8 @@ class X extends Aesthetic {
   get default_val() {return 1};
 }
 
+class X0 extends X {}
+
 class Y extends X {
 
   get range() {
@@ -568,9 +575,8 @@ class Y extends X {
 
 }
 
-/*class Alpha extends Aesthetic {
-  get default_val() {return 1};
-}*/
+class Y0 extends Y {}
+
 
 class Filter extends Aesthetic {
   get default_val() {
@@ -751,6 +757,7 @@ class Color extends Aesthetic {
 
     this.post_to_regl_buffer("one_d")
 
+
     return this._textures;
   }
 
@@ -772,6 +779,14 @@ class Color extends Aesthetic {
       this.texture_buffer.set(color_palettes[range])
     } else if (range.length == this.texture_size * 4) {
       this.texture_buffer.set(range)
+    } else if (range.length && range[0].length && range[0].length == 3) {
+      console.log("Setting color palette manually.")
+      // manually set colors.
+      const r = arange(palette_size).map(i => {
+        const [r, g, b] = range[i % range.length] 
+        return [r, g, b, 255]
+      })
+      this.texture_buffer.set(to_buffer(r))
     } else {
       console.warn(`request range of ${range} for color ${this.field} unknown`)
     }
@@ -780,7 +795,7 @@ class Color extends Aesthetic {
 }
 
 export const dimensions = {
-  Size, Jitter_speed, Jitter_radius, Color, Filter, X, Y
+  Size, Jitter_speed, Jitter_radius, Color, Filter, X, Y, X0, Y0
 };
 
 export class StatefulAesthetic {

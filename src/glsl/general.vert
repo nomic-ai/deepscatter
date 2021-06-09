@@ -1,16 +1,16 @@
 precision mediump float;
 
-attribute vec2 a_image_locations;
 
 uniform float u_zoom_balance;
 
 uniform float u_update_time;
 uniform float u_transition_duration;
 
-//uniform float u_jitter_radius;
+// Type of jitter.
 uniform float u_jitter;
-
 uniform float u_last_jitter;
+
+
 // Whether to plot only a single category.
 uniform float u_only_color;
 uniform float u_grid_mode;
@@ -37,7 +37,6 @@ uniform float u_last_alpha;
 
 // The same set of items for a variety of aesthetics.
 
-attribute float ix;
 
 // whether to continuously interpolate between
 // lastx and x, lasty and y.
@@ -45,101 +44,221 @@ uniform float u_position_interpolation_mode;
 
 /*
 python code to generate what follows.
-
-for k in ["x", "y", "jitter_radius", "jitter_speed", "size"]:
-  for time in ["", "last_"]:
+ks = ["x", "y", "jitter_radius", "jitter_speed", "size", "filter", "x0", "y0"]
+times = ["", "last_"]
+for k in ks:
+  for time in times:
     timek = time + k
     print(f"""
-attribute float a_{timek};
+uniform float u_{timek}_buffer_num;
+uniform float u_{timek}_constant;
 uniform float u_{timek}_transform;
 uniform vec2 u_{timek}_domain;
 uniform vec2 u_{timek}_range;
 uniform sampler2D u_{timek}_map;
 uniform float u_{timek}_needs_map;
+float a_{timek};
     """)
 
+for i in range(1, 15):
+  print(f"attribute float buffer_{i};")
+
+for k in ks:
+  for time in times:
+    timek = time + k
+    print(f"""
+  if (u_{timek}_buffer_num > -0.5) {{
+    a_{timek} = get_buffer(u_{timek}_buffer_num);
+  }} else {{
+    a_{timek} = u_{timek}_constant;
+  }}"""
 */
 
-attribute float a_x;
+attribute float buffer_0;
+attribute float buffer_1;
+attribute float buffer_2;
+attribute float buffer_3;
+attribute float buffer_4;
+attribute float buffer_5;
+attribute float buffer_6;
+attribute float buffer_7;
+attribute float buffer_8;
+attribute float buffer_9;
+attribute float buffer_10;
+attribute float buffer_11;
+attribute float buffer_12;
+attribute float buffer_13;
+attribute float buffer_14;
+attribute float buffer_15;
+
+uniform float u_x_buffer_num;
+uniform float u_x_constant;
 uniform float u_x_transform;
 uniform vec2 u_x_domain;
 uniform vec2 u_x_range;
 uniform sampler2D u_x_map;
 uniform float u_x_needs_map;
+float a_x;
+    
 
-
-attribute float a_last_x;
+uniform float u_last_x_buffer_num;
+uniform float u_last_x_constant;
 uniform float u_last_x_transform;
 uniform vec2 u_last_x_domain;
 uniform vec2 u_last_x_range;
 uniform sampler2D u_last_x_map;
 uniform float u_last_x_needs_map;
+float a_last_x;
+    
 
-
-attribute float a_y;
+uniform float u_y_buffer_num;
+uniform float u_y_constant;
 uniform float u_y_transform;
 uniform vec2 u_y_domain;
 uniform vec2 u_y_range;
 uniform sampler2D u_y_map;
 uniform float u_y_needs_map;
+float a_y;
+    
 
-
-attribute float a_last_y;
+uniform float u_last_y_buffer_num;
+uniform float u_last_y_constant;
 uniform float u_last_y_transform;
 uniform vec2 u_last_y_domain;
 uniform vec2 u_last_y_range;
 uniform sampler2D u_last_y_map;
 uniform float u_last_y_needs_map;
+float a_last_y;
+    
 
-attribute float a_jitter_radius;
+uniform float u_jitter_radius_buffer_num;
+uniform float u_jitter_radius_constant;
 uniform float u_jitter_radius_transform;
 uniform vec2 u_jitter_radius_domain;
 uniform vec2 u_jitter_radius_range;
 uniform sampler2D u_jitter_radius_map;
 uniform float u_jitter_radius_needs_map;
+float a_jitter_radius;
+    
 
-uniform float u_jitter_radius_lookup;
-uniform sampler2D u_jitter_radius_lookup_map;
-uniform float u_jitter_radius_lookup_y_constant;
-uniform vec2 u_jitter_radius_lookup_y_domain;
-uniform vec2 u_jitter_radius_lookup_z_domain;
-uniform vec2 u_jitter_radius_lookup_x_domain;
-
-
-attribute float a_last_jitter_radius;
+uniform float u_last_jitter_radius_buffer_num;
+uniform float u_last_jitter_radius_constant;
 uniform float u_last_jitter_radius_transform;
 uniform vec2 u_last_jitter_radius_domain;
 uniform vec2 u_last_jitter_radius_range;
 uniform sampler2D u_last_jitter_radius_map;
 uniform float u_last_jitter_radius_needs_map;
+float a_last_jitter_radius;
+    
 
+uniform float u_jitter_speed_buffer_num;
+uniform float u_jitter_speed_constant;
+uniform float u_jitter_speed_transform;
+uniform vec2 u_jitter_speed_domain;
+uniform vec2 u_jitter_speed_range;
+uniform sampler2D u_jitter_speed_map;
+uniform float u_jitter_speed_needs_map;
+float a_jitter_speed;
+    
 
-attribute float a_last_jitter_speed;
+uniform float u_last_jitter_speed_buffer_num;
+uniform float u_last_jitter_speed_constant;
 uniform float u_last_jitter_speed_transform;
 uniform vec2 u_last_jitter_speed_domain;
 uniform vec2 u_last_jitter_speed_range;
 uniform sampler2D u_last_jitter_speed_map;
 uniform float u_last_jitter_speed_needs_map;
+float a_last_jitter_speed;
+    
 
-
-attribute float a_size;
+uniform float u_size_buffer_num;
+uniform float u_size_constant;
 uniform float u_size_transform;
 uniform vec2 u_size_domain;
 uniform vec2 u_size_range;
 uniform sampler2D u_size_map;
 uniform float u_size_needs_map;
+float a_size;
 
-
-attribute float a_last_size;
+uniform float u_last_size_buffer_num;
+uniform float u_last_size_constant;
 uniform float u_last_size_transform;
 uniform vec2 u_last_size_domain;
 uniform vec2 u_last_size_range;
 uniform sampler2D u_last_size_map;
 uniform float u_last_size_needs_map;
+float a_last_size;
+    
 
+uniform float u_filter_buffer_num;
+uniform float u_filter_constant;
+uniform float u_filter_transform;
+uniform vec2 u_filter_domain;
+uniform vec2 u_filter_range;
+uniform sampler2D u_filter_map;
+uniform float u_filter_needs_map;
+float a_filter;
+    
 
-attribute float a_color;
-attribute float a_last_color;
+uniform float u_last_filter_buffer_num;
+uniform float u_last_filter_constant;
+uniform float u_last_filter_transform;
+uniform vec2 u_last_filter_domain;
+uniform vec2 u_last_filter_range;
+uniform sampler2D u_last_filter_map;
+uniform float u_last_filter_needs_map;
+float a_last_filter;
+    
+
+uniform float u_x0_buffer_num;
+uniform float u_x0_constant;
+uniform float u_x0_transform;
+uniform vec2 u_x0_domain;
+uniform vec2 u_x0_range;
+uniform sampler2D u_x0_map;
+uniform float u_x0_needs_map;
+float a_x0;
+    
+
+uniform float u_last_x0_buffer_num;
+uniform float u_last_x0_constant;
+uniform float u_last_x0_transform;
+uniform vec2 u_last_x0_domain;
+uniform vec2 u_last_x0_range;
+uniform sampler2D u_last_x0_map;
+uniform float u_last_x0_needs_map;
+float a_last_x0;
+    
+
+uniform float u_y0_buffer_num;
+uniform float u_y0_constant;
+uniform float u_y0_transform;
+uniform vec2 u_y0_domain;
+uniform vec2 u_y0_range;
+uniform sampler2D u_y0_map;
+uniform float u_y0_needs_map;
+float a_y0;
+    
+
+uniform float u_last_y0_buffer_num;
+uniform float u_last_y0_constant;
+uniform float u_last_y0_transform;
+uniform vec2 u_last_y0_domain;
+uniform vec2 u_last_y0_range;
+uniform sampler2D u_last_y0_map;
+uniform float u_last_y0_needs_map;
+float a_last_y0;
+    
+
+float a_color;
+float a_last_color;
+
+uniform float u_color_buffer_num;
+uniform float u_last_color_buffer_num;
+
+uniform vec3 u_color_constant;
+uniform vec3 u_last_color_constant;
+
 uniform float u_color_transform;
 uniform float u_last_color_transform;
 uniform vec2 u_color_domain;
@@ -151,30 +270,21 @@ uniform float u_color_needs_map;
 uniform vec3 u_constant_color;
 uniform vec3 u_constant_last_color;
 
-attribute float a_jitter_speed;
-uniform float u_jitter_speed_transform;
-uniform vec2 u_jitter_speed_domain;
-uniform vec2 u_jitter_speed_range;
-uniform sampler2D u_jitter_speed_map;
-uniform float u_jitter_speed_needs_map;
-
-
-
-attribute float a_filter;
-attribute float a_last_filter;
-// useless.
-uniform float u_filter_transform;
-uniform float u_last_filter_transform;
-uniform vec2 u_filter_domain;
-uniform vec2 u_last_filter_domain;
-uniform sampler2D u_last_filter_map;
-uniform sampler2D u_filter_map;
-
 
 // The fill color.
 varying vec4 fill;
+varying float point_size;
+
+
+uniform float u_jitter_radius_lookup;
+uniform float u_jitter_radius_lookup_y_constant;
+uniform sampler2D u_jitter_radius_lookup_map;
+uniform vec2 u_jitter_radius_lookup_x_domain;
+uniform vec2 u_jitter_radius_lookup_y_domain;
+uniform vec2 u_jitter_radius_lookup_z_domain;
 
 float point_size_adjust;
+float ix;
 
 // A coordinate to throw away a vertex point.
 vec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);
@@ -192,12 +302,12 @@ const float tau = 2. * 3.14159265359;
 
 // Ha! A gazillion version of this function:
 // https://gist.github.com/kylemcdonald/f8df3bc2f8d38ca2b7cb
-vec3 hsv2rgb(in vec3 c) {
+/*vec3 hsv2rgb(in vec3 c) {
   vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0,
                    0.0, 1.0);
   rgb = rgb * rgb * (3.0 - 2.0 * rgb);
   return c.z * mix(vec3(1.0), rgb, c.y);
-}
+}*/
 
 float interpolate_raw(in float x, in float min, in float max) {
   if (x < min) {return 0.;}
@@ -212,6 +322,80 @@ float interpolate(in float x, in float min, in float max) {
     return interpolate_raw(x, min, max);
   }
 }
+
+/*
+
+The following glsl code was written in python.
+
+buffers = [*range(16)]
+
+def write_buffs(buffs):
+    if len(buffs) == 1:
+        return[f"return buffer_{buffs[0]}"]
+    condition_1 = ["  " + line for line in write_buffs(buffs[:len(buffs)//2])]
+    condition_2 = ["" + line for line in write_buffs(buffs[len(buffs)//2:])]
+
+    args = [
+        f"if (i < {buffs[len(buffs) // 2 - 1]}.5) {{",
+        *condition_1,
+        "}",
+        *condition_2
+    ]
+    return args
+
+print("\n".join(write_buffs(buffers)))
+*/
+
+float get_buffer(in float i) {
+  //given an index, returns the appropriate buffer.
+  if (i < 7.5) {
+    if (i < 3.5) {
+      if (i < 1.5) {
+        if (i < 0.5) {
+          return buffer_0;
+        }
+        return buffer_1;
+      }
+      if (i < 2.5) {
+        return buffer_2;
+      }
+      return buffer_3;
+    }
+    if (i < 5.5) {
+      if (i < 4.5) {
+        return buffer_4;
+      }
+      return buffer_5;
+    }
+    if (i < 6.5) {
+      return buffer_6;
+    }
+    return buffer_7;
+  }
+  if (i < 11.5) {
+    if (i < 9.5) {
+      if (i < 8.5) {
+        return buffer_8;
+      }
+      return buffer_9;
+    }
+    if (i < 10.5) {
+      return buffer_10;
+    }
+    return buffer_11;
+  }
+  if (i < 13.5) {
+    if (i < 12.5) {
+      return buffer_12;
+    }
+    return buffer_13;
+  }
+  if (i < 14.5) {
+    return buffer_14;
+  }
+  return buffer_15;
+}
+
 
 float linstep(in vec2 range, in float x) {
   return interpolate(x, range.x, range.y);
@@ -428,7 +612,7 @@ vec2 calculate_jitter(
 
   if (jitter_type == 5.) {
     float time_period = 60.;
-    float share = 1./20.;
+    float share = 1./4.;
     float offset = ix_to_random(ix, 12.);
     float fractional = fract((offset * time_period + u_time)/time_period);
     if (fractional > share) {
@@ -490,6 +674,7 @@ if (jitter_type == 3.) {
     return circle_jitter(ix, u_width/u_height, u_time, jitter_r, p_jitter_speed);
   }
 }
+
 void run_color_fill(in float ease) {
 if (u_only_color >= -1.5) {
   if (u_only_color > -.5 && a_color != u_only_color) {
@@ -529,6 +714,116 @@ if (u_only_color >= -1.5) {
 }
 
 void main() {
+
+  float ix = buffer_0;
+
+ if (u_x_buffer_num > -0.5) {
+    a_x = get_buffer(u_x_buffer_num);
+  } else {
+    a_x = u_x_constant;
+  }
+
+  if (u_last_x_buffer_num > -0.5) {
+    a_last_x = get_buffer(u_last_x_buffer_num);
+  } else {
+    a_last_x = u_last_x_constant;
+  }
+
+  if (u_y_buffer_num > -0.5) {
+    a_y = get_buffer(u_y_buffer_num);
+  } else {
+    a_y = u_y_constant;
+  }
+
+  if (u_last_y_buffer_num > -0.5) {
+    a_last_y = get_buffer(u_last_y_buffer_num);
+  } else {
+    a_last_y = u_last_y_constant;
+  }
+
+  if (u_jitter_radius_buffer_num > -0.5) {
+    a_jitter_radius = get_buffer(u_jitter_radius_buffer_num);
+  } else {
+    a_jitter_radius = u_jitter_radius_constant;
+  }
+
+  if (u_last_jitter_radius_buffer_num > -0.5) {
+    a_last_jitter_radius = get_buffer(u_last_jitter_radius_buffer_num);
+  } else {
+    a_last_jitter_radius = u_last_jitter_radius_constant;
+  }
+
+  if (u_jitter_speed_buffer_num > -0.5) {
+    a_jitter_speed = get_buffer(u_jitter_speed_buffer_num);
+  } else {
+    a_jitter_speed = u_jitter_speed_constant;
+  }
+
+  if (u_last_jitter_speed_buffer_num > -0.5) {
+    a_last_jitter_speed = get_buffer(u_last_jitter_speed_buffer_num);
+  } else {
+    a_last_jitter_speed = u_last_jitter_speed_constant;
+  }
+
+  if (u_size_buffer_num > -0.5) {
+    a_size = get_buffer(u_size_buffer_num);
+  } else {
+    a_size = u_size_constant;
+  }
+
+  if (u_last_size_buffer_num > -0.5) {
+    a_last_size = get_buffer(u_last_size_buffer_num);
+  } else {
+    a_last_size = u_last_size_constant;
+  }
+
+  if (u_filter_buffer_num > -0.5) {
+    a_filter = get_buffer(u_filter_buffer_num);
+  } else {
+    a_filter = u_filter_constant;
+  }
+
+  if (u_last_filter_buffer_num > -0.5) {
+    a_last_filter = get_buffer(u_last_filter_buffer_num);
+  } else {
+    a_last_filter = u_last_filter_constant;
+  }
+
+  if (u_x0_buffer_num > -0.5) {
+    a_x0 = get_buffer(u_x0_buffer_num);
+  } else {
+    a_x0 = u_x0_constant;
+  }
+
+  if (u_last_x0_buffer_num > -0.5) {
+    a_last_x0 = get_buffer(u_last_x0_buffer_num);
+  } else {
+    a_last_x0 = u_last_x0_constant;
+  }
+
+  if (u_y0_buffer_num > -0.5) {
+    a_y0 = get_buffer(u_y0_buffer_num);
+  } else {
+    a_y0 = u_y0_constant;
+  }
+
+  if (u_last_y0_buffer_num > -0.5) {
+    a_last_y0 = get_buffer(u_last_y0_buffer_num);
+  } else {
+    a_last_y0 = u_last_y0_constant;
+  }
+
+  if (u_color_buffer_num > -0.5) {
+    a_color = get_buffer(u_color_buffer_num);
+  } else {
+    a_color = ix;
+  }
+
+  if (u_last_color_buffer_num > -0.5) {
+    a_last_color = get_buffer(u_last_color_buffer_num);
+  } else {
+    a_last_color = ix;
+  }
 
   pixelspace_to_glspace = mat3(
       2. / u_width, 0., -1.,
@@ -609,7 +904,7 @@ void main() {
     } // else position just is what it is.
 
   } else {
-    position.x = -1. + 2. * linscale(u_x_domain, position.x);
+     position.x = -1. + 2. * linscale(u_x_domain, position.x);
     //position.y = -1.0;
     vec2 jitterspec = vec2(
       (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,
@@ -657,7 +952,7 @@ void main() {
     return;
   }
 
-
+  
   float size_multiplier = texture_float_lookup(
     u_size_map, u_size_domain, u_size_range,
     u_size_transform, a_size, u_size_needs_map);
@@ -667,8 +962,12 @@ void main() {
                                               u_last_size_transform, a_last_size,
                                               u_last_size_needs_map);
 
-  size_multiplier = u_base_size * mix(last_size_multiplier, size_multiplier, ease);
-
+//  size_multiplier = a_size;
+  last_size_multiplier = a_last_size;
+  size_multiplier = u_base_size * 
+     mix(last_size_multiplier, size_multiplier, ease);
+//  size_multiplier = u_base_size;
+//  size_multiplier = u_base_size;
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
   point_size_adjust = exp(log(u_k) * u_zoom_balance);
@@ -683,7 +982,8 @@ void main() {
 
     float jitter_radius_fraction;
 
-    if (u_jitter_radius_lookup > 0.) {
+    // removed
+    if (u_jitter_radius_lookup == -10.) {
 
       float y_frac =
         linstep(u_jitter_radius_lookup_y_domain,
@@ -696,7 +996,7 @@ void main() {
       vec4 jitter_radius_texel = texture2D(
         u_jitter_radius_lookup_map,
         vec2(
-          // Reversed cause of the way it's fed in.
+          // Reversed 'cause of the way it's fed in.
           y_frac, x_frac
         ));
 
@@ -713,7 +1013,7 @@ void main() {
         jitter_radius_value = 0.;
       }
     }
-    jitter_radius_value = 0.;
+    jitter_radius_value = 0.1;
 
     vec2 jitter = calculate_jitter(
       u_jitter, ix, u_jitter_radius_map,
@@ -756,12 +1056,10 @@ void main() {
         return;
       }
     }
-
-    gl_Position = vec4(position + jitter * point_size_adjust, 0., 1.);
+    gl_Position = vec4(position + 0. * a_jitter_radius * jitter * point_size_adjust, 0., 1.);
   } else {
     gl_Position = vec4(position, 0., 1.);
   }
-
+  point_size = gl_PointSize;
   run_color_fill(ease);
-  // Plot a single tick of alpha.
 }

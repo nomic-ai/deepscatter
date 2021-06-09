@@ -1,22 +1,10 @@
-import { select, event } from 'd3-selection';
-import { timer, timerFlush, interval } from 'd3-timer';
-import { zoom, zoomTransform, zoomIdentity } from 'd3-zoom';
-import { mean, range, min, extent } from 'd3-array';
+import { select } from 'd3-selection';
+import { timer } from 'd3-timer';
+import { zoom, zoomIdentity } from 'd3-zoom';
+import { mean } from 'd3-array';
 import { scaleLinear } from 'd3-scale';
 import { annotation, annotationLabel } from 'd3-svg-annotation';
 
-/*export class Mouseover {
-  // Easiest just to inherit from zoom.
-  constructor(zoom) {
-    zoom.canvas.on("mouseover", () => {
-      const {x_, y_} = zoom.scales()
-      const closest = zoom.tileSet.find_closest(
-        [x_.invert(event.x),
-         y_.invert(event.y)
-       ])
-    })
-  }
-}*/
 
 export default class Zoom {
 
@@ -132,7 +120,7 @@ export default class Zoom {
     const zoomer = zoom()
           .scaleExtent([1/3, 100000])
           .extent([[0, 0], [width, height]])
-          .on("zoom", () => {
+          .on("zoom", (event) => {
             this.transform = event.transform;
             this.restart_timer(10 * 1000)
           })
@@ -162,7 +150,7 @@ export default class Zoom {
     const x_aes = renderer.aes.x.current;
     const y_aes = renderer.aes.y.current;
 
-    this.canvas.on("mousemove", () => {
+    this.canvas.on("mousemove", (event) => {
 
       // Debouncing this is really important, it turns out.
       if (Date.now() - last_fired < 50) {

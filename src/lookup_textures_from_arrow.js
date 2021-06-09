@@ -1,6 +1,6 @@
-import {Table} from '@apache-arrow/esnext-cjs';
+import {Table} from '@apache-arrow/es5-cjs';
 import {range, extent} from 'd3-array';
-import { scaleLinear } from 'd3-scale';
+//import { scaleLinear } from 'd3-scale';
 import { encodeFloatsRGBArange } from './util'
 export default class ArrowMetaTable {
   constructor(prefs, table_name) {

@@ -3,13 +3,12 @@ import {ReglRenderer} from './regl_rendering.js';
 import Zoom from './interaction.js';
 import {select} from 'd3-selection';
 import {geoPath, geoIdentity} from 'd3-geo';
-import {json as d3json } from 'd3-fetch';
 import {max, range} from 'd3-array';
-import { Table } from '@apache-arrow/esnext-cjs';
+import { Table } from '@apache-arrow/es5-cjs';
 import merge from 'lodash.merge';
 
 import ArrowMetaTable from './lookup_textures_from_arrow.js'
-import GeoLines from './geo_lines.js'
+// import GeoLines from './geo_lines.js'
 import FeatureHandler from './geo_poly.js'
 
 const base_elements = [
@@ -36,6 +35,7 @@ export default class Scatterplot {
   constructor(selector, width, height) {
     this.bound = false;
     if (selector === undefined) {
+      console.log(selector)
       console.warn("Must bind to selector manually")
     } else {
       this.bind(selector, width, height)
@@ -114,7 +114,7 @@ export default class Scatterplot {
 
     return this._root.promise
   }
-
+  /*
   registerBackgroundMap(url) {
     if (!this.geojson) {
       this.geojson = "in progress"
@@ -124,7 +124,7 @@ export default class Scatterplot {
       })
     }
   }
-
+  */
   registerPolygonMap(definition) {
     const {file, color} = definition
      if (!this.feather_features) {
@@ -195,6 +195,14 @@ export default class Scatterplot {
         prefs['last_' + k] = this.prefs[k] || undefined;
     }
 
+    if (this.prefs.encoding && prefs.encoding) {
+      for (let k of Object.keys(this.prefs.encoding)) {
+        if (prefs.encoding[k]) {
+          this.prefs.encoding[k] = prefs.encoding[k]
+        }
+      }
+    }
+
     merge(this.prefs, prefs)
   }
 
@@ -244,9 +252,11 @@ export default class Scatterplot {
     }
 
     // Doesn't block.
+    /*
     if (prefs.basemap_geojson) {
       this.registerBackgroundMap(prefs.basemap_geojson)
     }
+    */
 
     if (prefs.basemap_gleofeather) {
       // Deprecated.
@@ -300,6 +310,12 @@ export default class Scatterplot {
       return false
     }
     return this._root.table;
+  }
+
+  get query() {
+    const p = JSON.parse(JSON.stringify(this.prefs))
+    p.zoom = {bbox: this._renderer.zoom.current_corners()}
+    return p
   }
 
   top_n_points(n = 20) {

@@ -1,14 +1,7 @@
-// import { json as d3Json, csv as d3Csv } from 'd3-fetch';
-// import { quadtree } from 'd3-quadtree';
-// import { scaleLinear } from 'd3-scale';
-// import {contourDensity} from 'd3-contour';
-// import {geoPath} from 'd3-geo';
-import {extent, range, shuffle, group, rollup, min, max, bisectLeft} from 'd3-array';
+import {extent, range, min, max, bisectLeft} from 'd3-array';
 // Shouldn't be here, just while contours are.
-import {select} from 'd3-selection';
-import 'regenerator-runtime/runtime'
-import { Table, Column, Dictionary, Vector, Utf8, Int32, Float32Vector } from '@apache-arrow/esnext-cjs';
-//import ArrowTree from './ArrowTree';
+// import 'regenerator-runtime/runtime'
+import { Table } from '@apache-arrow/es5-cjs';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
 import TileWorker from './tileworker.worker.mjs';
@@ -145,7 +138,6 @@ class Tile extends BaseTile {
     return this.extend_promise(() => {
       // Nuke the table
       this._table = undefined;
-      console.log("Posting", ...Object.keys(needed_mutations), "on", this.key)
       return this.tileWorker
         .run_transforms(
           needed_mutations, Comlink.transfer(this._table_buffer, [this._table_buffer])
@@ -584,7 +576,6 @@ export default class RootTile extends Tile {
       }
     })
     const lines = array.map(a => a.join(""))
-    console.log(lines.join("\n"))
     
   }
 
@@ -647,7 +638,6 @@ export default class RootTile extends Tile {
 
 //      console.log("Getting", {distance, tile: tile.key, bbox, abbox: area(bbox), a_tile: area(tile.extent), e: tile.extent})
       queue.add(tile.key)
-      console.log(distance, tile.key, max_ix, tile.min_ix)
       tile.download()
       .catch((err) => {
         console.warn("Error on", tile.key)
@@ -724,7 +714,6 @@ export default class RootTile extends Tile {
     const counts = new Counter()
 
     this.map(tile => {
-      console.log(tile.key)
       counts.merge(tile.count(...category_names))
     })
 

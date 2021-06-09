@@ -6,8 +6,6 @@ export const aesthetic_variables = Array.from(Object.keys(Aesthetic))
 export class AestheticSet {
   constructor(scatterplot, regl, tileSet, fields = null) {
 
-    const { width, height } = scatterplot;
-
     this.is_aesthetic_set = true; // For type checking.
     this.scatterplot = scatterplot
     this.regl = regl
