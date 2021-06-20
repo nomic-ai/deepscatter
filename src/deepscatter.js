@@ -1,14 +1,13 @@
 import Tile from './tile.js';
 import {ReglRenderer} from './regl_rendering.js';
 import Zoom from './interaction.js';
-import {select} from 'd3-selection';
-import {geoPath, geoIdentity} from 'd3-geo';
+import { select } from 'd3-selection';
+import { geoPath, geoIdentity } from 'd3-geo';
 import {max, range} from 'd3-array';
-import { Table } from '@apache-arrow/es5-cjs';
+import { Table } from '@apache-arrow/es2015-esm';
 import merge from 'lodash.merge';
 
 import ArrowMetaTable from './lookup_textures_from_arrow.js'
-// import GeoLines from './geo_lines.js'
 import FeatureHandler from './geo_poly.js'
 
 const base_elements = [

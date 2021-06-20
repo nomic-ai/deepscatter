@@ -1,7 +1,7 @@
 import {extent, range, min, max, bisectLeft} from 'd3-array';
 // Shouldn't be here, just while contours are.
 // import 'regenerator-runtime/runtime'
-import { Table } from '@apache-arrow/es5-cjs';
+import { Table } from '@apache-arrow/es2015-esm';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
 import TileWorker from './tileworker.worker.mjs';

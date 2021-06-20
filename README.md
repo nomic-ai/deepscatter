@@ -1,3 +1,7 @@
+# Warning
+
+This library is still unstable; dragons, and so on. I wouldn't really
+recommend using it unless you clearly know why!
 
 # Principles
 
@@ -7,6 +11,29 @@
    should be able to use the zoom state to draw to canvas or svg layers using the
    same zoom and underlying data, so that you can draw point with webgl
    and then build a callout using d3-annotate.
+
+# Goal
+
+**Fast** scatterplots with over a billion points, served in a fully static
+way over the web and supporting grammar-of-graphics interfaces.
+
+# Quickstart
+
+From the project directory:
+
+```sh
+# Create a sample csv at /tmp/tmp.csv. I hope you don't mind
+# that file getting overwritten if it's there!
+
+python src/etc/create_sample_data.py
+# Build an Apache Arrow quadtree from those files.
+python src/tiler_pc.py --files /tmp/tmp.csv --tile_size 10000 --destination build/tiles --max_files 32
+
+# Build the
+npm run build
+
+```
+
 
 # Infinitely zoomable scatterplots.
 
@@ -132,7 +159,7 @@ So for example, in the following filter:
 ```
 
 `Science` will be limited by the return value of the function
-defined as `d => d.Classification=='Q'`. 
+defined as `d => d.Classification=='Q'`.
 
 
 #### Regex filters.

@@ -1,4 +1,4 @@
-import {Table} from '@apache-arrow/es5-cjs';
+import {Table} from '@apache-arrow/es2015-esm';
 import {range, extent} from 'd3-array';
 //import { scaleLinear } from 'd3-scale';
 import { encodeFloatsRGBArange } from './util'

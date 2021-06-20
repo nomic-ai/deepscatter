@@ -470,7 +470,15 @@ float run_filter(in float a_filter,
 
 #pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
 #pragma glslify: packFloat = require('glsl-read-float')
-#pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
+// #pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
+
+#ifndef PI
+#define PI 3.141592653589793
+#endif
+
+float sineInOut(float t) {
+  return -0.5 * (cos(PI * t) - 1.0);
+}
 
 const vec4 decoder = vec4(1./256./256./256., 1. / 256. / 256., 1. / 256., 1.);
 

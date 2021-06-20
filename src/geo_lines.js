@@ -1,7 +1,6 @@
 import {mesh} from "topojson-client";
 import vertex_shader from './glsl/line_shader.vert';
 import frag_shader from './glsl/line.frag';
-import earcut from 'earcut';
 
 export default class GeoLines {
   constructor(topojson, regl) {
