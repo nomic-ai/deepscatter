@@ -1,57 +1,89 @@
 <style>
-  .ttooltip: {
-  z-index: 99
+  .ttooltip {
+    z-index: 99
   }
-  </style>
-<script src='deepScatter.js'></script>
+</style>
 
-<div class=scrollership>
-  <div class=tale>
-    <h1 style="color:red">"Deep Scatterplots"</h1>
-  <div>
-</div>
-
+<body>
+  <h1>Welcome to a demo/test page.</h1>
   <div id="deepscatter" style="position:fixed;top:0;left:0">
+  </div>
+  <button id="flip" style="z-index:99;position:fixed;">Change encoding</button>
+  <pre id="ident" style="z-index:99;position:fixed;"></pre>
 
-</div>
+</body>
 
-<header>Wuh-oh!</header>
 
-Nurk!
+<script type="module">
+  import Scatterplot from './src/deepscatter.js';
+  import { select } from 'd3-selection';
+  window.select = select; // For the click function below.
+  const prefs = {
+    "source_url" : "/tiles",
+    "max_points" : 25000, // a full cap.
+    "alpha" : .7, // Target saturation for the full page.
+    "zoom_balance" : 0.09, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
+    "point_size": 10, // Default point size before application of size scaling
+    "background_color": "#EEEDDE",
+    "click_function": "select('#ident').html(JSON.stringify(datum, undefined, 2))",
+    "encoding": {
+      "color": {
+        "field": "class",
+        "range": "category10",
+        "domain": [-2047, 2047] 
+      },
+      "x": {
+        field: "x",
+        transform: "literal"
+      },
+      "y": {
+        field: "y", 
+        transform: "literal"
+      },
+      "size": {
+        "field": "quantity",
+        "transform": "sqrt",
+        "domain": [0, 3],
+        "range": [0, 4]
+      }
+    }
+  };
 
-<script>
 
-  scatterplot = new deepScatter.default(
-  {selector: "#deepscatter", source_url: "build"})
-  scatterplot.initialize()
-  scatterplot.plotAPI({
-   point_size: 0.8,
-   max_points: 1000000,
-   label_threshold: .0,
-   label_field: "yearday",
-   color_field: "yearday",
-   color_domain: [60, 110],
-   basemap_geojson: "earth.topojson",
-   filters: [
-    "return datum.yearday <= 188"
-  ],
-  jitter: "spiral"
+  const colors = [
+    JSON.parse(JSON.stringify(prefs.encoding.color)),
+    {
+        "field": "quantity",
+        "range": "viridis",
+        "domain": [0, 1] 
+    },
+    {
+      "field": "x",
+      "range": "viridis",
+      "domain": [-3, 3] 
+    }
+  ]
+
+  const scatterplot = new Scatterplot("#deepscatter")
+  scatterplot.plotAPI(prefs);
+  window.plot = scatterplot; // For debugging
+
+
+  // Simple animation demonstration.
+
+  let cycle = 0;
+
+  select("#flip").on("click", () => {
+    cycle += 1
+    const new_coding = {
+      "encoding": {
+        "x": {"field": cycle % 2 == 0 ? "x": "y"},
+        "y": {"field": cycle % 2 == 0 ? "y": "x"},
+        "color": colors[cycle % colors.length]
+      }
+    }
+    console.log(new_coding)
+    scatterplot.plotAPI(new_coding)
   })
 
-  keyaction = function(val) {
-    // This search function simply looks at every point and zooms
-    // to them if it matches the string.
-    const text = val.value
-    scatterplot.plotAPI({
-      filters: [
-        text
-      ]
-    })
-  }
 </script>
-
-<input type="text" style="position:fixed"
-value=    "return datum.yearday < (Date.now()/1000)*4 % 60 + 50" size=60
-onkeyup="keyaction(this)">
-
-</input>

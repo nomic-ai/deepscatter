@@ -284,7 +284,6 @@ uniform vec2 u_jitter_radius_lookup_y_domain;
 uniform vec2 u_jitter_radius_lookup_z_domain;
 
 float point_size_adjust;
-float ix;
 
 // A coordinate to throw away a vertex point.
 vec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);
@@ -470,7 +469,7 @@ float run_filter(in float a_filter,
 
 #pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
 #pragma glslify: packFloat = require('glsl-read-float')
-// #pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
+#pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
 
 #ifndef PI
 #define PI 3.141592653589793
@@ -684,46 +683,49 @@ if (jitter_type == 3.) {
 }
 
 void run_color_fill(in float ease) {
-if (u_only_color >= -1.5) {
-  if (u_only_color > -.5 && a_color != u_only_color) {
-    gl_Position = discard_me;
-    return;
-  } else {
-    // -1 is a special value meaning 'plot everything'.
-    fill = vec4(0., 0., 0., 1. / 255.);
-    gl_PointSize = 1.;
-  }
-} else if (u_color_picker_mode > 0.) {
-  fill = packFloat(ix);
-} else {
-  // fractional_color = 0.;
-  if (u_constant_color.r > -1.) {
-    fill = vec4(u_constant_color.rgb, u_current_alpha);
-  } else {
-    float fractional_color = linstep(u_color_domain, a_color);
-    fill = texture2D(u_color_map, vec2(0., fractional_color));
-    fill = vec4(fill.rgb, u_current_alpha);
-  }
-  if (ease < 1.) {
-    vec4 last_fill;
-    if (u_constant_last_color.r > 0.) {
-      last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);
+  if (u_only_color >= -1.5) {
+    if (u_only_color > -.5 && a_color != u_only_color) {
+      gl_Position = discard_me;
+      return;
     } else {
-      float last_fractional = linstep(u_last_color_domain, a_last_color);
-      last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
-      // Alpha channel interpolation already happened.
-      last_fill = vec4(last_fill.rgb, u_last_alpha);
+      // -1 is a special value meaning 'plot everything'.
+      fill = vec4(0., 0., 0., 1. / 255.);
+      gl_PointSize = 1.;
     }
-    // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
-    // instead?
-    fill = mix(last_fill, fill, ease);
+  } else {
+    if (u_constant_color.r > -1.) {
+      fill = vec4(u_constant_color.rgb, u_current_alpha);
+    } else {
+      float fractional_color = linstep(u_color_domain, a_color);
+      fill = texture2D(u_color_map, vec2(0., fractional_color));
+      fill = vec4(fill.rgb, u_current_alpha);
+    }
+    if (ease < 1.) {
+      vec4 last_fill;
+      if (u_constant_last_color.r > 0.) {
+        last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);
+      } else {
+        float last_fractional = linstep(u_last_color_domain, a_last_color);
+        last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
+        // Alpha channel interpolation already happened.
+        last_fill = vec4(last_fill.rgb, u_last_alpha);
+      }
+      // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
+      // instead?
+      fill = mix(last_fill, fill, ease);
+    }
   }
-}
 }
 
 void main() {
 
   float ix = buffer_0;
+
+  if (ix > u_maxix) {
+    // throwaway points that are too low.
+    gl_Position = discard_me;
+    return;
+  }
 
  if (u_x_buffer_num > -0.5) {
     a_x = get_buffer(u_x_buffer_num);
@@ -848,11 +850,6 @@ void main() {
 
   float debug_mode = 0.;
 
-  if (ix > u_maxix) {
-    // throwaway points that are too low.
-    gl_Position = discard_me;
-    return;
-  }
 
   vec2 position = vec2(a_x, a_y);
 
@@ -1067,7 +1064,12 @@ void main() {
     gl_Position = vec4(position + 0. * a_jitter_radius * jitter * point_size_adjust, 0., 1.);
   } else {
     gl_Position = vec4(position, 0., 1.);
+  }  
+  if (u_color_picker_mode > 0.) {
+    fill = packFloat(ix);
+  } else {
+    run_color_fill(ease);
+//    fill = packFloat(ix);
   }
   point_size = gl_PointSize;
-  run_color_fill(ease);
 }

@@ -1,11 +1,22 @@
 {
   "name": "deepscatter",
-  "version": "1.0.0",
-  "description": "Build zoomable scatterplots with millions of points using D3",
-  "main": "index.js",
+  "type": "module",
+  "version": "2.0.0",
+  "description": "Zoomable scatterplots with billions of points",
+  "files": [
+    "dist"
+  ],
+  "module": "./dist/deepscatter.es.js",
+  "main": "./dist/deescatter.umd.js",
+  "exports": {
+    ".": {
+      "import": "./dist/deepscatter.es.js",
+      "require": "./dist/deepscatter.umd.js"
+    }
+  },
   "scripts": {
-    "serve": "webpack serve --config webpack.config.js --progress --profile",
-    "build": "webpack --env dev --config webpack.config.js"
+    "dev": "vite",
+    "build": "vite build"
   },
   "repository": {
     "type": "git",
@@ -24,25 +35,23 @@
   },
   "homepage": "https://github.com/CreatingData/deepscatter#readme",
   "dependencies": {
-    "@apache-arrow/esnext-esm": "^3.0.0",
+    "@apache-arrow/es2015-esm": "^4.0.1",
     "@babel/runtime": "^7.9.6",
     "comlink": "^4.3.0",
-    "d3-array": "^2.4.0",
-    "d3-contour": "^2.0.0",
-    "d3-ease": "^2.0.0",
-    "d3-fetch": "^2.0.0",
-    "d3-format": "^2.0.0",
-    "d3-geo": "^2.0.1",
-    "d3-interpolate": "^2.0.1",
-    "d3-scale": "^3.2.3",
-    "d3-scale-chromatic": "^2.0.0",
-    "d3-selection": "^2.0.0",
-    "d3-svg-annotation": "^2.5.1",
-    "d3-tile": "^1.0.0",
-    "d3-zoom": "^2.0.0",
-    "earcut": "^2.2.2",
-    "flatbush": "^3.3.0",
-    "glsl": "0.0.1",
+    "d3-array": "^3.0.1",
+    "d3-color": "^3.0.1",
+    "d3-contour": "^3.0.1",
+    "d3-ease": "^3.0.1",
+    "d3-fetch": "^3.0.1",
+    "d3-format": "^3.0.1",
+    "d3-geo": "^3.0.1",
+    "d3-interpolate": "^3.0.1",
+    "d3-scale": "^4.0.0",
+    "d3-scale-chromatic": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-timer": "^3.0.1",
+    "d3-transition": "^3.0.1",
+    "d3-zoom": "^3.0.0",
     "glsl-easings": "^1.0.0",
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",
@@ -50,28 +59,27 @@
     "glur": "^1.1.2",
     "lodash.isequal": "^4.5.0",
     "lodash.merge": "^4.6.2",
-    "rbush-3d": "0.0.4",
-    "regl": "^1.3.13",
+    "regl": "^2.1.0",
     "string-hash": "^1.1.3",
     "tinyqueue": "^2.0.3",
     "topojson-client": "^3.1.0"
   },
   "deprecated": false,
   "devDependencies": {
-    "@apache-arrow/es5-cjs": "^3.0.0",
     "@babel/plugin-transform-runtime": "^7.9.6",
     "babel-cli": "^6.26.0",
     "babel-core": "^6.26.3",
-    "babel-loader": "^8.2.2",
+    "eslint": "^7.29.0",
+    "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-mourner": "^3.0.0",
+    "eslint-plugin-import": "^2.23.4",
     "glslify-hex": "^2.1.1",
     "glslify-loader": "^2.0.0",
     "promise-worker": "^2.0.1",
     "raw-loader": "^4.0.1",
     "regenerator-runtime": "^0.13.5",
-    "webpack-cli": "^4.5.0",
-    "webpack-dev-server": "^3.11.2",
-    "worker-loader": "^3.0.8",
-    "yargs": "^15.1.0"
+    "rollup-plugin-glslify": "^1.2.0",
+    "rollup-plugin-web-worker-loader": "^1.6.1",
+    "vite": "^2.3.8"
   }
 }

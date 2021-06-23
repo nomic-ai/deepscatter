@@ -23,11 +23,11 @@ export default class Counter extends Map {
 
   inc(...values) {
    // Increment by 1.
-   this.add(1, ...values)
+   this.add(1, ...values);
   }
 
   add(i, ...values) {
-    if (values.length == 1) {
+    if (values.length === 1) {
       this.set(values[0], this.get_count(values[0]) + i)
     }
     else {

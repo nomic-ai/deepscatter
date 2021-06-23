@@ -8,7 +8,6 @@ let libraryObjName = 'deepscatter'; // name for window.MyModule via script tag l
 
 let plugins = [], outputFile;
 
-
 module.exports = {
   entry: {
     deepscatter: __dirname + "/src/deepscatter.js",
