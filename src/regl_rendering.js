@@ -647,9 +647,11 @@ export class ReglRenderer extends Renderer {
       // read onto the contour vals.
       this.render_points(props);
       // Must be flipped
-      color_at_point = this.regl.read({
-        x, y: height - y, width: 1, height: 1,
-      });
+      try {
+        color_at_point = this.regl.read({
+          x, y: height - y, width: 1, height: 1,
+        });
+      } catch (err) { console.warn("Read bad data from", { x, y, height }) }
     });
 
     const float = unpackFloat(...color_at_point);
