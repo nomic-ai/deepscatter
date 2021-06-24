@@ -14,7 +14,7 @@ class ImageTile extends BaseTile {
           format: 'rgba',
           type: 'uint8',
       }),
-      image_locations': regl.buffer({
+      image_locations: regl.buffer({
         'usage': 'dynamic',
         data: new Array(points.length * 4).fill(0),
         type: 'float'

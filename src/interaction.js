@@ -341,7 +341,7 @@ export default class Zoom {
         }
       }
     }
-
+    /*
     for (const renderer of this.renderers.values()) {
       try {
         // renderer.tick()
@@ -349,7 +349,7 @@ export default class Zoom {
         this._timer.stop();
         throw err;
       }
-    }
+    } */
   }
 }
 

@@ -1,12 +1,9 @@
-import {
-  extent, range, min, max, bisectLeft,
-} from 'd3-array';
-// Shouldn't be here, just while contours are.
-// import 'regenerator-runtime/runtime'
+
+import { extent, range, min, max, bisectLeft } from 'd3-array';
 import { Table } from '@apache-arrow/es2015-esm';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
-import TileWorker from './tileworker.worker?worker&inline';
+//import TileWorker from './tileworker.worker.js?worker&inline';
 
 class BaseTile {
   // Can this usefully do anything?
@@ -150,7 +147,7 @@ class Tile extends BaseTile {
 
           return 'changed';
         });
-    });
+    }); 
   }
 
   * points(bounding = undefined, sorted = false) {
@@ -708,7 +705,8 @@ export default class RootTile extends Tile {
     for (const i of range(NUM_WORKERS)) {
       console.log(`Allocating worker ${i}`);
       this._tileWorkers.push(
-        Comlink.wrap(new TileWorker()),
+          Comlink.wrap(new Worker(this.url + '/../worker.js')),
+//        Comlink.wrap(new TileWorker()),
       );
     }
 

@@ -10,7 +10,13 @@ export default {
     lib: {
       entry: path.resolve(__dirname, 'src/deepscatter.js'),
       name: 'deepscatter',
-      formats: ['es', 'umd'],
+      formats: [/*'es', */'umd'],
+    },
+  },
+  rollupOptions: {
+    output: {
+      inlineDynamicImports: true,
+      manualChunks: {},
     },
   },
   plugins: [
@@ -21,5 +27,5 @@ export default {
       //      extensions: supportedExts,
       preserveSource: true, // somehow results in slightly smaller bundle
     }),
-  ],
+  ], 
 };

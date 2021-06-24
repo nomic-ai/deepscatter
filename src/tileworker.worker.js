@@ -1,9 +1,14 @@
+const window = {};
+
 import { transfer, expose } from 'comlink';
 import {
   Table, Column, Vector, Utf8, Float32,
   Uint32, Int32, Int64, Dictionary,
-} from '@apache-arrow/es2015-esm';
+} from '@apache-arrow/es5-cjs';
 
+const {Table, Column, Vector, Utf8, Float32,
+  Uint32, Int32, Int64, Dictionary} = window.Arrow;
+const { transfer, expose } = window.comlink;
 function compose_functions(val) {
 
   function compose_singleton_function(val) {
@@ -26,11 +31,13 @@ function compose_functions(val) {
 
 // Somehow have to keep these independent.
 function dictVector(input, id) {
+  console.log("Making Dictionary")
   const dictionary = Vector.from({
     values: input,
     type: new Dictionary(new Utf8(), new Uint32(), id),
     highWaterMark: 1000000,
   });
+  console.log("Made Dictionary")
   return dictionary;
 }
 
@@ -50,10 +57,10 @@ const WorkerTile = {
     return fetch(url)
       .then((resp) => resp.arrayBuffer())
       .then((response) => {
+        console.log("Attempting load")
         const table = Table.from(response);
+        console.log("Loaded")
         const { metadata } = table.schema;
-        // const tile = url.split("/").slice(-3).join("/")
-        // mutations['tile_key'] = `return "${tile}"`;
 
         let buffer;
         // For now, always mutate to ensure dict indexes are cast.
@@ -62,15 +69,20 @@ const WorkerTile = {
         } else {
           buffer = response;
         }
+        console.log("Here")
 
         const codes = get_dictionary_codes(buffer);
+        console.log("Now here")
 
         return [transfer(buffer, [buffer]), metadata, codes];
       });
   },
   run_transforms(map, table_buffer) {
+    console.log("5 here")
+
     const buffer = mutate(map, table_buffer);
     const codes = get_dictionary_codes(buffer);
+    console.log("6 here")
     return [transfer(buffer, [buffer]), codes];
   },
 };
@@ -173,5 +185,3 @@ function mutate(map, table_buffer, metadata) {
 }
 
 expose(WorkerTile);
-
-// expose(TableMutator)
