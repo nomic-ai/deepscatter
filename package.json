@@ -36,6 +36,7 @@
   "homepage": "https://github.com/CreatingData/deepscatter#readme",
   "dependencies": {
     "@apache-arrow/es2015-esm": "^4.0.1",
+    "@apache-arrow/es5-esm": "^3.0.0",
     "@babel/runtime": "^7.9.6",
     "comlink": "^4.3.0",
     "d3-array": "^3.0.1",
@@ -80,6 +81,7 @@
     "regenerator-runtime": "^0.13.5",
     "rollup-plugin-glslify": "^1.2.0",
     "rollup-plugin-web-worker-loader": "^1.6.1",
-    "vite": "^2.3.8"
+    "vite": "^2.3.8",
+    "vite-plugin-legacy": "^2.1.0"
   }
 }

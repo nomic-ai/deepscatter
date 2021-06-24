@@ -4,11 +4,8 @@ import { transfer, expose } from 'comlink';
 import {
   Table, Column, Vector, Utf8, Float32,
   Uint32, Int32, Int64, Dictionary,
-} from '@apache-arrow/es5-cjs';
+} from '@apache-arrow/es5-esm';
 
-const {Table, Column, Vector, Utf8, Float32,
-  Uint32, Int32, Int64, Dictionary} = window.Arrow;
-const { transfer, expose } = window.comlink;
 function compose_functions(val) {
 
   function compose_singleton_function(val) {

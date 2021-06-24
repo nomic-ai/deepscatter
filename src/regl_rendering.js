@@ -18,6 +18,7 @@ export class ReglRenderer extends Renderer {
       {
         //      extensions: 'angle_instanced_arrays',
         optionalExtensions: [
+          'OES_standard_derivatives',
           'OES_element_index_uint',
           'OES_texture_float',
           'OES_texture_half_float',

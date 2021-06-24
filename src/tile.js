@@ -1,9 +1,10 @@
 
 import { extent, range, min, max, bisectLeft } from 'd3-array';
-import { Table } from '@apache-arrow/es2015-esm';
+import { Table } from '@apache-arrow/es5-esm';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
-//import TileWorker from './tileworker.worker.js?worker&inline';
+
+import TileWorker from './tileworker.worker.js?worker&inline';
 
 class BaseTile {
   // Can this usefully do anything?
@@ -274,6 +275,7 @@ class Tile extends BaseTile {
     if (this._table) { return this._table; }
     // Constitute table if there's a present buffer.
     if (this._table_buffer && this._table_buffer.byteLength > 0) {
+      console.log("BYTES", this._table_buffer.byteLength)
       return this._table = Table.from(this._table_buffer);
     }
     return undefined;
@@ -298,7 +300,9 @@ class Tile extends BaseTile {
     }
     this._already_called = true;
 
-    const url = `${window.location.origin}/${this.url}/${this.key}.feather`;
+    const url = this.url.match("//") ? 
+    `${this.url}/${this.key}.feather` : 
+    `${window.location.origin}/${this.url}/${this.key}.feather`;
 
     this.download_state = 'In progress';
 
@@ -315,6 +319,9 @@ class Tile extends BaseTile {
         // how to fix it on the table in javascript, just python.
         this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
         this._table_buffer = buffer;
+        console.log("Got buffer")
+        this._table = Table.from(buffer)
+        console.log("Into table")
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
         this._min_ix = this.table.getColumn('ix').get(0);
@@ -705,8 +712,8 @@ export default class RootTile extends Tile {
     for (const i of range(NUM_WORKERS)) {
       console.log(`Allocating worker ${i}`);
       this._tileWorkers.push(
-          Comlink.wrap(new Worker(this.url + '/../worker.js')),
-//        Comlink.wrap(new TileWorker()),
+//          Comlink.wrap(new Worker(this.url + '/../worker.js')),
+        Comlink.wrap(new TileWorker()),
       );
     }
 
