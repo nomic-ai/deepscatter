@@ -967,12 +967,8 @@ void main() {
                                               u_last_size_transform, a_last_size,
                                               u_last_size_needs_map);
 
-//  size_multiplier = a_size;
-  last_size_multiplier = a_last_size;
   size_multiplier = u_base_size * 
      mix(last_size_multiplier, size_multiplier, ease);
-//  size_multiplier = u_base_size;
-//  size_multiplier = u_base_size;
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
   point_size_adjust = exp(log(u_k) * u_zoom_balance);
