@@ -1,8 +1,7 @@
 # Warning
 
 This library is still unstable; dragons, and so on. I wouldn't really
-recommend using it unless you clearly know why! At this current moment,
-it will only run in a local sandbox.
+recommend using it unless you clearly know why!
 
 # Deep Scatterplots for the Web
 
@@ -22,8 +21,6 @@ It's fast for two reasons:
    in parallel.
 
 # Quick start
-
-This is currently in between bundling strategies, but it should work in development.
 
 ## Demo Data.
 
@@ -55,10 +52,19 @@ If you go to localhost:3000, it should have an interactive scatterplot waiting.
   ```
 3. Edit the file at `index.html` to use dimensions matching those in your data.
 
-# JS Bundling
+# Code and bundling notes
 
 This is currently bundled with vite and rollup. There is/will be a further interaction layer on 
-top of it, but the core plotting components are separate and should work as a standalone.
+top of it, but the core plotting components are separate and should work as a standalone layer that supports 
+plot requests via an API. This is still subject to change and is not yet documented.
+
+The demo site at `index.html` in the vite build won't work in production because of slight differences in bundling.
+For a site that should work using the ESM module bundle created by 'npx vite build', see `index_prod.html`.
+
+Note that this is an ESM module and so requires you to use `<script type="module">` in your code. DOn't worry! It's 2021, we're allowed to 
+do this now!
+
+## Code strategy 
 
 Any interaction logic that changes the API call directly does not belong in this library. The only
 interaction code here is for zooming and interacting with points.
