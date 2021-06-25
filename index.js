@@ -1,4 +1,4 @@
 
-import infinite_scatter from './src/deepscatter';
+import Scatterplot from './src/deepscatter';
 
-export default infinite_scatter;
+export default Scatterplot;

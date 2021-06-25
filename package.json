@@ -1,11 +1,22 @@
 {
   "name": "deepscatter",
-  "version": "1.0.0",
-  "description": "Build zoomable scatterplots with millions of points using D3",
-  "main": "index.js",
+  "type": "module",
+  "version": "2.0.0",
+  "description": "Zoomable scatterplots with billions of points",
+  "files": [
+    "dist"
+  ],
+  "module": "./dist/deepscatter.es.js",
+  "main": "./dist/deescatter.umd.js",
+  "exports": {
+    ".": {
+      "import": "./dist/deepscatter.es.js",
+      "require": "./dist/deepscatter.umd.js"
+    }
+  },
   "scripts": {
-    "babel": "babel --presets es2015 index.js -o build/main.bundle.js",
-    "start": "http-server"
+    "dev": "vite",
+    "build": "vite build"
   },
   "repository": {
     "type": "git",
@@ -24,19 +35,53 @@
   },
   "homepage": "https://github.com/CreatingData/deepscatter#readme",
   "dependencies": {
-    "d3-array": "^1.2.4",
-    "d3-ease": "^1.0.5",
-    "d3-format": "^1.3.2",
-    "d3-quadtree": "github:bmschmidt/d3-quadtree",
-    "d3-scale": "^2.1.2",
-    "d3-tile": "^1.0.0"
+    "@apache-arrow/es2015-esm": "^4.0.1",
+    "@apache-arrow/es5-esm": "^3.0.0",
+    "@babel/runtime": "^7.9.6",
+    "comlink": "^4.3.0",
+    "d3-array": "^3.0.1",
+    "d3-color": "^3.0.1",
+    "d3-contour": "^3.0.1",
+    "d3-ease": "^3.0.1",
+    "d3-fetch": "^3.0.1",
+    "d3-format": "^3.0.1",
+    "d3-geo": "^3.0.1",
+    "d3-interpolate": "^3.0.1",
+    "d3-scale": "^4.0.0",
+    "d3-scale-chromatic": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-timer": "^3.0.1",
+    "d3-transition": "^3.0.1",
+    "d3-zoom": "^3.0.0",
+    "glsl-easings": "^1.0.0",
+    "glsl-fast-gaussian-blur": "^1.0.2",
+    "glsl-read-float": "^1.1.0",
+    "glslify": "^7.0.0",
+    "glur": "^1.1.2",
+    "lodash.isequal": "^4.5.0",
+    "lodash.merge": "^4.6.2",
+    "regl": "^2.1.0",
+    "string-hash": "^1.1.3",
+    "tinyqueue": "^2.0.3",
+    "topojson-client": "^3.1.0"
   },
   "deprecated": false,
   "devDependencies": {
+    "@babel/plugin-transform-runtime": "^7.9.6",
     "babel-cli": "^6.26.0",
     "babel-core": "^6.26.3",
-    "babel-preset-es2015": "^6.24.1",
-    "csv-parser": "^2.3.2",
-    "csv-stringify": "^5.3.6"
+    "eslint": "^7.29.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-mourner": "^3.0.0",
+    "eslint-plugin-import": "^2.23.4",
+    "glslify-hex": "^2.1.1",
+    "glslify-loader": "^2.0.0",
+    "promise-worker": "^2.0.1",
+    "raw-loader": "^4.0.1",
+    "regenerator-runtime": "^0.13.5",
+    "rollup-plugin-glslify": "^1.2.0",
+    "rollup-plugin-web-worker-loader": "^1.6.1",
+    "vite": "^2.3.8",
+    "vite-plugin-legacy": "^2.1.0"
   }
 }
