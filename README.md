@@ -143,7 +143,7 @@ node src/tiler.js --tile-size 20000 data/1e5.csv
 # API
 
 This API description is incomplete. If you actually want to use this and can't figure it out,
-feel free to file an issue.
+file an issue.
 
 
 ## Object creation
@@ -175,44 +175,7 @@ handled best if you only call this one method.
 
 There's also a special method, `scatterplot.redraw()`, that can be called in an emergency.
 
-Most of these options have defaults, but I'll give an extensive one because I don't have an example set up yet.
-
-```js
-
-scatterplot.plotAPI(
-{
-  "base_dir": "/data/scatter/streets",
-  "colors": {"name":""}, // Required; what are the colors to be used?
-  "lab": ["name"], // What fields can appear as labels?
-  "point_opacity": 1, // Zero to one.
-  "font": "Helvetica" // a font for text
-  "label_field":"name" // The field to use as labels in the initial plot.
-  "point_size": 1.2, // in pixels.
-  "variable_point_size": true, // should points vary in size.
-  "point_threshold": 8, /* Only plot points up to a zoom level of 8, relative to the
-  current window zoom.*/
-  "guides": ["legend", "label_legend", "filter_legend"], // Put selector guides onscreen. Requires Bootstrap css to be loaded or it'll sprawl across the screen.
-  "label_threshold": 0.1, // Attempt to print labels for up to 10% of points.
-  "variable_text_size": true, // Higher-indexed labels are bigger.
-  "zoom": [1, 4.06330232428664, 0.050736521860849315], // What zoom level to start at.
-  "scheme": "dark" // Light or dark background scheme.
-  }
-```
-
-## Simple calls
-
-* `base_dir`: A local path to find tiles and data description. Typically created with the python script.
-* `colors`: A dict of fields that should populate a dropdown menu of colors.
-* `lab`: A list of fields that might be used to label points.
-* `point_size`: The size of individual points, in pixels.
-* `keys`: A dictionary of supplemental files for fields that may have longer labels. This
-allows the use of integer or text keys in the CSV files without repeating long string. Each element
-in the dictionary is a key-value pair. For instance, `{"Subclassification": "LCC.txt"}` indicates that for display, the values in the field `Subclassification` will be matched against the first column in `LCC.txt`, and the second column returned. This file is a `tsv` file, but can end with `.txt`.
-* `show_only_n_categories`: if there is a color filter in effect, show only the top n values. This can
-ensure that colors are not re-used.
-* `debug`: Whether to show the outlines of the tiles being used. If 'theoretical,' returns the outlines of notional tile depth; if 'actual', shows the recursively packed tiles that actually have to be loaded.
-
-## Complex Calls
+Most of these options have defaults, see `index.html` for a reasonably comprehensive example.
 
 ### `filters` and `+filters`
 
@@ -224,14 +187,14 @@ By default, filters build a function that returns true or false.
 
 Filters are instantiated as an object.  The keys are the names of the
 filters (so that they can be deleted); the value is built into a function
-by implicitly adding `d => ` to the front.
+by implicitly adding `datum => ` to the front.
 
 So for example, in the following filter:
 
 ```
 "filters": {
- "English": "d.language=='English'",
- "Science": "d.Classification=='Q'"
+ "English": "datum.language=='English'",
+ "Science": "datum.Classification=='Q'"
 }
 ```
 
@@ -241,15 +204,7 @@ defined as `d => d.Classification=='Q'`.
 
 #### Regex filters.
 
-Regular expression filters use a special compact syntax. The key should be name of the field to
-be edited, and the value should be a regular expression with teh
-
-The following regex will limit to single letter classes for R, S, and T, and allow either Q or any two letter queries starting with Q.
-
-```
-    "Classification": "/^Q.?|R|S|T$/"
-```
-
+Removed--would this be useful?
 
 
 # Other notes
@@ -261,43 +216,6 @@ Especially important is the zoom level.
 You can get a string telling you where are by typing into the console.
 
 ```js
-scatterplot.where_am_i()
+scatterplot._renderer.current_corners()
 ```
 
-# To do
-
-## Indices by id.
-
-Almost all the code is there for indexes, which can locate a point
-that hasn't been loaded using an alphabetical list. This lets you zoom
-to any individual word without knowing where it is. I just haven't
-re-implemented it lately.
-
-```
-scatterplot.zoom_to_id('foo')
-```
-
-## WebGL
-
-Probably this should (at least optionally) be in WebGL. It's nice to
-be able to control the plotting directly on data in Canvas, which is
-why I use it. Canvas is fine for navigation, but there might be visual
-advantages to pushing up towards 100,000 or 500,000 points. Above
-1,000,000 points, the problem starts to be not rendering but shipping
-data to the browser.
-
-## Images
-
-It would be pretty easy to have this draw images to the canvas as well as text and points.
-This could be useful for T-SNE exploration. That field is already fairly well served up to a few hundred thousand, so I haven't done it here.
-
-## ES Module
-
-This should be an ES6 module.
-
-## Responsive size setting
-
-Currently, you specify the point size and target zoom directly. This means that smaller
-screens have much higher overplotting than bigger ones. For mobile devices, it would probably
-be better to print some combination of fewer points and smaller points; how to balance those
-two goals is unclear.
