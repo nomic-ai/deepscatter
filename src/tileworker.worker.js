@@ -28,13 +28,11 @@ function compose_functions(val) {
 
 // Somehow have to keep these independent.
 function dictVector(input, id) {
-  console.log("Making Dictionary")
   const dictionary = Vector.from({
     values: input,
     type: new Dictionary(new Utf8(), new Uint32(), id),
     highWaterMark: 1000000,
   });
-  console.log("Made Dictionary")
   return dictionary;
 }
 
@@ -131,7 +129,6 @@ function mutate(map, table_buffer, metadata) {
         columns[name] = floatVector(col);
       } else if ((name === 'x' || name === 'y') && typeId !== 3) {
         const float_version = new Float32Array(table.length);
-        console.log(metadata);
         const [min, max] = JSON.parse(metadata.get('extent'))[name];
         const diff = max - min;
         for (let i = 0; i < table.length; i++) {

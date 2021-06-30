@@ -243,7 +243,6 @@ class Aesthetic {
   }
 
   post_to_regl_buffer(buffer_name) {
-    console.log('Posting to buffer from ', buffer_name, this.field);
     this.textures[buffer_name].subimage({
       data: this.texture_buffer,
       width: 1,
@@ -252,7 +251,6 @@ class Aesthetic {
   }
 
   clear() {
-    console.log('Clearing', this.field);
     this.texture_buffer.set(this.default_data());
     this.post_to_regl_buffer('one_d');
     this.lookup = undefined;
@@ -304,7 +302,6 @@ class Aesthetic {
 
     let actual_values;
     if (lookup_handler === undefined) {
-      console.log('Using temporary null lookup.');
       actual_values = {
         texture: this.textures.one_d,
         y_domain: [-1, 1],
@@ -505,8 +502,6 @@ class Aesthetic {
     }
 
     const values = input.map((i) => +func(i));
-    console.log(values);
-    console.log(encodeFloatsRGBArange(values));
     this.texture_buffer.set(encodeFloatsRGBArange(values).array);
   }
 }
@@ -675,7 +670,6 @@ class Jitter_radius extends Aesthetic {
     if (encoding.method === null) {
       this.method = 'None';
     }
-    console.log(encoding, 'ENCODING');
     super.update(encoding);
   }
 
@@ -752,7 +746,6 @@ class Color extends Aesthetic {
     } else if (range.length === this.texture_size * 4) {
       this.texture_buffer.set(range);
     } else if (range.length && range[0].length && range[0].length == 3) {
-      console.log('Setting color palette manually.');
       // manually set colors.
       const r = arange(palette_size).map((i) => {
         const [r, g, b] = range[i % range.length];
@@ -830,7 +823,6 @@ export class StatefulAesthetic {
 function parseLambdaString(lambdastring, materialize = false) {
   // Materialize an arrow function from its string.
   // Note that this *does* reassign 'this'.
-  console.log(lambdastring);
   let [field, lambda] = lambdastring.split('=>').map((d) => d.trim());
   if (lambda === undefined) {
     throw `Couldn't parse ${lambdastring} into a function`;

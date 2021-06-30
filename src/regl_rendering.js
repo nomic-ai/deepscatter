@@ -526,7 +526,6 @@ export class ReglRenderer extends Renderer {
   }
 
   count_colors(field) {
-    console.log('Counting colors');
     const { regl, props } = this;
     props.prefs.jitter = null;
     if (field !== undefined) {
@@ -554,7 +553,6 @@ export class ReglRenderer extends Renderer {
         { data: minilist },
       );
     });
-    console.log(minilist);
     for (const [k, v] of this.tileSet.dictionary_lookups[field]) {
       if (typeof (k) === 'string') { continue; }
       const col = Math.floor(k / 64);
@@ -598,7 +596,6 @@ export class ReglRenderer extends Renderer {
     const { props } = this;
     props.only_color = only_color;
     let v;
-    console.log('Counting visible points');
     this.fbos.contour.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
       // read onto the contour vals.
@@ -652,7 +649,10 @@ export class ReglRenderer extends Renderer {
         color_at_point = this.regl.read({
           x, y: height - y, width: 1, height: 1,
         });
-      } catch (err) { console.warn("Read bad data from", { x, y, height }) }
+      } catch (err) {
+        console.warn("Read bad data from", { x, y, height, attempted: height - y})
+        color_at_point = [0, 0, 0, 0]
+      }
     });
 
     const float = unpackFloat(...color_at_point);
@@ -1118,7 +1118,6 @@ class MultipurposeBufferSet {
 
   generate_new_buffer() {
   // Adds to beginning of list.
-    console.log(`Creating buffer number ${this.buffers.length}`);
     if (this.pointer) { this.buffer_offsets.unshift(this.pointer); }
     this.pointer = 0;
     this.buffers.unshift(
