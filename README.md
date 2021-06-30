@@ -22,7 +22,12 @@ It's fast for two reasons:
 
 # Quick start
 
-## Demo Data.
+## Importing the module.
+
+I've got an Observable notebook that shows how to use this. For now, it's private--write 
+me if you want access.
+
+## Running locally.
 
 First, install the companion tiling library, which is written in python, 
 and generate a million points of test data in tiles of 50000 apiece.
@@ -45,26 +50,44 @@ If you go to localhost:3000, it should have an interactive scatterplot waiting.
 
 ## Your own data.
 
-1. Create a CSV file that has columns called 'x' and 'y'; e.g., 
-2. Tile it:
+1. Create a CSV file that has columns called 'x' and 'y'. (Or a feather file that has columns `x`, `y`, and `ix`, where `ix` is display order).
+3. Tile it:
   ```sh
   quadfeather --files tmp.csv --tile_size 50000 --destination public/tiles
   ```
-3. Edit the file at `index.html` to use dimensions matching those in your data.
+3. Edit the file at `index.html` to use an encoding scheme that matches your data.
 
-# Code and bundling notes
+## Build the module
 
+```sh
+npm run build
+```
+
+will create an ES module at `dist/deepscatter.es.js` The mechanics of
+importing this are very slightly different than `index.html`.
+
+Note that this is an ESM module and so requires you to use `<script type="module">` in your code.
+Don't worry! It's 2021, we're allowed to 
+do this now! Snippet:
+
+```html
+<div id="my-div"></div>
+<script type="module">
+import Scatterplot from './dist/deepscatter.umd.js'
+f = new Scatterplot("#my-div")
+</script>
+
+```
+
+ See `index_prod.html` for an example
+ 
 This is currently bundled with vite and rollup. There is/will be a further interaction layer on 
 top of it, but the core plotting components are separate and should work as a standalone layer that supports 
-plot requests via an API. This is still subject to change and is not yet documented.
+plot requests via an API. 
 
-The demo site at `index.html` in the vite build won't work in production because of slight differences in bundling.
-For a site that should work using the ESM module bundle created by 'npx vite build', see `index_prod.html`.
 
-Note that this is an ESM module and so requires you to use `<script type="module">` in your code. DOn't worry! It's 2021, we're allowed to 
-do this now!
 
-## Code strategy 
+# Code strategy 
 
 Any interaction logic that changes the API call directly does not belong in this library. The only
 interaction code here is for zooming and interacting with points.
@@ -77,9 +100,23 @@ the tiling strategy into a separate JS library called 'quadfeather'.
 Apache Arrow would still be a necessary intermediate format, but it could be generated from CSV files
 using, say, `arquero` or a WASM port of `DuckDB`.
 
-# Aesthetic channels
+# API
 
-## Implemented
+This is still subject to change and is not yet documented. The encoding portion of the 
+API mimics Vega-Lite with some minor distinctions.
+
+```js
+{
+   encoding: {
+     "x": {
+         "field": "
+     }
+   }
+}
+
+```
+
+## Implemented aesthetics.
 
 1. x
 2. y
@@ -89,6 +126,7 @@ using, say, `arquero` or a WASM port of `DuckDB`.
 6. color (categorical or linear: color scales explicitly, or accepting any d3-color name.)
 7. `x0` (for animations; transitions between x0 and x)
 8. `y0` (for animations; transitions between y0 and y)
+9. `filter`. (Filtering is treated as an aesthetic operation by this library.)
 
 ## Planned
 
