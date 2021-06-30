@@ -7,7 +7,7 @@ import {
 } from '@apache-arrow/es5-esm';
 
 function compose_functions(val) {
-
+  
   function compose_singleton_function(val) {
     return Function('datum', val);
   }
@@ -54,9 +54,7 @@ const WorkerTile = {
     return fetch(url)
       .then((resp) => resp.arrayBuffer())
       .then((response) => {
-        console.log("Attempting load")
         const table = Table.from(response);
-        console.log("Loaded")
         const { metadata } = table.schema;
 
         let buffer;
@@ -66,20 +64,15 @@ const WorkerTile = {
         } else {
           buffer = response;
         }
-        console.log("Here")
 
         const codes = get_dictionary_codes(buffer);
-        console.log("Now here")
 
         return [transfer(buffer, [buffer]), metadata, codes];
       });
   },
   run_transforms(map, table_buffer) {
-    console.log("5 here")
-
     const buffer = mutate(map, table_buffer);
     const codes = get_dictionary_codes(buffer);
-    console.log("6 here")
     return [transfer(buffer, [buffer]), codes];
   },
 };

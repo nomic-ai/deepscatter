@@ -40,8 +40,6 @@ bool out_of_triangle(in vec2 coord) {
 
 void main() {
 
-
-  
   if (u_only_color >= -1.5) {
     gl_FragColor = vec4(0., 0., 0., 1./255.);
     return;

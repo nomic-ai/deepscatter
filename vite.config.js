@@ -1,4 +1,5 @@
 import glslify from 'rollup-plugin-glslify';
+//import worker from 'rollup-plugin-web-worker-loader';
 import path from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
@@ -10,14 +11,15 @@ export default {
     lib: {
       entry: path.resolve(__dirname, 'src/deepscatter.js'),
       name: 'Deepscatter',
-      formats: ['es', 'umd'],
+      formats: ['es'],
     },
-  },
+    },
+
   plugins: [
-    glslify({ compress: false }),
+    glslify({ compress: false }), // for debugging 
 /*    worker({
       targetPlatform: 'browser',
-      pattern: /(.+)\?worker/,
+      pattern: /(.+)\?worker.js/,
       //      extensions: supportedExts,
       preserveSource: true, // somehow results in slightly smaller bundle
     }), */

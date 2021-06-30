@@ -1,6 +1,6 @@
 import { range as arange, shuffle, extent } from 'd3-array';
 import {
-  scaleLinear, scaleSqrt, scaleLog, scaleIdentity,
+  scaleLinear, scaleSqrt, scaleLog, scaleIdentity, scaleOrdinal
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
@@ -33,6 +33,8 @@ const color_palettes = {
   white: arange(palette_size).map((i) => [255, 255, 255, 255]),
 };
 
+const schemes = {};
+
 for (const [k, v] of Object.entries(d3Chromatic)) {
   if (k.startsWith('scheme') && typeof (v[0]) === 'string') {
     const colors = new Array(palette_size);
@@ -45,11 +47,12 @@ for (const [k, v] of Object.entries(d3Chromatic)) {
     }
     const name = k.replace('scheme', '').toLowerCase();
     color_palettes[name] = to_buffer(colors);
+    schemes[name] = v;
   }
   if (k.startsWith('interpolate')) {
     const name = k.replace('interpolate', '').toLowerCase();
     color_palettes[name] = materialize_color_interplator(v);
-    if (name == 'rainbow') {
+    if (name === 'rainbow') {
       color_palettes.shufbow = shuffle(color_palettes[name]);
     }
   }
@@ -130,6 +133,10 @@ class Aesthetic {
     return 4095;
   }
 
+  apply(point) {
+    return this.scale(this.value_for(point))
+  }
+
   get transform() {
     if (this._transform) return this._transform;
     return default_aesthetics[this.label].transform;
@@ -188,13 +195,8 @@ class Aesthetic {
   }
 
   value_for(point) {
-    const field = this.field || this.partner.field
-    // WTF? 
+    const field = this.field || this.partner.field;
     return point[field];
-  }
-
-  create_lookup_texture(x, y, z) {
-
   }
 
   get texture_buffer() {
@@ -487,7 +489,6 @@ class Aesthetic {
       //      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return;
     }
-    console.log(input);
     const { column } = this;
 
     if (!column) {
@@ -684,6 +685,7 @@ class Jitter_radius extends Aesthetic {
 }
 
 class Color extends Aesthetic {
+
   get default_val() { return [128, 150, 213, 255]; }
 
   default_data() {
@@ -732,10 +734,22 @@ class Color extends Aesthetic {
     return this._constant;
   }
 
+
+  get scale() {
+    return this._scale
+  }
+
   encode_for_textures(range) {
+    if (this.is_dictionary()) {
+      this._scale = scaleOrdinal().range(range).domain(this.domain);
+      this._scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+    } else {
+      this._scale = scales[this.transform]().range(range).domain(this.domain);
+    }
+
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range]);
-    } else if (range.length == this.texture_size * 4) {
+    } else if (range.length === this.texture_size * 4) {
       this.texture_buffer.set(range);
     } else if (range.length && range[0].length && range[0].length == 3) {
       console.log('Setting color palette manually.');

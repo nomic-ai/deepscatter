@@ -7,7 +7,7 @@
     "dist"
   ],
   "module": "./dist/deepscatter.es.js",
-  "main": "./dist/deescatter.umd.js",
+  "main": "./dist/deepscatter.umd.js",
   "exports": {
     ".": {
       "import": "./dist/deepscatter.es.js",
@@ -31,13 +31,11 @@
   "author": "Ben Schmidt",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/CreatingData/deepscatter/issues"
+    "url": "https://github.com/CreaacktingData/deepscatter/issues"
   },
   "homepage": "https://github.com/CreatingData/deepscatter#readme",
   "dependencies": {
-    "@apache-arrow/es2015-esm": "^4.0.1",
     "@apache-arrow/es5-esm": "^3.0.0",
-    "@babel/runtime": "^7.9.6",
     "comlink": "^4.3.0",
     "d3-array": "^3.0.1",
     "d3-color": "^3.0.1",
@@ -56,32 +54,21 @@
     "glsl-easings": "^1.0.0",
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",
-    "glslify": "^7.0.0",
-    "glur": "^1.1.2",
-    "lodash.isequal": "^4.5.0",
-    "lodash.merge": "^4.6.2",
-    "regl": "^2.1.0",
-    "string-hash": "^1.1.3",
-    "tinyqueue": "^2.0.3",
-    "topojson-client": "^3.1.0"
+    "lodash-es": "^4.17.21",
+    "regl": "^2.1.0"
   },
   "deprecated": false,
   "devDependencies": {
-    "@babel/plugin-transform-runtime": "^7.9.6",
-    "babel-cli": "^6.26.0",
-    "babel-core": "^6.26.3",
+    "glslify": "^7.0.0",
+    "@babel/runtime": "^7.9.6",
     "eslint": "^7.29.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-mourner": "^3.0.0",
     "eslint-plugin-import": "^2.23.4",
     "glslify-hex": "^2.1.1",
     "glslify-loader": "^2.0.0",
-    "promise-worker": "^2.0.1",
-    "raw-loader": "^4.0.1",
-    "regenerator-runtime": "^0.13.5",
     "rollup-plugin-glslify": "^1.2.0",
     "rollup-plugin-web-worker-loader": "^1.6.1",
-    "vite": "^2.3.8",
-    "vite-plugin-legacy": "^2.1.0"
+    "vite": "^2.3.8"
   }
 }

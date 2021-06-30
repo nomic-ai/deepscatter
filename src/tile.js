@@ -1,33 +1,30 @@
-
-import { extent, range, min, max, bisectLeft } from 'd3-array';
+import {
+  extent, range, min, max, bisectLeft,
+} from 'd3-array';
 import { Table } from '@apache-arrow/es5-esm';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
 
 import TileWorker from './tileworker.worker.js?worker&inline';
 
-class BaseTile {
+class Batch {
   // Can this usefully do anything?
+
+  download_to_depth() {}
+
 }
 
-class Tile extends BaseTile {
-  constructor(base_url, key, parent = undefined, prefs) {
+class Tile extends Batch {
+  constructor() {
     // Accepts prefs only for the case of the root tile.
     super();
-    this.url = base_url;
-    this.parent = parent;
-    if (parent === undefined) {
-      this._mutations = prefs.mutate;
-    }
-    this.key = key;
-    this.codes = this.key.split('/').map((t) => +t);
     this.max_ix = undefined;
 
     this.promise = Promise.resolve(1);
 
     this.download_state = 'Unattempted';
 
-    this.class = new.target;
+//    this.class = new.target;
   }
 
   get dictionary_lookups() {
@@ -58,42 +55,6 @@ class Tile extends BaseTile {
         || c.y[1] < viewport_limits.y[0]));
   }
 
-  download_to_depth(depth, corners = { x: [-1, 1], y: [-1, 1] }, recurse = false) {
-    // First, execute the download to populate this.max_ix
-
-    if (this.max_ix < depth && this.is_visible(depth, corners) && !recurse) {
-      const promises = this.children.map((child) => child.download());
-      if (this._children) {
-        // Already-downloaded children must also launch downloads.
-        for (const child of this._children) {
-          promises.concat(
-            child.download_to_depth(depth, corners, false),
-          );
-        }
-      }
-      return Promise.all(promises);
-      // return this.children().map(child => child.download_to_depth(depth, corners, false))
-    }
-
-    return this.download()
-      .then((_) => {
-      // If the last point here is less than the target depth, keep going.
-        if (this.max_ix < depth
-        && this.is_visible(depth, corners) && recurse
-        ) {
-        // Create the children.
-          const child_processes = this.children
-          // Filter to visible. Newly generated children
-          // will return invisible.
-            .map((child) => child.download_to_depth(depth, corners));
-          return Promise.all(child_processes)
-          // .catch(err => undefined)
-            .then((d) => this);
-        }
-        return this;
-      });
-  }
-
   get tileWorker() {
     // Bubbles up to grab one from the root tile.
     return this.parent.tileWorker;
@@ -107,7 +68,7 @@ class Tile extends BaseTile {
     for (const [k, v] of Object.entries(this.mutations)) {
       // Shallow copy to avoid overwriting.
       const current = this._current_mutations[k];
-      if (v != current) {
+      if (v !== current) {
         needed[k] = v;
       }
     }
@@ -120,8 +81,6 @@ class Tile extends BaseTile {
     // it will be populated.
 
     const { needed_mutations } = this;
-
-    let new_promise;
 
     if (Object.keys(needed_mutations).length === 0) {
       return Promise.resolve('complete');
@@ -148,7 +107,7 @@ class Tile extends BaseTile {
 
           return 'changed';
         });
-    }); 
+    });
   }
 
   * points(bounding = undefined, sorted = false) {
@@ -223,23 +182,6 @@ class Tile extends BaseTile {
     return this._highest_known_ix;
   }
 
-  get children() {
-    // create or return children.
-    if (this._children !== undefined) {
-      return this._children;
-    }
-    if (this.download_state !== 'Complete') {
-      return [];
-    }
-    this._children = [];
-
-    for (const key of this.child_locations) {
-      this._children.push(new this.class(this.url, key, this));
-    }
-    // }
-    // }
-    return this._children;
-  }
 
   /* kdtree() {
     if (this._kdtree) {
@@ -275,7 +217,7 @@ class Tile extends BaseTile {
     if (this._table) { return this._table; }
     // Constitute table if there's a present buffer.
     if (this._table_buffer && this._table_buffer.byteLength > 0) {
-      console.log("BYTES", this._table_buffer.byteLength)
+      console.log('BYTES', this._table_buffer.byteLength);
       return this._table = Table.from(this._table_buffer);
     }
     return undefined;
@@ -291,51 +233,6 @@ class Tile extends BaseTile {
     return undefined;
   }
 
-  download() {
-    // This should only be called once per tile.
-    if (this._download) { return this._download; }
-
-    if (this._already_called) {
-      throw ('Illegally attempting to download twice');
-    }
-    this._already_called = true;
-
-    const url = this.url.match("//") ? 
-    `${this.url}/${this.key}.feather` : 
-    `${window.location.origin}/${this.url}/${this.key}.feather`;
-
-    this.download_state = 'In progress';
-
-    this._download = this.tileWorker
-      .fetch(url, this.needed_mutations)
-      .catch((err) => {
-        this.download_state = 'Errored';
-        throw err;
-      })
-      .then(([buffer, metadata, codes]) => {
-        this.download_state = 'Complete';
-
-        // metadata is passed separately b/c I dont know
-        // how to fix it on the table in javascript, just python.
-        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
-        this._table_buffer = buffer;
-        console.log("Got buffer")
-        this._table = Table.from(buffer)
-        console.log("Into table")
-        this._extent = JSON.parse(metadata.get('extent'));
-        this.child_locations = JSON.parse(metadata.get('children'));
-        this._min_ix = this.table.getColumn('ix').get(0);
-        this.max_ix = this.table.getColumn('ix').get(this.table.length - 1);
-        this.highest_known_ix = this.max_ix;
-        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
-        //    this.setDataTypes()
-
-        this.local_dictionary_lookups = codes;
-        this.update_master_dictionary_lookups();
-        return this.table;
-      });
-    return this._download;
-  }
 
   get schema() {
     return this.download().then(
@@ -510,7 +407,122 @@ class Tile extends BaseTile {
   }
 }
 
-export default class RootTile extends Tile {
+export class QuadTile extends Tile {
+  constructor(base_url, key, parent = undefined, prefs) {
+    super();
+    this.url = base_url;
+    this.parent = parent;
+    if (parent === undefined) {
+      this._mutations = prefs.mutate;
+    }
+    this.key = key;
+    this.codes = this.key.split('/').map((t) => +t);
+    this.class = new.target;
+  }
+
+  download_to_depth(depth, corners = { x: [-1, 1], y: [-1, 1] }, recurse = false) {
+    // First, execute the download to populate this.max_ix
+
+    if (this.max_ix < depth && this.is_visible(depth, corners) && !recurse) {
+      const promises = this.children.map((child) => child.download());
+      if (this._children) {
+        // Already-downloaded children must also launch downloads.
+        for (const child of this._children) {
+          promises.concat(
+            child.download_to_depth(depth, corners, false),
+          );
+        }
+      }
+      return Promise.all(promises);
+      // return this.children().map(child => child.download_to_depth(depth, corners, false))
+    }
+
+    return this.download()
+      .then(() => {
+      // If the last point here is less than the target depth, keep going.
+        if (this.max_ix < depth
+        && this.is_visible(depth, corners) && recurse
+        ) {
+        // Create the children.
+          const child_processes = this.children
+          // Filter to visible. Newly generated children
+          // will return invisible.
+            .map((child) => child.download_to_depth(depth, corners));
+          return Promise.all(child_processes)
+          // .catch(err => undefined)
+            .then((d) => this);
+        }
+        return this;
+      });
+  }
+
+  download() {
+    // This should only be called once per tile.
+    if (this._download) { return this._download; }
+
+    if (this._already_called) {
+      throw ('Illegally attempting to download twice');
+    }
+    this._already_called = true;
+
+    const url = this.url.match('//')
+      ? `${this.url}/${this.key}.feather`
+      : `${window.location.origin}/${this.url}/${this.key}.feather`;
+
+    this.download_state = 'In progress';
+
+    this._download = this.tileWorker
+      .fetch(url, this.needed_mutations)
+      .catch((err) => {
+        this.download_state = 'Errored';
+        throw err;
+      })
+      .then(([buffer, metadata, codes]) => {
+        this.download_state = 'Complete';
+
+        // metadata is passed separately b/c I dont know
+        // how to fix it on the table in javascript, just python.
+        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
+        this._table_buffer = buffer;
+        this._table = Table.from(buffer);
+        this._extent = JSON.parse(metadata.get('extent'));
+        this.child_locations = JSON.parse(metadata.get('children'));
+        this._min_ix = this.table.getColumn('ix').get(0);
+        this.max_ix = this.table.getColumn('ix').get(this.table.length - 1);
+        this.highest_known_ix = this.max_ix;
+        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
+        //    this.setDataTypes()
+
+        this.local_dictionary_lookups = codes;
+        this.update_master_dictionary_lookups();
+        return this.table;
+      });
+    return this._download;
+  }
+
+  
+  get children() {
+    // create or return children.
+    if (this._children !== undefined) {
+      return this._children;
+    }
+    if (this.download_state !== 'Complete') {
+      return [];
+    }
+    this._children = [];
+
+    for (const key of this.child_locations) {
+      this._children.push(new this.class(this.url, key, this));
+    }
+    // }
+    // }
+    return this._children;
+  }
+
+
+}
+
+export default class RootTile extends QuadTile {
   // The parent tile carries some data for the full set.
   // For clarity, I keep those elements in this class.
 
@@ -549,11 +561,12 @@ export default class RootTile extends Tile {
       }
       array[i][2 ** depth] = '|';
     }
+    
     array[2 ** depth] = Array(2 ** depth + 1).fill('-');
 
     this.visit((tile) => {
       const [z, x, y] = tile.key.split('/').map((d) => +d);
-      if (z == depth) {
+      if (z === depth) {
         array[y][x] = '_';
         //        if (tile.download_state == "Complete") {
         array[y][x] = f(tile);
@@ -596,7 +609,6 @@ export default class RootTile extends Tile {
     } */
 
     const scores = [];
-    const r = Math.random();
     const callback = (tile) => {
       //      if (tile.download_state == "Unattempted") {
       const distance = check_overlap(tile, bbox);
@@ -644,7 +656,7 @@ export default class RootTile extends Tile {
     this._children = [];
 
     for (const key of this.child_locations) {
-      this._children.push(new Tile(this.url, key, this));
+      this._children.push(new QuadTile(this.url, key, this));
     }
 
     return this._children;
@@ -712,7 +724,7 @@ export default class RootTile extends Tile {
     for (const i of range(NUM_WORKERS)) {
       console.log(`Allocating worker ${i}`);
       this._tileWorkers.push(
-//          Comlink.wrap(new Worker(this.url + '/../worker.js')),
+        //          Comlink.wrap(new Worker(this.url + '/../worker.js')),
         Comlink.wrap(new TileWorker()),
       );
     }
@@ -759,9 +771,10 @@ export default class RootTile extends Tile {
   }
 }
 
+/*
 function setsAreEqual(a, b) {
   return a.size === b.size && [...a].every((value) => b.has(value));
-}
+} */
 
 function corner_distance(corners, x, y) {
   if (corners === undefined) {
@@ -799,8 +812,8 @@ function check_overlap(tile, bbox) {
   /* the area of Intersect(tile, bbox) expressed
      as a percentage of the area of bbox */
   const c = tile.extent;
-  thrower(c);
-  thrower(bbox);
+//  thrower(c);
+//  thrower(bbox);
 
   if (c.x[0] > bbox.x[1]
       || c.x[1] < bbox.x[0]

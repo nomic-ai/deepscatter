@@ -55,19 +55,20 @@ export default class Zoom {
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
     const els = select(div)
-      .selectAll('div.note')
+      .selectAll('div.tooltip')
       .data(points)
       .join(
         (enter) => enter
           .append('div')
-          .attr('class', 'note')
+          .attr('class', 'tooltip')
           .style('top', 0)
           .style('left', 0)
           .style('position', 'fixed')
           .style('z-index', 100)
-          .style('border-radius', '15px')
+          .style('border-radius', '8px')
           .style('padding', '10px')
-          .style('background', 'rgba(255, 220, 225, 0.8)'),
+          .style('background', 'ivory')
+          .style("opacity", .75),
         (exit) => exit,
         (update) => update
           .html((d) => label_from_point(d.data)),
@@ -125,7 +126,10 @@ export default class Zoom {
     let last_fired = 0;
 
     const labels = select('#deepscatter-svg')
-      .append('g')
+      .selectAll("g.label")
+      .data([1])
+      .join("g")
+//      .append('g')
       .attr('class', 'label');
 
     const renderer = this.renderers.get('regl');
@@ -152,20 +156,21 @@ export default class Zoom {
         },
       ] : [];
       const { x_, y_ } = this.scales();
+
       if (annotations.length) {
         this.html_annotation(annotations);
       }
+      
       const labelSet = labels
         .selectAll('g')
         .data(data)
         .join('g')
-        .attr('transform', (d) => `translate(
-          ${x_(x_aes.value_for(d))},
-          ${y_(y_aes.value_for(d))}
+        .attr('transform', (datum) => `translate(
+          ${x_(x_aes.value_for(datum))},
+          ${y_(y_aes.value_for(datum))}
         )`)
         .on('click', (event, d) => {
-          console.log(d)
-          this.renderers.get('regl').click_function(d)
+          this.renderers.get('regl').click_function(d, event);
         }
         );
 
@@ -173,42 +178,11 @@ export default class Zoom {
         .selectAll('circle')
         .data((d) => [d])
         .join('circle')
-        .attr('r', 6)
-        .style('fill', 'pink');
+        .attr('r', 12)
+        .attr("stroke", "#110022")
+        .attr('fill', d => this.renderers.get('regl').aes.color.current.apply(d));
     });
   }
-  /*
-  annotate(points) {
-    const type = annotationLabel;
-
-    const makeAnnotations = annotation()
-      .editMode(false)
-      // also can set and override in the note.padding property
-      // of the annotation object
-      .notePadding(15)
-      .type(type)
-      // accessors & accessorsInverse not needed
-      // if using x, y in annotations JSON
-      .accessors({
-        x: (d) => d.x,
-        y: (d) => d.y,
-      })
-      .annotations(points);
-
-    const container = select('#deepscatter-svg')
-      .selectAll('g.annotation-group')
-      .data([1]);
-
-    const entering = container
-      .enter()
-      .append('g')
-      .attr('class', 'annotation-group');
-
-    container
-      .merge(entering)
-      .call(makeAnnotations);
-  }
-  */
 
   current_corners() {
     // The corners of the current zoom transform, in data coordinates.
@@ -393,8 +367,9 @@ export function window_transform(x_scale, y_scale) {
 }
 
 function label_from_point(point, defaults) {
+
   // defaults: a Set of keys to include.
-  let output = '';
+  let output = '<dl>';
   const nope = new Set([
     'x', 'y', 'ix', 'bookstack', null, 'tile_key',
   ]);
@@ -409,7 +384,8 @@ function label_from_point(point, defaults) {
       if (v === null) { continue; }
       if (v === '') { continue; }
     }
-    output += `<strong>${k}</strong>: ${v}<br />`;
+    output += `<dt>${k}</dt>`
+    output += `<dd>${v}<dd>`;
   }
-  return output;
+  return output + `</dl>`;
 }

@@ -68,7 +68,7 @@ export default class Scatterplot {
       const container = this.div
         .append('div')
         .attr('id', `container-for-${d.id}`)
-        .style('position', 'fixed')
+        .style('position', 'absolute')
         .style('top', 0)
         .style('left', 0)
         .style('pointer-events', d.id == 'deepscatter-svg' ? 'auto' : 'none');
