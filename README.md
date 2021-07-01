@@ -7,7 +7,7 @@ recommend using it unless you clearly know why!
 
 This is a WebGL library for displaying more points than are ordinarily possible over the web.
 
-It's fast for two reasons:
+It's fast for three reasons:
 
 1. All data is sent in the Apache Arrow `feather` format, in a 
    special quadtree format that makes it possible to only load 
