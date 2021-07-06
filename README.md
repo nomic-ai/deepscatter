@@ -47,6 +47,8 @@ npm run dev
 ```
 
 If you go to localhost:3000, it should have an interactive scatterplot waiting.
+This development site only works in Chrome, not Safari or Firefox, because uses ES6 module syntax inside the webworker. The distributed version of 
+the module should work in all browsers.
 
 ## Your own data.
 

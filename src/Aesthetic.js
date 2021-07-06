@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 import { range as arange, shuffle, extent } from 'd3-array';
 import {
   scaleLinear, scaleSqrt, scaleLog, scaleIdentity, scaleOrdinal
@@ -125,6 +126,7 @@ class Aesthetic {
     this._domains = {};
   }
 
+  // eslint-disable-next-line class-methods-use-this
   get default_val() {
     return 1;
   }
@@ -730,7 +732,7 @@ class Color extends Aesthetic {
 
 
   get scale() {
-    return this._scale
+    return this._scale ? this._scale : (x) => 'white';
   }
 
   encode_for_textures(range) {

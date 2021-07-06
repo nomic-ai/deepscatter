@@ -905,8 +905,7 @@ void main() {
         mix(old_position, midpoint, frac),
         mix(midpoint, position, frac),
         frac);
-      //position = mix(old_position, position, frac);
-    } // else position just is what it is.
+    }
 
   } else {
      position.x = -1. + 2. * linscale(u_x_domain, position.x);
@@ -1057,7 +1056,7 @@ void main() {
         return;
       }
     }
-    gl_Position = vec4(position + 0. * a_jitter_radius * jitter * point_size_adjust, 0., 1.);
+    gl_Position = vec4(position + 1. * a_jitter_radius * jitter * point_size_adjust, 0., 1.);
   } else {
     gl_Position = vec4(position, 0., 1.);
   }  

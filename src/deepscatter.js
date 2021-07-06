@@ -32,10 +32,7 @@ const base_elements = [
 export default class Scatterplot {
   constructor(selector, width, height) {
     this.bound = false;
-    if (selector === undefined) {
-      console.log(selector);
-      console.warn('Must bind to selector manually');
-    } else {
+    if (selector !== undefined) {
       this.bind(selector, width, height);
     }
     this.d3 = { select };
@@ -48,12 +45,21 @@ export default class Scatterplot {
     this.width = width;
     this.height = height;
 
-    this.div = select(selector);
+    this.div = select(selector)
+      .selectAll("div.deepscatter_container")
+      .data([1])
+      .join("div")
+      .attr("class", "deepscatter_container")
+      .style("position", "absolute")
+    // Styling this as position absolute with no top/left
+    // forces the children to inherit the relative position
+    // of the div, not the div's parent.
+
     if (this.div.empty()) {
       console.error(selector);
       throw 'Must pass a valid div selector';
     }
-    console.log(this.div);
+
     this.elements = [];
 
     this.prefs = {

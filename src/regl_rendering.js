@@ -651,7 +651,7 @@ export class ReglRenderer extends Renderer {
         });
       } catch (err) {
         console.warn("Read bad data from", { x, y, height, attempted: height - y})
-        color_at_point = [0, 0, 0, 0]
+        color_at_point = [0, 0, 0, 0];
       }
     });
 

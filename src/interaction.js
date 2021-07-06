@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 import { select } from 'd3-selection';
 import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
@@ -63,12 +64,12 @@ export default class Zoom {
           .attr('class', 'tooltip')
           .style('top', 0)
           .style('left', 0)
-          .style('position', 'fixed')
+          .style('position', 'absolute')
           .style('z-index', 100)
           .style('border-radius', '8px')
           .style('padding', '10px')
           .style('background', 'ivory')
-          .style("opacity", .75),
+          .style('opacity', 0.75),
         (exit) => exit,
         (update) => update
           .html((d) => label_from_point(d.data)),
@@ -126,10 +127,9 @@ export default class Zoom {
     let last_fired = 0;
 
     const labels = select('#deepscatter-svg')
-      .selectAll("g.label")
+      .selectAll('g.label')
       .data([1])
-      .join("g")
-//      .append('g')
+      .join('g')
       .attr('class', 'label');
 
     const renderer = this.renderers.get('regl');
@@ -142,14 +142,15 @@ export default class Zoom {
         return;
       }
       last_fired = Date.now();
-      const p = renderer.color_pick(event.x, event.y);
+      const p = renderer.color_pick(event.layerX, event.layerY);
       const data = p ? [p] : [];
 
       const d = data[0];
+
       const annotations = d ? [
         {
-          x: event.x,
-          y: event.y,
+          x: event.layerX,
+          y: event.layerY,
           data: d,
           dx: 0,
           dy: 30,
@@ -160,27 +161,35 @@ export default class Zoom {
       if (annotations.length) {
         this.html_annotation(annotations);
       }
-      
+
+      if (!d) return
+
       const labelSet = labels
         .selectAll('g')
-        .data(data)
-        .join('g')
+        .data(data, (d) => d.ix)
+        .join(
+          (enter) => {
+            const e = enter.append('g');
+            e
+              .append('circle')
+              .attr('r', 5)
+              .attr('stroke', '#110022')
+              .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd))
+              .transition()
+              .attr('r', 12);
+            return e;
+          },
+          (update) => update,
+          (exit) => exit.remove(),
+        )
+        // Position relative to the ancestor here is funky.
         .attr('transform', (datum) => `translate(
           ${x_(x_aes.value_for(datum))},
           ${y_(y_aes.value_for(datum))}
         )`)
-        .on('click', (event, d) => {
-          this.renderers.get('regl').click_function(d, event);
-        }
-        );
-
-      labelSet
-        .selectAll('circle')
-        .data((d) => [d])
-        .join('circle')
-        .attr('r', 12)
-        .attr("stroke", "#110022")
-        .attr('fill', d => this.renderers.get('regl').aes.color.current.apply(d));
+        .on('click', (ev, dd) => {
+          this.renderers.get('regl').click_function(dd, ev);
+        });
     });
   }
 
@@ -311,7 +320,6 @@ export default class Zoom {
         if (this._timer.stop_at <= Date.now()) {
           console.log('Timer ending');
           this._timer.stop();
-          return;
         }
       }
     }
@@ -367,7 +375,6 @@ export function window_transform(x_scale, y_scale) {
 }
 
 function label_from_point(point, defaults) {
-
   // defaults: a Set of keys to include.
   let output = '<dl>';
   const nope = new Set([
@@ -384,8 +391,8 @@ function label_from_point(point, defaults) {
       if (v === null) { continue; }
       if (v === '') { continue; }
     }
-    output += `<dt>${k}</dt>`
+    output += `<dt>${k}</dt>`;
     output += `<dd>${v}<dd>`;
   }
-  return output + `</dl>`;
+  return `${output}</dl>`;
 }

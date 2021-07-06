@@ -59,12 +59,12 @@
   },
   "deprecated": false,
   "devDependencies": {
-    "glslify": "^7.0.0",
     "@babel/runtime": "^7.9.6",
     "eslint": "^7.29.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-mourner": "^3.0.0",
     "eslint-plugin-import": "^2.23.4",
+    "glslify": "^7.0.0",
     "glslify-hex": "^2.1.1",
     "glslify-loader": "^2.0.0",
     "rollup-plugin-glslify": "^1.2.0",
