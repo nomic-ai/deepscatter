@@ -471,7 +471,7 @@ class Aesthetic {
     let func;
     if (typeof (function_reference) === 'string') {
       const [name, lambda] = function_reference.split('=>').map((d) => d.trim());
-      if (lambda == undefined) {
+      if (lambda === undefined) {
         func = Function('x', function_reference);
       } else {
         func = Function(name, lambda);
@@ -483,7 +483,7 @@ class Aesthetic {
     this.scaleFunc = scaleLinear().range(range)
       .domain([0, this.texture_size - 1]);
     let input = arange(this.texture_size);
-    if (field === undefined || this.tileSet.table == undefined) {
+    if (field === undefined || this.tileSet.table === undefined) {
       this.texture_buffer.set(arange(this.texture_size).map((i) => 1));
       //      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return;
@@ -830,7 +830,7 @@ function parseLambdaString(lambdastring, materialize = false) {
     throw `Couldn't parse ${lambdastring} into a function`;
   }
 
-  if (lambda.slice(0, 1) != '{' && lambda.slice(0, 6) != 'return') {
+  if (lambda.slice(0, 1) !== '{' && lambda.slice(0, 6) !== 'return') {
     lambda = `return ${lambda}`;
   }
 

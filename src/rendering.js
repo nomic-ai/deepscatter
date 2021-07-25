@@ -86,9 +86,12 @@ export class Renderer {
     return this;
   }
 
+  set click_function() {
+
+  }
+
   get click_function() {
-    console.log(this._click_function);
-    this._current_click_function_string = this._current_click_function_string
+//    this._current_click_function_string = this._current_click_function_string
     if (this._current_click_function_string && this._current_click_function_string === this.scatterplot.prefs.click_function) {
       return this._click_function;
     }
@@ -106,5 +109,5 @@ export class Renderer {
 }
 
 export class CanvasRenderer extends Renderer {
-
+  
 }
