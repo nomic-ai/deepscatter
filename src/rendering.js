@@ -86,12 +86,12 @@ export class Renderer {
     return this;
   }
 
-  set click_function() {
-
+  set click_function(f) {
+    this._current_click_function_string = this.scatterplot.prefs.click_function;
+    this._click_function = Function("datum", this._current_click_function_string)
   }
 
   get click_function() {
-//    this._current_click_function_string = this._current_click_function_string
     if (this._current_click_function_string && this._current_click_function_string === this.scatterplot.prefs.click_function) {
       return this._click_function;
     }
