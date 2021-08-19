@@ -281,7 +281,6 @@ uniform float u_jitter_radius_lookup_y_constant;
 uniform sampler2D u_jitter_radius_lookup_map;
 uniform vec2 u_jitter_radius_lookup_x_domain;
 uniform vec2 u_jitter_radius_lookup_y_domain;
-uniform vec2 u_jitter_radius_lookup_z_domain;
 
 float point_size_adjust;
 
@@ -502,8 +501,9 @@ float texture_float_lookup(in sampler2D texture,
   }
   float inrange = domainify(domain, transform, attr, true);
   if (use_texture > 0.) {
-    float y_pos = linstep(y_range, y_attr);
+    float y_pos = 0.5;//linstep(y_range, y_attr);
     vec4 encoded = texture2D(texture, vec2(y_pos, inrange));
+    return encoded.a;
     return RGBAtoFloat(encoded);
   } else {
     return mix(range.x, range.y, inrange);
@@ -516,6 +516,7 @@ float texture_float_lookup(in sampler2D texture,
                            in float transform,
                            in float attr,
                            in float use_texture) {
+
   return texture_float_lookup(texture,
                               domain,
                               range,
@@ -928,35 +929,31 @@ void main() {
 
   float my_filter;
   float last_filter;
-
   if (u_filter_numeric.r < 0.5) {
-    my_filter = texture_float_lookup(u_filter_map, vec2(-2047., 2047.),
-                                        vec2(0., 1.),
-                                        0., a_filter,
-                                        1.,  1., vec2(0., 2.));
+    float frac_filter = linstep(u_filter_domain, a_filter);
+    my_filter = texture2D(u_filter_map, vec2(0.5, frac_filter)).a;
   } else {
     my_filter = run_filter(a_filter,
-       u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
+      u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
   }
   if (u_filter_last_numeric.r < 0.5) {
-    last_filter = texture_float_lookup(
-      u_last_filter_map, u_last_filter_domain, vec2(0., 1.),
-      u_last_filter_transform, a_last_filter, 0.,  1., vec2(0., 2.));
+    float frac_last_filter = linstep(u_last_filter_domain, a_last_filter);
+    last_filter = texture2D(u_last_filter_map, vec2(0.5, frac_last_filter)).a;
   } else {
     last_filter = run_filter(a_last_filter,
       u_filter_last_numeric.r, u_filter_last_numeric.g, u_filter_last_numeric.b);
   }
+
   // Progress through the filters at different rates.
   if (ix_to_random(ix, 13.5) > ease) {
     my_filter = last_filter;
   }
 
-  if (my_filter < 0.5) {
+  if (my_filter <= 0.5) {
     gl_Position = discard_me;
     return;
   }
 
-  
   float size_multiplier = texture_float_lookup(
     u_size_map, u_size_domain, u_size_range,
     u_size_transform, a_size, u_size_needs_map);
@@ -968,6 +965,7 @@ void main() {
 
   size_multiplier = u_base_size * 
      mix(last_size_multiplier, size_multiplier, ease);
+  
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
   point_size_adjust = exp(log(u_k) * u_zoom_balance);
@@ -982,36 +980,8 @@ void main() {
 
     float jitter_radius_fraction;
 
-    // removed
-    if (u_jitter_radius_lookup == -10.) {
-
-      float y_frac =
-        linstep(u_jitter_radius_lookup_y_domain,
-        u_jitter_radius_lookup_y_constant);
-      float x_frac = linstep(u_jitter_radius_lookup_x_domain, a_jitter_radius);
-
-      //x_frac = 0.;
-      //y_frac = .8;
-
-      vec4 jitter_radius_texel = texture2D(
-        u_jitter_radius_lookup_map,
-        vec2(
-          // Reversed 'cause of the way it's fed in.
-          y_frac, x_frac
-        ));
-
-
-        jitter_radius_fraction = RGBAtoFloat(jitter_radius_texel);
-
-        jitter_radius_value = mix(
-          u_jitter_radius_lookup_z_domain.x,
-          u_jitter_radius_lookup_z_domain.y,
-          jitter_radius_fraction
-        );
-    } else {
-      if (u_jitter == 0.) {
-        jitter_radius_value = 0.;
-      }
+    if (u_jitter == 0.) {
+      jitter_radius_value = 0.;
     }
     jitter_radius_value = 0.1;
 

@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 import wrapREGL from 'regl';
 import { create } from 'd3-selection';
 import { range, sum } from 'd3-array';
@@ -167,7 +168,7 @@ export class ReglRenderer extends Renderer {
     this._renderer(prop_list);
   }
 
-  tick(message = 'No message', force = false) {
+  tick() {
     const { prefs } = this;
     const { regl, tileSet } = this;
     const { props } = this;
@@ -277,8 +278,6 @@ export class ReglRenderer extends Renderer {
         }
       });
     }
-
-    // this.blur(this.fbos.points, this.fbos.ping, 1)
 
     regl.clear({ color: [0, 0, 0, 0] });
 
@@ -609,13 +608,14 @@ export class ReglRenderer extends Renderer {
     return v;
   }
 
+  /*
   calculate_contours(field = 'lc0') {
     const { width, height } = this;
     const ix = 16;
     let contour_set = [];
     const contour_machine = contours()
       .size([parseInt(width), parseInt(height)])
-      .thresholds(d3.range(-1, 9).map((p) => Math.pow(2, p * 2)));
+      .thresholds(range(-1, 9).map((p) => Math.pow(2, p * 2)));
 
     for (const ix of range(this.tileSet.dictionary_lookups[field].size / 2)) {
       this.draw_contour_buffer(field, ix);
@@ -631,7 +631,7 @@ export class ReglRenderer extends Renderer {
     }
     return contour_set;
   }
-
+  */
   color_pick(x, y) {
     const { props, height } = this;
 
@@ -852,15 +852,11 @@ export class ReglRenderer extends Renderer {
       'jitter_speed', 'size', 'filter', 'character', 'x0', 'y0']) {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
-
         parameters.uniforms[`u_${temporal}${k}_map`] = () => this.aes[k][time].textures.one_d;
-
-        parameters.uniforms[`u_${temporal}${k}_needs_map`] = () =>
-        // Currently, a texture lookup is only used for dictionaries.
-
-          this.aes[k][time].use_map_on_regl;
-
-        if (k == 'jitter_radius' && temporal == '') {
+        parameters.uniforms[`u_${temporal}${k}_needs_map`] = () => this.aes[k][time].use_map_on_regl;
+         // Currently, a texture lookup is only used for dictionaries.
+        /* db join code
+        if (k === 'jitter_radius' && temporal === '') {
           const base_string = `u_${temporal}${k}_lookup`;
 
           parameters.uniforms[base_string] = () =>
@@ -873,21 +869,19 @@ export class ReglRenderer extends Renderer {
           parameters.uniforms[`${base_string}_z_domain`] = () => this.aes[k][time].lookup_texture.z_domain;
           parameters.uniforms[`${base_string}_x_domain`] = () => this.aes[k][time].lookup_texture.x_domain;
         }
+        */
+        parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes[k][time].domain;
 
-        parameters.uniforms[`u_${temporal}${k}_domain`] = () =>
-        // wrap as function to clue regl that it might change.
-          this.aes[k][time].domain;
-
-        if (k != 'filter' && k != 'color') {
+        if (k !== 'color') {
           parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes[k][time].range;
         }
 
         parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
           const t = this.aes[k][time].transform;
-          if (t == 'linear') return 1;
-          if (t == 'sqrt') return 2;
-          if (t == 'log') return 3;
-          if (t == 'literal') return 4;
+          if (t === 'linear') return 1;
+          if (t === 'sqrt') return 2;
+          if (t === 'log') return 3;
+          if (t === 'literal') return 4;
           throw 'Invalid transform';
         };
 
@@ -900,7 +894,7 @@ export class ReglRenderer extends Renderer {
 
         parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
           const val = aes_to_buffer_num[`${k}--${time}`];
-          if (val == undefined) { return -1; }
+          if (val === undefined) { return -1; }
           return val;
         };
       }
@@ -911,12 +905,10 @@ export class ReglRenderer extends Renderer {
     return this._renderer;
   }
 
-/*  assign_aesthetic_buffer(manager, value) {
-    const regl_buffer = props.manager.regl_elements.get(val);
-  }*/
-
   allocate_aesthetic_buffers() {
-    // There are only 15 attribute buffers available to use, once we pass in the index.
+    // There are only 15 attribute buffers available to use,
+    // once we pass in the index. The order here determines
+    // how important it is to capture transitions for them.
 
     const buffers = [];
     const priorities = ['x', 'y', 'color', 'size', 'jitter_radius',
@@ -955,7 +947,7 @@ export class ReglRenderer extends Renderer {
         variable_to_buffer_num[field] = num;
         continue;
       } else {
-        // Don't use the lsat value, use the current value.
+        // Don't use the last value, use the current value.
         aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
       }
     }

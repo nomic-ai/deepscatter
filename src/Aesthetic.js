@@ -234,9 +234,6 @@ class Aesthetic {
       one_d: this.regl.texture(params),
     };
 
-    // Don't need this posting.
-    // this.post_to_regl_buffer("one_d")
-
     return this._textures;
   }
 
@@ -425,7 +422,6 @@ class Aesthetic {
 
   encode_for_textures(range) {
     const values = new Array(this.texture_size);
-
     this.scaleFunc = scales[this.transform]()
       .range(range)
       .domain([0, this.texture_size - 1]);
@@ -434,9 +430,8 @@ class Aesthetic {
       values[i] = this.scaleFunc(i);
     }
 
-    this.texture_buffer.set(values);//
-    //    encodeFloatsRGBA(values, this.texture_buffer)
-    //  );
+    this.texture_buffer.set(values);
+
   }
 
   arrow_column() {
@@ -480,6 +475,7 @@ class Aesthetic {
       func = function_reference;
     }
 
+
     this.scaleFunc = scaleLinear().range(range)
       .domain([0, this.texture_size - 1]);
     let input = arange(this.texture_size);
@@ -498,13 +494,14 @@ class Aesthetic {
       // NB--Assumes string type for dictionaries.
       input.fill('');
       const dvals = column.data.dictionary.toArray();
-      dvals.forEach((d, i) => input[i] = d);
+      dvals.forEach((d, i) => { input[i] = d });
     } else {
       input = input.map((d) => this.scaleFunc(d));
     }
 
-    const values = input.map((i) => +func(i));
-    this.texture_buffer.set(encodeFloatsRGBArange(values).array);
+    const values = input.map((i) => func(i));
+    this.texture_buffer.set(values);
+    this.post_to_regl_buffer('one_d');
   }
 }
 
@@ -747,7 +744,7 @@ class Color extends Aesthetic {
       this.texture_buffer.set(color_palettes[range]);
     } else if (range.length === this.texture_size * 4) {
       this.texture_buffer.set(range);
-    } else if (range.length && range[0].length && range[0].length == 3) {
+    } else if (range.length && range[0].length && range[0].length === 3) {
       // manually set colors.
       const r = arange(palette_size).map((i) => {
         const [r, g, b] = range[i % range.length];
@@ -766,22 +763,25 @@ export const dimensions = {
 
 export class StatefulAesthetic {
   // An aesthetic that tracks two states--current and last.
-
-  // Point is to handle transitions.
+  // The point is to handle transitions.
+  // It might make sense to handle more than two states, but there are
+  // diminishing returns.
 
   constructor(label, scatterplot, regl, tile) {
     this.states = [];
     const lower = label.toLowerCase();
     const Factory = dimensions[label];
 
-    for (const _ of [1, 2]) {
-      this.states.push(
-        new Factory(lower, scatterplot, regl, tile),
-      );
-    }
+    // state 0
+    this.states.push(new Factory(lower, scatterplot, regl, tile));
+    // state 1
+    this.states.push(new Factory(lower, scatterplot, regl, tile));
 
-    this.states[0].partner = this.states[1];
-    this.states[1].partner = this.states[0];
+    const [first, second] = this.states;
+    first.partner = second;
+    second.partner = first;
+/*    this.states[0].partner = this.states[1];
+    this.states[1].partner = this.states[0]; */
 
     for (const state of this.states) {
       state.update({ constant: default_aesthetics[lower].constant });
