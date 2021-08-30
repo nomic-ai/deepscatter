@@ -1,7 +1,7 @@
 # Warning
 
-This library is still unstable; dragons, and so on. I wouldn't really
-recommend using it unless you clearly know why!
+This library is still unstable, and the API shifts depending on what I'm currently interesting. Open to thoughts, conversations, issues and complaints, but don't
+put this on top of something that can't fail or that needs to change!
 
 # Deep Scatterplots for the Web
 
