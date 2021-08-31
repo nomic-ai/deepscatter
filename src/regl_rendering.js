@@ -2,14 +2,14 @@
 import wrapREGL from 'regl';
 import { create } from 'd3-selection';
 import { range, sum } from 'd3-array';
-import { contours } from 'd3-contour';
+// import { contours } from 'd3-contour';
 import unpackFloat from 'glsl-read-float';
-import { window_transform } from './interaction.js';
-import { Renderer } from './rendering.js';
+import { window_transform } from './interaction';
+import { Renderer } from './rendering';
 import gaussian_blur from './glsl/gaussian_blur.frag';
 import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
-import { aesthetic_variables, AestheticSet } from './AestheticSet.js';
+import { aesthetic_variables, AestheticSet } from './AestheticSet';
 
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
@@ -53,7 +53,7 @@ export class ReglRenderer extends Renderer {
   }
 
   data(dataset) {
-    if (data === undefined) {
+    if (dataset === undefined) {
       return this.tileSet;
     }
     this.tileSet = dataset;
@@ -262,7 +262,7 @@ export class ReglRenderer extends Renderer {
       regl.clear({ color: [0, 0, 0, 0] });
       this.render_points(props);
     });
-
+    /*
     if (this.geolines) {
       this.fbos.lines.use(() => {
         regl.clear({ color: [0, 0, 0, 0] });
@@ -278,10 +278,18 @@ export class ReglRenderer extends Renderer {
         }
       });
     }
-
+    */
     regl.clear({ color: [0, 0, 0, 0] });
-
+    if (this.scatterplot.trimap) {
+      // Allows binding a TriMap from `trifeather` object to the regl package without any import.
+      // This is the best way to do it that I can think of for now.
+      this.fbos.lines.use(() => {
+        this.scatterplot.trimap.zoom = this.zoom;
+        this.scatterplot.trimap.tick("polygon")
+      })
+    }
     // Copy the points buffer to the main buffer.
+    
     for (const layer of [this.fbos.lines, this.fbos.points]) {
       regl({
         profile: true,
@@ -388,8 +396,16 @@ export class ReglRenderer extends Renderer {
 
   initialize_textures() {
     const { regl } = this;
-
     this.fbos = this.fbos || {};
+    
+    this.fbos.empty_texture = regl.texture({
+      width: 2,
+      height: 2,
+      data: [
+        255, 255, 255, 255, 0, 0, 0, 0,
+        255, 0, 255, 255, 0, 0, 255, 255
+      ]
+    })
 
     this.fbos.minicounter = regl.framebuffer({
       width: 512,
@@ -437,16 +453,29 @@ export class ReglRenderer extends Renderer {
       depth: false,
     });
 
-    this.fbos.dummy = this.fbos.dummy
-    || regl.framebuffer({
+    this.fbos.dummy = this.fbos.dummy || regl.framebuffer({
       width: 1,
       height: 1,
       depth: false,
     });
+
+    this.fbos.dummy_buffer = regl.buffer(10)
+
   }
 
-  counter(x_field) {
-
+  get_image_texture(url) {
+    const { regl } = this;
+    this.textures = this.textures || {};
+    if (this.textures[url]) {
+      return this.textures[url];
+    }
+    const image = new Image();
+    image.src = url;
+    this.textures[url] = this.fbos.minicounter;
+    image.onload = () => {
+      this.textures[url] = regl.texture(image);
+    }
+    return this.textures[url];
   }
 
   plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
@@ -495,8 +524,8 @@ export class ReglRenderer extends Renderer {
         transform: 'literal',
       },
       jitter_radius: {
-        constant: 1 / 256 * 10, // maps to x jitter
-        method: 'xy', // Means x in radius and y in speed.
+        constant: 1 / 2560, // maps to x jitter
+        method: 'uniform', // Means x in radius and y in speed.
       },
 
       jitter_speed: y_field === undefined ? 1 : 1 / 256, // maps to y jitter
@@ -507,7 +536,8 @@ export class ReglRenderer extends Renderer {
     this.aes.apply_encoding(encoding);
     this.aes.x[1] = saved_aes.x[0];
     this.aes.y[1] = saved_aes.y[0];
-    this.aes.filter = saved_aes.filter;
+    this.aes.filter1 = saved_aes.filter1;
+    this.aes.filter2 = saved_aes.filter2;
 
     const { props } = this;
     props.block_for_buffers = true;
@@ -688,6 +718,7 @@ export class ReglRenderer extends Renderer {
   })
 } */
   get fill_buffer() {
+    // 
     if (!this._fill_buffer) {
       const { regl } = this;
       this._fill_buffer = regl.buffer(
@@ -787,6 +818,17 @@ export class ReglRenderer extends Renderer {
           // Other values plot a specific value of the color-encoded field.
           return -2;
         },
+        u_use_glyphset: (_, {prefs}) =>
+          {
+            return prefs.glyph_set ? 1 : 0
+        },
+        u_glyphset: (_, {prefs}) => {
+          if (prefs.glyph_set) {
+            return this.get_image_texture(prefs.glyph_set);
+          } else {
+            return this.fbos.empty_texture
+          }            
+        },
         u_color_picker_mode: regl.prop('color_picker_mode'),
         u_position_interpolation_mode() {
         // 1 indicates that there should be a continuous loop between the two points.
@@ -808,27 +850,29 @@ export class ReglRenderer extends Renderer {
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
-        u_sprites(_, props) {
-          return props.sprites
-            ? props.sprites : this.fbos.dummy;
-        },
         u_zoom_balance: regl.prop('zoom_balance'),
         u_base_size: (_, { prefs }) => prefs.point_size,
         u_maxix: (_, props) => {
-//          console.log(props.max_ix);
           return props.max_ix;
         },
         u_k(_, props) {
           return props.transform.k;
         },
+        // Allow interpolation between different coordinate systems.
         u_window_scale: regl.prop('webgl_scale'),
         u_last_window_scale: regl.prop('last_webgl_scale'),
         u_time: ({ time }) => time,
-        u_filter_numeric() {
-          return this.aes.filter.current.ops_to_array();
+        u_filter1_numeric() {
+          return this.aes.filter1.current.ops_to_array();
         },
-        u_filter_last_numeric() {
-          return this.aes.filter.last.ops_to_array();
+        u_last_filter1_numeric() {
+          return this.aes.filter1.last.ops_to_array();
+        },
+        u_filter2_numeric() {
+          return this.aes.filter2.current.ops_to_array();
+        },
+        u_last_filter2_numeric() {
+          return this.aes.filter2.last.ops_to_array();
         },
         u_current_alpha: () => this.optimal_alpha,
         u_last_alpha: () => this.optimal_alpha,
@@ -849,7 +893,7 @@ export class ReglRenderer extends Renderer {
     }
 
     for (const k of ['x', 'y', 'color', 'jitter_radius',
-      'jitter_speed', 'size', 'filter', 'character', 'x0', 'y0']) {
+      'jitter_speed', 'size', 'filter1', 'filter2', 'character', 'x0', 'y0']) {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
         parameters.uniforms[`u_${temporal}${k}_map`] = () => this.aes[k][time].textures.one_d;
@@ -898,7 +942,6 @@ export class ReglRenderer extends Renderer {
           return val;
         };
       }
-
     // Copy the parameters from the data name.
     }
     this._renderer = regl(parameters);
@@ -912,7 +955,7 @@ export class ReglRenderer extends Renderer {
 
     const buffers = [];
     const priorities = ['x', 'y', 'color', 'size', 'jitter_radius',
-      'jitter_speed', 'character', 'x0', 'y0', 'filter'];
+      'jitter_speed', 'character', 'x0', 'y0', 'filter1', 'filter2'];
 
     for (const aesthetic of priorities) {
       for (const time of ['current', 'last']) {
@@ -1053,6 +1096,7 @@ class TileBufferManager {
       console.warn('CREATING POSITION BUFFER (DEPRECATED)');
       return this.create_position_buffer();
     } */
+
     if (!column) {
       const col_names = tile.table.schema.fields.map((d) => d.name);
       throw `Requested ${key} but table has columns ${col_names.join(', ')}`;

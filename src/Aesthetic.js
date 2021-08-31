@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 import { range as arange, shuffle, extent } from 'd3-array';
 import {
-  scaleLinear, scaleSqrt, scaleLog, scaleIdentity, scaleOrdinal
+  scaleLinear, scaleSqrt, scaleLog, scaleIdentity, scaleOrdinal,
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
@@ -14,7 +14,7 @@ const scales = {
   literal: scaleIdentity,
 };
 
-const palette_size = 4095;
+const palette_size = 4096;
 
 function to_buffer(data) {
   const output = new Uint8Array(4 * palette_size);
@@ -31,7 +31,7 @@ function materialize_color_interplator(interpolator) {
 }
 
 const color_palettes = {
-  white: arange(palette_size).map((i) => [255, 255, 255, 255]),
+  white: arange(palette_size).map(() => [255, 255, 255, 255]),
 };
 
 const schemes = {};
@@ -58,6 +58,23 @@ for (const [k, v] of Object.entries(d3Chromatic)) {
     }
   }
 }
+
+function okabe() {
+  // Okabe-Ito color scheme.
+  const okabe_palette = ['#E69F00', '#CC79A7', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#F0E442'];
+  const colors = new Array(palette_size);
+  const scheme = okabe_palette.map((v) => {
+    const col = rgb(v);
+    return [col.r, col.g, col.b, 255];
+  });
+  for (const i of arange(palette_size)) {
+    colors[i] = scheme[i % okabe_palette.length];
+  }
+  color_palettes.okabe = to_buffer(colors);
+  schemes.okabe = okabe_palette;
+}
+
+okabe();
 
 export const default_aesthetics = {
   x: {
@@ -89,8 +106,8 @@ export const default_aesthetics = {
   },
   jitter_radius: {
     constant: 0,
-    range: [0, 0.05],
-    transform: 'sqrt',
+    range: [0, 1],
+    transform: 'linear',
   },
   jitter_speed: {
     constant: 0,
@@ -102,7 +119,12 @@ export const default_aesthetics = {
     range: [0.5, 5],
     transform: 'sqrt',
   },
-  filter: {
+  filter1: {
+    constant: 1, // Necessary though meaningless.
+    range: [0, 1],
+    transform: 'linear',
+  },
+  filter2: {
     constant: 1, // Necessary though meaningless.
     range: [0, 1],
     transform: 'linear',
@@ -132,11 +154,11 @@ class Aesthetic {
   }
 
   get texture_size() {
-    return 4095;
+    return 4096;
   }
 
   apply(point) {
-    return this.scale(this.value_for(point))
+    return this.scale(this.value_for(point));
   }
 
   get transform() {
@@ -253,7 +275,6 @@ class Aesthetic {
     this.texture_buffer.set(this.default_data());
     this.post_to_regl_buffer('one_d');
     this.lookup = undefined;
-    //    if (this.label == "x") {console.log("Clearing field", this.field)}
     this.field = undefined;
     this._domain = undefined;
     this._range = undefined;
@@ -317,7 +338,6 @@ class Aesthetic {
       crosstabs,
     } = actual_values;
 
-    // console.log("YOOOOO", z_domain, x_domain, y_domain, shape)
 
     return {
       value: y.constant || 0,
@@ -357,7 +377,7 @@ class Aesthetic {
 
     if (typeof (encoding) === 'string') {
       encoding = parseLambdaString(encoding, false);
-      if (this.label === 'filter') {
+      if (this.label.startsWith('filter')) {
         encoding.domain = [-2047, 2047];
       }
     }
@@ -376,7 +396,7 @@ class Aesthetic {
     }
 
     this.lookup = encoding.lookup;
-    
+
     this.field = encoding.field;
 
     this._domain = safe_expand(encoding.domain);
@@ -431,7 +451,6 @@ class Aesthetic {
     }
 
     this.texture_buffer.set(values);
-
   }
 
   arrow_column() {
@@ -475,7 +494,6 @@ class Aesthetic {
       func = function_reference;
     }
 
-
     this.scaleFunc = scaleLinear().range(range)
       .domain([0, this.texture_size - 1]);
     let input = arange(this.texture_size);
@@ -494,7 +512,7 @@ class Aesthetic {
       // NB--Assumes string type for dictionaries.
       input.fill('');
       const dvals = column.data.dictionary.toArray();
-      dvals.forEach((d, i) => { input[i] = d });
+      dvals.forEach((d, i) => { input[i] = d; });
     } else {
       input = input.map((d) => this.scaleFunc(d));
     }
@@ -540,7 +558,6 @@ class Y extends X {
 }
 
 class Y0 extends Y {}
-
 class Filter extends Aesthetic {
   get default_val() {
     return 1;
@@ -623,24 +640,27 @@ function safe_expand(range) {
   }
 }
 
+class Filter1 extends Filter {}
+class Filter2 extends Filter {}
+
 class Jitter_speed extends Aesthetic {
   get default_val() { return 0.1; }
 }
 
 function encode_jitter_to_int(jitter) {
-  if (jitter == 'spiral') {
+  if (jitter === 'spiral') {
     // animated in a logarithmic spiral.
     return 1;
-  } if (jitter == 'uniform') {
+  } if (jitter === 'uniform') {
     // Static jitter inside a circle
     return 2;
-  } if (jitter == 'normal') {
+  } if (jitter === 'normal') {
     // Static, normally distributed, standard deviation 1.
     return 3;
-  } if (jitter == 'circle') {
+  } if (jitter === 'circle') {
     // animated, evenly distributed in a circle with radius 1.
     return 4;
-  } if (jitter == 'time') {
+  } if (jitter === 'time') {
     // Cycle in and out.
     return 5;
   }
@@ -678,7 +698,6 @@ class Jitter_radius extends Aesthetic {
 }
 
 class Color extends Aesthetic {
-
   get default_val() { return [128, 150, 213, 255]; }
 
   default_data() {
@@ -705,7 +724,6 @@ class Color extends Aesthetic {
       format: 'rgba',
       data: this.default_data(),
     };
-
     // Store the current and the last values for transitions.
     this._textures = {
       one_d: this.regl.texture(params),
@@ -727,7 +745,6 @@ class Color extends Aesthetic {
     return this._constant;
   }
 
-
   get scale() {
     return this._scale ? this._scale : (x) => 'white';
   }
@@ -735,22 +752,25 @@ class Color extends Aesthetic {
   encode_for_textures(range) {
     if (this.is_dictionary()) {
       this._scale = scaleOrdinal().range(range).domain(this.domain);
-      this._scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+      if (schemes[range]) {
+        this._scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+      }
     } else {
       this._scale = scales[this.transform]().range(range).domain(this.domain);
     }
-
+    console.log('A');
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range]);
     } else if (range.length === this.texture_size * 4) {
       this.texture_buffer.set(range);
     } else if (range.length && range[0].length && range[0].length === 3) {
       // manually set colors.
+      console.log(range);
       const r = arange(palette_size).map((i) => {
         const [r, g, b] = range[i % range.length];
         return [r, g, b, 255];
       });
-      this.texture_buffer.set(to_buffer(r));
+      this.texture_buffer.set(r.flat());
     } else {
       console.warn(`request range of ${range} for color ${this.field} unknown`);
     }
@@ -758,7 +778,7 @@ class Color extends Aesthetic {
 }
 
 export const dimensions = {
-  Size, Jitter_speed, Jitter_radius, Color, Filter, X, Y, X0, Y0,
+  Size, Jitter_speed, Jitter_radius, Color, Filter1, Filter2, X, Y, X0, Y0,
 };
 
 export class StatefulAesthetic {
@@ -780,7 +800,7 @@ export class StatefulAesthetic {
     const [first, second] = this.states;
     first.partner = second;
     second.partner = first;
-/*    this.states[0].partner = this.states[1];
+    /*    this.states[0].partner = this.states[1];
     this.states[1].partner = this.states[0]; */
 
     for (const state of this.states) {

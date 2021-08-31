@@ -38,6 +38,7 @@ export default class Zoom {
 
   zoom_to(k, x = null, y = null, duration = 4000) {
     const scales = this.scales();
+    console.log;
     const {
       canvas, zoomer, width, height,
     } = this;
@@ -135,10 +136,10 @@ export default class Zoom {
     const renderer = this.renderers.get('regl');
     const x_aes = renderer.aes.x.current;
     const y_aes = renderer.aes.y.current;
-
+    console.log("shucks")
     this.canvas.on('mousemove', (event) => {
       // Debouncing this is really important, it turns out.
-      if (Date.now() - last_fired < 1000 / 30) {
+      if (Date.now() - last_fired < 1000 / 20) {
         return;
       }
       last_fired = Date.now();
@@ -146,7 +147,6 @@ export default class Zoom {
       const data = p ? [p] : [];
 
       const d = data[0];
-
       const annotations = d ? [
         {
           x: event.layerX,
@@ -157,12 +157,11 @@ export default class Zoom {
         },
       ] : [];
       const { x_, y_ } = this.scales();
-
       if (annotations.length) {
         this.html_annotation(annotations);
       }
 
-      if (!d) return
+      if (!d) return;
 
       const labelSet = labels
         .selectAll('g')
@@ -208,6 +207,15 @@ export default class Zoom {
       x: [x_.invert(0), x_.invert(width)],
       y: [y_.invert(0), y_.invert(height)],
     };
+  }
+
+  current_center() {
+    const { x, y } = this.current_corners();
+
+    return [
+      (x[0] + x[1]) / 2,
+      (y[0] + y[1]) / 2,
+    ];
   }
 
   restart_timer(run_at_least = 10000) {

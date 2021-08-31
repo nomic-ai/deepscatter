@@ -1,7 +1,6 @@
 import { select } from 'd3-selection';
 import { geoPath, geoIdentity } from 'd3-geo';
 import { max, range } from 'd3-array';
-import { Table } from '@apache-arrow/es2015-esm';
 import merge from 'lodash.merge';
 import Zoom from './interaction.js';
 import { ReglRenderer } from './regl_rendering.js';
@@ -128,6 +127,7 @@ export default class Scatterplot {
     }
   }
   */
+ /*
   registerPolygonMap(definition) {
     const { file, color } = definition;
     if (!this.feather_features) {
@@ -145,7 +145,7 @@ export default class Scatterplot {
         });
     }
   }
-
+  */
   visualize_tiles() {
     const map = this;
     const ctx = map.elements[2]
@@ -208,7 +208,7 @@ export default class Scatterplot {
     merge(this.prefs, prefs);
   }
 
-  load_lookup_table(item) {
+/*  load_lookup_table(item) {
     this.lookup_tables = this.lookup_tables || new Map();
     if (this.lookup_promises.get(item)) {
       return this.lookup_promises.get(item);
@@ -224,7 +224,7 @@ export default class Scatterplot {
     this.lookup_promises.set(item, metaTable.load());
 
     return undefined;
-  }
+  } */
 
   async plotAPI(prefs = {}) {
     if (prefs === undefined || prefs === null) { return Promise.resolve(1); }
@@ -264,12 +264,13 @@ export default class Scatterplot {
       prefs.polygons = [{ file: prefs.basemap_gleofeather }];
     }
 
+    /*
     if (prefs.polygons) {
       for (const polygon of prefs.polygons) {
         this.registerPolygonMap(polygon);
       }
     }
-
+    */
     await this._root.promise;
 
     // Doesn't block.
@@ -323,9 +324,10 @@ export default class Scatterplot {
 
     const current_corners = _renderer.zoom.current_corners();
     const output = [];
-    const filter = _renderer.aes.filter.current.get_function();
+    const filter1 = _renderer.aes.filter1.current.get_function();
+    const filter2 = _renderer.aes.filter2.current.get_function();
     for (const p of _root.points(current_corners, true)) {
-      if (filter(p)) {
+      if (filter1(p) && filter2(p)) {
         output.push(p);
       }
       if (output.length >= n) { return output; }

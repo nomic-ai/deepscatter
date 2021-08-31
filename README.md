@@ -219,33 +219,9 @@ Most of these options have defaults, see `index.html` for a reasonably comprehen
 
 ### `filters` and `+filters`
 
-The visualization maintains a list of 'filters' that prevent points from being plotted.
+The visualization maintains a list of 'filters' that prevent points from being plotted. Currently you can build up to two treated in an AND conjunction, each on a single datapoint. Filters are run on the GPU.
 
-#### Functional filters.
-
-By default, filters build a function that returns true or false.
-
-Filters are instantiated as an object.  The keys are the names of the
-filters (so that they can be deleted); the value is built into a function
-by implicitly adding `datum => ` to the front.
-
-So for example, in the following filter:
-
-```
-"filters": {
- "English": "datum.language=='English'",
- "Science": "datum.Classification=='Q'"
-}
-```
-
-`Science` will be limited by the return value of the function
-defined as `d => d.Classification=='Q'`.
-
-
-#### Regex filters.
-
-Removed--would this be useful?
-
+I would also like to have filters that can run in SQL on a webworker.
 
 # Other notes
 

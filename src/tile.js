@@ -1,7 +1,7 @@
 import {
   extent, range, min, max, bisectLeft,
 } from 'd3-array';
-import { Table } from '@apache-arrow/es5-esm';
+import { Table } from '@apache-arrow/es5-cjs';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
 

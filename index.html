@@ -8,9 +8,11 @@
   <h1>Welcome to a demo/test page.</h1>
   <div id="deepscatter">
   </div>
-  <button id="flip" style="z-index:99;position:fixed;">Change encoding</button>
-  <pre id="ident" style="z-index:99;position:fixed;"></pre>
-
+  <div id="controls" style="z-index:99;position:fixed;">
+  <input type="range" min=0 max=.5 step=.01 id="jitter" value=.05 />
+  <button id="flip">Change encoding</button>
+  <pre id="ident"></pre>
+  </div>
 </body>
 
 <head>
@@ -58,6 +60,10 @@
         field: "x",
         transform: "literal"
       },
+      "jitter_radius": {
+        method: "uniform",
+        constant: .01
+      },
       "y": {
         field: "y", 
         transform: "literal"
@@ -94,7 +100,17 @@
   // Simple animation demonstration.
 
   let cycle = 0;
-
+  select("#jitter").on("change", (event) => {
+    console.log(event.target.value);
+    scatterplot.plotAPI({
+      'encoding': {
+        'jitter_radius': {
+          'method': 'uniform',
+          'constant': +event.target.value
+        }
+      }
+    })
+  })
   select("#flip").on("click", () => {
     cycle += 1
     const new_coding = {

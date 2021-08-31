@@ -35,9 +35,9 @@
   },
   "homepage": "https://github.com/CreatingData/deepscatter#readme",
   "dependencies": {
-    "@apache-arrow/es5-esm": "^3.0.0",
+    "@apache-arrow/es5-cjs": "^5.0.0",
     "comlink": "^4.3.0",
-    "d3-array": "^3.0.1",
+    "d3-array": "^3.0.2",
     "d3-color": "^3.0.1",
     "d3-contour": "^3.0.1",
     "d3-ease": "^3.0.1",
@@ -59,7 +59,6 @@
   },
   "deprecated": false,
   "devDependencies": {
-    "@babel/runtime": "^7.9.6",
     "eslint": "^7.29.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-mourner": "^3.0.0",
@@ -69,6 +68,7 @@
     "glslify-loader": "^2.0.0",
     "rollup-plugin-glslify": "^1.2.0",
     "rollup-plugin-web-worker-loader": "^1.6.1",
-    "vite": "^2.3.8"
+    "trifeather": "file:../trifeather",
+    "vite": "^2.5.2"
   }
 }

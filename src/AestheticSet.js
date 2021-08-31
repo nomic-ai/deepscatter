@@ -79,6 +79,10 @@ export class AestheticSet {
       encoding = {};
     }
 
+    if (encoding.filter) {
+      encoding.filter1 = encoding.filter;
+      delete encoding['filter'];
+    }
     // Overwrite position fields.
     this.interpret_position(encoding);
 

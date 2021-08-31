@@ -4,7 +4,7 @@ import { transfer, expose } from 'comlink';
 import {
   Table, Column, Vector, Utf8, Float32,
   Uint32, Int32, Int64, Dictionary,
-} from '@apache-arrow/es5-esm';
+} from '@apache-arrow/es5-cjs';
 
 function compose_functions(val) {
   
