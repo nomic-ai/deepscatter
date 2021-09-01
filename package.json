@@ -68,7 +68,6 @@
     "glslify-loader": "^2.0.0",
     "rollup-plugin-glslify": "^1.2.0",
     "rollup-plugin-web-worker-loader": "^1.6.1",
-    "trifeather": "file:../trifeather",
     "vite": "^2.5.2"
   }
 }
