@@ -1179,13 +1179,13 @@ void main() {
     run_color_fill(ease);
   }
   point_size = gl_PointSize;
-  if (u_use_glyphset > 0. && point_size > 2.0) {
+  if (u_use_glyphset > 0. && point_size > 5.0) {
     float random_letter = floor(64. * ix_to_random(ix, 1.3));
     letter_pos = vec2(
       // start at a number between 0 and 7.
-      clamp(mod(random_letter, 8.) / 8., 0., 6./8.),
-      clamp(floor(random_letter / 8.) / 8., 0., 6./8.)
+      mod(random_letter, 8.) / 8.,
+      floor(random_letter / 8.) / 8.
     );
-    gl_PointSize *= 1.5;
+    gl_PointSize *= 3.0;
   }
 }

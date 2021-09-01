@@ -143,7 +143,7 @@ export class ReglRenderer extends Renderer {
           continue;
         }
       } catch (err) {
-//       console.warn(err);
+        //       console.warn(err);
       // throw "Dead"
         continue;
       }
@@ -258,6 +258,7 @@ export class ReglRenderer extends Renderer {
   render_all(props) {
     const { regl } = this;
 
+
     this.fbos.points.use(() => {
       regl.clear({ color: [0, 0, 0, 0] });
       this.render_points(props);
@@ -280,16 +281,17 @@ export class ReglRenderer extends Renderer {
     }
     */
     regl.clear({ color: [0, 0, 0, 0] });
+    this.fbos.lines.use(() => regl.clear({ color: [0, 0, 0, 0] }));
     if (this.scatterplot.trimap) {
       // Allows binding a TriMap from `trifeather` object to the regl package without any import.
       // This is the best way to do it that I can think of for now.
       this.fbos.lines.use(() => {
         this.scatterplot.trimap.zoom = this.zoom;
-        this.scatterplot.trimap.tick("polygon")
-      })
+        this.scatterplot.trimap.tick('polygon');
+      });
     }
     // Copy the points buffer to the main buffer.
-    
+
     for (const layer of [this.fbos.lines, this.fbos.points]) {
       regl({
         profile: true,
@@ -341,7 +343,7 @@ export class ReglRenderer extends Renderer {
 
     this.initialize_sprites(tile);
 
-//    const { sprites, image_locations } = tile._regl_elements;
+    //    const { sprites, image_locations } = tile._regl_elements;
     const { current_position } = sprites;
     if (current_position[1] > (4096 - 18 * 2)) {
       console.error(`First spritesheet overflow on ${tile.key}`);
@@ -397,15 +399,9 @@ export class ReglRenderer extends Renderer {
   initialize_textures() {
     const { regl } = this;
     this.fbos = this.fbos || {};
-    
-    this.fbos.empty_texture = regl.texture({
-      width: 2,
-      height: 2,
-      data: [
-        255, 255, 255, 255, 0, 0, 0, 0,
-        255, 0, 255, 255, 0, 0, 255, 255
-      ]
-    })
+    this.fbos.empty_texture = regl.texture(
+      range(128).map((d) => range(128).map((d) => [0, 0, 0])),
+    );
 
     this.fbos.minicounter = regl.framebuffer({
       width: 512,
@@ -459,8 +455,7 @@ export class ReglRenderer extends Renderer {
       depth: false,
     });
 
-    this.fbos.dummy_buffer = regl.buffer(10)
-
+    this.fbos.dummy_buffer = regl.buffer(10);
   }
 
   get_image_texture(url) {
@@ -473,8 +468,9 @@ export class ReglRenderer extends Renderer {
     image.src = url;
     this.textures[url] = this.fbos.minicounter;
     image.onload = () => {
+      console.log('loaded image', url);
       this.textures[url] = regl.texture(image);
-    }
+    };
     return this.textures[url];
   }
 
@@ -680,7 +676,9 @@ export class ReglRenderer extends Renderer {
           x, y: height - y, width: 1, height: 1,
         });
       } catch (err) {
-        console.warn("Read bad data from", { x, y, height, attempted: height - y})
+        console.warn('Read bad data from', {
+          x, y, height, attempted: height - y,
+        });
         color_at_point = [0, 0, 0, 0];
       }
     });
@@ -718,7 +716,7 @@ export class ReglRenderer extends Renderer {
   })
 } */
   get fill_buffer() {
-    // 
+    //
     if (!this._fill_buffer) {
       const { regl } = this;
       this._fill_buffer = regl.buffer(
@@ -818,16 +816,12 @@ export class ReglRenderer extends Renderer {
           // Other values plot a specific value of the color-encoded field.
           return -2;
         },
-        u_use_glyphset: (_, {prefs}) =>
-          {
-            return prefs.glyph_set ? 1 : 0
-        },
-        u_glyphset: (_, {prefs}) => {
+        u_use_glyphset: (_, { prefs }) => (prefs.glyph_set ? 1 : 0),
+        u_glyphset: (_, { prefs }) => {
           if (prefs.glyph_set) {
             return this.get_image_texture(prefs.glyph_set);
-          } else {
-            return this.fbos.empty_texture
-          }            
+          }
+          return this.fbos.empty_texture;
         },
         u_color_picker_mode: regl.prop('color_picker_mode'),
         u_position_interpolation_mode() {
@@ -852,9 +846,7 @@ export class ReglRenderer extends Renderer {
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
         u_zoom_balance: regl.prop('zoom_balance'),
         u_base_size: (_, { prefs }) => prefs.point_size,
-        u_maxix: (_, props) => {
-          return props.max_ix;
-        },
+        u_maxix: (_, props) => props.max_ix,
         u_k(_, props) {
           return props.transform.k;
         },
@@ -898,7 +890,7 @@ export class ReglRenderer extends Renderer {
         const temporal = time === 'current' ? '' : 'last_';
         parameters.uniforms[`u_${temporal}${k}_map`] = () => this.aes[k][time].textures.one_d;
         parameters.uniforms[`u_${temporal}${k}_needs_map`] = () => this.aes[k][time].use_map_on_regl;
-         // Currently, a texture lookup is only used for dictionaries.
+        // Currently, a texture lookup is only used for dictionaries.
         /* db join code
         if (k === 'jitter_radius' && temporal === '') {
           const base_string = `u_${temporal}${k}_lookup`;
@@ -1072,7 +1064,7 @@ class TileBufferManager {
       return regl_elements.get('_count');
     }
   }
-/*
+  /*
   create_position_buffer() {
     const { table } = this.tile;
     const x = table.getColumn('x').data.values;
@@ -1137,7 +1129,7 @@ class TileBufferManager {
       key,
       buffer_desc,
     );
-//    if (key === 'ix') {console.warn(buffer_desc)}
+    //    if (key === 'ix') {console.warn(buffer_desc)}
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
   }
 }
