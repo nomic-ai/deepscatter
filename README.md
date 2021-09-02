@@ -20,6 +20,11 @@ It's fast for two reasons:
    which allows for interpolated transitions with calculations 
    in parallel.
 
+# Examples
+
+* [1 million+ documents from arxiv.com](https://observablehq.com/@bmschmidt/arxiv) rendered inside an Observable notebook.
+* [Every person in the 2010 and 2020 US Censuses](https://all-of-us.benschmidt.org) displayed in an interactive svelte-kit app.
+
 # Quick start
 
 ## Importing the module.
