@@ -670,7 +670,7 @@ export default class RootTile extends QuadTile {
   findPoint(ix) {
     return this
       .map((t) => t)
-      .filter((t) => t.table && t.min_ix < ix && t.max_ix > ix)
+      .filter((t) => t.table && t.min_ix <= ix && t.max_ix >= ix)
       .map((t) => {
         const mid = bisectLeft(t.table.getColumn('ix').data.values, ix);
         if (t.table.get(mid) && t.table.get(mid).ix === ix) {
