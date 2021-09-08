@@ -227,10 +227,34 @@ export default class Scatterplot {
   } */
 
   set tooltip_html(func) {
+    /* PUBLIC */
+    /*
+
+    Set a function to run during mouseover that defines the content of 
+    a tooltip.
+
+    // Arguments: func: A function that takes a single argument:
+    the datum for the particular point. This is a row from the arrow 
+    table; it can generally be
+    safely treated as an object with indexes for the data keys.
+
+    So if you run
+    ```js
+    plot.tooltip_html = (d => 1 + d.x)
+    ```
+    the content of the tooltip will be a number one greater than the x-value of the point.
+
+    The default function is label_from_point, which
+    returns a <dl> element with <dt><dd> pairs
+    for all but a few data keys. CSS styling can make
+    these look better.
+    */
+
     this._zoom._tooltip_html = func;
   }
 
   get tooltip_html() {
+    /* PUBLIC see set tooltip_html */
     return this._zoom._tooltip_html
   }
 
