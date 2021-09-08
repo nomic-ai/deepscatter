@@ -1174,7 +1174,8 @@ void main() {
     gl_Position = vec4(position + jitter, 0., 1.);
   }  
   if (u_color_picker_mode > 0.) {
-    fill = packFloat(ix);
+    // Add one so the first element is distinguishable.
+    fill = packFloat(ix + 1.);
   } else {
     run_color_fill(ease);
   }

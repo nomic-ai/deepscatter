@@ -683,7 +683,8 @@ export class ReglRenderer extends Renderer {
       }
     });
 
-    const float = unpackFloat(...color_at_point);
+    // Subtract one.
+    const float = unpackFloat(...color_at_point) - 1;
 
     const p = this.tileSet.findPoint(float);
 

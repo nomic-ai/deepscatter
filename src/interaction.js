@@ -56,6 +56,7 @@ export default class Zoom {
 
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
+
     const els = select(div)
       .selectAll('div.tooltip')
       .data(points)
@@ -82,6 +83,11 @@ export default class Zoom {
         const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
         return t;
       });
+  }
+
+  get _tooltip_html() {
+    // not in current use.
+    return () => null
   }
 
   zoom_to_bbox(corners, duration = 4) {
@@ -136,7 +142,6 @@ export default class Zoom {
     const renderer = this.renderers.get('regl');
     const x_aes = renderer.aes.x.current;
     const y_aes = renderer.aes.y.current;
-    console.log("shucks")
     this.canvas.on('mousemove', (event) => {
       // Debouncing this is really important, it turns out.
       if (Date.now() - last_fired < 1000 / 20) {
@@ -158,6 +163,7 @@ export default class Zoom {
       ] : [];
       const { x_, y_ } = this.scales();
       if (annotations.length) {
+        // When a function is "annotated", this gets called.
         this.html_annotation(annotations);
       }
 
@@ -174,8 +180,13 @@ export default class Zoom {
               .attr('r', 5)
               .attr('stroke', '#110022')
               .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd))
-              .transition()
-              .attr('r', 12);
+//              .transition()            
+              .attr('r', 12)
+              .on('mouseout', () => {
+                labels.selectAll('g').remove();
+                select(".tooltip")
+                  .remove();            
+              })
             return e;
           },
           (update) => update,
@@ -388,6 +399,7 @@ function label_from_point(point, defaults) {
   const nope = new Set([
     'x', 'y', 'ix', 'bookstack', null, 'tile_key',
   ]);
+
   for (const [k, v] of point.entries()) {
     if (defaults) {
       if (!defaults.has(k)) {
@@ -395,8 +407,11 @@ function label_from_point(point, defaults) {
       }
     } else {
       if (nope.has(k)) { continue; }
+      // Private value.
       if (k.match(/_dict_index/)) { continue; }
+      // Don't show missing data.
       if (v === null) { continue; }
+      // Don't show empty data.
       if (v === '') { continue; }
     }
     output += `<dt>${k}</dt>`;
