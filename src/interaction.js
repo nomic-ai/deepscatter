@@ -74,20 +74,24 @@ export default class Zoom {
           .style('opacity', 0.75),
         (exit) => exit,
         (update) => update
-          .html((d) => label_from_point(d.data)),
+          .html((d) => this.tooltip_html(d.data)),
       );
 
     els
-      .html((d) => label_from_point(d.data))
+      .html((d) => this.tooltip_html(d.data))
       .style('transform', (d) => {
         const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
         return t;
       });
   }
 
-  get _tooltip_html() {
-    // not in current use.
-    return () => null
+  get tooltip_html() {
+    // a function that 
+    if (this._tooltip_html === undefined) {
+      return label_from_point
+    } else {
+      return this._tooltip_html
+    }
   }
 
   zoom_to_bbox(corners, duration = 4) {
@@ -180,7 +184,6 @@ export default class Zoom {
               .attr('r', 5)
               .attr('stroke', '#110022')
               .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd))
-//              .transition()            
               .attr('r', 12)
               .on('mouseout', () => {
                 labels.selectAll('g').remove();

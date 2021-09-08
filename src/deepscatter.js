@@ -226,6 +226,14 @@ export default class Scatterplot {
     return undefined;
   } */
 
+  set tooltip_html(func) {
+    this._zoom._tooltip_html = func;
+  }
+
+  get tooltip_html() {
+    return this._zoom._tooltip_html
+  }
+
   async plotAPI(prefs = {}) {
     if (prefs === undefined || prefs === null) { return Promise.resolve(1); }
 
