@@ -137,15 +137,12 @@ export default class Zoom {
   add_mouseover() {
     let last_fired = 0;
 
-    const labels = select('#deepscatter-svg')
-      .selectAll('g.label')
-      .data([1])
-      .join('g')
-      .attr('class', 'label');
+
 
     const renderer = this.renderers.get('regl');
     const x_aes = renderer.aes.x.current;
     const y_aes = renderer.aes.y.current;
+
     this.canvas.on('mousemove', (event) => {
       // Debouncing this is really important, it turns out.
       if (Date.now() - last_fired < 1000 / 20) {
@@ -165,41 +162,32 @@ export default class Zoom {
           dy: 30,
         },
       ] : [];
+
+      if (!d) return;
+
       const { x_, y_ } = this.scales();
+
       if (annotations.length) {
         // When a function is "annotated", this gets called.
         this.html_annotation(annotations);
       }
 
-      if (!d) return;
-
-      const labelSet = labels
-        .selectAll('g')
-        .data(data, (d) => d.ix)
+      const labelSet = select('#deepscatter-svg')
+        .selectAll('circle.label')
+        .data(data, (d_) => d_.ix)
         .join(
-          (enter) => {
-            const e = enter.append('g');
-            e
-              .append('circle')
-              .attr('r', 5)
-              .attr('stroke', '#110022')
-              .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd))
-              .attr('r', 12)
-              .on('mouseout', () => {
-                labels.selectAll('g').remove();
-                select(".tooltip")
-                  .remove();            
-              })
-            return e;
-          },
-          (update) => update,
-          (exit) => exit.remove(),
+          (enter) => enter
+            .append('circle')
+            .attr('class', 'label')
+            .attr('stroke', '#110022')
+            .attr('r', 12)
+            .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd))
+            .attr('cx', (datum) => x_(x_aes.value_for(datum)))
+            .attr('cy', (datum) => y_(y_aes.value_for(datum))),
+          (update) => update
+            .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd)),
+          (exit) => exit.call((e) => e.remove())
         )
-        // Position relative to the ancestor here is funky.
-        .attr('transform', (datum) => `translate(
-          ${x_(x_aes.value_for(datum))},
-          ${y_(y_aes.value_for(datum))}
-        )`)
         .on('click', (ev, dd) => {
           this.renderers.get('regl').click_function(dd, ev);
         });

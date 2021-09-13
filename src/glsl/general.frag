@@ -9,6 +9,7 @@ varying vec4 fill;
 varying vec4 stroke;
 varying vec2 letter_pos;
 varying float point_size;
+
 uniform float u_only_color;
 uniform float u_color_picker_mode;
 uniform float u_use_glyphset;
@@ -49,7 +50,7 @@ void main() {
   // Drop parts of the rectangle outside the unit circle.
   // I took this from observable.
   float alpha = fill.a;
-  if (u_use_glyphset == 0.) {
+  if (u_use_glyphset == 0. || point_size < 5.0) {
     if (out_of_circle(gl_PointCoord)) {
       discard;
       return;
@@ -61,11 +62,12 @@ void main() {
       alpha *= (1.0 - smoothstep(1.0 - delta, 1.0 + delta, r));
     #endif
   } else {
- //   vec2 coords = letter_pos + gl_PointCoord/8.;
-//    vec2 coords = vec2(.5, .5);
-  //  vec4 sprite = texture2D(u_glyphset, coords);
-   // alpha *= (sprite.a);    
-//    if (alpha <= 0.03) discard;
+    vec2 coords = letter_pos + gl_PointCoord/8.;
+//    vec2 coords = vec2(.2, .2);
+    vec4 sprite = texture2D(u_glyphset, coords);
+    alpha *= (sprite.a);  
+//    fill = vec4(1.0, 1.0, 1.0, alpha);  
+    if (alpha <= 0.03) discard;
   }
   // Pre-blend the alpha channel.
   if (u_color_picker_mode == 1.) {
