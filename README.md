@@ -29,8 +29,7 @@ It's fast for two reasons:
 
 ## Importing the module.
 
-I've got an Observable notebook that shows how to use this. For now, it's private--write 
-me if you want access.
+See the [arxiv example above](https://observablehq.com/@bmschmidt/arxiv) to see some basic examples.
 
 ## Running locally.
 
@@ -62,7 +61,24 @@ the module should work in all browsers, although the low float precision on iOs 
   ```sh
   quadfeather --files tmp.csv --tile_size 50000 --destination public/tiles
   ```
-3. Edit the file at `index.html` to use an encoding scheme that matches your data.
+3. Edit the file at `index.html` to use an encoding scheme that matches your data. The API call describing the basic plot is at [lines 45-78 in the example code]( https://github.com/CreatingData/deepscatter/blob/master/index.html#L45-L78), and includes some aesthetic descriptions like [`{field : "class"}`](https://github.com/CreatingData/deepscatter/blob/master/index.html#L55) on various lines that refer to CSV columns that are likely *not* in your data. So if you have a field called `species`, for example, you might change `{field : "class"}` to `{field : "species"}`, and replace 
+   ```
+   "size": {
+        "field": "quantity",
+        "transform": "sqrt",
+        "domain": [0, 3],
+        "range": [0, 4]
+   }
+   ```
+   with 
+   ```
+    "size": {
+        "field": "species",
+        "range": "category10"
+     }
+     ```
+At some point soon I hope to share an easier way to create these specs that does not require coding JSON directly.
+
 
 ## Build the module
 
@@ -75,7 +91,9 @@ importing this are very slightly different than `index.html`.
 
 Note that this is an ESM module and so requires you to use `<script type="module">` in your code.
 Don't worry! It's 2021, we're allowed to 
-do this now! Snippet:
+do this now! But do be aware that this will not work on computers running very old browsers.
+
+Snippet:
 
 ```html
 <div id="my-div"></div>
