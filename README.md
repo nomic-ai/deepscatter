@@ -29,8 +29,7 @@ It's fast for two reasons:
 
 ## Importing the module.
 
-I've got an Observable notebook that shows how to use this. For now, it's private--write 
-me if you want access.
+See the [arxiv example above](https://observablehq.com/@bmschmidt/arxiv) to see some basic examples.
 
 ## Running locally.
 
@@ -53,16 +52,33 @@ npm run dev
 
 If you go to localhost:3000, it should have an interactive scatterplot waiting.
 This development site only works in Chrome, not Safari or Firefox, because uses ES6 module syntax inside the webworker. The distributed version of 
-the module should work in all browsers.
+the module should work in all browsers, although the low float precision on iOs means it doesn't look ideal on iPads compared to Android tablets.
 
 ## Your own data.
 
-1. Create a CSV file that has columns called 'x' and 'y'. (Or a feather file that has columns `x`, `y`, and `ix`, where `ix` is display order).
+1. Create a CSV file that has columns called 'x' and 'y'. (Or a feather file that has columns `x`, `y`, and `ix`, where `ix` is display order). Any other columns (categorical information, etc.) can be included as additional columns.
 3. Tile it:
   ```sh
   quadfeather --files tmp.csv --tile_size 50000 --destination public/tiles
   ```
-3. Edit the file at `index.html` to use an encoding scheme that matches your data.
+3. Edit the file at `index.html` to use an encoding scheme that matches your data. The API call describing the basic plot is at [lines 45-78 in the example code]( https://github.com/CreatingData/deepscatter/blob/master/index.html#L45-L78), and includes some aesthetic descriptions like [`{field : "class"}`](https://github.com/CreatingData/deepscatter/blob/master/index.html#L55) on various lines that refer to CSV columns that are likely *not* in your data. So if you have a field called `species`, for example, you might change `{field : "class"}` to `{field : "species"}`, and replace 
+   ```
+   "size": {
+        "field": "quantity",
+        "transform": "sqrt",
+        "domain": [0, 3],
+        "range": [0, 4]
+   }
+   ```
+   with 
+   ```
+    "size": {
+        "field": "species",
+        "range": "category10"
+     }
+     ```
+At some point soon I hope to share an easier way to create these specs that does not require coding JSON directly.
+
 
 ## Build the module
 
@@ -75,7 +91,9 @@ importing this are very slightly different than `index.html`.
 
 Note that this is an ESM module and so requires you to use `<script type="module">` in your code.
 Don't worry! It's 2021, we're allowed to 
-do this now! Snippet:
+do this now! But do be aware that this will not work on computers running very old browsers.
+
+Snippet:
 
 ```html
 <div id="my-div"></div>
@@ -116,8 +134,13 @@ API mimics Vega-Lite with some minor distinctions.
 {
    encoding: {
      "x": {
-         "field": "
-     }
+         "field": "x",
+         "transform": "literal"
+     },
+     "color": {
+         "field": "year",
+         "range": "viridis",
+         "domain": [1970, 2020]
    }
 }
 
@@ -128,9 +151,9 @@ API mimics Vega-Lite with some minor distinctions.
 1. x
 2. y
 3. size
-4. jitter_radius: size of jitter.
-5. jitter_speed: Speed of jitter.
-6. color (categorical or linear: color scales explicitly, or accepting any d3-color name.)
+4. jitter_radius: size of jitter. API subject to change.
+5. jitter_speed: speed of jitter. API subject to change.
+6. color (categorical or linear: range can call color scales explicitly, or accepting any d3-color name.)
 7. `x0` (for animations; transitions between x0 and x)
 8. `y0` (for animations; transitions between y0 and y)
 9. `filter`. (Filtering is treated as an aesthetic operation by this library.)
@@ -153,90 +176,4 @@ Jitter is a little overloaded with features right now, but some are quite fun.
    should be able to use the zoom state to draw to canvas or svg layers using the
    same zoom and underlying data, so that you can draw point with webgl
    and then build a callout using d3-annotate.
-
-
-
-# Infinitely zoomable scatterplots.
-
-This is code for making scatterplots of indefinite resolution. There
-are two pieces of code; one is a script that builds a tiled
-directory of files; the other is a javascript (ES6) library that
-displays these points in the browser and loads new points as the user
-zooms in to specific areas.
-
-
-A description of some of the technology using the old Canvas API is at
-[Creating Data](http://creatingdata.us/techne/scatterplots/). The new WebGL version
-is much faster, but lacks some features there. (It also has features that don't exist there.)
-
-See examples:
-
-* [US Street names, UMAP embedding of word2vec model, 30,000 points](http://creatingdata.us/etc/streets/)
-* [Hathi Trust Library books, 13.8 million points](http://creatingdata.us/datasets/hathi-features/)
-* [Hathi Trust fiction, 150,000 books](http://creatingdata.us/techne/bibliographies/)
-
-
-# Creating tiles.
-
-This uses a python script to create csv data tiles (typically of around 1,000 - 50,000 points apiece) that are then served through javascript.
-
-```bash
-node src/tiler.js --tile-size 20000 data/1e5.csv
-
-```
-
-# API
-
-This API description is incomplete. If you actually want to use this and can't figure it out,
-file an issue.
-
-
-## Object creation
-
-Creation is a two-step process.
-
-First, instantiate a handler that will build a canvas. This is a synchronous function.
-
-```js
-import Scatterplot from 'deepscatter';
-
-scatterplot = Scatterplot(
-  '.vizpanel', // selector for the div where a canvas will be created
-  document.documentElement.clientWidth, // width of the canvas
-  document.documentElement.clientHeight, // height of the canvas.
-);
-
-```
-
-## Plot through API
-
-Then, interface by calling the API with a series of objects. The first call currently
-tends to require a lot of parameters--I give a verbose one below. The first argument is
-the directory created by the python call.
-
-This returns a `Promise` that will load all require files before resolving the plot. Although there are
-*are* a number of methods attached to the scatterplot that can be called directly, things are
-handled best if you only call this one method.
-
-There's also a special method, `scatterplot.redraw()`, that can be called in an emergency.
-
-Most of these options have defaults, see `index.html` for a reasonably comprehensive example.
-
-### `filters` and `+filters`
-
-The visualization maintains a list of 'filters' that prevent points from being plotted. Currently you can build up to two treated in an AND conjunction, each on a single datapoint. Filters are run on the GPU.
-
-I would also like to have filters that can run in SQL on a webworker.
-
-# Other notes
-
-There a few things for authoring that can only be done in the browser.
-
-Especially important is the zoom level.
-
-You can get a string telling you where are by typing into the console.
-
-```js
-scatterplot._renderer.current_corners()
-```
 

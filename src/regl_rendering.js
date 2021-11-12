@@ -683,10 +683,13 @@ export class ReglRenderer extends Renderer {
       }
     });
 
-    // Subtract one.
-    const float = unpackFloat(...color_at_point) - 1;
+    // Subtract one. This inverts the operation `fill = packFloat(ix + 1.);`
+    // in glsl/general.vert, to avoid off-by-one errors with the point selected.
+    const point_as_float = unpackFloat(...color_at_point) - 1;
 
-    const p = this.tileSet.findPoint(float);
+    // Coerce to int. unpackFloat returns float but findPoint expects int.
+    const point_as_int = Math.round(point_as_float)
+    const p = this.tileSet.findPoint(point_as_int);
 
     if (p.length === 0) { return undefined; }
 
