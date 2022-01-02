@@ -204,9 +204,9 @@ class Aesthetic {
       }
     }
     if (this.is_dictionary()) {
-      this.scale = scaleOrdinal().range(range).domain(this.domain);
+      scale = scaleOrdinal().range(range).domain(this.domain);
       if (schemes[range]) {
-        this.scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+        scale.range(schemes[range]).domain(this.column.dictionary.toArray());
       }
     }
 
