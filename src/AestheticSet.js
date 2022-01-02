@@ -1,4 +1,5 @@
-import { dimensions as Aesthetic, default_aesthetics, StatefulAesthetic } from './Aesthetic.js';
+/* eslint-disable no-param-reassign */
+import { dimensions as Aesthetic, default_aesthetics, StatefulAesthetic } from './Aesthetic.ts';
 
 export const aesthetic_variables = Array.from(Object.keys(Aesthetic))
   .map((d) => d.toLowerCase());
@@ -81,7 +82,7 @@ export class AestheticSet {
 
     if (encoding.filter) {
       encoding.filter1 = encoding.filter;
-      delete encoding['filter'];
+      delete encoding.filter;
     }
     // Overwrite position fields.
     this.interpret_position(encoding);

@@ -10,11 +10,11 @@ export default {
   build: {
     target: "esnext",
     lib: {
-      entry: path.resolve(__dirname, 'src/deepscatter.js'),
+      entry: path.resolve(__dirname, 'src/deepscatter.ts'),
       name: 'Deepscatter',
       formats: ['es'],
     },
-    },
+  },
 
   plugins: [
     glslify({ compress: false }), // for debugging 

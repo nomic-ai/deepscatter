@@ -1,13 +1,11 @@
-import { select } from 'd3-selection';
+import { select, Selection } from 'd3-selection';
 import { geoPath, geoIdentity } from 'd3-geo';
 import { max, range } from 'd3-array';
 import merge from 'lodash.merge';
-import Zoom from './interaction.js';
-import { ReglRenderer } from './regl_rendering.js';
-import Tile from './tile.js';
-
-import ArrowMetaTable from './lookup_textures_from_arrow.js';
-import FeatureHandler from './geo_poly.js';
+import Zoom from './interaction';
+import { ReglRenderer } from './regl_rendering';
+import Tile from './tile';
+import { APICall } from './d';
 
 const base_elements = [
   {
@@ -29,6 +27,14 @@ const base_elements = [
 ];
 
 export default class Scatterplot {
+  width : number;
+  height : number;
+  div : Selection<any, any, any, any>;
+  bound : boolean;
+  d3 : Object;
+  private _zoom : Zoom;
+  prefs : APICall;
+  
   constructor(selector, width, height) {
     this.bound = false;
     if (selector !== undefined) {
@@ -45,11 +51,11 @@ export default class Scatterplot {
     this.height = height;
 
     this.div = select(selector)
-      .selectAll("div.deepscatter_container")
+      .selectAll('div.deepscatter_container')
       .data([1])
-      .join("div")
-      .attr("class", "deepscatter_container")
-      .style("position", "absolute")
+      .join('div')
+      .attr('class', 'deepscatter_container')
+      .style('position', 'absolute');
     // Styling this as position absolute with no top/left
     // forces the children to inherit the relative position
     // of the div, not the div's parent.
@@ -66,7 +72,7 @@ export default class Scatterplot {
       duration: 2,
       point_size: 1, // base size before aes modifications.
       alpha: 0.4, // Overall screen saturation target.
-      click_function: "alert(`You clicked on a point with data ${JSON.stringify(datum)}`)"
+      click_function: 'alert(`You clicked on a point with data ${JSON.stringify(datum)}`)',
     };
 
     for (const d of base_elements) {
@@ -76,7 +82,7 @@ export default class Scatterplot {
         .style('position', 'absolute')
         .style('top', 0)
         .style('left', 0)
-        .style('pointer-events', d.id == 'deepscatter-svg' ? 'auto' : 'none');
+        .style('pointer-events', d.id === 'deepscatter-svg' ? 'auto' : 'none');
 
       container
         .append(d.nodetype)
@@ -127,7 +133,7 @@ export default class Scatterplot {
     }
   }
   */
- /*
+  /*
   registerPolygonMap(definition) {
     const { file, color } = definition;
     if (!this.feather_features) {
@@ -208,7 +214,7 @@ export default class Scatterplot {
     merge(this.prefs, prefs);
   }
 
-/*  load_lookup_table(item) {
+  /*  load_lookup_table(item) {
     this.lookup_tables = this.lookup_tables || new Map();
     if (this.lookup_promises.get(item)) {
       return this.lookup_promises.get(item);
@@ -230,11 +236,11 @@ export default class Scatterplot {
     /* PUBLIC */
     /*
 
-    Set a function to run during mouseover that defines the content of 
+    Set a function to run during mouseover that defines the content of
     a tooltip.
 
     // Arguments: func: A function that takes a single argument:
-    the datum for the particular point. This is a row from the arrow 
+    the datum for the particular point. This is a row from the arrow
     table; it can generally be
     safely treated as an object with indexes for the data keys.
 
@@ -249,13 +255,13 @@ export default class Scatterplot {
     for all but a few data keys. CSS styling can make
     these look better.
     */
-
+    this._tooltip_html = func;
     this._zoom._tooltip_html = func;
   }
 
   get tooltip_html() {
     /* PUBLIC see set tooltip_html */
-    return this._zoom._tooltip_html
+    return this._tooltip_html;
   }
 
   async plotAPI(prefs = {}) {

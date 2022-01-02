@@ -49,6 +49,9 @@ function floatVector(input) {
 const WorkerTile = {
 
   fetch(url, mutations) {
+    if (url.match('https://github')) {
+      url += '?raw=true';
+    }
     return fetch(url)
       .then((resp) => resp.arrayBuffer())
       .then((response) => {

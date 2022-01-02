@@ -15,16 +15,30 @@ class Batch {
 }
 
 class Tile extends Batch {
+  max_ix : number;
+  promise : Promise<void>;
+  download_state : string;
+  private _table : Table;
+  private _current_mutations: Record<string, any>;
+  parent : Tile;
+  _table_buffer: ArrayBuffer;
+  children : Array<Tile>;
+  private _highest_known_ix : BigInteger;
+  private _min_ix : BigInteger;
+  private _max_ix : BigInteger;
+  download : any;
+  __schema : {name: string, type : 'date', extent: Array<any>};
+  local_dictionary_lookups : Map<string, any>;
+  codes : [number, number, number];
+  private _extent? : Record<'x' | 'y', [number, number]>;
+
   constructor() {
     // Accepts prefs only for the case of the root tile.
     super();
     this.max_ix = undefined;
-
-    this.promise = Promise.resolve(1);
-
+    this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
 
-//    this.class = new.target;
   }
 
   get dictionary_lookups() {
@@ -90,6 +104,7 @@ class Tile extends Batch {
       return Promise.resolve('deferred');
     }
 
+    
     return this.extend_promise(() => {
       // Nuke the table
       this._table = undefined;
@@ -137,6 +152,7 @@ class Tile extends Batch {
           const f = {
             t: tile,
             iterator: tile.points(bounding, sorted),
+            next : undefined
           };
           f.next = f.iterator.next();
           return f;
@@ -253,7 +269,7 @@ class Tile extends Batch {
     return this._table_buffer && this._table_buffer.byteLength > 0;
   }
 
-  find_closest(p, dist = Infinity, filter) {
+/*  find_closest(p, dist = Infinity, filter) {
     let my_dist = dist;
     let candidate;
 
@@ -261,7 +277,7 @@ class Tile extends Batch {
     const DEBOUNCE = 1/60 * 1000;
     this._last_kdbuild_time = this._last_kdbuild_time || 0;
     */
-
+/*
     this.visit((tile) => {
       // Don't visit tiles too far away.
       if (corner_distance(tile.extent, p[0], p[1]) > my_dist) {
@@ -284,7 +300,7 @@ class Tile extends Batch {
 
     return candidate;
   }
-
+*/
   get _schema() {
     // Infer datatypes from the first file.
     if (this.__schema) {
@@ -357,7 +373,7 @@ class Tile extends Batch {
     this.dictionary_lookups;
   }
 
-  get theoretical_extent() {
+  get theoretical_extent() { 
     const base = this.root_extent;
     const [z, x, y] = this.codes;
 
@@ -408,6 +424,12 @@ class Tile extends Batch {
 }
 
 export class QuadTile extends Tile {
+  url : string;
+  _mutations : Map<string, any>;
+  key : string;
+  class : Tile;
+  codes : [number, number, number];
+
   constructor(base_url, key, parent = undefined, prefs) {
     super();
     this.url = base_url;
@@ -416,7 +438,8 @@ export class QuadTile extends Tile {
       this._mutations = prefs.mutate;
     }
     this.key = key;
-    this.codes = this.key.split('/').map((t) => +t);
+    const [z, x, y] = key.split('/').map((d) => parseInt(d));
+    this.codes = [z, x, y];
     this.class = new.target;
   }
 
@@ -525,6 +548,7 @@ export class QuadTile extends Tile {
 export default class RootTile extends QuadTile {
   // The parent tile carries some data for the full set.
   // For clarity, I keep those elements in this class.
+  public _tileWorkers : TileWorker[];
 
   constructor(base_url, prefs = {}) {
     let key;

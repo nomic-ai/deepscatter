@@ -2,12 +2,13 @@
 import { range as arange, shuffle, extent } from 'd3-array';
 import {
   scaleLinear, scaleSqrt, scaleLog, scaleIdentity, scaleOrdinal,
+  scaleSequential, scaleSequentialLog, scaleSequentialPow,
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 import { encodeFloatsRGBArange } from './util';
 
-const scales = {
+const scales : {[key : string] : Function} = {
   sqrt: scaleSqrt,
   log: scaleLog,
   linear: scaleLinear,
@@ -30,12 +31,11 @@ function materialize_color_interplator(interpolator) {
   return to_buffer(rawValues);
 }
 
-const color_palettes = {
+const color_palettes : Record<string, [Number, Number, Number, Number][]> = {
   white: arange(palette_size).map(() => [255, 255, 255, 255]),
 };
 
 const schemes = {};
-
 for (const [k, v] of Object.entries(d3Chromatic)) {
   if (k.startsWith('scheme') && typeof (v[0]) === 'string') {
     const colors = new Array(palette_size);
@@ -132,6 +132,9 @@ export const default_aesthetics = {
 };
 
 class Aesthetic {
+  label : string;
+  scatterplot : any;
+
   constructor(label, scatterplot, regl, tile) {
     this.label = label;
     this.scatterplot = scatterplot;
@@ -171,14 +174,55 @@ class Aesthetic {
   }
 
   get scale() {
-    return scales[this.transform]()
+    function capitalize(r) {
+      return r.charAt(0).toUpperCase() + r.slice(1);
+    }
+    let scale = scales[this.transform]()
       .domain(this.domain)
       .range(this.range);
+
+    const range = this.range;
+    if (typeof(range) == 'string') {
+      // Convert range from 'viridis' to InterpolateViridis.
+
+      const interpolator = d3Chromatic["interpolate" + capitalize(range)]
+      if (interpolator !== undefined) {
+        // linear maps to nothing, but.
+        // scaleLinear, and scaleLog but 
+        // scaleSequential and scaleSequentialLog. 
+        if (this.transform === 'sqrt') {
+          return scaleSequentialPow(interpolator)
+              .exponent(0.5)
+              .domain(this.domain);
+        } else if (this.transform === 'log') {
+          return scaleSequentialLog(interpolator)
+              .domain(this.domain);
+        } else {
+          return scaleSequential(interpolator)
+              .domain(this.domain);
+        }
+      }
+    }
+    if (this.is_dictionary()) {
+      this.scale = scaleOrdinal().range(range).domain(this.domain);
+      if (schemes[range]) {
+        this.scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+      }
+    }
+
+
+    return scale
   }
 
   get column() {
     return this.tileSet.table.getColumn(this.field);
   }
+
+  _domains: {
+    [key: string]: any;
+  }
+
+  field: string;
 
   get default_domain() {
     if (this.field == undefined) {
@@ -210,12 +254,6 @@ class Aesthetic {
 
   get range() {
     return this._range || this.default_range;
-  }
-
-  get scale() {
-    return scales[this.transform]()
-      .domain(this.domain)
-      .range(this.range);
   }
 
   value_for(point) {
@@ -474,7 +512,7 @@ class Aesthetic {
 
   get use_map_on_regl() {
     if (this.is_dictionary()) {
-      if (this.domain === [-2047, 2047]) {
+      if (this.domain[0] === -2047 && this.domain[1] == 2047) {
         return 1;
       }
     }
@@ -496,6 +534,7 @@ class Aesthetic {
 
     this.scaleFunc = scaleLinear().range(range)
       .domain([0, this.texture_size - 1]);
+
     let input = arange(this.texture_size);
     if (field === undefined || this.tileSet.table === undefined) {
       this.texture_buffer.set(arange(this.texture_size).map((i) => 1));
@@ -623,7 +662,7 @@ function safe_expand(range) {
   }
 
   // If it's a number, put it at both ends of the scale.
-  if (typeof (range) === 'numeric') {
+  if (typeof(range) === 'number') {
     return [range, range];
   }
   if (range === undefined) {
@@ -745,27 +784,19 @@ class Color extends Aesthetic {
     return this._constant;
   }
 
-  get scale() {
+/*  get scale() {
     return this._scale ? this._scale : (x) => 'white';
-  }
+  } */
 
   encode_for_textures(range) {
-    if (this.is_dictionary()) {
-      this._scale = scaleOrdinal().range(range).domain(this.domain);
-      if (schemes[range]) {
-        this._scale.range(schemes[range]).domain(this.column.dictionary.toArray());
-      }
-    } else {
-      this._scale = scales[this.transform]().range(range).domain(this.domain);
-    }
-    console.log('A');
+    this._scale = scales[this.transform]().range(range).domain(this.domain);
+  
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range]);
     } else if (range.length === this.texture_size * 4) {
       this.texture_buffer.set(range);
     } else if (range.length && range[0].length && range[0].length === 3) {
       // manually set colors.
-      console.log(range);
       const r = arange(palette_size).map((i) => {
         const [r, g, b] = range[i % range.length];
         return [r, g, b, 255];

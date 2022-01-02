@@ -37,7 +37,7 @@
   "dependencies": {
     "@apache-arrow/es5-cjs": "^5.0.0",
     "comlink": "^4.3.0",
-    "d3-array": "^3.0.2",
+    "d3-array": "^3.1.1",
     "d3-color": "^3.0.1",
     "d3-contour": "^3.0.1",
     "d3-ease": "^3.0.1",
@@ -45,7 +45,6 @@
     "d3-format": "^3.0.1",
     "d3-geo": "^3.0.1",
     "d3-interpolate": "^3.0.1",
-    "d3-scale": "^4.0.0",
     "d3-scale-chromatic": "^3.0.0",
     "d3-selection": "^3.0.0",
     "d3-timer": "^3.0.1",
@@ -55,11 +54,15 @@
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",
     "lodash-es": "^4.17.21",
+    "lodash.merge": "^4.6.2",
     "regl": "^2.1.0"
   },
   "deprecated": false,
   "devDependencies": {
-    "eslint": "^7.29.0",
+    "@types/d3-geo": "^3.0.2",
+    "@types/d3-selection": "^3.0.1",
+    "d3-scale": "^4.0.2",
+    "eslint": "^8.2.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-mourner": "^3.0.0",
     "eslint-plugin-import": "^2.23.4",
@@ -68,6 +71,6 @@
     "glslify-loader": "^2.0.0",
     "rollup-plugin-glslify": "^1.2.0",
     "rollup-plugin-web-worker-loader": "^1.6.1",
-    "vite": "^2.5.2"
+    "vite": "^2.6.14"
   }
 }
