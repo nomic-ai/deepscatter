@@ -1,9 +1,29 @@
 /* eslint-disable no-underscore-dangle */
 import { select } from 'd3-selection';
 import { min } from 'd3-array';
+import type Scatterplot from './deepscatter'
+import type { Tileset } from './tile';
+import type { APICall } from './d';
+import type Zoom from './interaction';
+import type { AestheticSet } from './AestheticSet';
 
 export class Renderer {
   // A renderer handles drawing to a display element.
+  public scatterplot : Scatterplot;
+  public holder : d3.Selection<any, any, any, any>;
+  public canvas : d3.Selection<HTMLCanvasElement, any, any, any>;
+  public tileSet : Tileset;
+  public prefs : APICall;
+  public width : number;
+  public height : number;
+  public deferred_functions : Array<() => void>;
+  public _use_scale_to_download_tiles : boolean = true;
+  public zoom : Zoom
+  public aes : AestheticSet;
+  public _current_clik_function_string : string;
+  public _click_function : () => void;
+  public _zoom : Zoom;
+  
   constructor(selector, tileSet, scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);

@@ -93,7 +93,7 @@
   ]
 
   const scatterplot = new Scatterplot("#deepscatter")
-  scatterplot.plotAPI(prefs);
+  scatterplot.plotAPI(prefs).then(d => scatterplot.plotAPI(prefs));
   window.plot = scatterplot; // For debugging
 
 

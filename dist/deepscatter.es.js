@@ -922,10 +922,6 @@ function select(selector) {
       : new Selection$1([[selector]], root);
 }
 
-function create$1(name) {
-  return select(creator(name).call(document.documentElement));
-}
-
 function sourceEvent(event) {
   let sourceEvent;
   while (sourceEvent = event.sourceEvent) event = sourceEvent;
@@ -7696,226 +7692,128 @@ function sequentialPow() {
   return initInterpolator.apply(scale, arguments);
 }
 
-/* eslint-disable no-underscore-dangle */
-// import { annotation, annotationLabel } from 'd3-svg-annotation';
-
 class Zoom {
   constructor(selector, prefs) {
-    // There can be many canvases that display the zoom, but
-    // this is initialized with the topmost most one that
-    // also registers events.
-
     this.prefs = prefs;
     this.canvas = select(selector);
-    this.width = +this.canvas.attr('width');
-    this.height = +this.canvas.attr('height');
-
-    // A zoom keeps track of all the renderers
-    // that it's in charge of adjusting.
-
+    this.width = +this.canvas.attr("width");
+    this.height = +this.canvas.attr("height");
     this.renderers = new Map();
   }
-
   attach_tiles(tiles) {
     this.tileSet = tiles;
     this.tileSet._zoom = this;
     return this;
   }
-
   attach_renderer(key, renderer) {
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
     renderer.zoom.initialize_zoom();
     return this;
   }
-
-  zoom_to(k, x = null, y = null, duration = 4000) {
+  zoom_to(k, x = null, y = null, duration = 4e3) {
     const scales = this.scales();
     const {
-      canvas, zoomer, width, height,
+      canvas,
+      zoomer,
+      width,
+      height
     } = this;
-
-    const t = identity$3
-      .translate(width / 2, height / 2)
-      .scale(k)
-      .translate(-scales.x(x), -scales.y(y));
-
-    canvas
-      .transition()
-      .duration(duration)
-      .call(zoomer.transform, t);
+    const t = identity$3.translate(width / 2, height / 2).scale(k).translate(-scales.x(x), -scales.y(y));
+    canvas.transition().duration(duration).call(zoomer.transform, t);
   }
-
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
-
-    const els = select(div)
-      .selectAll('div.tooltip')
-      .data(points)
-      .join(
-        (enter) => enter
-          .append('div')
-          .attr('class', 'tooltip')
-          .style('top', 0)
-          .style('left', 0)
-          .style('position', 'absolute')
-          .style('z-index', 100)
-          .style('border-radius', '8px')
-          .style('padding', '10px')
-          .style('background', 'ivory')
-          .style('opacity', 0.75),
-        (exit) => exit,
-        (update) => update
-          .html((d) => this.tooltip_html(d.data)),
-      );
-
-    els
-      .html((d) => this.tooltip_html(d.data))
-      .style('transform', (d) => {
-        const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
-        return t;
-      });
+    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", 0.75), (exit) => exit, (update) => update.html((d) => this.tooltip_html(d.data)));
+    els.html((d) => this.tooltip_html(d.data)).style("transform", (d) => {
+      const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
+      return t;
+    });
   }
-
   get tooltip_html() {
-    // a function that 
-    if (this._tooltip_html === undefined) {
-      return label_from_point
+    if (this._tooltip_html === void 0) {
+      return label_from_point;
     } else {
-      return this._tooltip_html
+      return this._tooltip_html;
     }
   }
-
   zoom_to_bbox(corners, duration = 4) {
-    // Zooms to two points.
     const scales = this.scales();
     const [x0, x1] = corners.x.map(scales.x);
     const [y0, y1] = corners.y.map(scales.y);
-
     const {
-      canvas, zoomer, width, height,
+      canvas,
+      zoomer,
+      width,
+      height
     } = this;
-
-    const t = identity$3
-      .translate(width / 2, height / 2)
-      .scale(0.9 / Math.max((x1 - x0) / width, (y1 - y0) / height))
-      .translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
-
-    canvas
-      .transition()
-      .duration(duration * 1000)
-      .call(zoomer.transform, t);
+    const t = identity$3.translate(width / 2, height / 2).scale(0.9 / Math.max((x1 - x0) / width, (y1 - y0) / height)).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+    canvas.transition().duration(duration * 1e3).call(zoomer.transform, t);
   }
-
   initialize_zoom() {
     const { width, height, canvas } = this;
     this.transform = identity$3;
-
-    const zoomer = zoom()
-      .scaleExtent([1 / 3, 100000])
-      .extent([[0, 0], [width, height]])
-      .on('zoom', (event) => {
-        this.transform = event.transform;
-        this.restart_timer(10 * 1000);
-      });
-
+    const zoomer = zoom().scaleExtent([1 / 3, 1e5]).extent([[0, 0], [width, height]]).on("zoom", (event) => {
+      this.transform = event.transform;
+      this.restart_timer(10 * 1e3);
+    });
     canvas.call(zoomer);
-
     this.add_mouseover();
-
     this.zoomer = zoomer;
   }
-
   add_mouseover() {
     let last_fired = 0;
-
-
-
-    const renderer = this.renderers.get('regl');
+    const renderer = this.renderers.get("regl");
     const x_aes = renderer.aes.x.current;
     const y_aes = renderer.aes.y.current;
-
-    this.canvas.on('mousemove', (event) => {
-      // Debouncing this is really important, it turns out.
-      if (Date.now() - last_fired < 1000 / 20) {
+    this.canvas.on("mousemove", (event) => {
+      if (Date.now() - last_fired < 1e3 / 20) {
         return;
       }
       last_fired = Date.now();
       const p = renderer.color_pick(event.layerX, event.layerY);
-      const data = p ? [p] : [];
-
-      const d = data[0];
+      const data2 = p ? [p] : [];
+      const d = data2[0];
       const annotations = d ? [
         {
           x: event.layerX,
           y: event.layerY,
           data: d,
           dx: 0,
-          dy: 30,
-        },
+          dy: 30
+        }
       ] : [];
-
-      if (!d) return;
-
+      if (!d)
+        return;
       const { x_, y_ } = this.scales();
-
       if (annotations.length) {
-        // When a function is "annotated", this gets called.
         this.html_annotation(annotations);
       }
-
-      select('#deepscatter-svg')
-        .selectAll('circle.label')
-        .data(data, (d_) => d_.ix)
-        .join(
-          (enter) => enter
-            .append('circle')
-            .attr('class', 'label')
-            .attr('stroke', '#110022')
-            .attr('r', 12)
-            .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd))
-            .attr('cx', (datum) => x_(x_aes.value_for(datum)))
-            .attr('cy', (datum) => y_(y_aes.value_for(datum))),
-          (update) => update
-            .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd)),
-          (exit) => exit.call((e) => e.remove())
-        )
-        .on('click', (ev, dd) => {
-          this.renderers.get('regl').click_function(dd, ev);
-        });
+      select("#deepscatter-svg").selectAll("circle.label").data(data2, (d_) => d_.ix).join((enter) => enter.append("circle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.color.current.apply(dd)).attr("cx", (datum) => x_(x_aes.value_for(datum))).attr("cy", (datum) => y_(y_aes.value_for(datum))), (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.color.current.apply(dd)), (exit) => exit.call((e) => e.remove())).on("click", (ev, dd) => {
+        this.renderers.get("regl").click_function(dd, ev);
+      });
     });
   }
-
   current_corners() {
-    // The corners of the current zoom transform, in data coordinates.
     const { width, height } = this;
-
-    // Use the rescaled versions of the scales.
     const scales = this.scales();
-    if (scales === undefined) {
-      return undefined;
+    if (scales === void 0) {
+      return void 0;
     }
     const { x_, y_ } = scales;
-
     return {
       x: [x_.invert(0), x_.invert(width)],
-      y: [y_.invert(0), y_.invert(height)],
+      y: [y_.invert(0), y_.invert(height)]
     };
   }
-
   current_center() {
     const { x, y } = this.current_corners();
-
     return [
       (x[0] + x[1]) / 2,
-      (y[0] + y[1]) / 2,
+      (y[0] + y[1]) / 2
     ];
   }
-
-  restart_timer(run_at_least = 10000) {
-    // Restart the timer and run it for
-    // run_at_least milliseconds or the current timeout,
-    // whichever is greater.
+  restart_timer(run_at_least = 1e4) {
     let stop_at = Date.now() + run_at_least;
     if (this._timer) {
       if (this._timer.stop_at > stop_at) {
@@ -7923,178 +7821,116 @@ class Zoom {
       }
       this._timer.stop();
     }
-
     const t = timer(this.tick.bind(this));
-
     this._timer = t;
-
     this._timer.stop_at = stop_at;
-
     return this._timer;
   }
-
   data(dataset) {
-    if (data === undefined) {
+    if (data === void 0) {
       return this.tileSet;
     }
     this.tileSet = dataset;
     return this;
   }
-
   scales(equal_units = true) {
-    // General x and y scales that map from data space
-    // to pixel coordinates, and also
-    // rescaled ones that describe the current zoom.
-    // The base scales are called 'x' and 'y',
-    // and the zoomed ones are called 'x_' and 'y_'.
-
-    // equal_units: should a point of x be the same as a point of y?
-
     if (this._scales) {
       this._scales.x_ = this.transform.rescaleX(this._scales.x);
       this._scales.y_ = this.transform.rescaleY(this._scales.y);
       return this._scales;
     }
-
-    const { width, height, tileSet } = this;
-
+    const { width, height } = this;
     const { extent } = this.tileSet;
-
     const scales = {};
-    if (extent === undefined) {
-      return undefined;
+    if (extent === void 0) {
+      return void 0;
     }
-
     const scale_dat = { x: {}, y: {} };
-
-    for (const [name, dim] of [['x', width], ['y', height]]) {
+    for (const [name, dim] of [["x", width], ["y", height]]) {
       const limits = extent[name];
       scale_dat[name].limits = limits;
       scale_dat[name].size_range = limits[1] - limits[0];
       scale_dat[name].pixels_per_unit = dim / scale_dat[name].size_range;
     }
-
     const data_aspect_ratio = scale_dat.x.pixels_per_unit / scale_dat.y.pixels_per_unit;
-
-    let x_buffer_size = 0; let y_buffer_size = 0;
-    let x_target_size = width; let
-      y_target_size = height;
+    let x_buffer_size = 0;
+    let y_buffer_size = 0;
+    let x_target_size = width;
+    let y_target_size = height;
     if (data_aspect_ratio > 1) {
-      // There are more pixels in the x dimension, so we need a buffer
-      // around it.
       x_target_size = width / data_aspect_ratio;
       x_buffer_size = (width - x_target_size) / 2;
     } else {
       y_target_size = height * data_aspect_ratio;
       y_buffer_size = (height - y_target_size) / 2;
     }
-
-    scales.x = linear()
-      .domain(scale_dat.x.limits)
-      .range([x_buffer_size, width - x_buffer_size]);
-
-    scales.y = linear()
-      .domain(scale_dat.y.limits)
-      .range([y_buffer_size, height - y_buffer_size]);
-
+    scales.x = linear().domain(scale_dat.x.limits).range([x_buffer_size, width - x_buffer_size]);
+    scales.y = linear().domain(scale_dat.y.limits).range([y_buffer_size, height - y_buffer_size]);
     scales.x_ = this.transform.rescaleX(scales.x);
     scales.y_ = this.transform.rescaleY(scales.y);
-
     this._scales = scales;
     return scales;
   }
-
   webgl_scale(flatten = true) {
     const { x, y } = this.scales();
     const transform = window_transform(x, y).flat();
     return transform;
   }
-
   tick(force = false) {
     this._start = this._start || Date.now();
-
-    // Force indicates that the tick must run even the timer metadata
-    // says we are not animating.
-
     if (force !== true) {
       if (this._timer) {
         if (this._timer.stop_at <= Date.now()) {
-          console.log('Timer ending');
+          console.log("Timer ending");
           this._timer.stop();
         }
       }
     }
-    /*
-    for (const renderer of this.renderers.values()) {
-      try {
-        // renderer.tick()
-      } catch (err) {
-        this._timer.stop();
-        throw err;
-      }
-    } */
   }
 }
-
 function window_transform(x_scale, y_scale) {
-  // width and height are svg parameters; x and y scales project from the data x and y into the
-  // the webgl space.
-
-  // Given two d3 scales in coordinate space, create two matrices that project from the original
-  // space into [-1, 1] webgl space.
-
   function gap(array) {
-    // Return the magnitude of a scale.
     return array[1] - array[0];
   }
-
   const x_mid = mean(x_scale.domain());
   const y_mid = mean(y_scale.domain());
-
   const xmulti = gap(x_scale.range()) / gap(x_scale.domain());
   const ymulti = gap(y_scale.range()) / gap(y_scale.domain());
-
-  // translates from data space to scaled space.
   const m1 = [
-    // transform by the scale;
     [xmulti, 0, -xmulti * x_mid + mean(x_scale.range())],
     [0, ymulti, -ymulti * y_mid + mean(y_scale.range())],
-    [0, 0, 1],
-  ];
-
-  // Note--at the end, you need to multiply by this matrix.
-  // I calculate it directly on the GPU.
-  // translate from scaled space to webgl space.
-  // The '2' here is because webgl space runs from -1 to 1.
-  /* const m2 = [
-    [2 / width, 0, -1],
-    [0, - 2 / height, 1],
     [0, 0, 1]
-  ] */
-
+  ];
   return m1;
 }
-
 function label_from_point(point, defaults) {
-  // defaults: a Set of keys to include.
-  let output = '<dl>';
+  let output = "<dl>";
   const nope = new Set([
-    'x', 'y', 'ix', 'bookstack', null, 'tile_key',
+    "x",
+    "y",
+    "ix",
+    "bookstack",
+    null,
+    "tile_key"
   ]);
-
   for (const [k, v] of point.entries()) {
     if (defaults) {
       if (!defaults.has(k)) {
         continue;
       }
     } else {
-      if (nope.has(k)) { continue; }
-      // Private value.
-      if (k.match(/_dict_index/)) { continue; }
-      // Don't show missing data.
-      if (v === null) { continue; }
-      // Don't show empty data.
-      if (v === '') { continue; }
+      if (nope.has(k)) {
+        continue;
+      }
+      if (k.match(/_dict_index/)) {
+        continue;
+      }
+      if (v === null) {
+        continue;
+      }
+      if (v === "") {
+        continue;
+      }
     }
     output += `<dt>${k}</dt>`;
     output += `<dd>${v}<dd>`;
@@ -18632,51 +18468,42 @@ function decodeFloat(x, y, z, w) {
   return FLOAT_VIEW[0]
 }
 
-/* eslint-disable no-underscore-dangle */
-
 class Renderer {
-  // A renderer handles drawing to a display element.
   constructor(selector, tileSet, scatterplot) {
+    this._use_scale_to_download_tiles = true;
     this.scatterplot = scatterplot;
     this.holder = select(selector);
     this.canvas = select(this.holder.node().firstElementChild);
     this.tileSet = tileSet;
     this.prefs = scatterplot.prefs;
-    this.width = +this.canvas.attr('width');
-    this.height = +this.canvas.attr('height');
+    this.width = +this.canvas.attr("width");
+    this.height = +this.canvas.attr("height");
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
   }
-
   get discard_share() {
-    // If jitter is temporal, e.g., or filters are in place,
-    // it may make sense to estimate the number of hidden points.
-    // For now, I don't actually do it.
     return 0;
   }
-
   get optimal_alpha() {
     let { zoom_balance, alpha, point_size } = this.prefs;
     const {
-      max_ix, width, discard_share, height,
+      max_ix,
+      width,
+      discard_share,
+      height
     } = this;
     const { k } = this.zoom.transform;
-    alpha = alpha === undefined ? 0.25 : alpha;
+    alpha = alpha === void 0 ? 0.25 : alpha;
     const target_share = alpha;
     const fraction_of_total_visible = 1 / k ** 2;
     const pixel_area = width * height;
     const total_intended_points = min([max_ix, this.tileSet.highest_known_ix]);
     const total_points = total_intended_points * (1 - discard_share);
     const area_of_point = (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2;
-    // average_alpha * pixel_area = total_points * fraction_of_total_visible *
-    // area_of_point * target_opacity
-    const target = (target_share * pixel_area)
-      / (total_points * fraction_of_total_visible * area_of_point);
+    const target = target_share * pixel_area / (total_points * fraction_of_total_visible * area_of_point);
     return target > 1 ? 1 : target < 1 / 255 ? 1 / 255 : target;
   }
-
   get max_ix() {
-    // By default, prefer dropping points to dropping alpha.
     const { prefs } = this;
     if (!this._use_scale_to_download_tiles) {
       return prefs.max_points;
@@ -18685,44 +18512,29 @@ class Renderer {
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
     return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
   }
-
   is_visible(point) {
-    return p_in_rect(point, this._zoom.current_corners)
-    && point.ix < this.prefs.max_points * this._zoom.k;
+    return p_in_rect(point, this._zoom.current_corners) && point.ix < this.prefs.max_points * this._zoom.k;
   }
-
   visible_tiles() {
-    // yield the currently visible tiles based on the zoom state
-    // and a maximum index passed manually.
-    //    console.log({ix: this.max_ix})
     const { max_ix } = this;
     const { tileSet } = this;
-    // Materialize using a tileset method.
     let all_tiles;
     if (this._use_scale_to_download_tiles) {
-      all_tiles = tileSet.map((d) => d)
-        .filter((tile) => tile.is_visible(max_ix, this.zoom.current_corners()));
+      all_tiles = tileSet.map((d) => d).filter((tile) => tile.is_visible(max_ix, this.zoom.current_corners()));
     } else {
-      all_tiles = tileSet.map((d) => d)
-        .filter((tile) => tile.min_ix < this.max_ix);
+      all_tiles = tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
     }
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
-
-    //    all_tiles.map(d => console.log(`${d.key} (${d.min_ix} - ${d.max_ix})`))
-
     return all_tiles;
   }
-
   bind_zoom(zoom) {
     this.zoom = zoom;
     return this;
   }
-
   set click_function(f) {
     this._current_click_function_string = this.scatterplot.prefs.click_function;
     this._click_function = Function("datum", this._current_click_function_string);
   }
-
   get click_function() {
     if (this._current_click_function_string && this._current_click_function_string === this.scatterplot.prefs.click_function) {
       return this._click_function;
@@ -18731,18 +18543,16 @@ class Renderer {
     this._click_function = Function("datum", this.scatterplot.prefs.click_function);
     return this._click_function;
   }
-
-  * initialize() {
-    // Asynchronously wait for the basic elements to be done.
+  *initialize() {
     return Promise.all(this._initializations).then((d) => {
-      this.zoom.restart_timer(500000);
+      this.zoom.restart_timer(5e5);
     });
   }
 }
 
 var gaussian_blur = "precision mediump float;\n#define GLSLIFY 1\n\nvec4 blur13(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {\n  vec4 color = vec4(0.0);\n  vec2 off1 = vec2(1.411764705882353) * direction;\n  vec2 off2 = vec2(3.2941176470588234) * direction;\n  vec2 off3 = vec2(5.176470588235294) * direction;\n  color += texture2D(image, uv) * 0.1964825501511404;\n  color += texture2D(image, uv + (off1 / resolution)) * 0.2969069646728344;\n  color += texture2D(image, uv - (off1 / resolution)) * 0.2969069646728344;\n  color += texture2D(image, uv + (off2 / resolution)) * 0.09447039785044732;\n  color += texture2D(image, uv - (off2 / resolution)) * 0.09447039785044732;\n  color += texture2D(image, uv + (off3 / resolution)) * 0.010381362401148057;\n  color += texture2D(image, uv - (off3 / resolution)) * 0.010381362401148057;\n  return color;\n}\n\nuniform vec2 iResolution;\nuniform sampler2D iChannel0;\nuniform vec2 direction;\n\nvoid main() {\n  vec2 uv = vec2(gl_FragCoord.xy / iResolution.xy);\n  gl_FragColor = blur13(iChannel0, uv, iResolution.xy, direction);\n}\n"; // eslint-disable-line
 
-var vertex_shader = "precision mediump float;\n#define GLSLIFY 1\n\nuniform float u_zoom_balance;\n\nuniform float u_update_time;\nuniform float u_transition_duration;\n\n// Type of jitter.\nuniform float u_jitter;\nuniform float u_last_jitter;\n\n// Whether to plot only a single category.\nuniform float u_only_color;\nuniform float u_grid_mode;\n\nuniform vec3 u_filter1_numeric; // An override for simple numeric operations.\nuniform vec3 u_last_filter1_numeric; // An override for simple numeric operations.\n\nuniform vec3 u_filter2_numeric; // An override for simple numeric operations.\nuniform vec3 u_last_filter2_numeric; // An override for simple numeric operations.\n\n// Transform from data space to the open window.\nuniform mat3 u_window_scale;\nuniform mat3 u_last_window_scale;\n// Transform from the open window to the d3-zoom.\nuniform mat3 u_zoom;\n\nuniform float u_width;\nuniform float u_height;\nuniform float u_use_glyphset;\nvarying vec2 letter_pos; // store which letter to use.\n\nuniform float u_maxix;           // The maximum index to plot.\nuniform float u_time;            // The current time.\nuniform float u_k;               // The d3-scale factor.\nuniform float u_color_picker_mode;\nuniform float u_base_size;\nuniform float u_current_alpha;\nuniform float u_last_alpha;\n\n// The same set of items for a variety of aesthetics.\n\n// whether to continuously interpolate between\n// x0 and x, y0 and y.\nuniform float u_position_interpolation_mode;\n\n/*\npython code to generate what follows.\ndef autogenerate_code():\n  ks = [\"x\", \"y\", \"jitter_radius\", \"jitter_speed\", \"size\", \"filter1\", \"filter2\", \"x0\", \"y0\"]\n  times = [\"\", \"last_\"]\n  print(\"\"\"\n  //  BEGIN AUTOGENERATED. DO NOT EDIT. \n  // ------------------------------------------------    \n  \"\"\")\n  for k in ks:\n    for time in times:\n      timek = time + k\n      print(f\"\"\"\n  uniform float u_{timek}_buffer_num;\n  uniform float u_{timek}_constant;\n  uniform float u_{timek}_transform;\n  uniform vec2 u_{timek}_domain;\n  uniform vec2 u_{timek}_range;\n  uniform sampler2D u_{timek}_map;\n  uniform float u_{timek}_needs_map;\n  float a_{timek};\n  bool a_{timek}_is_constant;\n      \"\"\")\n  for i in range(0, 16):\n    print(f\"attribute float buffer_{i};\")\n  for k in ks:\n    for time in times:\n      timek = time + k\n      print(f\"\"\"\n    if (u_{timek}_buffer_num > -0.5) {{\n      a_{timek} = get_buffer(u_{timek}_buffer_num);\n      a_{timek}_is_constant = false;\n    }} else {{\n      a_{timek} = u_{timek}_constant;\n      a_{timek}_is_constant = true;\n    }}\"\"\")\n  print(\"\"\"\n//  END AUTOGENERATED. DO NOT EDIT ABOVE. \n// ------------------------------------------------    \n  \"\"\")\n\nautogenerate_code()\n*/\n  //  BEGIN AUTOGENERATED. DO NOT EDIT. \n  // ------------------------------------------------    \n  \n\n  uniform float u_x_buffer_num;\n  uniform float u_x_constant;\n  uniform float u_x_transform;\n  uniform vec2 u_x_domain;\n  uniform vec2 u_x_range;\n  uniform sampler2D u_x_map;\n  uniform float u_x_needs_map;\n  float a_x;\n  bool a_x_is_constant;\n      \n\n  uniform float u_last_x_buffer_num;\n  uniform float u_last_x_constant;\n  uniform float u_last_x_transform;\n  uniform vec2 u_last_x_domain;\n  uniform vec2 u_last_x_range;\n  uniform sampler2D u_last_x_map;\n  uniform float u_last_x_needs_map;\n  float a_last_x;\n  bool a_last_x_is_constant;\n      \n\n  uniform float u_y_buffer_num;\n  uniform float u_y_constant;\n  uniform float u_y_transform;\n  uniform vec2 u_y_domain;\n  uniform vec2 u_y_range;\n  uniform sampler2D u_y_map;\n  uniform float u_y_needs_map;\n  float a_y;\n  bool a_y_is_constant;\n      \n\n  uniform float u_last_y_buffer_num;\n  uniform float u_last_y_constant;\n  uniform float u_last_y_transform;\n  uniform vec2 u_last_y_domain;\n  uniform vec2 u_last_y_range;\n  uniform sampler2D u_last_y_map;\n  uniform float u_last_y_needs_map;\n  float a_last_y;\n  bool a_last_y_is_constant;\n      \n\n  uniform float u_jitter_radius_buffer_num;\n  uniform float u_jitter_radius_constant;\n  uniform float u_jitter_radius_transform;\n  uniform vec2 u_jitter_radius_domain;\n  uniform vec2 u_jitter_radius_range;\n  uniform sampler2D u_jitter_radius_map;\n  uniform float u_jitter_radius_needs_map;\n  float a_jitter_radius;\n  bool a_jitter_radius_is_constant;\n      \n\n  uniform float u_last_jitter_radius_buffer_num;\n  uniform float u_last_jitter_radius_constant;\n  uniform float u_last_jitter_radius_transform;\n  uniform vec2 u_last_jitter_radius_domain;\n  uniform vec2 u_last_jitter_radius_range;\n  uniform sampler2D u_last_jitter_radius_map;\n  uniform float u_last_jitter_radius_needs_map;\n  float a_last_jitter_radius;\n  bool a_last_jitter_radius_is_constant;\n      \n\n  uniform float u_jitter_speed_buffer_num;\n  uniform float u_jitter_speed_constant;\n  uniform float u_jitter_speed_transform;\n  uniform vec2 u_jitter_speed_domain;\n  uniform vec2 u_jitter_speed_range;\n  uniform sampler2D u_jitter_speed_map;\n  uniform float u_jitter_speed_needs_map;\n  float a_jitter_speed;\n  bool a_jitter_speed_is_constant;\n      \n\n  uniform float u_last_jitter_speed_buffer_num;\n  uniform float u_last_jitter_speed_constant;\n  uniform float u_last_jitter_speed_transform;\n  uniform vec2 u_last_jitter_speed_domain;\n  uniform vec2 u_last_jitter_speed_range;\n  uniform sampler2D u_last_jitter_speed_map;\n  uniform float u_last_jitter_speed_needs_map;\n  float a_last_jitter_speed;\n  bool a_last_jitter_speed_is_constant;\n      \n\n  uniform float u_size_buffer_num;\n  uniform float u_size_constant;\n  uniform float u_size_transform;\n  uniform vec2 u_size_domain;\n  uniform vec2 u_size_range;\n  uniform sampler2D u_size_map;\n  uniform float u_size_needs_map;\n  float a_size;\n  bool a_size_is_constant;\n      \n\n  uniform float u_last_size_buffer_num;\n  uniform float u_last_size_constant;\n  uniform float u_last_size_transform;\n  uniform vec2 u_last_size_domain;\n  uniform vec2 u_last_size_range;\n  uniform sampler2D u_last_size_map;\n  uniform float u_last_size_needs_map;\n  float a_last_size;\n  bool a_last_size_is_constant;\n      \n\n  uniform float u_filter1_buffer_num;\n  uniform float u_filter1_constant;\n  uniform float u_filter1_transform;\n  uniform vec2 u_filter1_domain;\n  uniform vec2 u_filter1_range;\n  uniform sampler2D u_filter1_map;\n  uniform float u_filter1_needs_map;\n  float a_filter1;\n  bool a_filter1_is_constant;\n      \n\n  uniform float u_last_filter1_buffer_num;\n  uniform float u_last_filter1_constant;\n  uniform float u_last_filter1_transform;\n  uniform vec2 u_last_filter1_domain;\n  uniform vec2 u_last_filter1_range;\n  uniform sampler2D u_last_filter1_map;\n  uniform float u_last_filter1_needs_map;\n  float a_last_filter1;\n  bool a_last_filter1_is_constant;\n\n  uniform float u_filter2_buffer_num;\n  uniform float u_filter2_constant;\n  uniform float u_filter2_transform;\n  uniform vec2 u_filter2_domain;\n  uniform vec2 u_filter2_range;\n  uniform sampler2D u_filter2_map;\n  uniform float u_filter2_needs_map;\n  float a_filter2;\n  bool a_filter2_is_constant;\n      \n\n  uniform float u_last_filter2_buffer_num;\n  uniform float u_last_filter2_constant;\n  uniform float u_last_filter2_transform;\n  uniform vec2 u_last_filter2_domain;\n  uniform vec2 u_last_filter2_range;\n  uniform sampler2D u_last_filter2_map;\n  uniform float u_last_filter2_needs_map;\n  float a_last_filter2;\n  bool a_last_filter2_is_constant;\n\n  uniform float u_x0_buffer_num;\n  uniform float u_x0_constant;\n  uniform float u_x0_transform;\n  uniform vec2 u_x0_domain;\n  uniform vec2 u_x0_range;\n  uniform sampler2D u_x0_map;\n  uniform float u_x0_needs_map;\n  float a_x0;\n  bool a_x0_is_constant;\n      \n\n  uniform float u_last_x0_buffer_num;\n  uniform float u_last_x0_constant;\n  uniform float u_last_x0_transform;\n  uniform vec2 u_last_x0_domain;\n  uniform vec2 u_last_x0_range;\n  uniform sampler2D u_last_x0_map;\n  uniform float u_last_x0_needs_map;\n  float a_last_x0;\n  bool a_last_x0_is_constant;\n      \n\n  uniform float u_y0_buffer_num;\n  uniform float u_y0_constant;\n  uniform float u_y0_transform;\n  uniform vec2 u_y0_domain;\n  uniform vec2 u_y0_range;\n  uniform sampler2D u_y0_map;\n  uniform float u_y0_needs_map;\n  float a_y0;\n  bool a_y0_is_constant;\n      \n\n  uniform float u_last_y0_buffer_num;\n  uniform float u_last_y0_constant;\n  uniform float u_last_y0_transform;\n  uniform vec2 u_last_y0_domain;\n  uniform vec2 u_last_y0_range;\n  uniform sampler2D u_last_y0_map;\n  uniform float u_last_y0_needs_map;\n  float a_last_y0;\n  bool a_last_y0_is_constant;\n      \nattribute float buffer_0;\nattribute float buffer_1;\nattribute float buffer_2;\nattribute float buffer_3;\nattribute float buffer_4;\nattribute float buffer_5;\nattribute float buffer_6;\nattribute float buffer_7;\nattribute float buffer_8;\nattribute float buffer_9;\nattribute float buffer_10;\nattribute float buffer_11;\nattribute float buffer_12;\nattribute float buffer_13;\nattribute float buffer_14;\nattribute float buffer_15;\n\n// END AUTOGENERATED\n  \n\nhighp float ix_to_random(in float ix, in float seed) {\n  // For high numbers, taking the log avoids coincidence.\n  highp float seed2 = log(ix) + 1.;\n  vec2 co = vec2(seed2, seed);\n  highp float a = 12.9898;\n  highp float b = 78.233;\n  highp float c = 43758.5453;\n  highp float dt = dot(co.xy, vec2(a, b));\n  highp float sn = mod(dt, 3.14);\n  return fract(sin(sn) * c);\n}\n\nfloat a_color;\nfloat a_last_color;\n\nuniform float u_color_buffer_num;\nuniform float u_last_color_buffer_num;\n\nuniform vec3 u_color_constant;\nuniform vec3 u_last_color_constant;\n\nuniform float u_color_transform;\nuniform float u_last_color_transform;\nuniform vec2 u_color_domain;\nuniform vec2 u_last_color_domain;\nuniform sampler2D u_color_map;\nuniform sampler2D u_last_color_map;\nuniform float u_last_color_needs_map;\nuniform float u_color_needs_map;\nuniform vec3 u_constant_color;\nuniform vec3 u_constant_last_color;\n\n// The fill color.\nvarying vec4 fill;\nvarying float point_size;\n\nuniform float u_jitter_radius_lookup;\nuniform float u_jitter_radius_lookup_y_constant;\nuniform sampler2D u_jitter_radius_lookup_map;\nuniform vec2 u_jitter_radius_lookup_x_domain;\nuniform vec2 u_jitter_radius_lookup_y_domain;\n\nfloat point_size_adjust;\n\n// A coordinate to throw away a vertex point.\nvec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);\n\n// Initialized in the main loop\n// mat3 from_coord_to_gl;\n\nconst float e = 1.618282;\n// I've been convinced.\nconst float tau = 2. * 3.14159265359;\n\n// uniform vec4 corners;\n\n/*************** COLOR SCALES *******************************/\n\n// Ha! A gazillion version of this function:\n// https://gist.github.com/kylemcdonald/f8df3bc2f8d38ca2b7cb\n/*vec3 hsv2rgb(in vec3 c) {\n  vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0,\n                   0.0, 1.0);\n  rgb = rgb * rgb * (3.0 - 2.0 * rgb);\n  return c.z * mix(vec3(1.0), rgb, c.y);\n}*/\n\nfloat interpolate_raw(in float x, in float min, in float max) {\n  if (x < min) {return 0.;}\n  if (x > max) {return 1.;}\n  return (x - min)/(max - min);\n}\n\nfloat interpolate(in float x, in float min, in float max) {\n  if (max < min) {\n    return 1. - interpolate_raw(x, max, min);\n  } else {\n    return interpolate_raw(x, min, max);\n  }\n}\n\n/*\n\nThe following glsl code was written in python.\n\nbuffers = [*range(16)]\n\ndef write_buffs(buffs):\n    if len(buffs) == 1:\n        return[f\"return buffer_{buffs[0]}\"]\n    condition_1 = [\"  \" + line for line in write_buffs(buffs[:len(buffs)//2])]\n    condition_2 = [\"\" + line for line in write_buffs(buffs[len(buffs)//2:])]\n\n    args = [\n        f\"if (i < {buffs[len(buffs) // 2 - 1]}.5) {{\",\n        *condition_1,\n        \"}\",\n        *condition_2\n    ]\n    return args\n\nprint(\"\\n\".join(write_buffs(buffers)))\n*/\n\nfloat get_buffer(in float i) {\n  //given an index, returns the appropriate buffer.\n  if (i < 7.5) {\n    if (i < 3.5) {\n      if (i < 1.5) {\n        if (i < 0.5) {\n          return buffer_0;\n        }\n        return buffer_1;\n      }\n      if (i < 2.5) {\n        return buffer_2;\n      }\n      return buffer_3;\n    }\n    if (i < 5.5) {\n      if (i < 4.5) {\n        return buffer_4;\n      }\n      return buffer_5;\n    }\n    if (i < 6.5) {\n      return buffer_6;\n    }\n    return buffer_7;\n  }\n  if (i < 11.5) {\n    if (i < 9.5) {\n      if (i < 8.5) {\n        return buffer_8;\n      }\n      return buffer_9;\n    }\n    if (i < 10.5) {\n      return buffer_10;\n    }\n    return buffer_11;\n  }\n  if (i < 13.5) {\n    if (i < 12.5) {\n      return buffer_12;\n    }\n    return buffer_13;\n  }\n  if (i < 14.5) {\n    return buffer_14;\n  }\n  return buffer_15;\n}\n\nfloat linstep(in vec2 range, in float x) {\n  return interpolate(x, range.x, range.y);\n  float scale_size = range.y - range.x;\n  float from_left = x - range.x;\n  return clamp(from_left / scale_size, 0.0, 1.0);\n}\n\nfloat linscale(in vec2 range, in float x) {\n  float scale_size = range.y - range.x;\n  float from_left = x - range.x;\n  return from_left / scale_size;\n}\n\nvec2 box_muller(in float ix, in float seed) {\n  // Box-Muller transform gives you two gaussian randoms for two uniforms.\n  highp float U = ix_to_random(ix, seed);\n  highp float V = ix_to_random(ix, seed + 17.123123);\n  return vec2(sqrt(-2. * log(U)) * cos(tau * V),\n              sqrt(-2. * log(U)) * sin(tau * V));\n}\n\n/*************** END COLOR SCALES *******************************/\n\nfloat domainify(in vec2 domain, in float transform, in float attr, in bool clamped) {\n\n  // Clamp an attribute into a domain, with an option log or sqrt transform.\n  if (transform == 2.) {\n    domain = sqrt(domain);\n    attr = sqrt(attr);\n  }\n  if (transform == 3.) {\n    domain = log(domain);\n    attr = log(attr);\n  }\n  if (clamped) {\n    return linstep(domain, attr);\n  } else {\n    return linscale(domain, attr);\n  }\n}\n\nmat3 pixelspace_to_glspace;\n\nfloat run_numeric_filter (in float a_filter,\n  in float u_filter_op, in float u_filter_param_1,\n  in float u_filter_param_2) {\n  bool truthy;\n  if (u_filter_op < 1.5) {\n    truthy = a_filter < u_filter_param_1;\n  } else if (u_filter_op < 2.5) {\n    truthy = a_filter > u_filter_param_1;\n  } else if (u_filter_op < 3.5) {\n    truthy = a_filter == u_filter_param_1;\n  } else if (u_filter_op < 4.5) {\n    truthy = abs(a_filter - u_filter_param_2) < u_filter_param_1;\n  }\n  if (truthy) {return 1.;} else {return 0.;}\n}\n\nfloat choose_and_run_filter(\n  in vec3 u_filter_numeric,\n  in vec2 u_filter_domain,\n  in float a_filter,\n  in sampler2D filtermap) {\n  if (u_filter_numeric.r < 0.5) {\n    float frac_filter = linstep(u_filter_domain, a_filter);\n    return texture2D(filtermap, vec2(0.5, frac_filter)).a;\n  } else {\n    return run_numeric_filter(a_filter,\n      u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);\n  }\n}\n\n// Progress through the filters at different rates.\nfloat combine_filters(\n  in vec3 u_filter_numeric, in vec2 u_filter_domain, in float a_filter,\n  in sampler2D u_filter_map,\n  in vec3 u_last_filter_numeric, in vec2 u_last_filter_domain, in float a_last_filter,\n  in sampler2D u_last_filter_map,\n  in float ease,\n  in float ix\n) {\n  float my_filter = 0.;\n  if (ix_to_random(ix, 13.5) > ease) {\n    return choose_and_run_filter(\n      u_last_filter_numeric, u_last_filter_domain, a_last_filter,\n      u_last_filter_map\n    );\n  } else {\n    return choose_and_run_filter(\n      u_filter_numeric, u_filter_domain, a_filter,\n      u_filter_map);\n  }\n}\n\nconst float tau_0 = 2. * 3.14159265359;\n\nhighp float ix_to_random_1540259130(in float ix, in float seed) {\n  // For high numbers, taking the log avoids coincidence.\n  highp float seed2 = log(ix) + 1.;\n  vec2 co = vec2(seed2, seed);\n  highp float a = 12.9898;\n  highp float b = 78.233;\n  highp float c = 43758.5453;\n  highp float dt= dot(co.xy ,vec2(a,b));\n  highp float sn= mod(dt,3.14);\n  return fract(sin(sn) * c);\n}\n\nhighp vec2 box_muller_1540259130(in float ix, in float seed) {\n  // Box-Muller transform gives you two gaussian randoms for two uniforms.\n  highp float U = ix_to_random_1540259130(ix, seed);\n  highp float V = ix_to_random_1540259130(ix, seed + 17.123123);\n  return vec2(\n    sqrt(-2.*log(U))*cos(tau_0*V),\n    sqrt(-2.*log(U))*sin(tau_0*V)\n  );\n}\n\nvec2 logarithmic_spiral_jitter_1540259130(\n  in float ix, // a random seed.\n  in float a, // offset\n  in float angle_parameter_1540259130, // angle parameter\n  in float randomize_angle_1540259130, // sd radians\n  in float max_r_1540259130, // Maximum radius of spiral.\n  in float randomize_rotation_max_radians_1540259130, // in standard deviations to the log-multiplier.\n  in float randomize_radius_1540259130, // in standard deviation percentage points.\n  in float hole, // donut hole size.\n  in float speed_0, // webgl units per second.\n  in float time_0,// The time, in seconds, to plot at. Generally passed as a uniform or something.\n  in float acceleration,\n  in float n_spirals_1540259130,\n  in float shear,\n  in float aspect_ratio_1540259130\n  ) {\n  // Each point starts at a different place on the spiral.\n  vec2 two_gaussians_1540259130 = box_muller_1540259130(ix, 55.1);\n\n  highp float calculated_angle = angle_parameter_1540259130 + two_gaussians_1540259130.x * randomize_angle_1540259130;\n  float k = 1. / tan(calculated_angle);\n  if (k > 100000.) {\n    k = 0.;\n  }\n\n  // The length of the segment to be traversed.\n  float arc_length =  sqrt((1. + k*k)/k) * (max_r_1540259130 - a);\n  float period = arc_length / speed_0;\n\n  // Every point needs to start at a different place along the curve.\n  float stagger_time = ix_to_random_1540259130(ix, 3.);\n\n  // How long does a circuit take? Add some random noise.\n  float time_period = period * exp(box_muller_1540259130(ix, 0.031).x / 6.);\n\n  // Adjust u_time from the clock to our current spot.\n  float varying_time = time_0 + stagger_time * time_period;\n\n  // Adjust that time by raising to a power to set the speed along the curve.\n  // Not sure if this is the soundest way to parametrize.\n  float relative_time = pow(1. - mod(varying_time, time_period)/time_period, acceleration);\n\n  // Calculate the radius at this time point.\n  float radius = max_r_1540259130 * relative_time + a;\n\n  // The angle implied by that radius.\n  float theta  = 1./k * log(radius / a);\n\n  /* A different way to calculate radius from the theta. Not used\n  float max_theta = 1. / k * log(max_r / a);\n  float theta2 = max_theta * relative_time;\n  vec2 pos_theta_style = vec2(a * exp(k * theta2), theta2);\n  radius = pos_theta_style.x;\n  theta = pos_theta_style.y;\n  */\n\n  // If multiple spirals, the theta needs to be rotated for which spiral we're in.\n  // Choose it based on a new random seed.\n  float which_spiral = floor(ix_to_random_1540259130(ix, 13.13) * n_spirals_1540259130);\n  float which_spiral_adjust = which_spiral / n_spirals_1540259130 * tau_0;\n  theta = theta + which_spiral_adjust;\n\n  // Add some gaussian jitter to the polar coordinates.\n  vec2 polar_jitter = box_muller_1540259130(ix, 24.);\n\n  highp float radius_adjust = 1. + polar_jitter.x * randomize_radius_1540259130;\n  highp float theta_adjust = polar_jitter.y * randomize_rotation_max_radians_1540259130;\n\n  vec2 shear_adjust = box_muller_1540259130(ix, 59.1) * shear;\n\n  mat3 shear_mat = mat3(\n    1., shear_adjust.x, 0.,\n    shear_adjust.y, 1., 0.,\n    0., 0., 1.);\n  // into euclidean space.\n  vec3 pos_spiral = vec3(\n   cos(theta + theta_adjust)*(radius * radius_adjust + hole),\n   sin(theta + theta_adjust)*(radius * radius_adjust + hole),\n   0.\n  );\n  mat3 adjust_to_viewport =\n         mat3(\n            1./aspect_ratio_1540259130, 0., 0.,\n            0., 1., 0.,\n            0., 0., 1.);\n\n  pos_spiral = pos_spiral * shear_mat * \n               adjust_to_viewport;\n  return pos_spiral.xy;\n}\n\n#define FLOAT_MAX  1.70141184e38\n#define FLOAT_MIN  1.17549435e-38\n\nlowp vec4 encode_float_1604150559(highp float v) {\n  highp float av = abs(v);\n\n  //Handle special cases\n  if(av < FLOAT_MIN) {\n    return vec4(0.0, 0.0, 0.0, 0.0);\n  } else if(v > FLOAT_MAX) {\n    return vec4(127.0, 128.0, 0.0, 0.0) / 255.0;\n  } else if(v < -FLOAT_MAX) {\n    return vec4(255.0, 128.0, 0.0, 0.0) / 255.0;\n  }\n\n  highp vec4 c = vec4(0,0,0,0);\n\n  //Compute exponent and mantissa\n  highp float e = floor(log2(av));\n  highp float m = av * pow(2.0, -e) - 1.0;\n  \n  //Unpack mantissa\n  c[1] = floor(128.0 * m);\n  m -= c[1] / 128.0;\n  c[2] = floor(32768.0 * m);\n  m -= c[2] / 32768.0;\n  c[3] = floor(8388608.0 * m);\n  \n  //Unpack exponent\n  highp float ebias = e + 127.0;\n  c[0] = floor(ebias / 2.0);\n  ebias -= c[0] * 2.0;\n  c[1] += floor(ebias) * 128.0; \n\n  //Unpack sign bit\n  c[0] += 128.0 * step(0.0, -v);\n\n  //Scale back to range\n  return c / 255.0;\n}\n\n#ifndef PI\n#define PI 3.141592653589793\n#endif\n\nfloat sineInOut_0(float t) {\n  return -0.5 * (cos(PI * t) - 1.0);\n}\n\n#ifndef PI\n#define PI 3.141592653589793\n#endif\n\nfloat sineInOut(float t) {\n  return -0.5 * (cos(PI * t) - 1.0);\n}\n\nconst vec4 decoder = vec4(1./256./256./256., 1. / 256. / 256., 1. / 256., 1.);\n\nfloat RGBAtoFloat(in vec4 floater) {\n  //return 0.05;\n  // Scale values up by 256.\n  return dot(floater, decoder);\n}\n\nfloat texture_float_lookup(in sampler2D texture,\n                           in vec2 domain,\n                           in vec2 range,\n                           in float transform,\n                           in float attr,\n                           in float use_texture,\n                           in float y_attr,\n                           in vec2 y_range) {\n  if (transform == 4.0) {\n    // Literal transforms aren't looked up, just returned as is.\n    return attr;\n  }\n  float inrange = domainify(domain, transform, attr, true);\n  if (use_texture > 0.) {\n    float y_pos = 0.5;// linstep(y_range, y_attr);\n    vec4 encoded = texture2D(texture, vec2(y_pos, inrange));\n    return encoded.a;\n    return RGBAtoFloat(encoded);\n  } else {\n    return mix(range.x, range.y, inrange);\n  }\n}\n\nfloat texture_float_lookup(in sampler2D texture,\n                           in vec2 domain,\n                           in vec2 range,\n                           in float transform,\n                           in float attr,\n                           in float use_texture) {\n\n  return texture_float_lookup(texture,\n                              domain,\n                              range,\n                              transform,\n                              attr,use_texture,\n                              1.,\n                              vec2(0., 2.));\n}\n\nvec2 calculate_position(in vec2 position, in float x_scale_type,\n                        in vec2 x_domain, in vec2 x_range, in float y_scale_type,\n                        in vec2 y_domain, in vec2 y_range, in mat3 window_scale,\n                        in mat3 zoom, in sampler2D x_map, in float x_needs_map,\n                        in sampler2D y_map, in float y_needs_map\n                        ) {\n    float x;\n    float y;\n\n    if (x_scale_type < 4.0) {\n      x = texture_float_lookup(x_map, x_domain, x_range,\n        x_scale_type,\n        position.x, x_needs_map, 1., vec2(0., 2.)\n        );\n    } else {\n      x = position.x;\n    }\n\n    if (x_scale_type < 4.0) {\n      y = texture_float_lookup(y_map, y_domain, y_range, y_scale_type,\n        position.y, y_needs_map, 1., vec2(0., 2.)\n        );\n    } else {\n      y = position.y;\n    }\n\n    vec3 pos2d = vec3(x, y, 1.0) * window_scale * zoom * pixelspace_to_glspace;\n    return pos2d.xy;\n}\n\nfloat cubicInOut(float t) {\n  return t < 0.5\n    ? 4.0 * t * t * t\n    : 1. - 4.0 * pow(1. - t, 3.0);\n}\n\nvec4 ixToRGBA(in float ix)  {\n  float min = fract(ix / 256.);\n  float mid = fract((ix - min) / 256.);\n  float high = fract((ix - min - mid * 256.) / (256.) / 256.);\n  return vec4(min, mid, high, 1.);\n}\n\nvec2 circle_jitter(in float ix, in float aspect_ratio, in float time,\n                   in float radius, in float speed) {\n  vec2 two_gaussians = box_muller(ix, 12.);\n\n  float stagger_time = two_gaussians.y * tau;\n\n  // How long does a circuit take?\n\n  float units_per_period = radius * radius * tau / 2.;\n  float units_per_second = speed / 100.;\n  float seconds_per_period = units_per_period / units_per_second;\n  float time_period = seconds_per_period;\n  if (time_period > 1e4) {\n    return vec2(0., 0.);\n  }\n\n  // Adjust time from the clock to our current spot.\n  float varying_time = time + stagger_time * time_period;\n  // Where are we from 0 to 1 relative to the time period\n\n  float relative_time = 1. - mod(varying_time, time_period) / time_period;\n\n  float theta = relative_time * tau;\n\n  float r_mult = (sqrt(ix_to_random(ix, 7.)));\n  return vec2(cos(theta) * r_mult, aspect_ratio * sin(theta) * r_mult) *\n         radius;\n}\n\nvec2 calculate_jitter(\n  in float jitter_type,\n  in float ix, // distinguishing index\n  in sampler2D jitter_radius_map,\n  in vec2 jitter_radius_domain,\n  in vec2 jitter_radius_range,\n  in float jitter_radius_transform,\n  in float jitter_radius,\n  in float jitter_radius_needs_map,\n  in bool jitter_radius_is_constant,\n  in sampler2D jitter_speed_map,\n  in vec2 jitter_speed_domain,\n  in vec2 jitter_speed_range,\n  in float jitter_speed_transform,\n  in float jitter_speed,\n  in float jitter_speed_needs_map,\n  in bool jitter_speed_is_constant\n) {\n\n  // Jitter is calculated based on speed, so requires two full maps in.\n\n  if (jitter_type == 0.) {\n    // No jitter\n    return vec2(0., 0.);\n  }\n\n  if (jitter_type == 5.) {\n    // Temporal jitter--should be broken out into a separate channel/channels.\n    float time_period = 60.;\n    float share = 1./4.;\n    float offset = ix_to_random(ix, 12.);\n    float fractional = fract((offset * time_period + u_time)/time_period);\n    if (fractional > share) {\n      return vec2(0., 0.);\n    }\n    float size = 0.5 * (1. - cos(2. * 3.1415926 * min(fractional/share, 1. - fractional/share)));\n    size = clamp(size, 0., 1.);\n    return vec2(size, 0.);\n  }\n  float jitter_r;  \n  if (jitter_radius_is_constant) {\n    jitter_r = jitter_radius;\n  } else {\n    jitter_r = texture_float_lookup(\n    jitter_radius_map,\n    jitter_radius_domain,\n    jitter_radius_range,\n    jitter_radius_transform,\n    jitter_radius,\n    0., 0., vec2(-1., 1.));\n  }\n  if (jitter_type == 3.) {\n    float r = box_muller(ix, 1.).r * jitter_r;\n    r = r / u_k;    \n    float theta = ix_to_random(ix, 15.) * tau;\n    return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);\n  }\n\n  if (jitter_type == 2.) {\n    // uniform in the circle.\n    float theta = ix_to_random(ix, 15.) * tau;\n    float r = jitter_r * sqrt(ix_to_random(ix, 115.));\n    r = r / u_k;\n    return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);\n  }\n\n  /* Jittering that includes motion) */\n\n  float p_jitter_speed =\n      texture_float_lookup(jitter_speed_map, jitter_speed_domain,\n                          jitter_speed_range,\n                          jitter_speed_transform, jitter_speed,\n                          jitter_speed_needs_map,  1., vec2(0., 2.));\n\n  if (jitter_type == 1.) {\n    return logarithmic_spiral_jitter_1540259130(\n                ix,\n                0.005 * jitter_r,                     // a\n                1.3302036,                       // angle parameter\n                0.005,                                 // angle random\n                jitter_r,                             // max radius\n                0.03,                                 // random_rotation\n                0.06,                                 // random radius\n                0.003 * point_size_adjust * jitter_r, // donut.\n                .5 * p_jitter_speed * jitter_r / point_size_adjust, // speed\n                u_time,                                           // time\n                0.8,                                              // acceleration\n                2.0,                                              // n_spirals\n                .09, //shear\n                u_width/u_height         // shear\n            );\n  }\n\n  if (jitter_type == 4.) {\n    // circle\n    return circle_jitter(ix, u_width/u_height, u_time, jitter_r, p_jitter_speed);\n  }\n}\n\nvoid run_color_fill(in float ease) {\n  if (u_only_color >= -1.5) {\n    if (u_only_color > -.5 && a_color != u_only_color) {\n      gl_Position = discard_me;\n      return;\n    } else {\n      // -1 is a special value meaning 'plot everything'.\n      fill = vec4(0., 0., 0., 1. / 255.);\n      gl_PointSize = 1.;\n    }\n  } else {\n    if (u_constant_color.r > -1.) {\n      fill = vec4(u_constant_color.rgb, u_current_alpha);\n    } else {\n      float fractional_color = linstep(u_color_domain, a_color);\n      fill = texture2D(u_color_map, vec2(0., fractional_color));\n      fill = vec4(fill.rgb, u_current_alpha);\n    }\n    if (ease < 1.) {\n      vec4 last_fill;\n      if (u_constant_last_color.r > 0.) {\n        last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);\n      } else {\n        float last_fractional = linstep(u_last_color_domain, a_last_color);\n        last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));\n        // Alpha channel interpolation already happened.\n        last_fill = vec4(last_fill.rgb, u_last_alpha);\n      }\n      // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN\n      // instead?\n      fill = mix(last_fill, fill, ease);\n    }\n  }\n}\n\nvoid main() {\n\n  float ix = buffer_0;\n\n  if (ix > u_maxix) {\n    // throwaway points that are too low.\n    gl_Position = discard_me;\n    return;\n  }\n\n \n // Autogenerated below this point\n if (u_x_buffer_num > -0.5) {\n      a_x = get_buffer(u_x_buffer_num);\n      a_x_is_constant = false;\n    } else {\n      a_x = u_x_constant;\n      a_x_is_constant = true;\n    }\n\n    if (u_last_x_buffer_num > -0.5) {\n      a_last_x = get_buffer(u_last_x_buffer_num);\n      a_last_x_is_constant = false;\n    } else {\n      a_last_x = u_last_x_constant;\n      a_last_x_is_constant = true;\n    }\n\n    if (u_y_buffer_num > -0.5) {\n      a_y = get_buffer(u_y_buffer_num);\n      a_y_is_constant = false;\n    } else {\n      a_y = u_y_constant;\n      a_y_is_constant = true;\n    }\n\n    if (u_last_y_buffer_num > -0.5) {\n      a_last_y = get_buffer(u_last_y_buffer_num);\n      a_last_y_is_constant = false;\n    } else {\n      a_last_y = u_last_y_constant;\n      a_last_y_is_constant = true;\n    }\n\n    if (u_jitter_radius_buffer_num > -0.5) {\n      a_jitter_radius = get_buffer(u_jitter_radius_buffer_num);\n      a_jitter_radius_is_constant = false;\n    } else {\n      a_jitter_radius = u_jitter_radius_constant;\n      a_jitter_radius_is_constant = true;\n    }\n\n    if (u_last_jitter_radius_buffer_num > -0.5) {\n      a_last_jitter_radius = get_buffer(u_last_jitter_radius_buffer_num);\n      a_last_jitter_radius_is_constant = false;\n    } else {\n      a_last_jitter_radius = u_last_jitter_radius_constant;\n      a_last_jitter_radius_is_constant = true;\n    }\n\n    if (u_jitter_speed_buffer_num > -0.5) {\n      a_jitter_speed = get_buffer(u_jitter_speed_buffer_num);\n      a_jitter_speed_is_constant = false;\n    } else {\n      a_jitter_speed = u_jitter_speed_constant;\n      a_jitter_speed_is_constant = true;\n    }\n\n    if (u_last_jitter_speed_buffer_num > -0.5) {\n      a_last_jitter_speed = get_buffer(u_last_jitter_speed_buffer_num);\n      a_last_jitter_speed_is_constant = false;\n    } else {\n      a_last_jitter_speed = u_last_jitter_speed_constant;\n      a_last_jitter_speed_is_constant = true;\n    }\n\n    if (u_size_buffer_num > -0.5) {\n      a_size = get_buffer(u_size_buffer_num);\n      a_size_is_constant = false;\n    } else {\n      a_size = u_size_constant;\n      a_size_is_constant = true;\n    }\n\n    if (u_last_size_buffer_num > -0.5) {\n      a_last_size = get_buffer(u_last_size_buffer_num);\n      a_last_size_is_constant = false;\n    } else {\n      a_last_size = u_last_size_constant;\n      a_last_size_is_constant = true;\n    }\n\n    if (u_filter1_buffer_num > -0.5) {\n      a_filter1 = get_buffer(u_filter1_buffer_num);\n      a_filter1_is_constant = false;\n    } else {\n      a_filter1 = u_filter1_constant;\n      a_filter1_is_constant = true;\n    }\n\n    if (u_last_filter1_buffer_num > -0.5) {\n      a_last_filter1 = get_buffer(u_last_filter1_buffer_num);\n      a_last_filter1_is_constant = false;\n    } else {\n      a_last_filter1 = u_last_filter1_constant;\n      a_last_filter1_is_constant = true;\n    }\n\n    if (u_filter2_buffer_num > -0.5) {\n      a_filter2 = get_buffer(u_filter2_buffer_num);\n      a_filter2_is_constant = false;\n    } else {\n      a_filter2 = u_filter2_constant;\n      a_filter2_is_constant = true;\n    }\n\n    if (u_last_filter2_buffer_num > -0.5) {\n      a_last_filter2 = get_buffer(u_last_filter2_buffer_num);\n      a_last_filter2_is_constant = false;\n    } else {\n      a_last_filter2 = u_last_filter2_constant;\n      a_last_filter2_is_constant = true;\n    }\n    if (u_x0_buffer_num > -0.5) {\n      a_x0 = get_buffer(u_x0_buffer_num);\n      a_x0_is_constant = false;\n    } else {\n      a_x0 = u_x0_constant;\n      a_x0_is_constant = true;\n    }\n\n    if (u_last_x0_buffer_num > -0.5) {\n      a_last_x0 = get_buffer(u_last_x0_buffer_num);\n      a_last_x0_is_constant = false;\n    } else {\n      a_last_x0 = u_last_x0_constant;\n      a_last_x0_is_constant = true;\n    }\n\n    if (u_y0_buffer_num > -0.5) {\n      a_y0 = get_buffer(u_y0_buffer_num);\n      a_y0_is_constant = false;\n    } else {\n      a_y0 = u_y0_constant;\n      a_y0_is_constant = true;\n    }\n\n    if (u_last_y0_buffer_num > -0.5) {\n      a_last_y0 = get_buffer(u_last_y0_buffer_num);\n      a_last_y0_is_constant = false;\n    } else {\n      a_last_y0 = u_last_y0_constant;\n      a_last_y0_is_constant = true;\n    }\n\n//  END AUTOGENERATED. DO NOT EDIT ABOVE. \n// ------------------------------------------------    \n\n  if (u_color_buffer_num > -0.5) {\n    a_color = get_buffer(u_color_buffer_num);\n  } else {\n    a_color = ix;\n  }\n\n  if (u_last_color_buffer_num > -0.5) {\n    a_last_color = get_buffer(u_last_color_buffer_num);\n  } else {\n    a_last_color = ix;\n  }\n\n  pixelspace_to_glspace = mat3(\n      2. / u_width, 0., -1.,\n      0., - 2. / u_height, 1.,\n      0., 0., 1.\n  );\n\n  float interpolation =\n    interpolate(u_update_time, 0., u_transition_duration);\n\n  float ease = interpolation;\n//  float ease = easeCubic(interpolation);\n//  from_coord_to_gl = u_window_scale * u_zoom * pixelspace_to_glspace;\n\n  float debug_mode = 0.;\n\n  vec2 position = vec2(a_x, a_y);\n  vec2 old_position = vec2(a_last_x, a_last_y);\n\n  old_position = calculate_position(old_position, u_last_x_transform,\n     u_last_x_domain, u_last_x_range,\n     u_last_y_transform, u_last_y_domain, u_last_y_range,\n     u_last_window_scale,\n     u_zoom, u_last_x_map, u_last_x_needs_map, u_last_y_map,\n     u_last_y_needs_map);\n\n  bool plot_actual_position = u_grid_mode < .5;\n\n  if (plot_actual_position) {\n    position = calculate_position(position, u_x_transform,\n      u_x_domain, u_x_range,\n      u_y_transform, u_y_domain, u_y_range, u_window_scale, u_zoom, u_x_map,\n      u_x_needs_map, u_y_map, u_y_needs_map);\n\n    float xpos = clamp((1. + position.x) / 2., 0., 1.);\n    float randy = ix_to_random(ix, 13.76);\n    float delay = xpos + randy * .1;\n\n    delay = delay * 3.;\n    // delay = 0.;\n    float frac = interpolate(\n      u_update_time,\n      delay,\n      u_transition_duration + delay\n    );\n\n    if (u_position_interpolation_mode > 0.) {\n      // If it's a continuous loop, just choose a random point along that loop.\n      frac = fract(u_update_time/u_transition_duration);\n      frac = fract(frac + randy);\n    }\n\n    frac = sineInOut_0(frac);\n\n    if (frac <= 0.) {\n      position = old_position;\n    } else if (frac < 1.) {\n      // position = mix(old_position, position, u_interpolation);\n      frac = fract(frac);\n      vec2 midpoint = box_muller(ix, 3.) * .05 *\n         dot(old_position - position, old_position - position)\n         + old_position / 2. + position / 2.;\n\n      position = mix(\n        mix(old_position, midpoint, frac),\n        mix(midpoint, position, frac),\n        frac);\n    }\n\n  } else {\n     position.x = -1. + 2. * linscale(u_x_domain, position.x);\n    //position.y = -1.0;\n    vec2 jitterspec = vec2(\n      (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,\n      (ix_to_random(ix, 1.5) * a_jitter_speed ) * 2.\n    );\n\n    position = position + jitterspec;\n  }\n\n  if (debug_mode > 0.) {\n    // Just plot every point.\n    gl_PointSize = 1.;\n    fill = vec4(1., 1., 1., 1.);\n    gl_Position = vec4(position, 1., 1.);\n    return;\n  }\n\n  float filtered_by_filter1 = combine_filters(u_filter1_numeric, \n    u_filter1_domain, a_filter1,  \n    u_filter1_map,   \n    u_last_filter1_numeric, u_last_filter1_domain, a_last_filter1, \n    u_last_filter1_map, ease, ix);\n\n  if (filtered_by_filter1 <= 0.5) {\n    gl_Position = discard_me;\n    return;\n  }\n\n  float filtered_by_filter2 = combine_filters(u_filter2_numeric,\n    u_filter2_domain, a_filter2,\n    u_filter2_map,\n    u_last_filter2_numeric, u_last_filter2_domain, a_last_filter2,\n    u_last_filter2_map, ease, ix);\n\n  if (filtered_by_filter2 <= 0.5) {\n    gl_Position = discard_me;\n    return;\n  }\n\n  float size_multiplier = texture_float_lookup(\n    u_size_map, u_size_domain, u_size_range,\n    u_size_transform, a_size, u_size_needs_map);\n\n  float last_size_multiplier = texture_float_lookup(\n    u_last_size_map, u_last_size_domain, u_last_size_range,\n                                              u_last_size_transform, a_last_size,\n                                              u_last_size_needs_map);\n\n  size_multiplier = u_base_size * \n     mix(last_size_multiplier, size_multiplier, ease);\n  \n  float depth_size_adjust = (1.0 - ix / (u_maxix));\n\n  point_size_adjust = exp(log(u_k) * u_zoom_balance);\n\n  gl_PointSize = point_size_adjust * size_multiplier;\n\n  vec2 jitter = vec2(0., 0.);\n\n  if (plot_actual_position && (u_jitter > 0. || u_last_jitter > 0.)) {\n    /* JITTER */\n    float jitter_radius_fraction;\n      jitter = calculate_jitter(\n        u_jitter, ix, u_jitter_radius_map,\n        u_jitter_radius_domain,        u_jitter_radius_range,\n        u_jitter_radius_transform,        a_jitter_radius,\n        u_jitter_radius_needs_map,        a_jitter_radius_is_constant,\n        u_jitter_speed_map, u_jitter_speed_domain,\n        u_jitter_speed_range,\n        u_jitter_speed_transform, a_jitter_speed,\n        u_jitter_speed_needs_map, a_jitter_speed_is_constant\n      );\n\n    vec2 last_jitter;\n    if (ease < 1.) {\n      last_jitter = calculate_jitter(\n        u_last_jitter, ix,\n        u_last_jitter_radius_map,\n        u_last_jitter_radius_domain,        u_last_jitter_radius_range,\n        u_last_jitter_radius_transform,        a_last_jitter_radius,\n        u_last_jitter_radius_needs_map,        a_last_jitter_radius_is_constant,\n        u_last_jitter_speed_map,         u_last_jitter_speed_domain,\n        u_last_jitter_speed_range,\n        u_last_jitter_speed_transform, a_last_jitter_speed,\n        u_last_jitter_speed_needs_map,        a_last_jitter_speed_is_constant\n      );\n      jitter = mix(last_jitter, jitter, ease);\n    }\n    if (u_jitter == 5.) {\n      gl_PointSize *= jitter.x;\n      jitter = vec2(0., 0.);\n      if (gl_PointSize < 0.05) {\n        gl_Position = discard_me;\n        return;\n      }\n    }\n    gl_Position = vec4(position + jitter, 0., 1.);\n  } else {\n    gl_Position = vec4(position + jitter, 0., 1.);\n  }  \n  if (u_color_picker_mode > 0.) {\n    // Add one so the first element is distinguishable.\n    fill = encode_float_1604150559(ix + 1.);\n  } else {\n    run_color_fill(ease);\n  }\n  point_size = gl_PointSize;\n  if (u_use_glyphset > 0. && point_size > 5.0) {\n    float random_letter = floor(64. * ix_to_random(ix, 1.3));\n    letter_pos = vec2(\n      // start at a number between 0 and 7.\n      mod(random_letter, 8.) / 8.,\n      floor(random_letter / 8.) / 8.\n    );\n    gl_PointSize *= 3.0;\n  }\n}\n"; // eslint-disable-line
+var vertex_shader = "precision mediump float;\n#define GLSLIFY 1\n\nuniform float u_zoom_balance;\n\nuniform float u_update_time;\nuniform float u_transition_duration;\n\n// Type of jitter.\nuniform float u_jitter;\nuniform float u_last_jitter;\n\n// Whether to plot only a single category.\nuniform float u_only_color;\nuniform float u_grid_mode;\n\nuniform vec3 u_filter1_numeric; // An override for simple numeric operations.\nuniform vec3 u_last_filter1_numeric; // An override for simple numeric operations.\n\nuniform vec3 u_filter2_numeric; // An override for simple numeric operations.\nuniform vec3 u_last_filter2_numeric; // An override for simple numeric operations.\n\n// Transform from data space to the open window.\nuniform mat3 u_window_scale;\nuniform mat3 u_last_window_scale;\n// Transform from the open window to the d3-zoom.\nuniform mat3 u_zoom;\n\nuniform float u_width;\nuniform float u_height;\nuniform float u_use_glyphset;\nvarying vec2 letter_pos; // store which letter to use.\n\nuniform float u_maxix;           // The maximum index to plot.\nuniform float u_time;            // The current time.\nuniform float u_k;               // The d3-scale factor.\nuniform float u_color_picker_mode;\nuniform float u_base_size;\nuniform float u_current_alpha;\nuniform float u_last_alpha;\n\n// The same set of items for a variety of aesthetics.\n\n// whether to continuously interpolate between\n// x0 and x, y0 and y.\nuniform float u_position_interpolation_mode;\n\n/*\npython code to generate what follows.\ndef autogenerate_code():\n  ks = [\"x\", \"y\", \"jitter_radius\", \"jitter_speed\", \"size\", \"filter1\", \"filter2\", \"x0\", \"y0\"]\n  times = [\"\", \"last_\"]\n  print(\"\"\"\n  //  BEGIN AUTOGENERATED. DO NOT EDIT. \n  // ------------------------------------------------    \n  \"\"\")\n  for k in ks:\n    for time in times:\n      timek = time + k\n      print(f\"\"\"\n  uniform float u_{timek}_buffer_num;\n  uniform float u_{timek}_constant;\n  uniform float u_{timek}_transform;\n  uniform vec2 u_{timek}_domain;\n  uniform vec2 u_{timek}_range;\n  uniform sampler2D u_{timek}_map;\n  uniform float u_{timek}_needs_map;\n  float a_{timek};\n  bool a_{timek}_is_constant;\n      \"\"\")\n  for i in range(0, 16):\n    print(f\"attribute float buffer_{i};\")\n  for k in ks:\n    for time in times:\n      timek = time + k\n      print(f\"\"\"\n    if (u_{timek}_buffer_num > -0.5) {{\n      a_{timek} = get_buffer(u_{timek}_buffer_num);\n      a_{timek}_is_constant = false;\n    }} else {{\n      a_{timek} = u_{timek}_constant;\n      a_{timek}_is_constant = true;\n    }}\"\"\")\n  print(\"\"\"\n//  END AUTOGENERATED. DO NOT EDIT ABOVE. \n// ------------------------------------------------    \n  \"\"\")\n\nautogenerate_code()\n*/\n  //  BEGIN AUTOGENERATED. DO NOT EDIT. \n  // ------------------------------------------------    \n  \n\n  uniform float u_x_buffer_num;\n  uniform float u_x_constant;\n  uniform float u_x_transform;\n  uniform vec2 u_x_domain;\n  uniform vec2 u_x_range;\n  uniform sampler2D u_x_map;\n  uniform float u_x_needs_map;\n  float a_x;\n  bool a_x_is_constant;\n      \n\n  uniform float u_last_x_buffer_num;\n  uniform float u_last_x_constant;\n  uniform float u_last_x_transform;\n  uniform vec2 u_last_x_domain;\n  uniform vec2 u_last_x_range;\n  uniform sampler2D u_last_x_map;\n  uniform float u_last_x_needs_map;\n  float a_last_x;\n  bool a_last_x_is_constant;\n      \n\n  uniform float u_y_buffer_num;\n  uniform float u_y_constant;\n  uniform float u_y_transform;\n  uniform vec2 u_y_domain;\n  uniform vec2 u_y_range;\n  uniform sampler2D u_y_map;\n  uniform float u_y_needs_map;\n  float a_y;\n  bool a_y_is_constant;\n      \n\n  uniform float u_last_y_buffer_num;\n  uniform float u_last_y_constant;\n  uniform float u_last_y_transform;\n  uniform vec2 u_last_y_domain;\n  uniform vec2 u_last_y_range;\n  uniform sampler2D u_last_y_map;\n  uniform float u_last_y_needs_map;\n  float a_last_y;\n  bool a_last_y_is_constant;\n      \n\n  uniform float u_jitter_radius_buffer_num;\n  uniform float u_jitter_radius_constant;\n  uniform float u_jitter_radius_transform;\n  uniform vec2 u_jitter_radius_domain;\n  uniform vec2 u_jitter_radius_range;\n  uniform sampler2D u_jitter_radius_map;\n  uniform float u_jitter_radius_needs_map;\n  float a_jitter_radius;\n  bool a_jitter_radius_is_constant;\n      \n\n  uniform float u_last_jitter_radius_buffer_num;\n  uniform float u_last_jitter_radius_constant;\n  uniform float u_last_jitter_radius_transform;\n  uniform vec2 u_last_jitter_radius_domain;\n  uniform vec2 u_last_jitter_radius_range;\n  uniform sampler2D u_last_jitter_radius_map;\n  uniform float u_last_jitter_radius_needs_map;\n  float a_last_jitter_radius;\n  bool a_last_jitter_radius_is_constant;\n      \n\n  uniform float u_jitter_speed_buffer_num;\n  uniform float u_jitter_speed_constant;\n  uniform float u_jitter_speed_transform;\n  uniform vec2 u_jitter_speed_domain;\n  uniform vec2 u_jitter_speed_range;\n  uniform sampler2D u_jitter_speed_map;\n  uniform float u_jitter_speed_needs_map;\n  float a_jitter_speed;\n  bool a_jitter_speed_is_constant;\n      \n\n  uniform float u_last_jitter_speed_buffer_num;\n  uniform float u_last_jitter_speed_constant;\n  uniform float u_last_jitter_speed_transform;\n  uniform vec2 u_last_jitter_speed_domain;\n  uniform vec2 u_last_jitter_speed_range;\n  uniform sampler2D u_last_jitter_speed_map;\n  uniform float u_last_jitter_speed_needs_map;\n  float a_last_jitter_speed;\n  bool a_last_jitter_speed_is_constant;\n      \n\n  uniform float u_size_buffer_num;\n  uniform float u_size_constant;\n  uniform float u_size_transform;\n  uniform vec2 u_size_domain;\n  uniform vec2 u_size_range;\n  uniform sampler2D u_size_map;\n  uniform float u_size_needs_map;\n  float a_size;\n  bool a_size_is_constant;\n      \n\n  uniform float u_last_size_buffer_num;\n  uniform float u_last_size_constant;\n  uniform float u_last_size_transform;\n  uniform vec2 u_last_size_domain;\n  uniform vec2 u_last_size_range;\n  uniform sampler2D u_last_size_map;\n  uniform float u_last_size_needs_map;\n  float a_last_size;\n  bool a_last_size_is_constant;\n      \n\n  uniform float u_filter1_buffer_num;\n  uniform float u_filter1_constant;\n  uniform float u_filter1_transform;\n  uniform vec2 u_filter1_domain;\n  uniform vec2 u_filter1_range;\n  uniform sampler2D u_filter1_map;\n  uniform float u_filter1_needs_map;\n  float a_filter1;\n  bool a_filter1_is_constant;\n      \n\n  uniform float u_last_filter1_buffer_num;\n  uniform float u_last_filter1_constant;\n  uniform float u_last_filter1_transform;\n  uniform vec2 u_last_filter1_domain;\n  uniform vec2 u_last_filter1_range;\n  uniform sampler2D u_last_filter1_map;\n  uniform float u_last_filter1_needs_map;\n  float a_last_filter1;\n  bool a_last_filter1_is_constant;\n\n  uniform float u_filter2_buffer_num;\n  uniform float u_filter2_constant;\n  uniform float u_filter2_transform;\n  uniform vec2 u_filter2_domain;\n  uniform vec2 u_filter2_range;\n  uniform sampler2D u_filter2_map;\n  uniform float u_filter2_needs_map;\n  float a_filter2;\n  bool a_filter2_is_constant;\n      \n\n  uniform float u_last_filter2_buffer_num;\n  uniform float u_last_filter2_constant;\n  uniform float u_last_filter2_transform;\n  uniform vec2 u_last_filter2_domain;\n  uniform vec2 u_last_filter2_range;\n  uniform sampler2D u_last_filter2_map;\n  uniform float u_last_filter2_needs_map;\n  float a_last_filter2;\n  bool a_last_filter2_is_constant;\n\n  uniform float u_x0_buffer_num;\n  uniform float u_x0_constant;\n  uniform float u_x0_transform;\n  uniform vec2 u_x0_domain;\n  uniform vec2 u_x0_range;\n  uniform sampler2D u_x0_map;\n  uniform float u_x0_needs_map;\n  float a_x0;\n  bool a_x0_is_constant;\n      \n\n  uniform float u_last_x0_buffer_num;\n  uniform float u_last_x0_constant;\n  uniform float u_last_x0_transform;\n  uniform vec2 u_last_x0_domain;\n  uniform vec2 u_last_x0_range;\n  uniform sampler2D u_last_x0_map;\n  uniform float u_last_x0_needs_map;\n  float a_last_x0;\n  bool a_last_x0_is_constant;\n      \n\n  uniform float u_y0_buffer_num;\n  uniform float u_y0_constant;\n  uniform float u_y0_transform;\n  uniform vec2 u_y0_domain;\n  uniform vec2 u_y0_range;\n  uniform sampler2D u_y0_map;\n  uniform float u_y0_needs_map;\n  float a_y0;\n  bool a_y0_is_constant;\n      \n\n  uniform float u_last_y0_buffer_num;\n  uniform float u_last_y0_constant;\n  uniform float u_last_y0_transform;\n  uniform vec2 u_last_y0_domain;\n  uniform vec2 u_last_y0_range;\n  uniform sampler2D u_last_y0_map;\n  uniform float u_last_y0_needs_map;\n  float a_last_y0;\n  bool a_last_y0_is_constant;\n      \nattribute float buffer_0;\nattribute float buffer_1;\nattribute float buffer_2;\nattribute float buffer_3;\nattribute float buffer_4;\nattribute float buffer_5;\nattribute float buffer_6;\nattribute float buffer_7;\nattribute float buffer_8;\nattribute float buffer_9;\nattribute float buffer_10;\nattribute float buffer_11;\nattribute float buffer_12;\nattribute float buffer_13;\nattribute float buffer_14;\nattribute float buffer_15;\n\n// END AUTOGENERATED\n  \n\nhighp float ix_to_random(in float ix, in float seed) {\n  // For high numbers, taking the log avoids coincidence.\n  highp float seed2 = log(ix) + 1.;\n  vec2 co = vec2(seed2, seed);\n  highp float a = 12.9898;\n  highp float b = 78.233;\n  highp float c = 43758.5453;\n  highp float dt = dot(co.xy, vec2(a, b));\n  highp float sn = mod(dt, 3.14);\n  return fract(sin(sn) * c);\n}\n\nfloat a_color;\nfloat a_last_color;\n\nuniform float u_color_buffer_num;\nuniform float u_last_color_buffer_num;\n\nuniform vec3 u_color_constant;\nuniform vec3 u_last_color_constant;\n\nuniform float u_color_transform;\nuniform float u_last_color_transform;\nuniform vec2 u_color_domain;\nuniform vec2 u_last_color_domain;\nuniform sampler2D u_color_map;\nuniform sampler2D u_last_color_map;\nuniform float u_last_color_needs_map;\nuniform float u_color_needs_map;\nuniform vec3 u_constant_color;\nuniform vec3 u_constant_last_color;\n\n// The fill color.\nvarying vec4 fill;\nvarying float point_size;\n\nuniform float u_jitter_radius_lookup;\nuniform float u_jitter_radius_lookup_y_constant;\nuniform sampler2D u_jitter_radius_lookup_map;\nuniform vec2 u_jitter_radius_lookup_x_domain;\nuniform vec2 u_jitter_radius_lookup_y_domain;\n\nfloat point_size_adjust;\n\n// A coordinate to throw away a vertex point.\nvec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);\n\n// Initialized in the main loop\n// mat3 from_coord_to_gl;\n\nconst float e = 1.618282;\n// I've been convinced.\nconst float tau = 2. * 3.14159265359;\n\n// uniform vec4 corners;\n\n/*************** COLOR SCALES *******************************/\n\n// Ha! A gazillion version of this function:\n// https://gist.github.com/kylemcdonald/f8df3bc2f8d38ca2b7cb\n/*vec3 hsv2rgb(in vec3 c) {\n  vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0,\n                   0.0, 1.0);\n  rgb = rgb * rgb * (3.0 - 2.0 * rgb);\n  return c.z * mix(vec3(1.0), rgb, c.y);\n}*/\n\nfloat interpolate_raw(in float x, in float min, in float max) {\n  if (x < min) {return 0.;}\n  if (x > max) {return 1.;}\n  return (x - min)/(max - min);\n}\n\nfloat interpolate(in float x, in float min, in float max) {\n  if (max < min) {\n    return 1. - interpolate_raw(x, max, min);\n  } else {\n    return interpolate_raw(x, min, max);\n  }\n}\n\n/*\n\nThe following glsl code was written in python.\n\nbuffers = [*range(16)]\n\ndef write_buffs(buffs):\n    if len(buffs) == 1:\n        return[f\"return buffer_{buffs[0]}\"]\n    condition_1 = [\"  \" + line for line in write_buffs(buffs[:len(buffs)//2])]\n    condition_2 = [\"\" + line for line in write_buffs(buffs[len(buffs)//2:])]\n\n    args = [\n        f\"if (i < {buffs[len(buffs) // 2 - 1]}.5) {{\",\n        *condition_1,\n        \"}\",\n        *condition_2\n    ]\n    return args\n\nprint(\"\\n\".join(write_buffs(buffers)))\n*/\n\nfloat get_buffer(in float i) {\n  //given an index, returns the appropriate buffer.\n  if (i < 7.5) {\n    if (i < 3.5) {\n      if (i < 1.5) {\n        if (i < 0.5) {\n          return buffer_0;\n        }\n        return buffer_1;\n      }\n      if (i < 2.5) {\n        return buffer_2;\n      }\n      return buffer_3;\n    }\n    if (i < 5.5) {\n      if (i < 4.5) {\n        return buffer_4;\n      }\n      return buffer_5;\n    }\n    if (i < 6.5) {\n      return buffer_6;\n    }\n    return buffer_7;\n  }\n  if (i < 11.5) {\n    if (i < 9.5) {\n      if (i < 8.5) {\n        return buffer_8;\n      }\n      return buffer_9;\n    }\n    if (i < 10.5) {\n      return buffer_10;\n    }\n    return buffer_11;\n  }\n  if (i < 13.5) {\n    if (i < 12.5) {\n      return buffer_12;\n    }\n    return buffer_13;\n  }\n  if (i < 14.5) {\n    return buffer_14;\n  }\n  return buffer_15;\n}\n\nfloat linstep(in vec2 range, in float x) {\n  return interpolate(x, range.x, range.y);\n  float scale_size = range.y - range.x;\n  float from_left = x - range.x;\n  return clamp(from_left / scale_size, 0.0, 1.0);\n}\n\nfloat linscale(in vec2 range, in float x) {\n  float scale_size = range.y - range.x;\n  float from_left = x - range.x;\n  return from_left / scale_size;\n}\n\nvec2 box_muller(in float ix, in float seed) {\n  // Box-Muller transform gives you two gaussian randoms for two uniforms.\n  highp float U = ix_to_random(ix, seed);\n  highp float V = ix_to_random(ix, seed + 17.123123);\n  return vec2(sqrt(-2. * log(U)) * cos(tau * V),\n              sqrt(-2. * log(U)) * sin(tau * V));\n}\n\n/*************** END COLOR SCALES *******************************/\n\nfloat domainify(in vec2 domain, in float transform, in float attr, in bool clamped) {\n\n  // Clamp an attribute into a domain, with an option log or sqrt transform.\n  if (transform == 2.) {\n    domain = sqrt(domain);\n    attr = sqrt(attr);\n  }\n  if (transform == 3.) {\n    domain = log(domain);\n    attr = log(attr);\n  }\n  if (clamped) {\n    return linstep(domain, attr);\n  } else {\n    return linscale(domain, attr);\n  }\n}\n\nmat3 pixelspace_to_glspace;\n\nfloat run_numeric_filter (in float a_filter,\n  in float u_filter_op, in float u_filter_param_1,\n  in float u_filter_param_2) {\n  bool truthy;\n  if (u_filter_op < 1.5) {\n    truthy = a_filter < u_filter_param_1;\n  } else if (u_filter_op < 2.5) {\n    truthy = a_filter > u_filter_param_1;\n  } else if (u_filter_op < 3.5) {\n    truthy = a_filter == u_filter_param_1;\n  } else if (u_filter_op < 4.5) {\n    truthy = abs(a_filter - u_filter_param_2) < u_filter_param_1;\n  }\n  if (truthy) {return 1.;} else {return 0.;}\n}\n\nfloat choose_and_run_filter(\n  in vec3 u_filter_numeric,\n  in vec2 u_filter_domain,\n  in float a_filter,\n  in sampler2D filtermap) {\n  if (u_filter_numeric.r < 0.5) {\n    float frac_filter = linstep(u_filter_domain, a_filter);\n    return texture2D(filtermap, vec2(0.5, frac_filter)).a;\n  } else {\n    return run_numeric_filter(a_filter,\n      u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);\n  }\n}\n\n// Progress through the filters at different rates.\nfloat combine_filters(\n  in vec3 u_filter_numeric, in vec2 u_filter_domain, in float a_filter,\n  in sampler2D u_filter_map,\n  in vec3 u_last_filter_numeric, in vec2 u_last_filter_domain, in float a_last_filter,\n  in sampler2D u_last_filter_map,\n  in float ease,\n  in float ix\n) {\n  float my_filter = 0.;\n  if (ix_to_random(ix, 13.5) > ease) {\n    return choose_and_run_filter(\n      u_last_filter_numeric, u_last_filter_domain, a_last_filter,\n      u_last_filter_map\n    );\n  } else {\n    return choose_and_run_filter(\n      u_filter_numeric, u_filter_domain, a_filter,\n      u_filter_map);\n  }\n}\n\nconst float tau_0 = 2. * 3.14159265359;\n\nhighp float ix_to_random_1540259130(in float ix, in float seed) {\n  // For high numbers, taking the log avoids coincidence.\n  highp float seed2 = log(ix) + 1.;\n  vec2 co = vec2(seed2, seed);\n  highp float a = 12.9898;\n  highp float b = 78.233;\n  highp float c = 43758.5453;\n  highp float dt= dot(co.xy ,vec2(a,b));\n  highp float sn= mod(dt,3.14);\n  return fract(sin(sn) * c);\n}\n\nhighp vec2 box_muller_1540259130(in float ix, in float seed) {\n  // Box-Muller transform gives you two gaussian randoms for two uniforms.\n  highp float U = ix_to_random_1540259130(ix, seed);\n  highp float V = ix_to_random_1540259130(ix, seed + 17.123123);\n  return vec2(\n    sqrt(-2.*log(U))*cos(tau_0*V),\n    sqrt(-2.*log(U))*sin(tau_0*V)\n  );\n}\n\nvec2 logarithmic_spiral_jitter_1540259130(\n  in float ix, // a random seed.\n  in float a, // offset\n  in float angle_parameter_1540259130, // angle parameter\n  in float randomize_angle_1540259130, // sd radians\n  in float max_r_1540259130, // Maximum radius of spiral.\n  in float randomize_rotation_max_radians_1540259130, // in standard deviations to the log-multiplier.\n  in float randomize_radius_1540259130, // in standard deviation percentage points.\n  in float hole, // donut hole size.\n  in float speed_0, // webgl units per second.\n  in float time_0,// The time, in seconds, to plot at. Generally passed as a uniform or something.\n  in float acceleration,\n  in float n_spirals_1540259130,\n  in float shear,\n  in float aspect_ratio_1540259130\n  ) {\n  // Each point starts at a different place on the spiral.\n  vec2 two_gaussians_1540259130 = box_muller_1540259130(ix, 55.1);\n\n  highp float calculated_angle = angle_parameter_1540259130 + two_gaussians_1540259130.x * randomize_angle_1540259130;\n  float k = 1. / tan(calculated_angle);\n  if (k > 100000.) {\n    k = 0.;\n  }\n\n  // The length of the segment to be traversed.\n  float arc_length =  sqrt((1. + k*k)/k) * (max_r_1540259130 - a);\n  float period = arc_length / speed_0;\n\n  // Every point needs to start at a different place along the curve.\n  float stagger_time = ix_to_random_1540259130(ix, 3.);\n\n  // How long does a circuit take? Add some random noise.\n  float time_period = period * exp(box_muller_1540259130(ix, 0.031).x / 6.);\n\n  // Adjust u_time from the clock to our current spot.\n  float varying_time = time_0 + stagger_time * time_period;\n\n  // Adjust that time by raising to a power to set the speed along the curve.\n  // Not sure if this is the soundest way to parametrize.\n  float relative_time = pow(1. - mod(varying_time, time_period)/time_period, acceleration);\n\n  // Calculate the radius at this time point.\n  float radius = max_r_1540259130 * relative_time + a;\n\n  // The angle implied by that radius.\n  float theta  = 1./k * log(radius / a);\n\n  /* A different way to calculate radius from the theta. Not used\n  float max_theta = 1. / k * log(max_r / a);\n  float theta2 = max_theta * relative_time;\n  vec2 pos_theta_style = vec2(a * exp(k * theta2), theta2);\n  radius = pos_theta_style.x;\n  theta = pos_theta_style.y;\n  */\n\n  // If multiple spirals, the theta needs to be rotated for which spiral we're in.\n  // Choose it based on a new random seed.\n  float which_spiral = floor(ix_to_random_1540259130(ix, 13.13) * n_spirals_1540259130);\n  float which_spiral_adjust = which_spiral / n_spirals_1540259130 * tau_0;\n  theta = theta + which_spiral_adjust;\n\n  // Add some gaussian jitter to the polar coordinates.\n  vec2 polar_jitter = box_muller_1540259130(ix, 24.);\n\n  highp float radius_adjust = 1. + polar_jitter.x * randomize_radius_1540259130;\n  highp float theta_adjust = polar_jitter.y * randomize_rotation_max_radians_1540259130;\n\n  vec2 shear_adjust = box_muller_1540259130(ix, 59.1) * shear;\n\n  mat3 shear_mat = mat3(\n    1., shear_adjust.x, 0.,\n    shear_adjust.y, 1., 0.,\n    0., 0., 1.);\n  // into euclidean space.\n  vec3 pos_spiral = vec3(\n   cos(theta + theta_adjust)*(radius * radius_adjust + hole),\n   sin(theta + theta_adjust)*(radius * radius_adjust + hole),\n   0.\n  );\n  mat3 adjust_to_viewport =\n         mat3(\n            1./aspect_ratio_1540259130, 0., 0.,\n            0., 1., 0.,\n            0., 0., 1.);\n\n  pos_spiral = pos_spiral * shear_mat * \n               adjust_to_viewport;\n  return pos_spiral.xy;\n}\n\n#define FLOAT_MAX  1.70141184e38\n#define FLOAT_MIN  1.17549435e-38\n\nlowp vec4 encode_float_1604150559(highp float v) {\n  highp float av = abs(v);\n\n  //Handle special cases\n  if(av < FLOAT_MIN) {\n    return vec4(0.0, 0.0, 0.0, 0.0);\n  } else if(v > FLOAT_MAX) {\n    return vec4(127.0, 128.0, 0.0, 0.0) / 255.0;\n  } else if(v < -FLOAT_MAX) {\n    return vec4(255.0, 128.0, 0.0, 0.0) / 255.0;\n  }\n\n  highp vec4 c = vec4(0,0,0,0);\n\n  //Compute exponent and mantissa\n  highp float e = floor(log2(av));\n  highp float m = av * pow(2.0, -e) - 1.0;\n  \n  //Unpack mantissa\n  c[1] = floor(128.0 * m);\n  m -= c[1] / 128.0;\n  c[2] = floor(32768.0 * m);\n  m -= c[2] / 32768.0;\n  c[3] = floor(8388608.0 * m);\n  \n  //Unpack exponent\n  highp float ebias = e + 127.0;\n  c[0] = floor(ebias / 2.0);\n  ebias -= c[0] * 2.0;\n  c[1] += floor(ebias) * 128.0; \n\n  //Unpack sign bit\n  c[0] += 128.0 * step(0.0, -v);\n\n  //Scale back to range\n  return c / 255.0;\n}\n\n#ifndef PI\n#define PI 3.141592653589793\n#endif\n\nfloat sineInOut_0(float t) {\n  return -0.5 * (cos(PI * t) - 1.0);\n}\n\n#ifndef PI\n#define PI 3.141592653589793\n#endif\n\nfloat sineInOut(float t) {\n  return -0.5 * (cos(PI * t) - 1.0);\n}\n\nconst vec4 decoder = vec4(1./256./256./256., 1. / 256. / 256., 1. / 256., 1.);\n\nfloat RGBAtoFloat(in vec4 floater) {\n  //return 0.05;\n  // Scale values up by 256.\n  return dot(floater, decoder);\n}\n\nfloat texture_float_lookup(in sampler2D texture,\n                           in vec2 domain,\n                           in vec2 range,\n                           in float transform,\n                           in float attr,\n                           in float use_texture,\n                           in float y_attr,\n                           in vec2 y_range) {\n  if (transform == 4.0) {\n    // Literal transforms aren't looked up, just returned as is.\n    return attr;\n  }\n  float inrange = domainify(domain, transform, attr, true);\n  if (use_texture > 0.) {\n    float y_pos = 0.5;// linstep(y_range, y_attr);\n    vec4 encoded = texture2D(texture, vec2(y_pos, inrange));\n    return encoded.a;\n    return RGBAtoFloat(encoded);\n  } else {\n    return mix(range.x, range.y, inrange);\n  }\n}\n\nfloat texture_float_lookup(in sampler2D texture,\n                           in vec2 domain,\n                           in vec2 range,\n                           in float transform,\n                           in float attr,\n                           in float use_texture) {\n\n  return texture_float_lookup(texture,\n                              domain,\n                              range,\n                              transform,\n                              attr,use_texture,\n                              1.,\n                              vec2(0., 2.));\n}\n\nvec2 calculate_position(in vec2 position, in float x_scale_type,\n                        in vec2 x_domain, in vec2 x_range, in float y_scale_type,\n                        in vec2 y_domain, in vec2 y_range, in mat3 window_scale,\n                        in mat3 zoom, in sampler2D x_map, in float x_needs_map,\n                        in sampler2D y_map, in float y_needs_map\n                        ) {\n    float x;\n    float y;\n\n    if (x_scale_type < 4.0) {\n      x = texture_float_lookup(x_map, x_domain, x_range,\n        x_scale_type,\n        position.x, x_needs_map, 1., vec2(0., 2.)\n        );\n    } else {\n      x = position.x;\n    }\n\n    if (x_scale_type < 4.0) {\n      y = texture_float_lookup(y_map, y_domain, y_range, y_scale_type,\n        position.y, y_needs_map, 1., vec2(0., 2.)\n        );\n    } else {\n      y = position.y;\n    }\n\n    vec3 pos2d = vec3(x, y, 1.0) * window_scale * zoom * pixelspace_to_glspace;\n    return pos2d.xy;\n}\n\nfloat cubicInOut(float t) {\n  return t < 0.5\n    ? 4.0 * t * t * t\n    : 1. - 4.0 * pow(1. - t, 3.0);\n}\n\nvec4 ixToRGBA(in float ix)  {\n  float min = fract(ix / 256.);\n  float mid = fract((ix - min) / 256.);\n  float high = fract((ix - min - mid * 256.) / (256.) / 256.);\n  return vec4(min, mid, high, 1.);\n}\n\nvec2 circle_jitter(in float ix, in float aspect_ratio, in float time,\n                   in float radius, in float speed) {\n  vec2 two_gaussians = box_muller(ix, 12.);\n\n  float stagger_time = two_gaussians.y * tau;\n\n  // How long does a circuit take?\n\n  float units_per_period = radius * radius * tau / 2.;\n  float units_per_second = speed / 100.;\n  float seconds_per_period = units_per_period / units_per_second;\n  float time_period = seconds_per_period;\n  if (time_period > 1e4) {\n    return vec2(0., 0.);\n  }\n\n  // Adjust time from the clock to our current spot.\n  float varying_time = time + stagger_time * time_period;\n  // Where are we from 0 to 1 relative to the time period\n\n  float relative_time = 1. - mod(varying_time, time_period) / time_period;\n\n  float theta = relative_time * tau;\n\n  float r_mult = (sqrt(ix_to_random(ix, 7.)));\n  return vec2(cos(theta) * r_mult, aspect_ratio * sin(theta) * r_mult) *\n         radius;\n}\n\nvec2 calculate_jitter(\n  in float jitter_type,\n  in float ix, // distinguishing index\n  in sampler2D jitter_radius_map,\n  in vec2 jitter_radius_domain,\n  in vec2 jitter_radius_range,\n  in float jitter_radius_transform,\n  in float jitter_radius,\n  in float jitter_radius_needs_map,\n  in bool jitter_radius_is_constant,\n  in sampler2D jitter_speed_map,\n  in vec2 jitter_speed_domain,\n  in vec2 jitter_speed_range,\n  in float jitter_speed_transform,\n  in float jitter_speed,\n  in float jitter_speed_needs_map,\n  in bool jitter_speed_is_constant\n) {\n\n  // Jitter is calculated based on speed, so requires two full maps in.\n\n  if (jitter_type == 0.) {\n    // No jitter\n    return vec2(0., 0.);\n  }\n\n  if (jitter_type == 5.) {\n    // Temporal jitter--should be broken out into a separate channel/channels.\n    float time_period = 60.;\n    float share = 1./4.;\n    float offset = ix_to_random(ix, 12.);\n    float fractional = fract((offset * time_period + u_time)/time_period);\n    if (fractional > share) {\n      return vec2(0., 0.);\n    }\n    float size = 0.5 * (1. - cos(2. * 3.1415926 * min(fractional/share, 1. - fractional/share)));\n    size = clamp(size, 0., 1.);\n    return vec2(size, 0.);\n  }\n  float jitter_r;  \n  if (jitter_radius_is_constant) {\n    jitter_r = jitter_radius;\n  } else {\n    jitter_r = texture_float_lookup(\n    jitter_radius_map,\n    jitter_radius_domain,\n    jitter_radius_range,\n    jitter_radius_transform,\n    jitter_radius,\n    0., 0., vec2(-1., 1.));\n  }\n  if (jitter_type == 3.) {\n    float r = box_muller(ix, 1.).r * jitter_r;\n    r = r / u_k;    \n    float theta = ix_to_random(ix, 15.) * tau;\n    return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);\n  }\n\n  if (jitter_type == 2.) {\n    // uniform in the circle.\n    float theta = ix_to_random(ix, 15.) * tau;\n    float r = jitter_r * sqrt(ix_to_random(ix, 115.));\n    r = r / u_k;\n    return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);\n  }\n\n  /* Jittering that includes motion) */\n\n  float p_jitter_speed =\n      texture_float_lookup(jitter_speed_map, jitter_speed_domain,\n                          jitter_speed_range,\n                          jitter_speed_transform, jitter_speed,\n                          jitter_speed_needs_map,  1., vec2(0., 2.));\n\n  if (jitter_type == 1.) {\n    return logarithmic_spiral_jitter_1540259130(\n                ix,\n                0.005 * jitter_r,                     // a\n                1.3302036,                       // angle parameter\n                0.005,                                 // angle random\n                jitter_r,                             // max radius\n                0.03,                                 // random_rotation\n                0.06,                                 // random radius\n                0.003 * point_size_adjust * jitter_r, // donut.\n                .5 * p_jitter_speed * jitter_r / point_size_adjust, // speed\n                u_time,                                           // time\n                0.8,                                              // acceleration\n                2.0,                                              // n_spirals\n                .09, //shear\n                u_width/u_height         // shear\n            );\n  }\n\n  if (jitter_type == 4.) {\n    // circle\n    return circle_jitter(ix, u_width/u_height, u_time, jitter_r, p_jitter_speed);\n  }\n}\n\nvoid run_color_fill(in float ease) {\n  if (u_only_color >= -1.5) {\n    if (u_only_color > -.5 && a_color != u_only_color) {\n      gl_Position = discard_me;\n      return;\n    } else {\n      // -1 is a special value meaning 'plot everything'.\n      fill = vec4(0., 0., 0., 1. / 255.);\n      gl_PointSize = 1.;\n    }\n  } else {\n    if (false) {//u_constant_color.r > -1.) {\n      fill = vec4(u_constant_color.rgb, u_current_alpha);\n    } else {\n      float fractional_color = linstep(u_color_domain, a_color);\n      fill = texture2D(u_color_map, vec2(0.5, fractional_color));\n      fill = vec4(fill.rgb, u_current_alpha);\n    }\n    if (ease < 1.) {\n      vec4 last_fill;\n      if (u_constant_last_color.r > 0.) {\n        last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);\n      } else {\n        float last_fractional = linstep(u_last_color_domain, a_last_color);\n        last_fill = texture2D(u_last_color_map, vec2(0.5, last_fractional));\n        // Alpha channel interpolation already happened.\n        last_fill = vec4(last_fill.rgb, u_last_alpha);\n\n      }\n      // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN\n      // instead?\n      fill = mix(last_fill, fill, ease);\n    }\n  }\n}\n\nvoid main() {\n\n  float ix = buffer_0;\n\n  if (ix > u_maxix) {\n    // throwaway points that are too low.\n    gl_Position = discard_me;\n    return;\n  }\n\n \n // Autogenerated below this point\n if (u_x_buffer_num > -0.5) {\n      a_x = get_buffer(u_x_buffer_num);\n      a_x_is_constant = false;\n    } else {\n      a_x = u_x_constant;\n      a_x_is_constant = true;\n    }\n\n    if (u_last_x_buffer_num > -0.5) {\n      a_last_x = get_buffer(u_last_x_buffer_num);\n      a_last_x_is_constant = false;\n    } else {\n      a_last_x = u_last_x_constant;\n      a_last_x_is_constant = true;\n    }\n\n    if (u_y_buffer_num > -0.5) {\n      a_y = get_buffer(u_y_buffer_num);\n      a_y_is_constant = false;\n    } else {\n      a_y = u_y_constant;\n      a_y_is_constant = true;\n    }\n\n    if (u_last_y_buffer_num > -0.5) {\n      a_last_y = get_buffer(u_last_y_buffer_num);\n      a_last_y_is_constant = false;\n    } else {\n      a_last_y = u_last_y_constant;\n      a_last_y_is_constant = true;\n    }\n\n    if (u_jitter_radius_buffer_num > -0.5) {\n      a_jitter_radius = get_buffer(u_jitter_radius_buffer_num);\n      a_jitter_radius_is_constant = false;\n    } else {\n      a_jitter_radius = u_jitter_radius_constant;\n      a_jitter_radius_is_constant = true;\n    }\n\n    if (u_last_jitter_radius_buffer_num > -0.5) {\n      a_last_jitter_radius = get_buffer(u_last_jitter_radius_buffer_num);\n      a_last_jitter_radius_is_constant = false;\n    } else {\n      a_last_jitter_radius = u_last_jitter_radius_constant;\n      a_last_jitter_radius_is_constant = true;\n    }\n\n    if (u_jitter_speed_buffer_num > -0.5) {\n      a_jitter_speed = get_buffer(u_jitter_speed_buffer_num);\n      a_jitter_speed_is_constant = false;\n    } else {\n      a_jitter_speed = u_jitter_speed_constant;\n      a_jitter_speed_is_constant = true;\n    }\n\n    if (u_last_jitter_speed_buffer_num > -0.5) {\n      a_last_jitter_speed = get_buffer(u_last_jitter_speed_buffer_num);\n      a_last_jitter_speed_is_constant = false;\n    } else {\n      a_last_jitter_speed = u_last_jitter_speed_constant;\n      a_last_jitter_speed_is_constant = true;\n    }\n\n    if (u_size_buffer_num > -0.5) {\n      a_size = get_buffer(u_size_buffer_num);\n      a_size_is_constant = false;\n    } else {\n      a_size = u_size_constant;\n      a_size_is_constant = true;\n    }\n\n    if (u_last_size_buffer_num > -0.5) {\n      a_last_size = get_buffer(u_last_size_buffer_num);\n      a_last_size_is_constant = false;\n    } else {\n      a_last_size = u_last_size_constant;\n      a_last_size_is_constant = true;\n    }\n\n    if (u_filter1_buffer_num > -0.5) {\n      a_filter1 = get_buffer(u_filter1_buffer_num);\n      a_filter1_is_constant = false;\n    } else {\n      a_filter1 = u_filter1_constant;\n      a_filter1_is_constant = true;\n    }\n\n    if (u_last_filter1_buffer_num > -0.5) {\n      a_last_filter1 = get_buffer(u_last_filter1_buffer_num);\n      a_last_filter1_is_constant = false;\n    } else {\n      a_last_filter1 = u_last_filter1_constant;\n      a_last_filter1_is_constant = true;\n    }\n\n    if (u_filter2_buffer_num > -0.5) {\n      a_filter2 = get_buffer(u_filter2_buffer_num);\n      a_filter2_is_constant = false;\n    } else {\n      a_filter2 = u_filter2_constant;\n      a_filter2_is_constant = true;\n    }\n\n    if (u_last_filter2_buffer_num > -0.5) {\n      a_last_filter2 = get_buffer(u_last_filter2_buffer_num);\n      a_last_filter2_is_constant = false;\n    } else {\n      a_last_filter2 = u_last_filter2_constant;\n      a_last_filter2_is_constant = true;\n    }\n    if (u_x0_buffer_num > -0.5) {\n      a_x0 = get_buffer(u_x0_buffer_num);\n      a_x0_is_constant = false;\n    } else {\n      a_x0 = u_x0_constant;\n      a_x0_is_constant = true;\n    }\n\n    if (u_last_x0_buffer_num > -0.5) {\n      a_last_x0 = get_buffer(u_last_x0_buffer_num);\n      a_last_x0_is_constant = false;\n    } else {\n      a_last_x0 = u_last_x0_constant;\n      a_last_x0_is_constant = true;\n    }\n\n    if (u_y0_buffer_num > -0.5) {\n      a_y0 = get_buffer(u_y0_buffer_num);\n      a_y0_is_constant = false;\n    } else {\n      a_y0 = u_y0_constant;\n      a_y0_is_constant = true;\n    }\n\n    if (u_last_y0_buffer_num > -0.5) {\n      a_last_y0 = get_buffer(u_last_y0_buffer_num);\n      a_last_y0_is_constant = false;\n    } else {\n      a_last_y0 = u_last_y0_constant;\n      a_last_y0_is_constant = true;\n    }\n\n//  END AUTOGENERATED. DO NOT EDIT ABOVE. \n// ------------------------------------------------    \n\n  if (u_color_buffer_num > -0.5) {\n    a_color = get_buffer(u_color_buffer_num);\n  } else {\n    a_color = ix;\n  }\n\n  if (u_last_color_buffer_num > -0.5) {\n    a_last_color = get_buffer(u_last_color_buffer_num);\n  } else {\n    a_last_color = ix;\n  }\n\n  pixelspace_to_glspace = mat3(\n      2. / u_width, 0., -1.,\n      0., - 2. / u_height, 1.,\n      0., 0., 1.\n  );\n\n  float interpolation =\n    interpolate(u_update_time, 0., u_transition_duration);\n    \n  float ease = interpolation;\n\n  // I set this sometimes.\n  float debug_mode = 0.;\n\n  vec2 position = vec2(a_x, a_y);\n  vec2 old_position = vec2(a_last_x, a_last_y);\n\n  old_position = calculate_position(old_position, u_last_x_transform,\n     u_last_x_domain, u_last_x_range,\n     u_last_y_transform, u_last_y_domain, u_last_y_range,\n     u_last_window_scale,\n     u_zoom, u_last_x_map, u_last_x_needs_map, u_last_y_map,\n     u_last_y_needs_map);\n\n  bool plot_actual_position = u_grid_mode < .5;\n\n  if (plot_actual_position) {\n    position = calculate_position(position, u_x_transform,\n      u_x_domain, u_x_range,\n      u_y_transform, u_y_domain, u_y_range, u_window_scale, u_zoom, u_x_map,\n      u_x_needs_map, u_y_map, u_y_needs_map);\n\n    float xpos = clamp((1. + position.x) / 2., 0., 1.);\n    float randy = ix_to_random(ix, 13.76);\n    float delay = xpos + randy * .1;\n\n    delay = delay * 3.;\n    // delay = 0.;\n    float frac = interpolate(\n      u_update_time,\n      delay,\n      u_transition_duration + delay\n    );\n\n    if (u_position_interpolation_mode > 0.) {\n      // If it's a continuous loop, just choose a random point along that loop.\n      frac = fract(u_update_time/u_transition_duration);\n      frac = fract(frac + randy);\n    }\n\n    frac = sineInOut_0(frac);\n\n    if (frac <= 0.) {\n      position = old_position;\n    } else if (frac < 1.) {\n      // position = mix(old_position, position, u_interpolation);\n      frac = fract(frac);\n      vec2 midpoint = box_muller(ix, 3.) * .05 *\n         dot(old_position - position, old_position - position)\n         + old_position / 2. + position / 2.;\n\n      position = mix(\n        mix(old_position, midpoint, frac),\n        mix(midpoint, position, frac),\n        frac);\n    }\n\n  } else {\n     position.x = -1. + 2. * linscale(u_x_domain, position.x);\n    //position.y = -1.0;\n    vec2 jitterspec = vec2(\n      (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,\n      (ix_to_random(ix, 1.5) * a_jitter_speed ) * 2.\n    );\n\n    position = position + jitterspec;\n  }\n\n  if (debug_mode > 0.) {\n    // Just plot every point.\n    gl_PointSize = 1.;\n    fill = vec4(1., 1., 1., 1.);\n    gl_Position = vec4(position, 1., 1.);\n    return;\n  }\n\n  float filtered_by_filter1 = combine_filters(u_filter1_numeric, \n    u_filter1_domain, a_filter1,  \n    u_filter1_map,   \n    u_last_filter1_numeric, u_last_filter1_domain, a_last_filter1, \n    u_last_filter1_map, ease, ix);\n\n  if (filtered_by_filter1 <= 0.5) {\n    gl_Position = discard_me;\n    return;\n  }\n\n  float filtered_by_filter2 = combine_filters(u_filter2_numeric,\n    u_filter2_domain, a_filter2,\n    u_filter2_map,\n    u_last_filter2_numeric, u_last_filter2_domain, a_last_filter2,\n    u_last_filter2_map, ease, ix);\n\n  if (filtered_by_filter2 <= 0.5) {\n    gl_Position = discard_me;\n    return;\n  }\n\n  float size_multiplier = texture_float_lookup(\n    u_size_map, u_size_domain, u_size_range,\n    u_size_transform, a_size, u_size_needs_map);\n\n  float last_size_multiplier = texture_float_lookup(\n    u_last_size_map, u_last_size_domain, u_last_size_range,\n                                              u_last_size_transform, a_last_size,\n                                              u_last_size_needs_map);\n\n  size_multiplier = u_base_size * \n     mix(last_size_multiplier, size_multiplier, ease);\n  \n  float depth_size_adjust = (1.0 - ix / (u_maxix));\n\n  point_size_adjust = exp(log(u_k) * u_zoom_balance);\n\n  gl_PointSize = point_size_adjust * size_multiplier;\n\n  vec2 jitter = vec2(0., 0.);\n\n  if (plot_actual_position && (u_jitter > 0. || u_last_jitter > 0.)) {\n    /* JITTER */\n    float jitter_radius_fraction;\n      jitter = calculate_jitter(\n        u_jitter, ix, u_jitter_radius_map,\n        u_jitter_radius_domain,        u_jitter_radius_range,\n        u_jitter_radius_transform,        a_jitter_radius,\n        u_jitter_radius_needs_map,        a_jitter_radius_is_constant,\n        u_jitter_speed_map, u_jitter_speed_domain,\n        u_jitter_speed_range,\n        u_jitter_speed_transform, a_jitter_speed,\n        u_jitter_speed_needs_map, a_jitter_speed_is_constant\n      );\n\n    vec2 last_jitter;\n    if (ease < 1.) {\n      last_jitter = calculate_jitter(\n        u_last_jitter, ix,\n        u_last_jitter_radius_map,\n        u_last_jitter_radius_domain,        u_last_jitter_radius_range,\n        u_last_jitter_radius_transform,        a_last_jitter_radius,\n        u_last_jitter_radius_needs_map,        a_last_jitter_radius_is_constant,\n        u_last_jitter_speed_map,         u_last_jitter_speed_domain,\n        u_last_jitter_speed_range,\n        u_last_jitter_speed_transform, a_last_jitter_speed,\n        u_last_jitter_speed_needs_map,        a_last_jitter_speed_is_constant\n      );\n      jitter = mix(last_jitter, jitter, ease);\n    }\n    if (u_jitter == 5.) {\n      gl_PointSize *= jitter.x;\n      jitter = vec2(0., 0.);\n      if (gl_PointSize < 0.05) {\n        gl_Position = discard_me;\n        return;\n      }\n    }\n    gl_Position = vec4(position + jitter, 0., 1.);\n  } else {\n    gl_Position = vec4(position + jitter, 0., 1.);\n  }  \n  if (u_color_picker_mode > 0.) {\n    // Add one so the first element is distinguishable.\n    fill = encode_float_1604150559(ix + 1.);\n  } else {\n    run_color_fill(ease);\n  }\n  point_size = gl_PointSize;\n  if (u_use_glyphset > 0. && point_size > 5.0) {\n    float random_letter = floor(64. * ix_to_random(ix, 1.3));\n    letter_pos = vec2(\n      // start at a number between 0 and 7.\n      mod(random_letter, 8.) / 8.,\n      floor(random_letter / 8.) / 8.\n    );\n    gl_PointSize *= 3.0;\n  }\n}\n"; // eslint-disable-line
 
 var frag_shader = "#ifdef GL_OES_standard_derivatives\n#extension GL_OES_standard_derivatives : enable\n#endif\n\nprecision mediump float;\n#define GLSLIFY 1\n\nvarying float pic_mode;\nvarying vec4 fill;\nvarying vec4 stroke;\nvarying vec2 letter_pos;\nvarying float point_size;\n\nuniform float u_only_color;\nuniform float u_color_picker_mode;\nuniform float u_use_glyphset;\nuniform sampler2D u_glyphset;\n\nfloat delta = 0.0, alpha = 1.0;\n\nbool out_of_circle(in vec2 coord) {\n  vec2 cxy = 2.0 * coord - 1.0;\n  float r_sq = dot(cxy, cxy);\n  if (r_sq > 1.03) {return true;}\n  return false;\n}\n\nbool out_of_hollow_circle(in vec2 coord) {\n  vec2 cxy = 2.0 * coord - 1.0;\n  float r_sq = dot(cxy, cxy);\n  if (r_sq > 1.01) {return true;}\n  float distance_from_edge = (1.0 - r_sq) * point_size;\n  if (distance_from_edge > 4.0) {return true;}\n  return false;\n}\n\nbool out_of_triangle(in vec2 coord) {\n  if (coord.y > (2. * abs(coord.x - .5))) {\n    return false;\n  }\n  return true;\n}\n\nvoid main() {\n\n  if (u_only_color >= -1.5) {\n    gl_FragColor = vec4(0., 0., 0., 1./255.);\n    return;\n  }\n\n  // Drop parts of the rectangle outside the unit circle.\n  // I took this from observable.\n  float alpha = fill.a;\n  if (u_use_glyphset == 0. || point_size < 5.0) {\n    if (out_of_circle(gl_PointCoord)) {\n      discard;\n      return;\n    }\n    vec2 cxy = 2.0 * gl_PointCoord - 1.0;\n    float r = dot(cxy, cxy);\n    #ifdef GL_OES_standard_derivatives\n      delta = fwidth(r);\n      alpha *= (1.0 - smoothstep(1.0 - delta, 1.0 + delta, r));\n    #endif\n  } else {\n    vec2 coords = letter_pos + gl_PointCoord/8.;\n//    vec2 coords = vec2(.2, .2);\n    vec4 sprite = texture2D(u_glyphset, coords);\n    alpha *= (sprite.a);  \n//    fill = vec4(1.0, 1.0, 1.0, alpha);  \n    if (alpha <= 0.03) discard;\n  }\n  // Pre-blend the alpha channel.\n  if (u_color_picker_mode == 1.) {\n    // no alpha when color picking; we use all four channels for that.\n    gl_FragColor = fill;\n  } else {\n    gl_FragColor = vec4(fill.rgb * alpha, alpha);\n  }\n}\n"; // eslint-disable-line
 
@@ -19279,7 +19089,7 @@ function materialize_color_interplator(interpolator) {
   return to_buffer(rawValues);
 }
 const color_palettes = {
-  white: range(palette_size).map(() => [255, 255, 255, 255])
+  white: to_buffer(range(palette_size).map(() => [0.5, 0.5, 0.5, 0.5]))
 };
 const schemes = {};
 for (const [k, v] of Object.entries(d3Chromatic)) {
@@ -19315,7 +19125,7 @@ function okabe() {
     colors[i] = scheme[i % okabe_palette.length];
   }
   color_palettes.okabe = to_buffer(colors);
-  schemes.okabe = okabe_palette;
+  schemes["okabe"] = okabe_palette;
 }
 okabe();
 const default_aesthetics = {
@@ -19342,7 +19152,7 @@ const default_aesthetics = {
     transform: "literal"
   },
   color: {
-    constant: [1, 1, 1],
+    constant: [0.5, 0.5, 0.5],
     range: color_palettes.white,
     transform: "linear"
   },
@@ -19373,7 +19183,13 @@ const default_aesthetics = {
   }
 };
 class Aesthetic {
-  constructor(label, scatterplot, regl, tile) {
+  constructor(label, scatterplot, regl, tile, number = -1) {
+    this._texture_buffer = null;
+    this.partner = null;
+    this._textures = {};
+    this.texture_type = "float";
+    this.texture_format = "rgba";
+    this.number = number;
     this.label = label;
     this.scatterplot = scatterplot;
     this.regl = regl;
@@ -19420,9 +19236,9 @@ class Aesthetic {
       }
     }
     if (this.is_dictionary()) {
-      this.scale = ordinal().range(range).domain(this.domain);
+      scale = ordinal().range(range).domain(this.domain);
       if (schemes[range]) {
-        this.scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+        scale.range(schemes[range]).domain(this.column.dictionary.toArray());
       }
     }
     return scale;
@@ -19470,10 +19286,12 @@ class Aesthetic {
     return this._texture_buffer;
   }
   get textures() {
-    if (this._textures) {
+    if (this._textures.one_d) {
       return this._textures;
     }
     this.texture_type = this.regl.hasExtension("OES_texture_float") ? "float" : this.regl.hasExtension("OES_texture_half_float") ? "half float" : "uint8";
+    if (this.label == "color")
+      console.log("getting textures", this.texture_type);
     this.texture_format = this.texture_type === "uint8" ? "rgba" : "alpha";
     const params = {
       width: 1,
@@ -19482,15 +19300,16 @@ class Aesthetic {
       format: this.texture_format,
       data: this.default_data()
     };
-    this._textures = {
-      one_d: this.regl.texture(params)
-    };
+    this._textures.one_d = this.regl.texture(params);
     return this._textures;
   }
   key() {
     return this.field + this.domain + this.range + this.transform;
   }
   post_to_regl_buffer(buffer_name) {
+    if (this.label === "color") {
+      console.log("POSTING", this.textures, this.texture_buffer);
+    }
     this.textures[buffer_name].subimage({
       data: this.texture_buffer,
       width: 1,
@@ -19500,72 +19319,10 @@ class Aesthetic {
   clear() {
     this.texture_buffer.set(this.default_data());
     this.post_to_regl_buffer("one_d");
-    this.lookup = void 0;
     this.field = void 0;
     this._domain = void 0;
     this._range = void 0;
     this._transform = void 0;
-  }
-  get use_lookup() {
-    const { lookup } = this;
-    return lookup ? 1 : 0;
-  }
-  get lookup_texture() {
-    const { lookup } = this;
-    if (lookup === void 0) {
-      return {
-        texture: this.textures.one_d,
-        y_domain: [-1, 1],
-        x_domain: [-1, 1],
-        z_domain: [-1, 1],
-        y_constant: 0
-      };
-    }
-    const { field } = this;
-    const {
-      table,
-      value,
-      y,
-      z
-    } = lookup;
-    if (!y.constant) {
-      throw "Only constant lookups for the secondary dimension are currently supported.";
-    }
-    const dimensions2 = {
-      x: field,
-      y: y.field,
-      z: z.field
-    };
-    const lookup_handler = this.scatterplot.lookup_tables.get(table);
-    const x_names = () => this.arrow_column().data.dictionary.toArray();
-    let actual_values;
-    if (lookup_handler === void 0) {
-      actual_values = {
-        texture: this.textures.one_d,
-        y_domain: [-1, 1],
-        z_domain: [-1, 1],
-        x_domain: [-1, 1]
-      };
-    } else {
-      actual_values = lookup_handler.get_cached_crosstab_texture(dimensions2, { x: x_names }, this.regl);
-    }
-    const {
-      texture,
-      z_domain,
-      y_domain,
-      x_domain,
-      shape,
-      crosstabs
-    } = actual_values;
-    return {
-      value: y.constant || 0,
-      crosstabs,
-      texture,
-      shape,
-      x_domain,
-      y_domain,
-      z_domain
-    };
   }
   update(encoding) {
     if (encoding === null) {
@@ -19598,7 +19355,6 @@ class Aesthetic {
     if (encoding.lambda && typeof encoding.lambda === "string") {
       Object.assign(encoding, parseLambdaString(encoding.lambda, false));
     }
-    this.lookup = encoding.lookup;
     this.field = encoding.field;
     this._domain = safe_expand(encoding.domain);
     this._range = safe_expand(encoding.range);
@@ -19644,6 +19400,9 @@ class Aesthetic {
       if (this.domain[0] === -2047 && this.domain[1] == 2047) {
         return 1;
       }
+    }
+    if (this.label === "color") {
+      return 1;
     }
     return 0;
   }
@@ -19696,9 +19455,6 @@ class X extends Aesthetic {
   get range() {
     return this.tileSet.extent ? this.tileSet.extent.x : [-20, 20];
   }
-  get previous_range() {
-    return this.range;
-  }
   get default_val() {
     return 1;
   }
@@ -19709,9 +19465,6 @@ class Y extends X {
   get range() {
     const [min, max] = this.tileSet.extent ? this.tileSet.extent.y : [-20, 20];
     return [max, min];
-  }
-  get previous_range() {
-    return this.range;
   }
 }
 class Y0 extends Y {
@@ -19725,7 +19478,7 @@ class Filter extends Aesthetic {
   }
   get_function() {
     const input = this.stringversion;
-    if (input && input.op) {
+    if (input && input["op"]) {
       if (input.op == "gt") {
         return (d) => d > input.a;
       }
@@ -19836,7 +19589,7 @@ class Jitter_radius extends Aesthetic {
 }
 class Color extends Aesthetic {
   get default_val() {
-    return [128, 150, 213, 255];
+    return [0.5, 0.5, 0.5, 1];
   }
   default_data() {
     return color_palettes.viridis;
@@ -19850,7 +19603,7 @@ class Color extends Aesthetic {
     return this._texture_buffer;
   }
   get textures() {
-    if (this._textures) {
+    if (this._textures.one_d) {
       return this._textures;
     }
     const params = {
@@ -19889,9 +19642,11 @@ class Color extends Aesthetic {
         return [r2, g, b, 255];
       });
       this.texture_buffer.set(r.flat());
+      console.log("SETTING BUFFER", r.flat());
     } else {
       console.warn(`request range of ${range$1} for color ${this.field} unknown`);
     }
+    console.log("WITH PARTNER", this.texture_buffer, this.partner.texture_buffer);
   }
 }
 const dimensions = {
@@ -19908,11 +19663,13 @@ const dimensions = {
 };
 class StatefulAesthetic {
   constructor(label, scatterplot, regl, tile) {
+    this.needs_transitions = false;
     this.states = [];
     const lower = label.toLowerCase();
+    this.label = lower;
     const Factory = dimensions[label];
-    this.states.push(new Factory(lower, scatterplot, regl, tile));
-    this.states.push(new Factory(lower, scatterplot, regl, tile));
+    this.states.push(new Factory(lower, scatterplot, regl, tile, 1));
+    this.states.push(new Factory(lower, scatterplot, regl, tile, 2));
     const [first, second] = this.states;
     first.partner = second;
     second.partner = first;
@@ -19931,15 +19688,20 @@ class StatefulAesthetic {
     const stringy = JSON.stringify(encoding);
     if (stringy == this.current_encoding || encoding === void 0) {
       if (this.needs_transitions) {
+        if (this.label == "color") {
+          console.log(this.current_encoding, encoding);
+        } else {
+          console.log(this.label);
+        }
         this.states[1].update(JSON.parse(this.current_encoding));
       }
       this.needs_transitions = false;
-      return;
+    } else {
+      this.states.reverse();
+      this.states[0].update(encoding);
+      this.needs_transitions = true;
+      this.current_encoding = stringy;
     }
-    this.states.reverse();
-    this.states[0].update(encoding);
-    this.needs_transitions = true;
-    this.current_encoding = stringy;
   }
 }
 function parseLambdaString(lambdastring, materialize = false) {
@@ -19960,72 +19722,54 @@ function parseLambdaString(lambdastring, materialize = false) {
   };
 }
 
-/* eslint-disable no-param-reassign */
-
-const aesthetic_variables = Array.from(Object.keys(dimensions))
-  .map((d) => d.toLowerCase());
-
+const aesthetic_variables = Array.from(Object.keys(dimensions)).map((d) => d.toLowerCase());
 class AestheticSet {
   constructor(scatterplot, regl, tileSet, fields = null) {
-    this.is_aesthetic_set = true; // For type checking.
     this.scatterplot = scatterplot;
     this.regl = regl;
     this.tileSet = tileSet;
     if (fields === null) {
       for (const field of Array.from(Object.keys(dimensions))) {
-        const aes = field;// .toLowerCase()
+        const aes = field;
         const args = [aes, this.scatterplot, this.regl, tileSet];
-        /* if (aes == "x") {
-          args.unshift(scatterplot.width)
-        }
-        if (aes == "y") {
-          args.unshift(scatterplot.height)
-        } */
         this[aes.toLowerCase()] = new StatefulAesthetic(...args);
       }
     }
-
     const starting_aesthetics = {};
-
     for (const [k, v] of Object.entries(default_aesthetics)) {
       starting_aesthetics[k] = v.constant || v;
     }
-
     this.encoding = JSON.parse(JSON.stringify(starting_aesthetics));
-
     this.apply_encoding(this.encoding);
   }
-
   interpret_position(encoding) {
     if (encoding) {
-      // First--set position interpolation mode to
-      // true if x0 or position0 has been manually passed.
-
-      // If it hasn't, set it to false *only* if the positional
-      // parameters have changed.
       if (encoding.x0 || encoding.position0) {
         this.position_interpolation = true;
       } else if (encoding.x || encoding.position) {
         this.position_interpolation = false;
       }
-      for (const p of ['position', 'position0']) {
-        const suffix = p.replace('position', '');
+      for (const p of ["position", "position0"]) {
+        const suffix = p.replace("position", "");
         if (encoding[p]) {
-          if (encoding[p] === 'literal') {
-          // A shortcut.
+          if (encoding[p] === "literal") {
             encoding[`x${suffix}`] = {
-              field: 'x', transform: 'literal',
+              field: "x",
+              transform: "literal"
             };
             encoding[`y${suffix}`] = {
-              field: 'y', transform: 'literal',
+              field: "y",
+              transform: "literal"
             };
           } else {
             const field = encoding[p];
             encoding[`x${suffix}`] = {
-              field: `${field}.x`, transform: 'literal',
+              field: `${field}.x`,
+              transform: "literal"
             };
             encoding[`y${suffix}`] = {
-              field: `${field}.y`, transform: 'literal',
+              field: `${field}.y`,
+              transform: "literal"
             };
           }
           delete encoding[p];
@@ -20035,126 +19779,77 @@ class AestheticSet {
     delete encoding.position;
     delete encoding.position0;
   }
-
   apply_encoding(encoding) {
-    if (encoding === undefined || encoding === null) {
+    if (encoding === void 0 || encoding === null) {
       encoding = {};
     }
-
     if (encoding.filter) {
       encoding.filter1 = encoding.filter;
       delete encoding.filter;
     }
-    // Overwrite position fields.
     this.interpret_position(encoding);
-
-    // Make believe that that the x0 and y0 values were there already.
     if (encoding.x0) {
       this.x.update(encoding.x0);
     }
-
     if (encoding.y0) {
       this.y.update(encoding.y0);
     }
-
     for (const k of aesthetic_variables) {
       this[k].update(encoding[k]);
     }
   }
 }
 
-/* eslint-disable no-underscore-dangle */
-
-// eslint-disable-next-line import/prefer-default-export
 class ReglRenderer extends Renderer {
   constructor(selector, tileSet, scatterplot) {
     super(selector, tileSet, scatterplot);
-    this.regl = wrapREGL(
-      {
-        //      extensions: 'angle_instanced_arrays',
-        optionalExtensions: [
-          'OES_standard_derivatives',
-          'OES_element_index_uint',
-          'OES_texture_float',
-          'OES_texture_half_float',
-        ],
-        canvas: this.canvas.node(),
-      },
-    );
-
-    this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
-    // allocate buffers in 64 MB blocks.
     this.buffer_size = 1024 * 1024 * 64;
-
+    this.regl = wrapREGL({
+      optionalExtensions: [
+        "OES_standard_derivatives",
+        "OES_element_index_uint",
+        "OES_texture_float",
+        "OES_texture_half_float"
+      ],
+      canvas: this.canvas.node()
+    });
+    this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
     this.initialize_textures();
-    // Not the right way, for sure.
     this._initializations = [
-    // some things that need to be initialized before the renderer is loaded.
-      this.tileSet
-        .promise
-        .then(() => {
-          this.remake_renderer();
-          this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
-        }),
+      this.tileSet.promise.then(() => {
+        this.remake_renderer();
+        this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
+      })
     ];
     this.initialize();
   }
-
   get buffers() {
-    this._buffers = this._buffers
-    || new MultipurposeBufferSet(this.regl, this.buffer_size);
+    this._buffers = this._buffers || new MultipurposeBufferSet(this.regl, this.buffer_size);
     return this._buffers;
   }
-
   data(dataset) {
-    if (dataset === undefined) {
+    if (dataset === void 0) {
       return this.tileSet;
     }
     this.tileSet = dataset;
     return this;
   }
-
-  apply_webgl_scale() {
-  // Should probably be attached to AestheticSet, not to this class.
-
-    // The webgl transform can either be 'literal', in which case it uses
-    // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
-    // in which case it has to calculate off of the x and y dimensions.
-
-    this._use_scale_to_download_tiles = true;
-    if (
-      (this.aes.encoding.x.transform && this.aes.encoding.x.transform !== 'literal')
-    || (this.aes.encoding.y.transform && this.aes.encoding.y.transform !== 'literal')
-    ) {
-      const webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat();
-      this._webgl_scale_history.unshift(webglscale);
-      this._use_scale_to_download_tiles = false;
-    } else {
-      if (!this._webgl_scale_history) {
-        this._webgl_scale_history = [];
-      }
-      // Use the default linked to the coordinates used to build the tree.
-      this._webgl_scale_history.unshift(this.default_webgl_scale);
-    }
-  }
-
   get props() {
     const { prefs } = this;
     const { transform } = this.zoom;
     const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
     const props = {
-    // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
       corners: this.zoom.current_corners(),
       zoom_balance: prefs.zoom_balance,
       transform,
       max_ix: this.max_ix,
-      time: (Date.now() - this.zoom._start) / 1000,
-      update_time: (Date.now() - this.most_recent_restart) / 1000,
+      time: (Date.now() - this.zoom._start) / 1e3,
+      update_time: (Date.now() - this.most_recent_restart) / 1e3,
       string_index: 0,
       prefs: JSON.parse(JSON.stringify(prefs)),
-      color_type: undefined,
+      color_type: void 0,
       start_time: this.most_recent_restart,
       webgl_scale: this._webgl_scale_history[0],
       last_webgl_scale: this._webgl_scale_history[1],
@@ -20163,19 +19858,15 @@ class ReglRenderer extends Renderer {
       buffer_num_to_variable,
       aes_to_buffer_num,
       variable_to_buffer_num,
-      color_picker_mode: 0, // whether to draw as a color picker.
+      color_picker_mode: 0
     };
-
     props.zoom_matrix = [
       [props.transform.k, 0, props.transform.x],
       [0, props.transform.k, props.transform.y],
-      [0, 0, 1],
+      [0, 0, 1]
     ].flat();
-
-    // Clone.
     return JSON.parse(JSON.stringify(props));
   }
-
   get default_webgl_scale() {
     if (this._default_webgl_scale) {
       return this._default_webgl_scale;
@@ -20183,69 +19874,52 @@ class ReglRenderer extends Renderer {
     this._default_webgl_scale = this.zoom.webgl_scale();
     return this._default_webgl_scale;
   }
-
   render_points(props) {
-  // Regl is faster if it can render a large number of draw calls together.
     const prop_list = [];
     for (const tile of this.visible_tiles()) {
-    // Do the binding operation; returns truthy if it's already done.
       const manager = new TileBufferManager(this.regl, tile, this);
       try {
         if (!manager.ready(props.prefs, props.block_for_buffers)) {
-        // The 'ready' call also pushes a creation request into
-        // the deferred_functions queue.
           continue;
         }
       } catch (err) {
-        //       console.warn(err);
-      // throw "Dead"
         continue;
       }
-
       const this_props = {
         manager,
         image_locations: manager.image_locations,
-        sprites: this.sprites,
+        sprites: this.sprites
       };
       Object.assign(this_props, props);
       prop_list.push(this_props);
     }
-
-    if (this._renderer === undefined) {
+    if (this._renderer === void 0) {
       if (this._zoom && this._zoom._timer) {
         this._zoom._timer.stop();
       }
       return;
     }
-    // Do the lowest tiles first.
     prop_list.reverse();
     this._renderer(prop_list);
   }
-
   tick() {
     const { prefs } = this;
     const { regl, tileSet } = this;
     const { props } = this;
-
     this.tick_num = this.tick_num || 0;
     this.tick_num++;
-
-    // Set a download call in motion.
     if (this._use_scale_to_download_tiles) {
       tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix);
     } else {
       tileSet.download_to_depth(prefs.max_points);
     }
-
     regl.clear({
       color: [0.9, 0.9, 0.93, 0],
-      depth: 1,
+      depth: 1
     });
-
     const start = Date.now();
-    let current = () => undefined;
+    let current = () => void 0;
     while (Date.now() - start < 10 && this.deferred_functions.length) {
-    // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
       current = this.deferred_functions.shift();
       try {
         current();
@@ -20253,36 +19927,22 @@ class ReglRenderer extends Renderer {
         console.warn(err, current);
       }
     }
-
     this.render_all(props);
   }
-
   render_jpeg(props) {
-
   }
-
   single_blur_pass(fbo1, fbo2, direction) {
     const { regl } = this;
     fbo2.use(() => {
       regl.clear({ color: [0, 0, 0, 0] });
-      regl(
-        {
-          frag: gaussian_blur,
-          uniforms: {
-            iResolution: ({ viewportWidth, viewportHeight }) => [viewportWidth, viewportHeight],
-            iChannel0: fbo1,
-            direction,
-          },
-          /* blend: {
-        enable: true,
-        func: {
-          srcRGB: 'one',
-          srcAlpha: 'one',
-          dstRGB: 'one minus src alpha',
-          dstAlpha: 'one minus src alpha',
+      regl({
+        frag: gaussian_blur,
+        uniforms: {
+          iResolution: ({ viewportWidth, viewportHeight }) => [viewportWidth, viewportHeight],
+          iChannel0: fbo1,
+          direction
         },
-      }, */
-          vert: `
+        vert: `
         precision mediump float;
         attribute vec2 position;
         varying vec2 uv;
@@ -20290,16 +19950,14 @@ class ReglRenderer extends Renderer {
           uv = 0.5 * (position + 1.0);
           gl_Position = vec4(position, 0, 1);
         }`,
-          attributes: {
-            position: [-4, -4, 4, -4, 0, 4],
-          },
-          depth: { enable: false },
-          count: 3,
+        attributes: {
+          position: [-4, -4, 4, -4, 0, 4]
         },
-      )();
+        depth: { enable: false },
+        count: 3
+      })();
     });
   }
-
   blur(fbo1, fbo2, passes = 3) {
     let remaining = passes - 1;
     while (remaining > -1) {
@@ -20308,57 +19966,32 @@ class ReglRenderer extends Renderer {
       remaining -= 1;
     }
   }
-
   render_all(props) {
     const { regl } = this;
-
-
     this.fbos.points.use(() => {
       regl.clear({ color: [0, 0, 0, 0] });
       this.render_points(props);
     });
-    /*
-    if (this.geolines) {
-      this.fbos.lines.use(() => {
-        regl.clear({ color: [0, 0, 0, 0] });
-        this.geolines.render(props);
-      });
-    }
-
-    if (this.geo_polygons && this.geo_polygons.length) {
-      this.fbos.lines.use(() => {
-        regl.clear({ color: [0, 0, 0, 0] });
-        for (const handler of this.geo_polygons) {
-          handler.render(props);
-        }
-      });
-    }
-    */
     regl.clear({ color: [0, 0, 0, 0] });
     this.fbos.lines.use(() => regl.clear({ color: [0, 0, 0, 0] }));
     if (this.scatterplot.trimap) {
-      // Allows binding a TriMap from `trifeather` object to the regl package without any import.
-      // This is the best way to do it that I can think of for now.
       this.fbos.lines.use(() => {
         this.scatterplot.trimap.zoom = this.zoom;
-        this.scatterplot.trimap.tick('polygon');
+        this.scatterplot.trimap.tick("polygon");
       });
     }
-    // Copy the points buffer to the main buffer.
-
     for (const layer of [this.fbos.lines, this.fbos.points]) {
       regl({
         profile: true,
         blend: {
           enable: true,
           func: {
-            srcRGB: 'one',
-            srcAlpha: 'one',
-            dstRGB: 'one minus src alpha',
-            dstAlpha: 'one minus src alpha',
-          },
+            srcRGB: "one",
+            srcAlpha: "one",
+            dstRGB: "one minus src alpha",
+            dstAlpha: "one minus src alpha"
+          }
         },
-
         frag: `
         precision mediump float;
         varying vec2 uv;
@@ -20378,136 +20011,74 @@ class ReglRenderer extends Renderer {
         }
       `,
         attributes: {
-          position: this.fill_buffer,
+          position: this.fill_buffer
         },
         depth: { enable: false },
         count: 3,
         uniforms: {
           tex: () => layer,
-          wRcp: ({ viewportWidth }) => 1.0 / viewportWidth,
-          hRcp: ({ viewportHeight }) => 1.0 / viewportHeight,
-        },
+          wRcp: ({ viewportWidth }) => 1 / viewportWidth,
+          hRcp: ({ viewportHeight }) => 1 / viewportHeight
+        }
       })();
     }
   }
-
   set_image_data(tile, ix) {
-
     this.initialize_sprites(tile);
-
-    //    const { sprites, image_locations } = tile._regl_elements;
     const { current_position } = sprites;
-    if (current_position[1] > (4096 - 18 * 2)) {
+    if (current_position[1] > 4096 - 18 * 2) {
       console.error(`First spritesheet overflow on ${tile.key}`);
-      // Just move back to the beginning. Will cause all sorts of havoc.
       sprites.current_position = [0, 0];
       return;
     }
     if (!tile.table.get(ix)._jpeg) ;
   }
-
-  spritesheet_setter(word) {
-  // Set if not there.
-    let ctx = 0;
-    if (!this.spritesheet) {
-      const offscreen = create$1('canvas')
-        .attr('width', 4096)
-        .attr('width', 4096)
-        .style('display', 'none');
-
-      ctx = offscreen.node().getContext('2d');
-      const font_size = 32;
-      ctx.font = `${font_size}px Times New Roman`;
-      ctx.fillStyle = 'black';
-      ctx.lookups = new Map();
-      ctx.position = [0, font_size - font_size / 4.0];
-      this.spritesheet = ctx;
-    } else {
-      ctx = this.spritesheet;
-    }
-    let [x, y] = ctx.position;
-
-    if (ctx.lookups.get(word)) {
-      return ctx.lookups.get(word);
-    }
-    const w_ = ctx.measureText(word).width;
-    if (w_ > 4096) {
-      return;
-    }
-    if ((x + w_) > 4096) {
-      x = 0;
-      y += font_size;
-    }
-    ctx.fillText(word, x, y);
-    lookups.set(word, { x, y, width: w_ });
-    // ctx.strokeRect(x, y - font_size, width, font_size)
-    x += w_;
-    ctx.position = [x, y];
-    return lookups.get(word);
-  }
-
   initialize_textures() {
     const { regl } = this;
     this.fbos = this.fbos || {};
-    this.fbos.empty_texture = regl.texture(
-      range(128).map((d) => range(128).map((d) => [0, 0, 0])),
-    );
-
+    this.fbos.empty_texture = regl.texture(range(128).map((d) => range(128).map((d2) => [0, 0, 0])));
     this.fbos.minicounter = regl.framebuffer({
       width: 512,
       height: 512,
-      depth: false,
+      depth: false
     });
-
     this.fbos.lines = regl.framebuffer({
-      // type: 'half float',
       width: this.width,
       height: this.height,
-      depth: false,
+      depth: false
     });
-
     this.fbos.points = regl.framebuffer({
-      // type: 'half float',
       width: this.width,
       height: this.height,
-      depth: false,
+      depth: false
     });
-
     this.fbos.ping = regl.framebuffer({
       width: this.width,
       height: this.height,
-      depth: false,
+      depth: false
     });
-
     this.fbos.pong = regl.framebuffer({
       width: this.width,
       height: this.height,
-      depth: false,
+      depth: false
     });
-
-    this.fbos.contour = this.fbos.contour
-    || regl.framebuffer({
+    this.fbos.contour = this.fbos.contour || regl.framebuffer({
       width: this.width,
       height: this.height,
-      depth: false,
+      depth: false
     });
-
-    this.fbos.colorpicker = this.fbos.colorpicker
-    || regl.framebuffer({
+    this.fbos.colorpicker = this.fbos.colorpicker || regl.framebuffer({
       width: this.width,
       height: this.height,
-      depth: false,
+      depth: false
     });
-
     this.fbos.dummy = this.fbos.dummy || regl.framebuffer({
       width: 1,
       height: 1,
-      depth: false,
+      depth: false
     });
-
     this.fbos.dummy_buffer = regl.buffer(10);
   }
-
   get_image_texture(url) {
     const { regl } = this;
     this.textures = this.textures || {};
@@ -20518,393 +20089,219 @@ class ReglRenderer extends Renderer {
     image.src = url;
     this.textures[url] = this.fbos.minicounter;
     image.onload = () => {
-      console.log('loaded image', url);
+      console.log("loaded image", url);
       this.textures[url] = regl.texture(image);
     };
     return this.textures[url];
   }
-
   plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
-    console.log('plotting as grid');
+    console.log("plotting as grid");
     const { scatterplot, regl, tileSet } = this.aes;
-
     const saved_aes = this.aes;
-
-    if (buffer === undefined) {
-    // Mock up dummy syntax to use the main draw buffer.
+    if (buffer === void 0) {
       buffer = {
         width: this.width,
         height: this.height,
-        use: (f) => f(),
+        use: (f) => f()
       };
     }
-
     const { width, height } = buffer;
-
     this.aes = new AestheticSet(scatterplot, regl, tileSet);
-
     const x_length = map._root.table.getColumn(x_field).data.dictionary.length;
-
     let nearest_pow_2 = 1;
     while (nearest_pow_2 < x_length) {
       nearest_pow_2 *= 2;
     }
-
     const encoding = {
       x: {
         field: x_field,
-        transform: 'linear',
-        domain: [-2047, -2047 + nearest_pow_2],
+        transform: "linear",
+        domain: [-2047, -2047 + nearest_pow_2]
       },
-      y: y_field !== undefined ? {
+      y: y_field !== void 0 ? {
         field: y_field,
-        transform: 'linear',
-        domain: [-2047, -2020],
-
+        transform: "linear",
+        domain: [-2047, -2020]
       } : { constant: -1 },
       size: 1,
       color: {
         constant: [0, 0, 0],
-        transform: 'literal',
+        transform: "literal"
       },
       jitter_radius: {
-        constant: 1 / 2560, // maps to x jitter
-        method: 'uniform', // Means x in radius and y in speed.
+        constant: 1 / 2560,
+        method: "uniform"
       },
-
-      jitter_speed: y_field === undefined ? 1 : 1 / 256, // maps to y jitter
+      jitter_speed: y_field === void 0 ? 1 : 1 / 256
     };
     console.log(`map.plotAPI({encoding: ${JSON.stringify(encoding)}})`);
-    // Twice to overwrite the defaults and avoid interpolation.
     this.aes.apply_encoding(encoding);
     this.aes.apply_encoding(encoding);
     this.aes.x[1] = saved_aes.x[0];
     this.aes.y[1] = saved_aes.y[0];
     this.aes.filter1 = saved_aes.filter1;
     this.aes.filter2 = saved_aes.filter2;
-
     const { props } = this;
     props.block_for_buffers = true;
     props.grid_mode = 1;
-
     const minilist = new Uint8Array(width * height * 4);
-
     buffer.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
       this.render_points(props);
       regl.read({ data: minilist });
     });
-    // Then revert back.
     this.aes = saved_aes;
   }
-
-  count_colors(field) {
-    const { regl, props } = this;
-    props.prefs.jitter = null;
-    if (field !== undefined) {
-      console.warn('PROBABLY BROKEN BECAUSE OF THE NEW AES', field, props.prefs, field);
-      props.aes.encoding.color = {
-        field,
-        domain: [-2047, 2047],
-      // range: "shufbow"
-      };
-    } else {
-      field = this.aes.color.field;
-    }
-
-    props.only_color = -1;
-    props.colors_as_grid = 1.0;
-    props.block_for_buffers = true;
-
-    const { width, height } = this.fbos.minicounter;
-    const minilist = new Uint8Array(width * height * 4);
-    const counts = new Map();
-    this.fbos.minicounter.use(() => {
-      regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      regl.read(
-        { data: minilist },
-      );
-    });
-    for (const [k, v] of this.tileSet.dictionary_lookups[field]) {
-      if (typeof (k) === 'string') { continue; }
-      const col = Math.floor(k / 64);
-      const row = (k % 64);
-      const step = width / 64;
-      let score = 0;
-      let overflown = false;
-      for (const j of range(step)) {
-        for (const i of range(step)) {
-          const value = minilist[
-            col * step * 4 + i * 4 // column
-          + row * step * 4 * width + j * width * 4 // row
-          + 3];
-          // Can't be sure that we've got precision up above half precision.
-          // So for factors with > 128 items, count them manually.
-          if (value >= 128) {
-            overflown = true;
-            continue;
-          }
-          score += value;
-        }
-      }
-      if (!overflown) {
-      // The cells might be filled up at 128;
-        counts.set(v, score);
-      } else {
-        console.log(k, v, 'overflown, performing manually');
-        counts.set(v, this.n_visible(k));
-      }
-      //        console.log(k, v, col, row, score)
-    }
-    return counts;
-  }
-
   n_visible(only_color = -1) {
     let { width, height } = this;
     width = Math.floor(width);
     height = Math.floor(height);
     this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height);
-
     const { props } = this;
     props.only_color = only_color;
     let v;
     this.fbos.contour.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
-      // read onto the contour vals.
       this.render_points(props);
       this.regl.read(this.contour_vals);
-      // Could be done faster on the GPU itself.
-      // But would require writing to float textures, which
-      // can be hard.
       v = sum$1(this.contour_vals);
     });
     return v;
   }
-
-  /*
-  calculate_contours(field = 'lc0') {
-    const { width, height } = this;
-    const ix = 16;
-    let contour_set = [];
-    const contour_machine = contours()
-      .size([parseInt(width), parseInt(height)])
-      .thresholds(range(-1, 9).map((p) => Math.pow(2, p * 2)));
-
-    for (const ix of range(this.tileSet.dictionary_lookups[field].size / 2)) {
-      this.draw_contour_buffer(field, ix);
-      // Rather than take the fourth element of each channel, I can use
-      // a Uint32Array view of the data directly since rgb channels are all
-      // zero. This just gives a view 256 * 256 * 256 larger than the actual numbers.
-      const my_contours = contour_machine(this.contour_alpha_vals);
-      //    console.log(sum(this.contour_alpha_vals))
-      my_contours.forEach((d) => {
-        d.label = this.tileSet.dictionary_lookups[field].get(ix);
-      });
-      contour_set = contour_set.concat(my_contours);
-    }
-    return contour_set;
-  }
-  */
   color_pick(x, y) {
     const { props, height } = this;
-
     props.color_picker_mode = 1;
-
     let color_at_point;
-
     this.fbos.colorpicker.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
-
-      // read onto the contour vals.
       this.render_points(props);
-      // Must be flipped
       try {
         color_at_point = this.regl.read({
-          x, y: height - y, width: 1, height: 1,
+          x,
+          y: height - y,
+          width: 1,
+          height: 1
         });
       } catch (err) {
-        console.warn('Read bad data from', {
-          x, y, height, attempted: height - y,
+        console.warn("Read bad data from", {
+          x,
+          y,
+          height,
+          attempted: height - y
         });
         color_at_point = [0, 0, 0, 0];
       }
     });
-
-    // Subtract one. This inverts the operation `fill = packFloat(ix + 1.);`
-    // in glsl/general.vert, to avoid off-by-one errors with the point selected.
     const point_as_float = glslReadFloat(...color_at_point) - 1;
-
-    // Coerce to int. unpackFloat returns float but findPoint expects int.
     const point_as_int = Math.round(point_as_float);
     const p = this.tileSet.findPoint(point_as_int);
-
-    if (p.length === 0) { return undefined; }
-
+    if (p.length === 0) {
+      return void 0;
+    }
     return p[0];
   }
-
-  /* blur(fbo) {
-  var passes = [];
-  var radii = [Math.round(
-    Math.max(1, state.bloom.radius * pixelRatio / state.bloom.downsample))];
-  for (var radius = nextPow2(radii[0]) / 2; radius >= 1; radius /= 2) {
-    radii.push(radius);
-  }
-  radii.forEach(radius => {
-    for (var pass = 0; pass < state.bloom.blur.passes; pass++) {
-      passes.push({
-        kernel: 13,
-        src: bloomFbo[0],
-        dst: bloomFbo[1],
-        direction: [radius, 0]
-      }, {
-        kernel: 13,
-        src: bloomFbo[1],
-        dst: bloomFbo[0],
-        direction: [0, radius]
-      });
-    }
-  })
-} */
   get fill_buffer() {
-    //
     if (!this._fill_buffer) {
       const { regl } = this;
-      this._fill_buffer = regl.buffer(
-        { data: [-4, -4, 4, -4, 0, 4] },
-      );
+      this._fill_buffer = regl.buffer({ data: [-4, -4, 4, -4, 0, 4] });
     }
     return this._fill_buffer;
   }
-
   draw_contour_buffer(field, ix) {
     let { width, height } = this;
     width = Math.floor(width);
     height = Math.floor(height);
-
     this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height);
     this.contour_alpha_vals = this.contour_alpha_vals || new Uint16Array(width * height);
-
     const { props } = this;
-
     props.aes.encoding.color = {
-      field,
+      field
     };
-
     props.only_color = ix;
-
     this.fbos.contour.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
-      // read onto the contour vals.
       this.render_points(props);
       this.regl.read(this.contour_vals);
-      console.log(
-        this.contour_vals.filter((d) => d !== 0)
-          .map((d) => d / 6).reduce((a, b) => a + b, 0),
-      );
+      console.log(this.contour_vals.filter((d) => d !== 0).map((d) => d / 6).reduce((a, b) => a + b, 0));
     });
-
-    // 3-pass blur
     this.blur(this.fbos.contour, this.fbos.ping, 3);
-
     this.fbos.contour.use(() => {
       this.regl.read(this.contour_vals);
-      console.log(
-        this.contour_vals.filter((d) => d != 0)
-          .map((d) => d / 6)
-          .reduce((a, b) => a + b, 0),
-      );
+      console.log(this.contour_vals.filter((d) => d != 0).map((d) => d / 6).reduce((a, b) => a + b, 0));
     });
-
     let i = 0;
-
     while (i < width * height * 4) {
       this.contour_alpha_vals[i / 4] = this.contour_vals[i + 3] * 255;
       i += 4;
     }
     return this.contour_alpha_vals;
   }
-
   remake_renderer() {
-    console.log('Remaking renderers');
-
+    console.log("Remaking renderers");
     const { regl } = this;
-    // This should be scoped somewhere to allow resizing.
-
     const parameters = {
       depth: { enable: false },
       stencil: { enable: false },
       blend: {
-        enable(_, { color_picker_mode }) { return color_picker_mode < 0.5; },
-        func: {
-          srcRGB: 'one',
-          srcAlpha: 'one',
-          dstRGB: 'one minus src alpha',
-          dstAlpha: 'one minus src alpha',
+        enable(_, { color_picker_mode }) {
+          return color_picker_mode < 0.5;
         },
+        func: {
+          srcRGB: "one",
+          srcAlpha: "one",
+          dstRGB: "one minus src alpha",
+          dstAlpha: "one minus src alpha"
+        }
       },
-      primitive: 'points',
+      primitive: "points",
       frag: frag_shader,
       vert: vertex_shader,
       count(_, props) {
         return props.manager.count;
       },
       attributes: {
-        buffer_0: (_, props) => props.manager.regl_elements.get('ix'),
-      }, // Filled below.
+        buffer_0: (_, props) => props.manager.regl_elements.get("ix")
+      },
       uniforms: {
-        u_update_time: regl.prop('update_time'),
+        u_update_time: regl.prop("update_time"),
         u_transition_duration(_, props) {
-        // const fraction = (props.time)/props.prefs.duration;
           return props.prefs.duration;
         },
         u_only_color(_, props) {
-          if (props.only_color !== undefined) {
+          if (props.only_color !== void 0) {
             return props.only_color;
           }
-          // Use -2 to disable color plotting. -1 is a special
-          // value to plot all.
-          // Other values plot a specific value of the color-encoded field.
           return -2;
         },
-        u_use_glyphset: (_, { prefs }) => (prefs.glyph_set ? 1 : 0),
+        u_use_glyphset: (_, { prefs }) => prefs.glyph_set ? 1 : 0,
         u_glyphset: (_, { prefs }) => {
           if (prefs.glyph_set) {
             return this.get_image_texture(prefs.glyph_set);
           }
           return this.fbos.empty_texture;
         },
-        u_color_picker_mode: regl.prop('color_picker_mode'),
+        u_color_picker_mode: regl.prop("color_picker_mode"),
         u_position_interpolation_mode() {
-        // 1 indicates that there should be a continuous loop between the two points.
           if (this.aes.position_interpolation) {
             return 1;
           }
           return 0;
         },
         u_grid_mode: (_, { grid_mode }) => grid_mode,
-        u_colors_as_grid: regl.prop('colors_as_grid'),
-
-        u_constant_color: () => (this.aes.color.current.constant !== undefined
-          ? this.aes.color.current.constant
-          : [-1, -1, -1]),
-        u_constant_last_color: () => (this.aes.color.last.constant != undefined
-          ? this.aes.color.last.constant
-          : [-1, -1, -1]),
-
+        u_colors_as_grid: regl.prop("colors_as_grid"),
+        u_constant_color: () => this.aes.color.current.constant !== void 0 ? this.aes.color.current.constant : [-1, -1, -1],
+        u_constant_last_color: () => this.aes.color.last.constant != void 0 ? this.aes.color.last.constant : [-1, -1, -1],
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
-        u_zoom_balance: regl.prop('zoom_balance'),
+        u_zoom_balance: regl.prop("zoom_balance"),
         u_base_size: (_, { prefs }) => prefs.point_size,
         u_maxix: (_, props) => props.max_ix,
         u_k(_, props) {
           return props.transform.k;
         },
-        // Allow interpolation between different coordinate systems.
-        u_window_scale: regl.prop('webgl_scale'),
-        u_last_window_scale: regl.prop('last_webgl_scale'),
+        u_window_scale: regl.prop("webgl_scale"),
+        u_last_window_scale: regl.prop("last_webgl_scale"),
         u_time: ({ time }) => time,
         u_filter1_numeric() {
           return this.aes.filter1.current.ops_to_array();
@@ -20924,85 +20321,85 @@ class ReglRenderer extends Renderer {
         u_last_jitter: () => this.aes.jitter_radius.last.jitter_int_format,
         u_zoom(_, props) {
           return props.zoom_matrix;
-        },
-      },
+        }
+      }
     };
-
-    // store needed buffers
     for (const i of range(0, 16)) {
       parameters.attributes[`buffer_${i}`] = (_, { manager, buffer_num_to_variable }) => {
         const c = manager.regl_elements.get(buffer_num_to_variable[i]);
         return c || { constant: 0 };
       };
     }
-
-    for (const k of ['x', 'y', 'color', 'jitter_radius',
-      'jitter_speed', 'size', 'filter1', 'filter2', 'character', 'x0', 'y0']) {
-      for (const time of ['current', 'last']) {
-        const temporal = time === 'current' ? '' : 'last_';
-        parameters.uniforms[`u_${temporal}${k}_map`] = () => this.aes[k][time].textures.one_d;
+    for (const k of [
+      "x",
+      "y",
+      "color",
+      "jitter_radius",
+      "jitter_speed",
+      "size",
+      "filter1",
+      "filter2",
+      "character",
+      "x0",
+      "y0"
+    ]) {
+      for (const time of ["current", "last"]) {
+        const temporal = time === "current" ? "" : "last_";
+        parameters.uniforms[`u_${temporal}${k}_map`] = () => {
+          return this.aes[k][time].textures.one_d;
+        };
         parameters.uniforms[`u_${temporal}${k}_needs_map`] = () => this.aes[k][time].use_map_on_regl;
-        // Currently, a texture lookup is only used for dictionaries.
-        /* db join code
-        if (k === 'jitter_radius' && temporal === '') {
-          const base_string = `u_${temporal}${k}_lookup`;
-
-          parameters.uniforms[base_string] = () =>
-          // return 1;
-            (this.aes[k][time].use_lookup ? 1 : 0);
-
-          parameters.uniforms[`${base_string}_map`] = () => this.aes[k][time].lookup_texture.texture;
-          parameters.uniforms[`${base_string}_y_constant`] = () => +this.aes[k][time].lookup_texture.value || 0.5;
-          parameters.uniforms[`${base_string}_y_domain`] = () => this.aes[k][time].lookup_texture.y_domain;
-          parameters.uniforms[`${base_string}_z_domain`] = () => this.aes[k][time].lookup_texture.z_domain;
-          parameters.uniforms[`${base_string}_x_domain`] = () => this.aes[k][time].lookup_texture.x_domain;
-        }
-        */
         parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes[k][time].domain;
-
-        if (k !== 'color') {
+        if (k !== "color") {
           parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes[k][time].range;
         }
-
         parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
           const t = this.aes[k][time].transform;
-          if (t === 'linear') return 1;
-          if (t === 'sqrt') return 2;
-          if (t === 'log') return 3;
-          if (t === 'literal') return 4;
-          throw 'Invalid transform';
+          if (t === "linear")
+            return 1;
+          if (t === "sqrt")
+            return 2;
+          if (t === "log")
+            return 3;
+          if (t === "literal")
+            return 4;
+          throw "Invalid transform";
         };
-
         parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
-          if (this.aes[k][time].constant !== undefined) {
+          if (this.aes[k][time].constant !== void 0) {
             return this.aes[k][time].constant;
           }
           return this.aes[k][time].default_val;
         };
-
         parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
           const val = aes_to_buffer_num[`${k}--${time}`];
-          if (val === undefined) { return -1; }
+          if (val === void 0) {
+            return -1;
+          }
           return val;
         };
       }
-    // Copy the parameters from the data name.
     }
     this._renderer = regl(parameters);
     return this._renderer;
   }
-
   allocate_aesthetic_buffers() {
-    // There are only 15 attribute buffers available to use,
-    // once we pass in the index. The order here determines
-    // how important it is to capture transitions for them.
-
     const buffers = [];
-    const priorities = ['x', 'y', 'color', 'size', 'jitter_radius',
-      'jitter_speed', 'character', 'x0', 'y0', 'filter1', 'filter2'];
-
+    const priorities = [
+      "x",
+      "y",
+      "color",
+      "size",
+      "jitter_radius",
+      "jitter_speed",
+      "character",
+      "x0",
+      "y0",
+      "filter1",
+      "filter2"
+    ];
     for (const aesthetic of priorities) {
-      for (const time of ['current', 'last']) {
+      for (const time of ["current", "last"]) {
         if (this.aes[aesthetic]) {
           if (this.aes[aesthetic][time].field) {
             buffers.push({ aesthetic, time, field: this.aes[aesthetic][time].field });
@@ -21010,22 +20407,21 @@ class ReglRenderer extends Renderer {
         }
       }
     }
-
     buffers.sort((a, b) => {
-      // Current values always come first.
-      if (a.time < b.time) { return -1; } // current < last.
-      if (b.time < a.time) { return 1; }
+      if (a.time < b.time) {
+        return -1;
+      }
+      if (b.time < a.time) {
+        return 1;
+      }
       return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
     });
-
-    const aes_to_buffer_num = {}; // eg 'x' => 3
-
-    // Pre-allocate the 'ix' buffer.
-    const variable_to_buffer_num = { ix: 0 }; // eg 'year' =>  3
+    const aes_to_buffer_num = {};
+    const variable_to_buffer_num = { ix: 0 };
     let num = 0;
     for (const { aesthetic, time, field } of buffers) {
       const k = `${aesthetic}--${time}`;
-      if (variable_to_buffer_num[field] !== undefined) {
+      if (variable_to_buffer_num[field] !== void 0) {
         aes_to_buffer_num[k] = variable_to_buffer_num[field];
         continue;
       }
@@ -21034,26 +20430,17 @@ class ReglRenderer extends Renderer {
         variable_to_buffer_num[field] = num;
         continue;
       } else {
-        // Don't use the last value, use the current value.
         aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
       }
     }
     const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
     return { aes_to_buffer_num, variable_to_buffer_num, buffer_num_to_variable };
   }
-
   get discard_share() {
-    // If jitter is temporal, e.g., or filters are in place,
-    // it may make sense to estimate the number of hidden points.
     return 0;
   }
 }
-
 class TileBufferManager {
-// Handle the interactions of a tile with a regl state.
-
-  // binds elements directly to the tile, so it's safe
-  // to re-run this multiple times on the same tile.
   constructor(regl, tile, renderer) {
     this.tile = tile;
     this.regl = regl;
@@ -21061,39 +20448,30 @@ class TileBufferManager {
     tile._regl_elements = tile._regl_elements || new Map();
     this.regl_elements = tile._regl_elements;
   }
-
   ready(prefs, block_for_buffers = true) {
     const { renderer, regl_elements } = this;
     const { aes } = renderer;
-    if (!aes.is_aesthetic_set) {
-      throw 'Aesthetic must be an aesthetic set';
-    }
-    let keys = [...Object.entries(aes)];
-    keys = keys
-      .map(([k, v]) => {
-        if (aesthetic_variables.indexOf(k) === -1) {
-          return [];
-        }
-        const needed = [];
-        for (const aesthetic of [v.current, v.last]) {
-          if (aesthetic.field) needed.push(aesthetic.field);
-        }
-        return needed;
-      })
-
-      .flat();
-
-    for (const key of keys.concat(['ix'])) {
+    const entries = [...Object.entries(aes)];
+    const keys = entries.map(([k, v]) => {
+      if (aesthetic_variables.indexOf(k) === -1) {
+        return [];
+      }
+      const needed = [];
+      for (const aesthetic of [v.current, v.last]) {
+        if (aesthetic.field)
+          needed.push(aesthetic.field);
+      }
+      return needed;
+    }).flat();
+    for (const key of keys.concat(["ix"])) {
       const current = this.regl_elements.get(key);
       if (current === null) {
-      // It's in the process of being built.
         return false;
-      } if (current === undefined) {
+      }
+      if (current === void 0) {
         if (!this.tile.ready) {
-        // Can't build b/c no tile ready.
           return false;
         }
-        // Request that the buffer be created before returning false.
         regl_elements.set(key, null);
         if (block_for_buffers) {
           this.create_regl_buffer(key);
@@ -21105,47 +20483,26 @@ class TileBufferManager {
     }
     return true;
   }
-
   get count() {
     const { tile, regl_elements } = this;
-    if (regl_elements.has('_count')) {
-      return regl_elements.get('_count');
+    if (regl_elements.has("_count")) {
+      return regl_elements.get("_count");
     }
     if (tile.ready) {
-      regl_elements.set('_count', tile.table.length);
-      return regl_elements.get('_count');
+      regl_elements.set("_count", tile.table.length);
+      return regl_elements.get("_count");
     }
   }
-  /*
-  create_position_buffer() {
-    const { table } = this.tile;
-    const x = table.getColumn('x').data.values;
-    const y = table.getColumn('y').data.values;
-    const buffer = new Float32Array(this.count * 2);
-    for (let i = 0; i < this.count; i += 1) {
-      buffer[i * 2] = x[i];
-      buffer[i * 2 + 1] = y[i];
-    }
-    return buffer;
-  } */
-
   create_buffer_data(key) {
     const { tile } = this;
     if (!tile.ready) {
-      throw 'Tile table not present.';
+      throw "Tile table not present.";
     }
     const column = tile.table.getColumn(`${key}_dict_index`) || tile.table.getColumn(key);
-
-    /* if (key == 'position') {
-      console.warn('CREATING POSITION BUFFER (DEPRECATED)');
-      return this.create_position_buffer();
-    } */
-
     if (!column) {
       const col_names = tile.table.schema.fields.map((d) => d.name);
-      throw `Requested ${key} but table has columns ${col_names.join(', ')}`;
+      throw `Requested ${key} but table has columns ${col_names.join(", ")}`;
     }
-
     if (column.dictionary) {
       const buffer = new Float32Array(tile.table.length);
       let row = 0;
@@ -21155,73 +20512,53 @@ class TileBufferManager {
         row += 1;
       }
       return buffer;
-    } if (column.data.values.constructor !== Float32Array) {
+    }
+    if (column.data.values.constructor !== Float32Array) {
       const buffer = new Float32Array(tile.table.length);
       for (let i = 0; i < tile.table.length; i++) {
         buffer[i] = column.data.values[i];
       }
       return buffer;
     }
-    // For numeric data, it's safe to simply return the data straight up.
     return column.data.values;
   }
-
   create_regl_buffer(key) {
     const { regl, regl_elements } = this;
-
     const data = this.create_buffer_data(key);
     const item_size = 4;
     const data_length = data.length;
-
-    const buffer_desc = this.renderer.buffers.allocate_block(
-      data_length, item_size,
-    );
-
-    regl_elements.set(
-      key,
-      buffer_desc,
-    );
-    //    if (key === 'ix') {console.warn(buffer_desc)}
+    const buffer_desc = this.renderer.buffers.allocate_block(data_length, item_size);
+    regl_elements.set(key, buffer_desc);
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
   }
 }
-
 class MultipurposeBufferSet {
   constructor(regl, buffer_size) {
     this.regl = regl;
     this.buffer_size = buffer_size;
     this.buffers = [];
-    // Track the ends in case we want to allocate smaller items.
     this.buffer_offsets = [];
     this.generate_new_buffer();
   }
-
   generate_new_buffer() {
-  // Adds to beginning of list.
-    if (this.pointer) { this.buffer_offsets.unshift(this.pointer); }
+    if (this.pointer) {
+      this.buffer_offsets.unshift(this.pointer);
+    }
     this.pointer = 0;
-    this.buffers.unshift(
-      this.regl.buffer({
-        type: 'float',
-        length: this.buffer_size,
-        usage: 'dynamic',
-      }),
-    );
+    this.buffers.unshift(this.regl.buffer({
+      type: "float",
+      length: this.buffer_size,
+      usage: "dynamic"
+    }));
   }
-
   allocate_block(items, bytes_per_item) {
-  // Allocate a block of this buffer.
-  // NB size is in **bytes**
     if (this.pointer + items * bytes_per_item > this.buffer_size) {
-    // May lead to ragged ends. Could be smarter about reallocation here,
-    // too.
       this.generate_new_buffer();
     }
     const value = {
-    // First slot stores the active buffer.
       buffer: this.buffers[0],
       offset: this.pointer,
-      stride: bytes_per_item,
+      stride: bytes_per_item
     };
     this.pointer += items * bytes_per_item;
     return value;
@@ -43419,6 +42756,7 @@ class Tile extends Batch {
 class QuadTile extends Tile {
   constructor(base_url, key, parent = void 0, prefs) {
     super();
+    this._already_called = false;
     this.url = base_url;
     this.parent = parent;
     if (parent === void 0) {
@@ -43468,7 +42806,7 @@ class QuadTile extends Tile {
       this._extent = JSON.parse(metadata.get("extent"));
       this.child_locations = JSON.parse(metadata.get("children"));
       this._min_ix = this.table.getColumn("ix").get(0);
-      this.max_ix = this.table.getColumn("ix").get(this.table.length - 1);
+      this.max_ix = 0 + this.table.getColumn("ix").get(this.table.length - 1);
       this.highest_known_ix = this.max_ix;
       this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
       this.local_dictionary_lookups = codes;

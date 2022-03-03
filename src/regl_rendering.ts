@@ -1,18 +1,43 @@
 /* eslint-disable no-underscore-dangle */
-import wrapREGL from 'regl';
+import wrapREGL, { Regl } from 'regl';
 import { create } from 'd3-selection';
 import { range, sum } from 'd3-array';
 // import { contours } from 'd3-contour';
 import unpackFloat from 'glsl-read-float';
-import { window_transform } from './interaction';
+import Zoom, { window_transform } from './interaction';
 import { Renderer } from './rendering';
 import gaussian_blur from './glsl/gaussian_blur.frag';
 import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import { aesthetic_variables, AestheticSet } from './AestheticSet';
 
+import type {Tileset, Tile} from './tile'
+import { APICall } from './d';
+
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
+  public regl : Regl;
+  public aes : AestheticSet;
+  public buffer_size = 1024 * 1024 * 64;
+  public canvas : d3.Selection<HTMLCanvasElement, any, any, any>;
+  public _buffers : MultipurposeBufferSet[];
+  public _initializations : Function[];
+
+  public tileSet : RootTile;
+  public zoom : Zoom; 
+  public prefs : APICall;
+  public _webgl_scale_history : [number, number];
+  public _start : number;
+  public most_recent_restart : number;
+  public _default_webgl_scale : number;
+  public _renderer : Regl;
+  public _use_scale_to_download_tiles : boolean;
+  public sprites : d3.Selection<SVGSVGElement, any, any, any>;
+  public _zoom : Zoom;
+  public 
+//  public _renderer : Renderer;
+
+
   constructor(selector, tileSet, scatterplot) {
     super(selector, tileSet, scatterplot);
     this.regl = wrapREGL(
@@ -30,7 +55,6 @@ export class ReglRenderer extends Renderer {
 
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
     // allocate buffers in 64 MB blocks.
-    this.buffer_size = 1024 * 1024 * 64;
 
     this.initialize_textures();
     // Not the right way, for sure.
@@ -60,12 +84,13 @@ export class ReglRenderer extends Renderer {
     return this;
   }
 
+  /* 
   apply_webgl_scale() {
   // Should probably be attached to AestheticSet, not to this class.
 
-    // The webgl transform can either be 'literal', in which case it uses
-    // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
-    // in which case it has to calculate off of the x and y dimensions.
+  // The webgl transform can either be 'literal', in which case it uses
+  // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
+  // in which case it has to calculate off of the x and y dimensions.
 
     this._use_scale_to_download_tiles = true;
     if (
@@ -83,6 +108,7 @@ export class ReglRenderer extends Renderer {
       this._webgl_scale_history.unshift(this.default_webgl_scale);
     }
   }
+  */
 
   get props() {
     const { prefs } = this;
@@ -355,7 +381,7 @@ export class ReglRenderer extends Renderer {
 
     }
   }
-
+  /*
   spritesheet_setter(word) {
   // Set if not there.
     let ctx = 0;
@@ -395,7 +421,7 @@ export class ReglRenderer extends Renderer {
     ctx.position = [x, y];
     return lookups.get(word);
   }
-
+  */
   initialize_textures() {
     const { regl } = this;
     this.fbos = this.fbos || {};
@@ -550,68 +576,6 @@ export class ReglRenderer extends Renderer {
     this.aes = saved_aes;
   }
 
-  count_colors(field) {
-    const { regl, props } = this;
-    props.prefs.jitter = null;
-    if (field !== undefined) {
-      console.warn('PROBABLY BROKEN BECAUSE OF THE NEW AES', field, props.prefs, field);
-      props.aes.encoding.color = {
-        field,
-        domain: [-2047, 2047],
-      // range: "shufbow"
-      };
-    } else {
-      field = this.aes.color.field;
-    }
-
-    props.only_color = -1;
-    props.colors_as_grid = 1.0;
-    props.block_for_buffers = true;
-
-    const { width, height } = this.fbos.minicounter;
-    const minilist = new Uint8Array(width * height * 4);
-    const counts = new Map();
-    this.fbos.minicounter.use(() => {
-      regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      regl.read(
-        { data: minilist },
-      );
-    });
-    for (const [k, v] of this.tileSet.dictionary_lookups[field]) {
-      if (typeof (k) === 'string') { continue; }
-      const col = Math.floor(k / 64);
-      const row = (k % 64);
-      const step = width / 64;
-      let score = 0;
-      let overflown = false;
-      for (const j of range(step)) {
-        for (const i of range(step)) {
-          const value = minilist[
-            col * step * 4 + i * 4 // column
-          + row * step * 4 * width + j * width * 4 // row
-          + 3];
-          // Can't be sure that we've got precision up above half precision.
-          // So for factors with > 128 items, count them manually.
-          if (value >= 128) {
-            overflown = true;
-            continue;
-          }
-          score += value;
-        }
-      }
-      if (!overflown) {
-      // The cells might be filled up at 128;
-        counts.set(v, score);
-      } else {
-        console.log(k, v, 'overflown, performing manually');
-        counts.set(v, this.n_visible(k));
-      }
-      //        console.log(k, v, col, row, score)
-    }
-    return counts;
-  }
-
   n_visible(only_color = -1) {
     let { width, height } = this;
     width = Math.floor(width);
@@ -634,30 +598,6 @@ export class ReglRenderer extends Renderer {
     return v;
   }
 
-  /*
-  calculate_contours(field = 'lc0') {
-    const { width, height } = this;
-    const ix = 16;
-    let contour_set = [];
-    const contour_machine = contours()
-      .size([parseInt(width), parseInt(height)])
-      .thresholds(range(-1, 9).map((p) => Math.pow(2, p * 2)));
-
-    for (const ix of range(this.tileSet.dictionary_lookups[field].size / 2)) {
-      this.draw_contour_buffer(field, ix);
-      // Rather than take the fourth element of each channel, I can use
-      // a Uint32Array view of the data directly since rgb channels are all
-      // zero. This just gives a view 256 * 256 * 256 larger than the actual numbers.
-      const my_contours = contour_machine(this.contour_alpha_vals);
-      //    console.log(sum(this.contour_alpha_vals))
-      my_contours.forEach((d) => {
-        d.label = this.tileSet.dictionary_lookups[field].get(ix);
-      });
-      contour_set = contour_set.concat(my_contours);
-    }
-    return contour_set;
-  }
-  */
   color_pick(x, y) {
     const { props, height } = this;
 
@@ -892,26 +832,14 @@ export class ReglRenderer extends Renderer {
       'jitter_speed', 'size', 'filter1', 'filter2', 'character', 'x0', 'y0']) {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
-        parameters.uniforms[`u_${temporal}${k}_map`] = () => this.aes[k][time].textures.one_d;
+        parameters.uniforms[`u_${temporal}${k}_map`] = () => {
+          return this.aes[k][time].textures.one_d
+        };
         parameters.uniforms[`u_${temporal}${k}_needs_map`] = () => this.aes[k][time].use_map_on_regl;
-        // Currently, a texture lookup is only used for dictionaries.
-        /* db join code
-        if (k === 'jitter_radius' && temporal === '') {
-          const base_string = `u_${temporal}${k}_lookup`;
-
-          parameters.uniforms[base_string] = () =>
-          // return 1;
-            (this.aes[k][time].use_lookup ? 1 : 0);
-
-          parameters.uniforms[`${base_string}_map`] = () => this.aes[k][time].lookup_texture.texture;
-          parameters.uniforms[`${base_string}_y_constant`] = () => +this.aes[k][time].lookup_texture.value || 0.5;
-          parameters.uniforms[`${base_string}_y_domain`] = () => this.aes[k][time].lookup_texture.y_domain;
-          parameters.uniforms[`${base_string}_z_domain`] = () => this.aes[k][time].lookup_texture.z_domain;
-          parameters.uniforms[`${base_string}_x_domain`] = () => this.aes[k][time].lookup_texture.x_domain;
-        }
-        */
         parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes[k][time].domain;
-
+        if (k === 'color') {
+//          parameters.uniforms[`u_${temporal}${k}_map`] = () => this.aes[k]['current'].textures.one_d;
+        }
         if (k !== 'color') {
           parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes[k][time].range;
         }
@@ -1002,10 +930,15 @@ export class ReglRenderer extends Renderer {
 }
 
 class TileBufferManager {
-// Handle the interactions of a tile with a regl state.
+  // Handle the interactions of a tile with a regl state.
 
   // binds elements directly to the tile, so it's safe
   // to re-run this multiple times on the same tile.
+  public tile : Tile;
+  public regl: Regl;
+  public renderer : ReglRenderer;
+  public regl_elements : Map<string, any>;
+
   constructor(regl, tile, renderer) {
     this.tile = tile;
     this.regl = regl;
@@ -1017,11 +950,8 @@ class TileBufferManager {
   ready(prefs, block_for_buffers = true) {
     const { renderer, regl_elements } = this;
     const { aes } = renderer;
-    if (!aes.is_aesthetic_set) {
-      throw 'Aesthetic must be an aesthetic set';
-    }
-    let keys = [...Object.entries(aes)];
-    keys = keys
+    const entries = [...Object.entries(aes)];
+    const keys = entries
       .map(([k, v]) => {
         if (aesthetic_variables.indexOf(k) === -1) {
           return [];
@@ -1139,6 +1069,13 @@ class TileBufferManager {
 }
 
 class MultipurposeBufferSet {
+
+  public regl : Regl;
+  public buffers : Buffer[];
+  public buffer_size : number;
+  public buffer_offsets : number[];
+  public pointer : number;
+
   constructor(regl, buffer_size) {
     this.regl = regl;
     this.buffer_size = buffer_size;

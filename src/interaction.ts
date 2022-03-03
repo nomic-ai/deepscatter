@@ -4,9 +4,21 @@ import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
 import { scaleLinear } from 'd3-scale';
+import { APICall } from './d';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
+import type {Renderer} from './rendering'
+import type RootTile from './tile';
+
+
 
 export default class Zoom {
+  public prefs : APICall;
+  public canvas : d3.Selection<HTMLCanvasElement, any, any, any>;
+  public width : number;
+  public height : number;
+  public renderers : Map<string, Renderer>;
+  public tileSet : RootTile;
+  public _tooltip_html : string;
   constructor(selector, prefs) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
@@ -264,7 +276,7 @@ export default class Zoom {
       return this._scales;
     }
 
-    const { width, height, tileSet } = this;
+    const { width, height } = this;
 
     const { extent } = this.tileSet;
 

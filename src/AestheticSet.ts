@@ -1,12 +1,29 @@
 /* eslint-disable no-param-reassign */
-import { dimensions as Aesthetic, default_aesthetics, StatefulAesthetic } from './Aesthetic.ts';
-
+import type { Regl } from 'regl';
+import { dimensions as Aesthetic, 
+  default_aesthetics, StatefulAesthetic 
+} from './Aesthetic';
+import type Scatterplot from './deepscatter';
+import type RootTile from './tile';
+import type { Encoding } from './d';
 export const aesthetic_variables = Array.from(Object.keys(Aesthetic))
   .map((d) => d.toLowerCase());
 
 export class AestheticSet {
+  public tileSet : RootTile;
+  public scatterplot : Scatterplot;
+  public regl : Regl;
+  public encoding : Encoding;
+  public position_interpolation : boolean;
+  public x : StatefulAesthetic;
+  public y : StatefulAesthetic;
+  public color : StatefulAesthetic;
+  public filter1 : StatefulAesthetic;
+  public filter2 : StatefulAesthetic;
+  public jitter_speed : StatefulAesthetic;
+  public jitter_radius : StatefulAesthetic;
+  
   constructor(scatterplot, regl, tileSet, fields = null) {
-    this.is_aesthetic_set = true; // For type checking.
     this.scatterplot = scatterplot;
     this.regl = regl;
     this.tileSet = tileSet;

@@ -1,11 +1,13 @@
 import {
   extent, range, min, max, bisectLeft,
 } from 'd3-array';
+
 import { Table } from '@apache-arrow/es5-cjs';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
 
 import TileWorker from './tileworker.worker.js?worker&inline';
+import Zoom from './interaction';
 
 class Batch {
   // Can this usefully do anything?
@@ -14,23 +16,25 @@ class Batch {
 
 }
 
-class Tile extends Batch {
+export class Tile extends Batch {
   max_ix : number;
   promise : Promise<void>;
   download_state : string;
-  private _table : Table;
-  private _current_mutations: Record<string, any>;
+  public _table : Table;
+  public _current_mutations: Record<string, any>;
   parent : Tile;
   _table_buffer: ArrayBuffer;
-  children : Array<Tile>;
-  private _highest_known_ix : BigInteger;
-  private _min_ix : BigInteger;
-  private _max_ix : BigInteger;
-  download : any;
+  children : () => Array<Tile>;
+  public _children : Array<Tile>;
+  public _highest_known_ix : number;
+  public _min_ix : number;
+  public _max_ix : number;
+  public download : () => Promise<Table>;
+  public _download : Promise<Table>;
   __schema : {name: string, type : 'date', extent: Array<any>};
   local_dictionary_lookups : Map<string, any>;
   codes : [number, number, number];
-  private _extent? : Record<'x' | 'y', [number, number]>;
+  public _extent? : Record<'x' | 'y', [number, number]>;
 
   constructor() {
     // Accepts prefs only for the case of the root tile.
@@ -194,7 +198,7 @@ class Tile extends Batch {
     }
   }
 
-  get highest_known_ix() {
+  get highest_known_ix() : number {
     return this._highest_known_ix;
   }
 
@@ -429,6 +433,7 @@ export class QuadTile extends Tile {
   key : string;
   class : Tile;
   codes : [number, number, number];
+  _already_called = false;
 
   constructor(base_url, key, parent = undefined, prefs) {
     super();
@@ -511,7 +516,7 @@ export class QuadTile extends Tile {
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
         this._min_ix = this.table.getColumn('ix').get(0);
-        this.max_ix = this.table.getColumn('ix').get(this.table.length - 1);
+        this.max_ix = 0 + this.table.getColumn('ix').get(this.table.length - 1);
         this.highest_known_ix = this.max_ix;
         this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
         //    this.setDataTypes()
@@ -545,11 +550,15 @@ export class QuadTile extends Tile {
 
 }
 
+type Key = string;
+
 export default class RootTile extends QuadTile {
   // The parent tile carries some data for the full set.
   // For clarity, I keep those elements in this class.
   public _tileWorkers : TileWorker[];
-
+  public _download_queue : Set<Key>;
+  public key : Key;
+  public _zoom : Zoom;
   constructor(base_url, prefs = {}) {
     let key;
 
@@ -865,3 +874,5 @@ function check_overlap(tile, bbox) {
   }
   return area(intersection) / area(bbox);
 }
+
+export type Tileset = RootTile;

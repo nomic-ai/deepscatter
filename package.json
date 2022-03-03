@@ -54,11 +54,11 @@
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",
     "lodash-es": "^4.17.21",
-    "lodash.merge": "^4.6.2",
-    "regl": "^2.1.0"
+    "lodash.merge": "^4.6.2"
   },
   "deprecated": false,
   "devDependencies": {
+    "@types/d3": "^7.1.0",
     "@types/d3-geo": "^3.0.2",
     "@types/d3-selection": "^3.0.1",
     "d3-scale": "^4.0.2",
@@ -69,6 +69,7 @@
     "glslify": "^7.0.0",
     "glslify-hex": "^2.1.1",
     "glslify-loader": "^2.0.0",
+    "regl": "^2.1.0",
     "rollup-plugin-glslify": "^1.2.0",
     "rollup-plugin-web-worker-loader": "^1.6.1",
     "vite": "^2.6.14"

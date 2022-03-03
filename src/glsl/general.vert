@@ -808,11 +808,11 @@ void run_color_fill(in float ease) {
       gl_PointSize = 1.;
     }
   } else {
-    if (u_constant_color.r > -1.) {
+    if (false) {//u_constant_color.r > -1.) {
       fill = vec4(u_constant_color.rgb, u_current_alpha);
     } else {
       float fractional_color = linstep(u_color_domain, a_color);
-      fill = texture2D(u_color_map, vec2(0., fractional_color));
+      fill = texture2D(u_color_map, vec2(0.5, fractional_color));
       fill = vec4(fill.rgb, u_current_alpha);
     }
     if (ease < 1.) {
@@ -821,9 +821,10 @@ void run_color_fill(in float ease) {
         last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);
       } else {
         float last_fractional = linstep(u_last_color_domain, a_last_color);
-        last_fill = texture2D(u_last_color_map, vec2(0., last_fractional));
+        last_fill = texture2D(u_last_color_map, vec2(0.5, last_fractional));
         // Alpha channel interpolation already happened.
         last_fill = vec4(last_fill.rgb, u_last_alpha);
+
       }
       // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
       // instead?
@@ -1011,11 +1012,10 @@ void main() {
 
   float interpolation =
     interpolate(u_update_time, 0., u_transition_duration);
-
+    
   float ease = interpolation;
-//  float ease = easeCubic(interpolation);
-//  from_coord_to_gl = u_window_scale * u_zoom * pixelspace_to_glspace;
 
+  // I set this sometimes.
   float debug_mode = 0.;
 
   vec2 position = vec2(a_x, a_y);
