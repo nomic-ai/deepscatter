@@ -5,7 +5,7 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import Tile from './tile';
-import { APICall } from './d';
+import { APICall } from './types';
 
 const base_elements = [
   {
@@ -362,7 +362,7 @@ export default class Scatterplot {
 
     const current_corners = _renderer.zoom.current_corners();
     const output = [];
-    const filter1 = _renderer.aes.filter1.current.get_function();
+    const filter1 = _renderer.aes.filter.current.get_function();
     const filter2 = _renderer.aes.filter2.current.get_function();
     for (const p of _root.points(current_corners, true)) {
       if (filter1(p) && filter2(p)) {

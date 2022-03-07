@@ -5,7 +5,7 @@ import { dimensions as Aesthetic,
 } from './Aesthetic';
 import type Scatterplot from './deepscatter';
 import type RootTile from './tile';
-import type { Encoding } from './d';
+import type { Encoding } from './types';
 export const aesthetic_variables = Array.from(Object.keys(Aesthetic))
   .map((d) => d.toLowerCase());
 
@@ -17,42 +17,38 @@ export class AestheticSet {
   public position_interpolation : boolean;
   public x : StatefulAesthetic;
   public y : StatefulAesthetic;
+  public size : StatefulAesthetic
   public color : StatefulAesthetic;
-  public filter1 : StatefulAesthetic;
+  public filter : StatefulAesthetic;
   public filter2 : StatefulAesthetic;
   public jitter_speed : StatefulAesthetic;
   public jitter_radius : StatefulAesthetic;
   
-  constructor(scatterplot, regl, tileSet, fields = null) {
+  constructor(scatterplot : Scatterplot, regl : Regl, tileSet : RootTile) {
     this.scatterplot = scatterplot;
     this.regl = regl;
     this.tileSet = tileSet;
-    if (fields === null) {
-      for (const field of Array.from(Object.keys(Aesthetic))) {
-        const aes = field;// .toLowerCase()
-        const args = [aes, this.scatterplot, this.regl, tileSet];
-        /* if (aes == "x") {
-          args.unshift(scatterplot.width)
-        }
-        if (aes == "y") {
-          args.unshift(scatterplot.height)
-        } */
-        this[aes.toLowerCase()] = new StatefulAesthetic(...args);
-      }
+    this.position_interpolation = false;
+    const rest = [scatterplot, regl, tileSet];
+    this.x= new StatefulAesthetic('X', scatterplot, regl, tileSet);
+    this.y = new StatefulAesthetic('Y', scatterplot, regl, tileSet);
+    this.color = new StatefulAesthetic('Color', scatterplot, regl, tileSet);
+    this.filter = new StatefulAesthetic('Filter', scatterplot, regl, tileSet);
+    this.filter2 = new StatefulAesthetic('Filter2', scatterplot, regl, tileSet);
+    this.jitter_speed = new StatefulAesthetic('Jitter_speed', scatterplot, regl, tileSet);
+    this.jitter_radius = new StatefulAesthetic('Jitter_radius', scatterplot, regl, tileSet);
+    this.size = new StatefulAesthetic('Size', scatterplot, regl, tileSet);
+    return this
+  }
+  
+  *[Symbol.iterator]() : Iterator<[string, StatefulAesthetic]> {
+    for (let k of ['x', 'y', 'color', 'filter', 'filter2',
+                   'jitter_speed', 'jitter_radius', 'size']) {
+      yield [k, this[k]];
     }
-
-    const starting_aesthetics = {};
-
-    for (const [k, v] of Object.entries(default_aesthetics)) {
-      starting_aesthetics[k] = v.constant || v;
-    }
-
-    this.encoding = JSON.parse(JSON.stringify(starting_aesthetics));
-
-    this.apply_encoding(this.encoding);
   }
 
-  interpret_position(encoding) {
+  interpret_position(encoding : Encoding) {
     if (encoding) {
       // First--set position interpolation mode to
       // true if x0 or position0 has been manually passed.
@@ -93,13 +89,16 @@ export class AestheticSet {
   }
 
   apply_encoding(encoding) {
-    if (encoding === undefined || encoding === null) {
+    if (encoding === undefined) {
+      // pass with nothing--this will clear out the old saved states
+      // to avoid regenerating transitions if you keep replotting
+      // keeping something other than the encoding.
       encoding = {};
     }
 
-    if (encoding.filter) {
-      encoding.filter1 = encoding.filter;
-      delete encoding.filter;
+    if (encoding.filter1) {
+      encoding.filter = encoding.filter1;
+      delete encoding.filter1;
     }
     // Overwrite position fields.
     this.interpret_position(encoding);
@@ -114,7 +113,13 @@ export class AestheticSet {
     }
 
     for (const k of aesthetic_variables) {
+      if (k === 'x0' || k === 'y0') {
+        continue
+      }
+      console.log(k)
+
       this[k].update(encoding[k]);
     }
+
   }
 }

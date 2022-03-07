@@ -4,21 +4,27 @@ import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
 import { scaleLinear } from 'd3-scale';
-import { APICall } from './d';
+import { APICall } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type {Renderer} from './rendering'
 import type RootTile from './tile';
+import { ReglRenderer } from './regl_rendering';
 
 
 
 export default class Zoom {
   public prefs : APICall;
-  public canvas : d3.Selection<HTMLCanvasElement, any, any, any>;
+  public canvas : d3.Selection<Element, any, any, any>;
   public width : number;
   public height : number;
   public renderers : Map<string, Renderer>;
   public tileSet : RootTile;
-  public _tooltip_html : string;
+  public _tooltip_html : () => string;
+  public _timer : d3.Timer;
+  public _scales : Record<string, d3.ScaleLinear<number, number>>;
+  public zoomer : d3.ZoomBehavior<Element, any>;
+  public transform : d3.ZoomTransform;
+  public _start : number;
   constructor(selector, prefs) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
@@ -148,10 +154,8 @@ export default class Zoom {
 
   add_mouseover() {
     let last_fired = 0;
-
-
-
-    const renderer = this.renderers.get('regl');
+    //@ts-ignore Not sure how to guarantee this formally.
+    const renderer : ReglRenderer = this.renderers.get('regl');
     const x_aes = renderer.aes.x.current;
     const y_aes = renderer.aes.y.current;
 
@@ -165,7 +169,15 @@ export default class Zoom {
       const data = p ? [p] : [];
 
       const d = data[0];
-      const annotations = d ? [
+
+      type Annotation = {
+        x: number,
+        y: number,
+        dx: number,
+        dy: number,
+        data: any,
+      }
+      const annotations : Annotation[] = d ? [
         {
           x: event.layerX,
           y: event.layerY,
@@ -238,7 +250,9 @@ export default class Zoom {
     // whichever is greater.
     let stop_at = Date.now() + run_at_least;
     if (this._timer) {
+      //@ts-ignore      
       if (this._timer.stop_at > stop_at) {
+        //@ts-ignore
         stop_at = this._timer.stop_at;
       }
       this._timer.stop();
@@ -247,21 +261,21 @@ export default class Zoom {
     const t = timer(this.tick.bind(this));
 
     this._timer = t;
-
+    //@ts-ignore
     this._timer.stop_at = stop_at;
 
     return this._timer;
   }
 
   data(dataset) {
-    if (data === undefined) {
+    if (dataset === undefined) {
       return this.tileSet;
     }
     this.tileSet = dataset;
     return this;
   }
 
-  scales(equal_units = true) {
+  scales(equal_units = true) : Record<string, d3.ScaleLinear> {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.
@@ -280,18 +294,26 @@ export default class Zoom {
 
     const { extent } = this.tileSet;
 
-    const scales = {};
+    const scales : Record<string, any> = {};
     if (extent === undefined) {
       return undefined;
     }
 
-    const scale_dat = { x: {}, y: {} };
+    interface Scale_datum {
+      limits : [number, number];
+      size_range : number;
+      pixels_per_unit : number;
+    }
+    const scale_dat : Record<string, Scale_datum> = {}
 
     for (const [name, dim] of [['x', width], ['y', height]]) {
       const limits = extent[name];
-      scale_dat[name].limits = limits;
-      scale_dat[name].size_range = limits[1] - limits[0];
-      scale_dat[name].pixels_per_unit = dim / scale_dat[name].size_range;
+      const size_range = limits[1] - limits[0];
+      scale_dat[name] = {
+        limits,
+        size_range,
+        pixels_per_unit : dim / size_range
+      }
     }
 
     const data_aspect_ratio = scale_dat.x.pixels_per_unit / scale_dat.y.pixels_per_unit;
@@ -339,6 +361,7 @@ export default class Zoom {
 
     if (force !== true) {
       if (this._timer) {
+        //@ts-ignore
         if (this._timer.stop_at <= Date.now()) {
           console.log('Timer ending');
           this._timer.stop();
@@ -396,7 +419,7 @@ export function window_transform(x_scale, y_scale) {
   return m1;
 }
 
-function label_from_point(point, defaults) {
+function label_from_point(point, defaults : null | Set<string> = null) {
   // defaults: a Set of keys to include.
   let output = '<dl>';
   const nope = new Set([
@@ -404,7 +427,7 @@ function label_from_point(point, defaults) {
   ]);
 
   for (const [k, v] of point.entries()) {
-    if (defaults) {
+    if (defaults !== null) {
       if (!defaults.has(k)) {
         continue;
       }

@@ -1,18 +1,21 @@
 /* eslint-disable no-underscore-dangle */
-import wrapREGL, { Regl } from 'regl';
-import { create } from 'd3-selection';
+import wrapREGL, { Framebuffer2D, Regl, Texture2D, Buffer } from 'regl';
 import { range, sum } from 'd3-array';
 // import { contours } from 'd3-contour';
 import unpackFloat from 'glsl-read-float';
 import Zoom, { window_transform } from './interaction';
 import { Renderer } from './rendering';
+//@ts-ignore
 import gaussian_blur from './glsl/gaussian_blur.frag';
+//@ts-ignore
 import vertex_shader from './glsl/general.vert';
+//@ts-ignore
 import frag_shader from './glsl/general.frag';
 import { aesthetic_variables, AestheticSet } from './AestheticSet';
 
 import type {Tileset, Tile} from './tile'
-import { APICall } from './d';
+import type { ZoomBehavior } from 'd3-zoom';
+import { APICall } from './types';
 
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
@@ -20,21 +23,27 @@ export class ReglRenderer extends Renderer {
   public aes : AestheticSet;
   public buffer_size = 1024 * 1024 * 64;
   public canvas : d3.Selection<HTMLCanvasElement, any, any, any>;
-  public _buffers : MultipurposeBufferSet[];
-  public _initializations : Function[];
+  public _buffers : MultipurposeBufferSet;
+  public _initializations : Promise<void>[];
 
-  public tileSet : RootTile;
-  public zoom : Zoom; 
+  public tileSet : Tileset;
+  public zoom : Zoom;
   public prefs : APICall;
-  public _webgl_scale_history : [number, number];
   public _start : number;
   public most_recent_restart : number;
-  public _default_webgl_scale : number;
+  public _default_webgl_scale : number[];
+  public _webgl_scale_history : [number[], number[]];
   public _renderer : Regl;
   public _use_scale_to_download_tiles : boolean;
-  public sprites : d3.Selection<SVGSVGElement, any, any, any>;
+  public sprites : d3.Selection<SVGElement, any, any, any>;
   public _zoom : Zoom;
-  public 
+  public fbos : Record<string, Framebuffer2D>;
+  public textures : Record<string, Texture2D> = {};
+  public _fill_buffer : Buffer;
+  public contour_alpha_vals : Float32Array | Uint8Array | Uint16Array;
+  public contour_vals : Uint8Array;
+  public tick_num : number
+
 //  public _renderer : Renderer;
 
 
@@ -54,6 +63,7 @@ export class ReglRenderer extends Renderer {
     );
 
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
+
     // allocate buffers in 64 MB blocks.
 
     this.initialize_textures();
@@ -136,14 +146,12 @@ export class ReglRenderer extends Renderer {
       aes_to_buffer_num,
       variable_to_buffer_num,
       color_picker_mode: 0, // whether to draw as a color picker.
-    };
-
-    props.zoom_matrix = [
-      [props.transform.k, 0, props.transform.x],
-      [0, props.transform.k, props.transform.y],
-      [0, 0, 1],
-    ].flat();
-
+      zoom_matrix : [
+        [transform.k, 0, transform.x],
+        [0, transform.k, transform.y],
+        [0, 0, 1],
+      ].flat(),
+    }
     // Clone.
     return JSON.parse(JSON.stringify(props));
   }
@@ -170,7 +178,7 @@ export class ReglRenderer extends Renderer {
         }
       } catch (err) {
         //       console.warn(err);
-      // throw "Dead"
+        throw err
         continue;
       }
 
@@ -213,7 +221,6 @@ export class ReglRenderer extends Renderer {
       color: [0.9, 0.9, 0.93, 0],
       depth: 1,
     });
-
     const start = Date.now();
     let current = () => undefined;
     while (Date.now() - start < 10 && this.deferred_functions.length) {
@@ -284,7 +291,6 @@ export class ReglRenderer extends Renderer {
   render_all(props) {
     const { regl } = this;
 
-
     this.fbos.points.use(() => {
       regl.clear({ color: [0, 0, 0, 0] });
       this.render_points(props);
@@ -307,12 +313,16 @@ export class ReglRenderer extends Renderer {
     }
     */
     regl.clear({ color: [0, 0, 0, 0] });
+
     this.fbos.lines.use(() => regl.clear({ color: [0, 0, 0, 0] }));
+    //@ts-ignore
     if (this.scatterplot.trimap) {
       // Allows binding a TriMap from `trifeather` object to the regl package without any import.
       // This is the best way to do it that I can think of for now.
       this.fbos.lines.use(() => {
+        //@ts-ignore
         this.scatterplot.trimap.zoom = this.zoom;
+        //@ts-ignore
         this.scatterplot.trimap.tick('polygon');
       });
     }
@@ -363,6 +373,7 @@ export class ReglRenderer extends Renderer {
     }
   }
 
+  /*
   set_image_data(tile, ix) {
   // Stores a *single* image onto the texture.
     const { regl } = this;
@@ -381,6 +392,7 @@ export class ReglRenderer extends Renderer {
 
     }
   }
+  */
   /*
   spritesheet_setter(word) {
   // Set if not there.
@@ -425,7 +437,8 @@ export class ReglRenderer extends Renderer {
   initialize_textures() {
     const { regl } = this;
     this.fbos = this.fbos || {};
-    this.fbos.empty_texture = regl.texture(
+    this.textures = this.textures || {};
+    this.textures.empty_texture = regl.texture(
       range(128).map((d) => range(128).map((d) => [0, 0, 0])),
     );
 
@@ -481,7 +494,7 @@ export class ReglRenderer extends Renderer {
       depth: false,
     });
 
-    this.fbos.dummy_buffer = regl.buffer(10);
+//   this.fbos.dummy_buffer = regl.buffer(10);
   }
 
   get_image_texture(url) {
@@ -492,7 +505,7 @@ export class ReglRenderer extends Renderer {
     }
     const image = new Image();
     image.src = url;
-    this.textures[url] = this.fbos.minicounter;
+//    this.textures[url] = this.fbos.minicounter;
     image.onload = () => {
       console.log('loaded image', url);
       this.textures[url] = regl.texture(image);
@@ -500,6 +513,7 @@ export class ReglRenderer extends Renderer {
     return this.textures[url];
   }
 
+  /*
   plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
     console.log('plotting as grid');
     const { scatterplot, regl, tileSet } = this.aes;
@@ -575,7 +589,7 @@ export class ReglRenderer extends Renderer {
     // Then revert back.
     this.aes = saved_aes;
   }
-
+   */
   n_visible(only_color = -1) {
     let { width, height } = this;
     width = Math.floor(width);
@@ -600,9 +614,7 @@ export class ReglRenderer extends Renderer {
 
   color_pick(x, y) {
     const { props, height } = this;
-
     props.color_picker_mode = 1;
-
     let color_at_point;
 
     this.fbos.colorpicker.use(() => {
@@ -746,6 +758,7 @@ export class ReglRenderer extends Renderer {
         buffer_0: (_, props) => props.manager.regl_elements.get('ix'),
       }, // Filled below.
       uniforms: {
+        //@ts-ignore
         u_update_time: regl.prop('update_time'),
         u_transition_duration(_, props) {
         // const fraction = (props.time)/props.prefs.duration;
@@ -765,8 +778,9 @@ export class ReglRenderer extends Renderer {
           if (prefs.glyph_set) {
             return this.get_image_texture(prefs.glyph_set);
           }
-          return this.fbos.empty_texture;
+          return this.textures.empty_texture;
         },
+        //@ts-ignore
         u_color_picker_mode: regl.prop('color_picker_mode'),
         u_position_interpolation_mode() {
         // 1 indicates that there should be a continuous loop between the two points.
@@ -776,6 +790,7 @@ export class ReglRenderer extends Renderer {
           return 0;
         },
         u_grid_mode: (_, { grid_mode }) => grid_mode,
+        //@ts-ignore
         u_colors_as_grid: regl.prop('colors_as_grid'),
 
         u_constant_color: () => (this.aes.color.current.constant !== undefined
@@ -788,6 +803,7 @@ export class ReglRenderer extends Renderer {
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
+        //@ts-ignore
         u_zoom_balance: regl.prop('zoom_balance'),
         u_base_size: (_, { prefs }) => prefs.point_size,
         u_maxix: (_, props) => props.max_ix,
@@ -795,14 +811,16 @@ export class ReglRenderer extends Renderer {
           return props.transform.k;
         },
         // Allow interpolation between different coordinate systems.
+        //@ts-ignore
         u_window_scale: regl.prop('webgl_scale'),
+        //@ts-ignore
         u_last_window_scale: regl.prop('last_webgl_scale'),
         u_time: ({ time }) => time,
         u_filter1_numeric() {
-          return this.aes.filter1.current.ops_to_array();
+          return this.aes.filter.current.ops_to_array();
         },
         u_last_filter1_numeric() {
-          return this.aes.filter1.last.ops_to_array();
+          return this.aes.filter.last.ops_to_array();
         },
         u_filter2_numeric() {
           return this.aes.filter2.current.ops_to_array();
@@ -818,6 +836,7 @@ export class ReglRenderer extends Renderer {
           return props.zoom_matrix;
         },
       },
+      
     };
 
     // store needed buffers
@@ -829,17 +848,16 @@ export class ReglRenderer extends Renderer {
     }
 
     for (const k of ['x', 'y', 'color', 'jitter_radius',
-      'jitter_speed', 'size', 'filter1', 'filter2', 'character', 'x0', 'y0']) {
+      'jitter_speed', 'size', 'filter', 'filter2', 'character', 'x0', 'y0']) {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
         parameters.uniforms[`u_${temporal}${k}_map`] = () => {
-          return this.aes[k][time].textures.one_d
+          const aes_holder = this.aes[k][time];
+          return aes_holder.textures.one_d
         };
-        parameters.uniforms[`u_${temporal}${k}_needs_map`] = () => this.aes[k][time].use_map_on_regl;
+        parameters.uniforms[`u_${temporal}${k}_needs_map`] = () =>
+          false//this.aes[k][time].use_map_on_regl;
         parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes[k][time].domain;
-        if (k === 'color') {
-//          parameters.uniforms[`u_${temporal}${k}_map`] = () => this.aes[k]['current'].textures.one_d;
-        }
         if (k !== 'color') {
           parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes[k][time].range;
         }
@@ -868,6 +886,7 @@ export class ReglRenderer extends Renderer {
       }
     // Copy the parameters from the data name.
     }
+    //@ts-expect-error
     this._renderer = regl(parameters);
     return this._renderer;
   }
@@ -879,7 +898,7 @@ export class ReglRenderer extends Renderer {
 
     const buffers = [];
     const priorities = ['x', 'y', 'color', 'size', 'jitter_radius',
-      'jitter_speed', 'character', 'x0', 'y0', 'filter1', 'filter2'];
+      'jitter_speed', 'character', 'x0', 'y0', 'filter', 'filter2'];
 
     for (const aesthetic of priorities) {
       for (const time of ['current', 'last']) {
@@ -915,6 +934,7 @@ export class ReglRenderer extends Renderer {
         continue;
       } else {
         // Don't use the last value, use the current value.
+        // Strategy will break if more than 15 base channels are defined.
         aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
       }
     }
@@ -938,6 +958,7 @@ class TileBufferManager {
   public regl: Regl;
   public renderer : ReglRenderer;
   public regl_elements : Map<string, any>;
+  public image;
 
   constructor(regl, tile, renderer) {
     this.tile = tile;
@@ -950,7 +971,7 @@ class TileBufferManager {
   ready(prefs, block_for_buffers = true) {
     const { renderer, regl_elements } = this;
     const { aes } = renderer;
-    const entries = [...Object.entries(aes)];
+    const entries = [...aes];
     const keys = entries
       .map(([k, v]) => {
         if (aesthetic_variables.indexOf(k) === -1) {
@@ -958,26 +979,37 @@ class TileBufferManager {
         }
         const needed = [];
         for (const aesthetic of [v.current, v.last]) {
-          if (aesthetic.field) needed.push(aesthetic.field);
+          if (!aesthetic.current_encoding !== null) {
+            needed.push(aesthetic.field);            
+          }
         }
         return needed;
       })
-
       .flat();
 
-    for (const key of keys.concat(['ix'])) {
+    for (const key of ['ix', ...keys]) {
       const current = this.regl_elements.get(key);
+      if (key === 'ix') {
+//        console.log("______\n\n", key)
+      }
       if (current === null) {
       // It's in the process of being built.
         return false;
       } if (current === undefined) {
         if (!this.tile.ready) {
         // Can't build b/c no tile ready.
-          return false;
+        return false;
         }
         // Request that the buffer be created before returning false.
         regl_elements.set(key, null);
         if (block_for_buffers) {
+          console.log("CREATING", key)
+          if (key === "A field name that must be specified") {
+//            throw "WHAT"
+            console.error("WHAT")
+//            throw new Error("A field name that must be specified");
+            console.log("CREATING", key)
+          }
           this.create_regl_buffer(key);
         } else {
           renderer.deferred_functions.push(() => this.create_regl_buffer(key));
@@ -1049,7 +1081,7 @@ class TileBufferManager {
   }
 
   create_regl_buffer(key) {
-    const { regl, regl_elements } = this;
+    const { regl_elements } = this;
 
     const data = this.create_buffer_data(key);
     const item_size = 4;
@@ -1063,7 +1095,8 @@ class TileBufferManager {
       key,
       buffer_desc,
     );
-    //    if (key === 'ix') {console.warn(buffer_desc)}
+
+    console.log("allocating buffer for", key, "of size", data_length);
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
   }
 }

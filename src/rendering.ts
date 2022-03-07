@@ -3,7 +3,7 @@ import { select } from 'd3-selection';
 import { min } from 'd3-array';
 import type Scatterplot from './deepscatter'
 import type { Tileset } from './tile';
-import type { APICall } from './d';
+import type { APICall } from './types';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 
@@ -18,12 +18,12 @@ export class Renderer {
   public height : number;
   public deferred_functions : Array<() => void>;
   public _use_scale_to_download_tiles : boolean = true;
-  public zoom : Zoom
+  public zoom : Zoom;
   public aes : AestheticSet;
-  public _current_clik_function_string : string;
+  public _current_click_function_string : string;
   public _click_function : () => void;
   public _zoom : Zoom;
-  
+  public _initializations : Promise<any>[];
   constructor(selector, tileSet, scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
@@ -42,6 +42,10 @@ export class Renderer {
     // For now, I don't actually do it.
     return 0;
   }
+
+  //color_pick() {
+  //  return 1;
+  //}
 
   get optimal_alpha() {
     let { zoom_balance, alpha, point_size } = this.prefs;
@@ -73,11 +77,11 @@ export class Renderer {
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
     return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
   }
-
+  /*
   is_visible(point) {
     return p_in_rect(point, this._zoom.current_corners)
-    && point.ix < this.prefs.max_points * this._zoom.k;
-  }
+    && point.ix < this.prefs.max_points * this._zoom.transform.k;
+  } */
 
   visible_tiles() {
     // yield the currently visible tiles based on the zoom state

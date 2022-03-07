@@ -11,11 +11,14 @@ import Zoom from './interaction';
 
 class Batch {
   // Can this usefully do anything?
-
-  download_to_depth() {}
-
 }
 
+interface schema_entry{name: string,
+   type : string, 
+   extent: Array<any>,
+   keys ? : Array<any>,
+  }
+type minmax = [number, number]
 export class Tile extends Batch {
   max_ix : number;
   promise : Promise<void>;
@@ -24,17 +27,17 @@ export class Tile extends Batch {
   public _current_mutations: Record<string, any>;
   parent : Tile;
   _table_buffer: ArrayBuffer;
-  children : () => Array<Tile>;
+  children : Array<Tile>;
   public _children : Array<Tile>;
   public _highest_known_ix : number;
   public _min_ix : number;
   public _max_ix : number;
   public download : () => Promise<Table>;
   public _download : Promise<Table>;
-  __schema : {name: string, type : 'date', extent: Array<any>};
+  __schema : schema_entry[];
   local_dictionary_lookups : Map<string, any>;
   codes : [number, number, number];
-  public _extent? : Record<'x' | 'y', [number, number]>;
+  public _extent? : {'x' : minmax, 'y': minmax};
 
   constructor() {
     // Accepts prefs only for the case of the root tile.
@@ -310,14 +313,16 @@ export class Tile extends Batch {
     if (this.__schema) {
       return this.__schema;
     }
-    const attributes = [];
+    const attributes : schema_entry[] = [];
 
     for (const field of this.table.schema.fields) {
       const { name, type, nullable } = field;
       if (type && type.typeId == 5) {
         // character
         attributes.push({
-          name, type: 'string',
+          name,
+          type: 'string',
+          extent: []
         });
       }
       if (type && type.dictionary) {
@@ -431,10 +436,11 @@ export class QuadTile extends Tile {
   url : string;
   _mutations : Map<string, any>;
   key : string;
+  _children : QuadTile[];
   class : Tile;
   codes : [number, number, number];
   _already_called = false;
-
+  public ChildLocations : Record<string, string>;
   constructor(base_url, key, parent = undefined, prefs) {
     super();
     this.url = base_url;
@@ -445,6 +451,7 @@ export class QuadTile extends Tile {
     this.key = key;
     const [z, x, y] = key.split('/').map((d) => parseInt(d));
     this.codes = [z, x, y];
+    //@ts-ignore
     this.class = new.target;
   }
 
@@ -606,7 +613,6 @@ export default class RootTile extends QuadTile {
         //        }
       }
     });
-    const lines = array.map((a) => a.join(''));
   }
 
   download_most_needed_tiles(bbox, max_ix, queue_length = 4) {
@@ -653,9 +659,6 @@ export default class RootTile extends QuadTile {
       callback,
     );
     scores.sort((a, b) => a[0] - b[0]);
-    for (const [d, t, bb, state] of scores) {
-      //      console.log({d, t, k: t.key, bb, state})
-    }
     while (scores.length && queue.size < queue_length) {
       const [distance, tile, bbox, _] = scores.pop();
       if (tile.min_ix > max_ix || distance < 0) {
@@ -697,7 +700,7 @@ export default class RootTile extends QuadTile {
 
   get mutations() {
     return this._mutations
-      ? this._mutations : this._mutations = {};
+      ? this._mutations : this._mutations = new Map();
   }
 
   findPoint(ix) {

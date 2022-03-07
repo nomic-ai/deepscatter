@@ -68,6 +68,10 @@
         field: "y", 
         transform: "literal"
       },
+/*      "filter": {
+        field: "class",
+        lambda: "class => class !== 'Strawberry'"
+      },*/
       "size": {
         "field": "quantity",
         "transform": "sqrt",
@@ -77,9 +81,8 @@
     }
   };
 
-
   const colors = [
-    JSON.parse(JSON.stringify(prefs.encoding.color)),
+//    JSON.parse(JSON.stringify(prefs.encoding.color)),
     {
         "field": "quantity",
         "range": "viridis",
@@ -111,6 +114,7 @@
       }
     })
   })
+  
   select("#flip").on("click", () => {
     cycle += 1
     const new_coding = {

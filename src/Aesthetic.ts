@@ -1,12 +1,29 @@
 /* eslint-disable no-underscore-dangle */
 import { range as arange, shuffle, extent } from 'd3-array';
 import {
-  scaleLinear, scaleSqrt, scaleLog, scaleIdentity, scaleOrdinal,
-  scaleSequential, scaleSequentialLog, scaleSequentialPow,
+  scaleLinear, scaleSqrt, 
+  scaleLog, scaleIdentity,
+  scaleOrdinal,
+  scaleSequential, scaleSequentialLog, 
+  scaleSequentialPow,
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 import { encodeFloatsRGBArange } from './util';
+import type Scatterplot from './deepscatter';
+
+
+import type { Regl, Texture2D } from 'regl';
+import type RootTile from './tile';
+import {isOpChannel, isLambdaChannel,
+   isConstantChannel} from './types';
+import type {
+  OpChannel, LambdaChannel,
+  Channel, BasicChannel, ConstantChannel,
+  ConstantColorChannel, ColorChannel, OpArray
+
+} from './types';
+import { ArrowJSONLike } from '@apache-arrow/es5-cjs';
 
 const scales : {[key : string] : Function} = {
   sqrt: scaleSqrt,
@@ -17,7 +34,7 @@ const scales : {[key : string] : Function} = {
 
 const palette_size = 4096;
 
-function to_buffer(data) {
+function to_buffer(data: number[] | number[][]) {
   const output = new Uint8Array(4 * palette_size);
   output.set(data.flat());
   return output;
@@ -39,6 +56,7 @@ const schemes = {};
 for (const [k, v] of Object.entries(d3Chromatic)) {
   if (k.startsWith('scheme') && typeof (v[0]) === 'string') {
     const colors = new Array(palette_size);
+    //@ts-ignore The startsWith filters this.
     const scheme = v.map((v) => {
       const col = rgb(v);
       return [col.r, col.g, col.b, 255];
@@ -76,15 +94,19 @@ function okabe() {
 
 okabe();
 
-export const default_aesthetics = {
+type Transform = "log" | "sqrt" | "linear" | "literal";
+interface Default {
+  constant : number | number[];
+  range : [number, number] | Uint8Array;
+  transform : Transform;
+}
+export const default_aesthetics : Record<string, Default> = {
   x: {
-    field: 'x',
     constant: 1,
     range: [0, 500],
     transform: 'literal',
   },
   y: {
-    field: 'y',
     constant: 1,
     range: [0, 500],
     transform: 'literal',
@@ -101,7 +123,7 @@ export const default_aesthetics = {
   },
   color: {
     constant: [.5, .5, .5],
-    range: color_palettes.white,
+    range: color_palettes.viridis,
     transform: 'linear',
   },
   jitter_radius: {
@@ -119,7 +141,7 @@ export const default_aesthetics = {
     range: [0.5, 5],
     transform: 'sqrt',
   },
-  filter1: {
+  filter: {
     constant: 1, // Necessary though meaningless.
     range: [0, 1],
     transform: 'linear',
@@ -131,18 +153,13 @@ export const default_aesthetics = {
   },
 };
 
-import type Scatterplot from './deepscatter';
-import type { Regl, Texture2D } from 'regl';
-import type RootTile from './tile';
-import type { Channel } from './d';
-
-class Aesthetic {
+abstract class Aesthetic {
   public label : string;
   public scatterplot : Scatterplot;
   public regl : Regl
   public _texture_buffer : Float32Array | Uint8Array | null = null;
   public _domain : [number, number];
-  public _range : [number, number];
+  public _range : [number, number] | Uint8Array;
   public _transform : "log" | "sqrt" | "linear" | "literal";
   public tileSet : RootTile;
   public needs_transitions : boolean;
@@ -152,11 +169,14 @@ class Aesthetic {
   public _scale : Function;
   public texture_type : "float" | "uint8" | "half float" = "float";
   public texture_format : "rgba" | "rgb" | "alpha" = "rgba"
-  public stringversion : Channel;
+  public current_encoding : BasicChannel | OpChannel | LambdaChannel | ConstantChannel;
   public number : number;
-//  public default_val : () => number | number[];
-
-  constructor(label, scatterplot, regl, tile, number = -1) {
+  public _func : (x : any) => any;
+  public scaleFunc : (x : number | string) => number;
+  public default_val : number | [number, number, number];
+  public texture_size = 4096;
+  public aes_type: "undefined" | "one_d" | "boolean" | "color" = "undefined" 
+  constructor(label : string, scatterplot : Scatterplot, regl : Regl, tile : RootTile, number = -1) {
     this.number = number;
     this.label = label;
     this.scatterplot = scatterplot;
@@ -166,29 +186,25 @@ class Aesthetic {
     this._range = this.default_range;
     this._transform = default_aesthetics[label].transform;
     this.tileSet = tile;
-
+    this.aes_type = "undefined";
     // A flag that will be turned on and off in AestheticSet.
     this.needs_transitions = true;
 
     this._domains = {};
   }
-
-  // eslint-disable-next-line class-methods-use-this
-  get default_val() {
-    return 1;
-  }
-
-  get texture_size() {
-    return 4096;
-  }
-
+  
   apply(point) {
+    // Takes an arrow point and returns the aesthetic value.
     return this.scale(this.value_for(point));
   }
 
-  get transform() {
+  get transform() {    
     if (this._transform) return this._transform;
     return default_aesthetics[this.label].transform;
+  }
+
+  set transform(transform) {
+    this._transform = transform;
   }
 
   get default_range() {
@@ -204,6 +220,7 @@ class Aesthetic {
       .range(this.range);
 
     const range = this.range;
+
     if (typeof(range) == 'string') {
       // Convert range from 'viridis' to InterpolateViridis.
 
@@ -214,6 +231,7 @@ class Aesthetic {
         // scaleSequential and scaleSequentialLog. 
         if (this.transform === 'sqrt') {
           return scaleSequentialPow(interpolator)
+            //@ts-ignore
               .exponent(0.5)
               .domain(this.domain);
         } else if (this.transform === 'log') {
@@ -226,13 +244,14 @@ class Aesthetic {
       }
     }
     if (this.is_dictionary()) {
-      scale = scaleOrdinal().range(range).domain(this.domain);
-      if (schemes[range]) {
-        scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+        scale = scaleOrdinal()
+          .domain(this.domain);
+        if (typeof(range) === "string" && schemes[range]) {
+          scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+      } else {
+        scale.range(this.range)
       }
     }
-
-
     return scale
   }
 
@@ -247,6 +266,8 @@ class Aesthetic {
   field: string;
 
   get default_domain() {
+    // Look at the data to determine a reasonable default domain.
+    // Cached to _domains.
     if (this.field == undefined) {
       return [1, 1];
     }
@@ -256,6 +277,7 @@ class Aesthetic {
     // Maybe the table is checked out
     if (!this.tileSet.table) { return [1, 1]; }
     const { column } = this;
+    if (!column) { return [1, 1]; }
     if (column.type.dictionary) {
       this._domains[this.field] = [0, this.texture_size - 1];
     } else {
@@ -264,10 +286,11 @@ class Aesthetic {
     return this._domains[this.field];
   }
 
-  default_data() {
+  default_data() : Uint8Array | Float32Array | Array<number> {
     return Array(this.texture_size).fill(this.default_val);
-    return encodeFloatsRGBArange(Array(this.texture_size)
-      .fill(this.default_val)).array;
+/*    return encodeFloatsRGBArange(
+      Array(this.texture_size)
+      .fill(this.default_val)).array;*/
   }
 
   get domain() {
@@ -300,7 +323,7 @@ class Aesthetic {
     this.texture_type = this.regl.hasExtension('OES_texture_float')
       ? 'float' : this.regl.hasExtension('OES_texture_half_float')
         ? 'half float' : 'uint8';
-    if (this.label == 'color') console.log("getting textures", this.texture_type)
+//    if (this.label == 'color') console.log("getting textures", this.texture_type)
     this.texture_format = this.texture_type === 'uint8' ? 'rgba' : 'alpha';
 
     const params = {
@@ -321,9 +344,9 @@ class Aesthetic {
     return this.field + this.domain + this.range + this.transform;
   }
 
-  post_to_regl_buffer(buffer_name) {
+  post_to_regl_buffer(buffer_name : string) {
     if (this.label==='color') {
-      console.log("POSTING", this.textures, this.texture_buffer)
+//      console.log("POSTING", this.textures, this.texture_buffer)
     }
     this.textures[buffer_name].subimage({
       data: this.texture_buffer,
@@ -332,70 +355,61 @@ class Aesthetic {
     });
   }
 
-  clear() {
-    this.texture_buffer.set(this.default_data());
-    this.post_to_regl_buffer('one_d');
-    this.field = undefined;
-    this._domain = undefined;
-    this._range = undefined;
-    this._transform = undefined;
+  convert_string_encoding(channel : string) {
+    const v : BasicChannel = {
+      field : channel,
+      domain : this.default_domain,
+      range : this.default_range,
+    }
+    return v
   }
 
-  update(encoding) {
+  complete_domain(encoding : BasicChannel) {
+    encoding.domain = encoding.domain || this.default_domain;
+    return encoding
+  }
+
+  update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
     if (encoding === null) {
-      this.clear();
+      this.current_encoding = null;
       return;
     }
 
-    if (encoding === undefined) {
-      throw 'This should have been removed earlier';
+    if (typeof(encoding) === 'string') {
+      encoding = this.convert_string_encoding(encoding);
     }
 
-    if (
-      (encoding.field === 'x' || encoding.field === 'y')
-        && encoding.range) {
-      console.warn(`Asked for an x or y range, but it will be automatically
-                    set to the window scale.`);
-    }
-
-    this.stringversion = JSON.parse(JSON.stringify(encoding));
-
-    if (encoding.field === this.field
-        && encoding.op && this.field !== undefined) {
-      // op functions don't need any more caching than just the JSON.
+//    this.current_encoding = encoding;
+    this.current_encoding = JSON.parse(JSON.stringify(encoding));
+    
+    if (isConstantChannel(encoding)) {
+      this._constant = encoding.constant;
       return;
-    }
-
-    if (typeof (encoding) === 'string') {
-      encoding = parseLambdaString(encoding, false);
-      if (this.label.startsWith('filter')) {
-        encoding.domain = [-2047, 2047];
-      }
     }
 
     // Numbers or arrays treated as constants.
-    if (typeof (encoding) === 'number' || encoding.length) {
-      encoding = {
+    if (typeof (encoding) !== 'object') {
+      let x : ConstantChannel = {
         constant: encoding,
-        transform: 'literal',
-      };
+      }
+      this._constant = x.constant;
+      this.current_encoding = x;
+      return;
     }
 
-    if (encoding.lambda && typeof (encoding.lambda) === 'string') {
-    // May overwrite 'field!!'
-      Object.assign(encoding, parseLambdaString(encoding.lambda, false));
+    if (isLambdaChannel(encoding)) {
+       this._func = lambda_to_function(encoding);
     }
-
+    if (isOpChannel(encoding)) {
+      this._func = op_to_function(encoding)
+    }
     this.field = encoding.field;
+    if (encoding.domain === undefined) {
+      encoding.domain = this.default_domain;
+    }
 
-    this._domain = safe_expand(encoding.domain);
-    this._range = safe_expand(encoding.range);
-
-    this._constant = encoding.constant;
-
-    const {
-      label,
-    } = this;
+    this._domain = encoding.domain
+    this._range = encoding.range;
 
     const {
       lambda,
@@ -406,13 +420,8 @@ class Aesthetic {
 
     // resets to default if undefined
 
-    this._transform = encoding.transform || this.default_transform;
+    this._transform = encoding.transform || undefined;
 
-    const {
-      range,
-      domain,
-      transform,
-    } = this;
 
     // Passing a number directly means that all data
     // will simply be represented as that number.
@@ -476,8 +485,12 @@ class Aesthetic {
   apply_function_to_textures(field, range, function_reference) {
     let func;
     if (typeof (function_reference) === 'string') {
-      const [name, lambda] = function_reference.split('=>').map((d) => d.trim());
+      const [name, lambda, sentinel] = function_reference.split('=>').map((d) => d.trim());
+      if (sentinel !== undefined) {
+        throw `Can't handle multiple '=>' in function definition`;
+      }
       if (lambda === undefined) {
+        // Allow functions of 'x'.
         func = Function('x', function_reference);
       } else {
         func = Function(name, lambda);
@@ -485,12 +498,14 @@ class Aesthetic {
     } else {
       func = function_reference;
     }
-
-    this.scaleFunc = scaleLinear().range(range)
+    //@ts-ignore TEMPORARY XXX
+    this.scaleFunc = scaleLinear()
+      .range(range)
       .domain([0, this.texture_size - 1]);
 
     let input = arange(this.texture_size);
     if (field === undefined || this.tileSet.table === undefined) {
+      console.warning("SETTING EMPTY FIELD")
       this.texture_buffer.set(arange(this.texture_size).map((i) => 1));
       //      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return;
@@ -516,122 +531,89 @@ class Aesthetic {
   }
 }
 
-class Size extends Aesthetic {
-  get default_val() { return 1; }
+abstract class OneDAesthetic extends Aesthetic {
+  public aes_type = "one_d";
+  static get default_value() {return 1.5;}
+  static get_default_domain() {return [0, 1]}
+  static get_default_range() {return [0, 1]}
 }
 
-class X extends Aesthetic {
-  constructor(...args) {
-    super(...args);
+abstract class BooleanAesthetic extends Aesthetic {
+  public aes_type = "boolean";
+}
+
+class Size extends OneDAesthetic {
+ 
+}
+
+abstract class PositionalAesthetic extends OneDAesthetic {
+  constructor(label, scatterplot, regl, tile, number = -1) {
+    super(label, scatterplot, regl, tile, number = -1);
     this._transform = 'literal';
   }
-
-  get range() {
-    return this.tileSet.extent ? this.tileSet.extent.x : [-20, 20];
+  get range() : [number, number] {
+    if (this.tileSet.extent && this.tileSet.extent[this.label]) return this.tileSet.extent[this.label] 
+    return [-20, 20];
   }
+  static get default_val() { return 0; }
+}
 
-  get default_val() { return 1; }
+class X extends PositionalAesthetic {
 }
 
 class X0 extends X {}
 
-class Y extends X {
-  get range() {
-    const [min, max] = this.tileSet.extent ? this.tileSet.extent.y : [-20, 20];
-    return [max, min];
-  }
-}
+class Y extends PositionalAesthetic {}
 
 class Y0 extends Y {}
-class Filter extends Aesthetic {
-  get default_val() {
+
+abstract class AbstractFilter extends BooleanAesthetic {
+  public current_encoding : LambdaChannel | OpChannel;
+  static get default_val() {
     return 1;
   }
-
+  static get default_domain() {
+    return [0, 1];
+  }
   get domain() {
+//    return [-2047, 2047];
     return this.is_dictionary()
       ? [-2047, 2047] : [0, 1];
   }
 
-  get_function() {
-    const input = this.stringversion;
-
-    if (input && input['op']) {
-      if (input.op == 'gt') {
-        return (d) => d > input.a;
-      }
-      if (input.op == 'lt') {
-        return (d) => d < input.a;
-      }
-      if (input.op == 'eq') {
-        return (d) => d == input.a;
-      }
-      if (input.op == 'within') {
-        return (d) => Math.abs(d - input.a) <= input.b;
-      }
-    }
-    if (!this.encoding) {
-      return () => true;
-    }
-    const {
-      lambda,
-      field,
-    } = this.encoding;
-
-    if (!lambda) { return (d) => true; }
-    return (d) => lambda(d[field]);
-  }
-
   ops_to_array() : OpArray {
-    const input = this.stringversion;
-    if (!input || !input.op) {
+    const input = this.current_encoding;
+    if (input === null) return [0, 0, 0];
+    if (!isOpChannel(input)) {
       return [0, 0, 0];
     }
-
-    const val = [
+    if (input.op === 'within') {
+      return [4, input.a, input.b]
+    }
+    const val : OpArray = [
       // Encoding of op as number.
-      [null, 'lt', 'gt', 'eq', 'within']
+      [null, 'lt', 'gt', 'eq']
         .indexOf(input.op),
-      input.a || 0,
-      input.b || 0,
+      input.a,
+      0
     ];
     return val;
   }
 }
 
-function safe_expand(range) {
-  // the range of a scale can sensibly take several different forms.
 
-  // Usually for a color.
-  if (typeof (range) === 'string') {
-    return range;
-  }
+class Filter extends AbstractFilter {}
 
-  // If it's a number, put it at both ends of the scale.
-  if (typeof(range) === 'number') {
-    return [range, range];
-  }
-  if (range === undefined) {
-    // Sketchy.
-    return [1, 1];
-  }
-  // Copy the elements by spreading because a copy-by-reference will
-  //
-  try {
-    return [...range];
-  } catch (err) {
-    console.warn('No list for range', range);
-    return [1, 1];
-  }
-}
-
-class Filter1 extends Filter {}
-
-class Filter2 extends Filter {}
+class Filter2 extends AbstractFilter {}
 
 class Jitter_speed extends Aesthetic {
-  get default_val() { return 0.1; }
-}
+
+  constructor(label, scatterplot, regl, tile, number = -1) {
+    super(label, scatterplot, regl, tile, number = -1);
+    this.default_val = 0.5;
+  }
+
+  }
 
 function encode_jitter_to_int(jitter) {
   if (jitter === 'spiral') {
@@ -654,15 +636,23 @@ function encode_jitter_to_int(jitter) {
 }
 
 class Jitter_radius extends Aesthetic {
-  public method : string;
-  constructor(...args) {
-    super(...args);
-    this.method = 'None';
+  public jitter_int_formatted : 0 | 1 | 2 | 3 | 4 | 5;
+  public partner : Jitter_radius ;
+  public _method : string;
+  constructor(label, scatterplot, regl, tile, number = -1) {
+    super(label, scatterplot, regl, tile, number = -1);
+    this.default_val = 0.1;
   }
 
-  get default_val() { return 0.05; }
+  get method() {
+    return this._method || "None";
+  }
 
-  update(encoding) {
+  set method(value : string) {
+    this._method = value;
+  }
+
+  update(encoding): void {
     // The jitter method is buried in here.
     if (typeof (encoding) === 'number') {
       encoding = { constant: encoding };
@@ -672,7 +662,6 @@ class Jitter_radius extends Aesthetic {
     } else if (this.partner.method) {
       this.method = this.partner.method;
     }
-
     if (encoding.method === null) {
       this.method = 'None';
     }
@@ -682,14 +671,19 @@ class Jitter_radius extends Aesthetic {
   get jitter_int_format() {
     return encode_jitter_to_int(this.method);
   }
+  
 }
 
 class Color extends Aesthetic {
-
+  public label = 'color';
   public texture_type : "uint8";
-  get default_val() { return [.5, .5, .5, 1]; }
 
-  default_data() {
+  constructor(label, scatterplot, regl, tile, number = -1) {
+    super(label, scatterplot, regl, tile, number = -1);
+    this.default_val = [0.5, .5, 0.5];
+  }
+  
+  default_data() : Uint8Array {
     return color_palettes.viridis;
   }
 
@@ -716,6 +710,7 @@ class Color extends Aesthetic {
     };
     // Store the current and the last values for transitions.
     this._textures = {
+      // @ts-ignore
       one_d: this.regl.texture(params),
     };
 
@@ -753,16 +748,15 @@ class Color extends Aesthetic {
         return [r, g, b, 255];
       });
       this.texture_buffer.set(r.flat());
-      console.log("SETTING BUFFER", r.flat())
+//      console.log("SETTING BUFFER", r.flat())
     } else {
       console.warn(`request range of ${range} for color ${this.field} unknown`);
     }
-    console.log("WITH PARTNER", this.texture_buffer, this.partner.texture_buffer)
   }
 }
 
 export const dimensions = {
-  Size, Jitter_speed, Jitter_radius, Color, Filter1, Filter2, X, Y, X0, Y0,
+  Size, Jitter_speed, Jitter_radius, Color, Filter, Filter2, X, Y, X0, Y0,
 };
 
 export class StatefulAesthetic {
@@ -770,27 +764,28 @@ export class StatefulAesthetic {
   // The point is to handle transitions.
   // It might make sense to handle more than two states, but there are
   // diminishing returns.
-  public states : Aesthetic[];
+  public states : [Aesthetic, Aesthetic];
   public current_encoding : string;
   public needs_transitions = false;
   public label : string;
 
-  constructor(label, scatterplot, regl, tile) {
-    this.states = [];
+  constructor(label , scatterplot, regl, tile) {
     const lower = label.toLowerCase();
     this.label = lower;
     const Factory = dimensions[label];
-
     // state 0
-    this.states.push(new Factory(lower, scatterplot, regl, tile, 1));
-    // state 1
-    this.states.push(new Factory(lower, scatterplot, regl, tile, 2));
+    const states = []
 
+    states.push(new Factory(lower, scatterplot, regl, tile, 1));
+    states.push(new Factory(lower, scatterplot, regl, tile, 2));
+
+    this.states = [
+      new Factory(lower, scatterplot, regl, tile, 1),
+      new Factory(lower, scatterplot, regl, tile, 2)
+    ]
     const [first, second] = this.states;
     first.partner = second;
     second.partner = first;
-    /*    this.states[0].partner = this.states[1];
-    this.states[1].partner = this.states[0]; */
 
     for (const state of this.states) {
       state.update({ constant: default_aesthetics[lower].constant });
@@ -810,7 +805,7 @@ export class StatefulAesthetic {
     return this.states[1];
   }
 
-  update(encoding) {
+  update(encoding : BasicChannel | ConstantChannel) {
     const stringy = JSON.stringify(encoding);
     // Overwrite the last version.
     if (stringy == this.current_encoding || encoding === undefined) {
@@ -818,11 +813,6 @@ export class StatefulAesthetic {
       // we've seen an update without any change.
       if (this.needs_transitions) {
         // The first one is fine, but we gotta update the *last* one.
-        if (this.label == 'color') {
-          console.log(this.current_encoding, encoding);
-        } else {
-          console.log(this.label)
-        }
         this.states[1].update(JSON.parse(this.current_encoding));
       }
       this.needs_transitions = false;
@@ -836,9 +826,10 @@ export class StatefulAesthetic {
   }
 }
 
-function parseLambdaString(lambdastring : string, materialize = false) {
+
+function parseLambdaString(lambdastring : string) {
   // Materialize an arrow function from its string.
-  // Note that this *does* reassign 'this'.
+  // Note that this *does* reassign 'field'.
   let [field, lambda] = lambdastring.split('=>').map((d) => d.trim());
   if (lambda === undefined) {
     throw `Couldn't parse ${lambdastring} into a function`;
@@ -847,15 +838,58 @@ function parseLambdaString(lambdastring : string, materialize = false) {
   if (lambda.slice(0, 1) !== '{' && lambda.slice(0, 6) !== 'return') {
     lambda = `return ${lambda}`;
   }
-
   const func = `${field} => ${lambda}`;
-
-  if (materialize) {
-    return Function(field, lambda);
-  }
-
   return {
     field,
     lambda: func,
   };
 }
+
+
+function safe_expand(range) {
+  // the range of a scale can sensibly take several different forms.
+
+  // If it's a number, put it at both ends of the scale.
+  if (typeof(range) === 'number') {
+    return [range, range];
+  }
+  if (range === undefined) {
+    // Sketchy.
+    return [1, 1];
+  }
+  // Copy the elements by spreading because a copy-by-reference will
+  //
+  try {
+    return [...range];
+  } catch (err) {
+    console.warn('No list for range', range);
+    return [1, 1];
+  }
+}
+
+function op_to_function(input : OpChannel) {
+  if (input.op == 'gt') {
+    return (d : number) => d > input.a;
+  } else if (input.op == 'lt') {
+    return (d : number) => d < input.a;
+  } else if (input.op == 'eq') {
+    return (d : number) => d == input.a;
+  } else if (input.op == 'within') {
+    return (d : number) => Math.abs(d - input.a) <= input.b;
+  }
+}
+
+function lambda_to_function(input : LambdaChannel) {
+  if (typeof(input.lambda) === 'function') {
+    throw "Must pass a string to lambda, not a function."
+  }
+  const {
+    lambda,
+    field,
+  } = input;
+  const cleaned = parseLambdaString(lambda).lambda
+  const [arg, code] = cleaned.split('=>', 1).map((d) => d.trim());
+  const func = new Function(arg, code)
+  return (d) => func(d[field]);
+}
+

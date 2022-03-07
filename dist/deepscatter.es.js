@@ -42561,7 +42561,7 @@ class Tile extends Batch {
       return;
     }
     for (const p of this) {
-      if (p_in_rect$1([p.x, p.y], bounding)) {
+      if (p_in_rect([p.x, p.y], bounding)) {
         yield p;
       }
     }
@@ -42571,7 +42571,7 @@ class Tile extends Batch {
           continue;
         }
         for (const p of child.points(bounding, sorted)) {
-          if (p_in_rect$1([p.x, p.y], bounding)) {
+          if (p_in_rect([p.x, p.y], bounding)) {
             yield p;
           }
         }
@@ -42982,12 +42982,14 @@ class RootTile extends QuadTile {
     }
   }
 }
-function p_in_rect$1(p, rect) {
+
+function p_in_rect(p, rect) {
   if (rect === void 0) {
     return true;
   }
   return p[0] < rect.x[1] && p[0] > rect.x[0] && p[1] < rect.y[1] && p[1] > rect.y[0];
 }
+
 function area(rect) {
   return (rect.x[1] - rect.x[0]) * (rect.y[1] - rect.y[0]);
 }
