@@ -138,50 +138,6 @@ autogenerate_code()
   bool a_last_y_is_constant;
       
 
-  uniform float u_jitter_radius_buffer_num;
-  uniform float u_jitter_radius_constant;
-  uniform float u_jitter_radius_transform;
-  uniform vec2 u_jitter_radius_domain;
-  uniform vec2 u_jitter_radius_range;
-  uniform sampler2D u_jitter_radius_map;
-  uniform float u_jitter_radius_needs_map;
-  float a_jitter_radius;
-  bool a_jitter_radius_is_constant;
-      
-
-  uniform float u_last_jitter_radius_buffer_num;
-  uniform float u_last_jitter_radius_constant;
-  uniform float u_last_jitter_radius_transform;
-  uniform vec2 u_last_jitter_radius_domain;
-  uniform vec2 u_last_jitter_radius_range;
-  uniform sampler2D u_last_jitter_radius_map;
-  uniform float u_last_jitter_radius_needs_map;
-  float a_last_jitter_radius;
-  bool a_last_jitter_radius_is_constant;
-      
-
-  uniform float u_jitter_speed_buffer_num;
-  uniform float u_jitter_speed_constant;
-  uniform float u_jitter_speed_transform;
-  uniform vec2 u_jitter_speed_domain;
-  uniform vec2 u_jitter_speed_range;
-  uniform sampler2D u_jitter_speed_map;
-  uniform float u_jitter_speed_needs_map;
-  float a_jitter_speed;
-  bool a_jitter_speed_is_constant;
-      
-
-  uniform float u_last_jitter_speed_buffer_num;
-  uniform float u_last_jitter_speed_constant;
-  uniform float u_last_jitter_speed_transform;
-  uniform vec2 u_last_jitter_speed_domain;
-  uniform vec2 u_last_jitter_speed_range;
-  uniform sampler2D u_last_jitter_speed_map;
-  uniform float u_last_jitter_speed_needs_map;
-  float a_last_jitter_speed;
-  bool a_last_jitter_speed_is_constant;
-      
-
   uniform float u_size_buffer_num;
   uniform float u_size_constant;
   uniform float u_size_transform;
@@ -349,12 +305,6 @@ uniform vec3 u_constant_last_color;
 // The fill color.
 varying vec4 fill;
 varying float point_size;
-
-uniform float u_jitter_radius_lookup;
-uniform float u_jitter_radius_lookup_y_constant;
-uniform sampler2D u_jitter_radius_lookup_map;
-uniform vec2 u_jitter_radius_lookup_x_domain;
-uniform vec2 u_jitter_radius_lookup_y_domain;
 
 float point_size_adjust;
 
@@ -565,7 +515,6 @@ float combine_filters(
   }
 }
 
-#pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
 #pragma glslify: packFloat = require('glsl-read-float')
 #pragma glslify: easeCubic = require(glsl-easings/sine-in-out)
 
@@ -669,133 +618,6 @@ vec4 ixToRGBA(in float ix)  {
   return vec4(min, mid, high, 1.);
 }
 
-vec2 circle_jitter(in float ix, in float aspect_ratio, in float time,
-                   in float radius, in float speed) {
-  vec2 two_gaussians = box_muller(ix, 12.);
-
-  float stagger_time = two_gaussians.y * tau;
-
-  // How long does a circuit take?
-
-  float units_per_period = radius * radius * tau / 2.;
-  float units_per_second = speed / 100.;
-  float seconds_per_period = units_per_period / units_per_second;
-  float time_period = seconds_per_period;
-  if (time_period > 1e4) {
-    return vec2(0., 0.);
-  }
-
-  // Adjust time from the clock to our current spot.
-  float varying_time = time + stagger_time * time_period;
-  // Where are we from 0 to 1 relative to the time period
-
-  float relative_time = 1. - mod(varying_time, time_period) / time_period;
-
-  float theta = relative_time * tau;
-
-  float r_mult = (sqrt(ix_to_random(ix, 7.)));
-  return vec2(cos(theta) * r_mult, aspect_ratio * sin(theta) * r_mult) *
-         radius;
-}
-
-vec2 calculate_jitter(
-  in float jitter_type,
-  in float ix, // distinguishing index
-  in sampler2D jitter_radius_map,
-  in vec2 jitter_radius_domain,
-  in vec2 jitter_radius_range,
-  in float jitter_radius_transform,
-  in float jitter_radius,
-  in float jitter_radius_needs_map,
-  in bool jitter_radius_is_constant,
-  in sampler2D jitter_speed_map,
-  in vec2 jitter_speed_domain,
-  in vec2 jitter_speed_range,
-  in float jitter_speed_transform,
-  in float jitter_speed,
-  in float jitter_speed_needs_map,
-  in bool jitter_speed_is_constant
-) {
-
-  // Jitter is calculated based on speed, so requires two full maps in.
-
-  if (jitter_type == 0.) {
-    // No jitter
-    return vec2(0., 0.);
-  }
-
-  if (jitter_type == 5.) {
-    // Temporal jitter--should be broken out into a separate channel/channels.
-    float time_period = 60.;
-    float share = 1./4.;
-    float offset = ix_to_random(ix, 12.);
-    float fractional = fract((offset * time_period + u_time)/time_period);
-    if (fractional > share) {
-      return vec2(0., 0.);
-    }
-    float size = 0.5 * (1. - cos(2. * 3.1415926 * min(fractional/share, 1. - fractional/share)));
-    size = clamp(size, 0., 1.);
-    return vec2(size, 0.);
-  }
-  float jitter_r;  
-  if (jitter_radius_is_constant) {
-    jitter_r = jitter_radius;
-  } else {
-    jitter_r = texture_float_lookup(
-    jitter_radius_map,
-    jitter_radius_domain,
-    jitter_radius_range,
-    jitter_radius_transform,
-    jitter_radius,
-    0., 0., vec2(-1., 1.));
-  }
-  if (jitter_type == 3.) {
-    float r = box_muller(ix, 1.).r * jitter_r;
-    r = r / u_k;    
-    float theta = ix_to_random(ix, 15.) * tau;
-    return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);
-  }
-
-  if (jitter_type == 2.) {
-    // uniform in the circle.
-    float theta = ix_to_random(ix, 15.) * tau;
-    float r = jitter_r * sqrt(ix_to_random(ix, 115.));
-    r = r / u_k;
-    return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);
-  }
-
-  /* Jittering that includes motion) */
-
-  float p_jitter_speed =
-      texture_float_lookup(jitter_speed_map, jitter_speed_domain,
-                          jitter_speed_range,
-                          jitter_speed_transform, jitter_speed,
-                          jitter_speed_needs_map,  1., vec2(0., 2.));
-
-  if (jitter_type == 1.) {
-    return logarithmic_spiral_jitter(
-                ix,
-                0.005 * jitter_r,                     // a
-                1.3302036,                       // angle parameter
-                0.005,                                 // angle random
-                jitter_r,                             // max radius
-                0.03,                                 // random_rotation
-                0.06,                                 // random radius
-                0.003 * point_size_adjust * jitter_r, // donut.
-                .5 * p_jitter_speed * jitter_r / point_size_adjust, // speed
-                u_time,                                           // time
-                0.8,                                              // acceleration
-                2.0,                                              // n_spirals
-                .09, //shear
-                u_width/u_height         // shear
-            );
-  }
-
-  if (jitter_type == 4.) {
-    // circle
-    return circle_jitter(ix, u_width/u_height, u_time, jitter_r, p_jitter_speed);
-  }
-}
 
 void run_color_fill(in float ease) {
   if (u_only_color >= -1.5) {
@@ -875,38 +697,6 @@ void main() {
     } else {
       a_last_y = u_last_y_constant;
       a_last_y_is_constant = true;
-    }
-
-    if (u_jitter_radius_buffer_num > -0.5) {
-      a_jitter_radius = get_buffer(u_jitter_radius_buffer_num);
-      a_jitter_radius_is_constant = false;
-    } else {
-      a_jitter_radius = u_jitter_radius_constant;
-      a_jitter_radius_is_constant = true;
-    }
-
-    if (u_last_jitter_radius_buffer_num > -0.5) {
-      a_last_jitter_radius = get_buffer(u_last_jitter_radius_buffer_num);
-      a_last_jitter_radius_is_constant = false;
-    } else {
-      a_last_jitter_radius = u_last_jitter_radius_constant;
-      a_last_jitter_radius_is_constant = true;
-    }
-
-    if (u_jitter_speed_buffer_num > -0.5) {
-      a_jitter_speed = get_buffer(u_jitter_speed_buffer_num);
-      a_jitter_speed_is_constant = false;
-    } else {
-      a_jitter_speed = u_jitter_speed_constant;
-      a_jitter_speed_is_constant = true;
-    }
-
-    if (u_last_jitter_speed_buffer_num > -0.5) {
-      a_last_jitter_speed = get_buffer(u_last_jitter_speed_buffer_num);
-      a_last_jitter_speed_is_constant = false;
-    } else {
-      a_last_jitter_speed = u_last_jitter_speed_constant;
-      a_last_jitter_speed_is_constant = true;
     }
 
     if (u_size_buffer_num > -0.5) {
@@ -1074,12 +864,7 @@ void main() {
   } else {
      position.x = -1. + 2. * linscale(u_x_domain, position.x);
     //position.y = -1.0;
-    vec2 jitterspec = vec2(
-      (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,
-      (ix_to_random(ix, 1.5) * a_jitter_speed ) * 2.
-    );
 
-    position = position + jitterspec;
   }
 
   if (debug_mode > 0.) {
@@ -1129,50 +914,8 @@ void main() {
   point_size_adjust = exp(log(u_k) * u_zoom_balance);
 
   gl_PointSize = point_size_adjust * size_multiplier;
-
-  vec2 jitter = vec2(0., 0.);
-
-  if (plot_actual_position && (u_jitter > 0. || u_last_jitter > 0.)) {
-    /* JITTER */
-    float jitter_radius_fraction;
-      jitter = calculate_jitter(
-        u_jitter, ix, u_jitter_radius_map,
-        u_jitter_radius_domain,        u_jitter_radius_range,
-        u_jitter_radius_transform,        a_jitter_radius,
-        u_jitter_radius_needs_map,        a_jitter_radius_is_constant,
-        u_jitter_speed_map, u_jitter_speed_domain,
-        u_jitter_speed_range,
-        u_jitter_speed_transform, a_jitter_speed,
-        u_jitter_speed_needs_map, a_jitter_speed_is_constant
-      );
-
-    vec2 last_jitter;
-    if (ease < 1.) {
-      last_jitter = calculate_jitter(
-        u_last_jitter, ix,
-        u_last_jitter_radius_map,
-        u_last_jitter_radius_domain,        u_last_jitter_radius_range,
-        u_last_jitter_radius_transform,        a_last_jitter_radius,
-        u_last_jitter_radius_needs_map,        a_last_jitter_radius_is_constant,
-        u_last_jitter_speed_map,         u_last_jitter_speed_domain,
-        u_last_jitter_speed_range,
-        u_last_jitter_speed_transform, a_last_jitter_speed,
-        u_last_jitter_speed_needs_map,        a_last_jitter_speed_is_constant
-      );
-      jitter = mix(last_jitter, jitter, ease);
-    }
-    if (u_jitter == 5.) {
-      gl_PointSize *= jitter.x;
-      jitter = vec2(0., 0.);
-      if (gl_PointSize < 0.05) {
-        gl_Position = discard_me;
-        return;
-      }
-    }
-    gl_Position = vec4(position + jitter, 0., 1.);
-  } else {
-    gl_Position = vec4(position + jitter, 0., 1.);
-  }  
+  
+  gl_Position = vec4(position, 0., 1.);
   if (u_color_picker_mode > 0.) {
     // Add one so the first element is distinguishable.
     fill = packFloat(ix + 1.);
