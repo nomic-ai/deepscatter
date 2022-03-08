@@ -35,12 +35,15 @@ export default class Scatterplot {
   d3 : Object;
   private _zoom : Zoom;
   prefs : APICall;
+  ready : Promise<void>;
   
   constructor(selector, width, height) {
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
     }
+    // Unresolvable.
+    this.ready = Promise.resolve()
     this.d3 = { select };
   }
 
@@ -120,7 +123,8 @@ export default class Scatterplot {
 
     this._renderer.initialize();
 
-    return this._root.promise;
+    this.ready = this._root.promise;
+    return this.ready;
   }
 
   /*
@@ -256,13 +260,20 @@ export default class Scatterplot {
     for all but a few data keys. CSS styling can make
     these look better.
     */
-    this._tooltip_html = func;
-    this._zoom._tooltip_html = func;
+
+    // aargh. We have to wait for the zoom object to exist to have a
+    // sensible place to stash this function, but there's not an easy
+    // way to wait for that.
+    if (!this._zoom) {
+      setTimeout(() => this.tooltip_html = func, 100);
+    } else {
+      this._zoom._tooltip_html_function = func;
+    }
   }
 
   get tooltip_html() {
     /* PUBLIC see set tooltip_html */
-    return this._tooltip_html;
+    return this._zoom.tooltip_html;
   }
 
   async plotAPI(prefs = {}) {
