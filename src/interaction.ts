@@ -18,7 +18,8 @@ export default class Zoom {
   public height : number;
   public renderers : Map<string, Renderer>;
   public tileSet : RootTile;
-  public _tooltip_html : string;
+  public _tooltip_html_string? : string;
+  public _tooltip_html_function? : Function;
   constructor(selector, prefs) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
@@ -28,7 +29,7 @@ export default class Zoom {
     this.canvas = select(selector);
     this.width = +this.canvas.attr('width');
     this.height = +this.canvas.attr('height');
-
+    this.renderers = new Map();
     // A zoom keeps track of all the renderers
     // that it's in charge of adjusting.
 
@@ -99,12 +100,17 @@ export default class Zoom {
 
   get tooltip_html() {
     // a function that 
-    if (this._tooltip_html === undefined) {
+    if (this._tooltip_html_function === undefined) {
       return label_from_point
     } else {
-      return this._tooltip_html
+      return this._tooltip_html_function
     }
   }
+
+  set tooltip_html(f) {
+    throw new Error('Don\'t set this directly; set on the parent scatterplot.');
+  }
+
 
   zoom_to_bbox(corners, duration = 4) {
     // Zooms to two points.
