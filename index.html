@@ -11,6 +11,8 @@
   <div id="controls" style="z-index:99;position:fixed;">
   <input type="range" min=0 max=.5 step=.01 id="jitter" value=.05 />
   <button id="flip">Change encoding</button>
+
+  <button id="html">Change tooltip HTML</button>
   <pre id="ident"></pre>
   </div>
 </body>
@@ -110,6 +112,12 @@
         }
       }
     })
+  })
+  let weird = false;
+  select("#html").on("click", () => {
+    scatterplot.tooltip_html = (datum) => {
+      return `This is point number <span style="color:blue">${datum.ix}</span>`;
+    }
   })
   select("#flip").on("click", () => {
     cycle += 1

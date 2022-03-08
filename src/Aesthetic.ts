@@ -323,7 +323,6 @@ class Aesthetic {
 
   post_to_regl_buffer(buffer_name) {
     if (this.label==='color') {
-      console.log("POSTING", this.textures, this.texture_buffer)
     }
     this.textures[buffer_name].subimage({
       data: this.texture_buffer,
@@ -753,11 +752,9 @@ class Color extends Aesthetic {
         return [r, g, b, 255];
       });
       this.texture_buffer.set(r.flat());
-      console.log("SETTING BUFFER", r.flat())
     } else {
       console.warn(`request range of ${range} for color ${this.field} unknown`);
     }
-    console.log("WITH PARTNER", this.texture_buffer, this.partner.texture_buffer)
   }
 }
 
@@ -818,11 +815,6 @@ export class StatefulAesthetic {
       // we've seen an update without any change.
       if (this.needs_transitions) {
         // The first one is fine, but we gotta update the *last* one.
-        if (this.label == 'color') {
-          console.log(this.current_encoding, encoding);
-        } else {
-          console.log(this.label)
-        }
         this.states[1].update(JSON.parse(this.current_encoding));
       }
       this.needs_transitions = false;
