@@ -2,3 +2,4 @@ node_modules
 public/tiles
 .vscode
 
+dist/tiles

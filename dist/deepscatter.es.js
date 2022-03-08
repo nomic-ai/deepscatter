@@ -5302,6 +5302,7 @@ class Zoom {
     this.width = +this.canvas.attr("width");
     this.height = +this.canvas.attr("height");
     this.renderers = new Map();
+    this.renderers = new Map();
   }
   attach_tiles(tiles) {
     this.tileSet = tiles;
@@ -5337,8 +5338,11 @@ class Zoom {
     if (this._tooltip_html_function === void 0) {
       return label_from_point;
     } else {
-      return this._tooltip_html;
+      return this._tooltip_html_function;
     }
+  }
+  set tooltip_html(f) {
+    throw new Error("Don't set this directly; set on the parent scatterplot.");
   }
   zoom_to_bbox(corners, duration = 4) {
     const scales2 = this.scales();
@@ -13506,16 +13510,35 @@ class Renderer {
     this.zoom = zoom2;
     return this;
   }
+  _click_function_from_string() {
+    return Function("datum", this.scatterplot.prefs.click_function);
+  }
+  _click_function_matches_prefs() {
+    if (this._click_function_type == "string" && this._click_function == this._click_function_from_string()) {
+      return true;
+    } else if (this._click_function_type == "function" && this._click_function == this.scatterplot.prefs.click_function) {
+      return true;
+    }
+    return false;
+  }
   set click_function(f) {
-    this._current_click_function_string = this.scatterplot.prefs.click_function;
-    this._click_function = Function("datum", this._current_click_function_string);
+    if (typeof this.scatterplot.prefs.click_function == "function") {
+      this._click_function_type = "function";
+      this._click_function = this.scatterplot.prefs.click_function;
+    } else if (typeof this.scatterplot.prefs.click_function == "string") {
+      this._click_function_type = "string";
+      this._click_function = this._click_function_from_string();
+    } else {
+      console.log("Unrecognized click_function type; should be string or function.");
+      this._click_function_type = null;
+      this._click_function = function() {
+      };
+    }
   }
   get click_function() {
-    if (this._current_click_function_string && this._current_click_function_string === this.scatterplot.prefs.click_function) {
-      return this._click_function;
+    if (!this._click_function || !this._click_function_matches_prefs()) {
+      this.click_function = this.scatterplot.prefs.click_function;
     }
-    this._current_click_function_string = this.scatterplot.prefs.click_function;
-    this._click_function = Function("datum", this.scatterplot.prefs.click_function);
     return this._click_function;
   }
   *initialize() {
@@ -36238,6 +36261,7 @@ class Scatterplot {
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
     }
+    this.ready = Promise.resolve();
     this.d3 = { select };
   }
   bind(selector2, width, height) {
@@ -36277,7 +36301,8 @@ class Scatterplot {
     ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
     this._renderer.initialize();
-    return this._root.promise;
+    this.ready = this._root.promise;
+    return this.ready;
   }
   visualize_tiles() {
     const map2 = this;
@@ -36336,11 +36361,14 @@ class Scatterplot {
     merge(this.prefs, prefs);
   }
   set tooltip_html(func) {
-    this._tooltip_html = func;
-    this._zoom._tooltip_html = func;
+    if (!this._zoom) {
+      setTimeout(() => this.tooltip_html = func, 100);
+    } else {
+      this._zoom._tooltip_html_function = func;
+    }
   }
   get tooltip_html() {
-    return this._tooltip_html;
+    return this._zoom.tooltip_html;
   }
   async plotAPI(prefs = {}) {
     if (prefs === void 0 || prefs === null) {
