@@ -7699,6 +7699,7 @@ class Zoom {
     this.width = +this.canvas.attr("width");
     this.height = +this.canvas.attr("height");
     this.renderers = new Map();
+    this.renderers = new Map();
   }
   attach_tiles(tiles) {
     this.tileSet = tiles;
@@ -7724,18 +7725,21 @@ class Zoom {
   }
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
-    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", 0.75), (exit) => exit, (update) => update.html((d) => this.tooltip_html(d.data)));
+    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", 0.75), (update) => update.html((d) => this.tooltip_html(d.data)), (exit) => exit.call((e) => e.remove()));
     els.html((d) => this.tooltip_html(d.data)).style("transform", (d) => {
       const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
       return t;
     });
   }
   get tooltip_html() {
-    if (this._tooltip_html === void 0) {
+    if (this._tooltip_html_function === void 0) {
       return label_from_point;
     } else {
-      return this._tooltip_html;
+      return this._tooltip_html_function;
     }
+  }
+  set tooltip_html(f) {
+    throw new Error("Don't set this directly; set on the parent scatterplot.");
   }
   zoom_to_bbox(corners, duration = 4) {
     const scales = this.scales();
@@ -7783,12 +7787,8 @@ class Zoom {
           dy: 30
         }
       ] : [];
-      if (!d)
-        return;
       const { x_, y_ } = this.scales();
-      if (annotations.length) {
-        this.html_annotation(annotations);
-      }
+      this.html_annotation(annotations);
       select("#deepscatter-svg").selectAll("circle.label").data(data2, (d_) => d_.ix).join((enter) => enter.append("circle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.color.current.apply(dd)).attr("cx", (datum) => x_(x_aes.value_for(datum))).attr("cy", (datum) => y_(y_aes.value_for(datum))), (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.color.current.apply(dd)), (exit) => exit.call((e) => e.remove())).on("click", (ev, dd) => {
         this.renderers.get("regl").click_function(dd, ev);
       });
@@ -19326,9 +19326,7 @@ class Aesthetic {
     return this.field + this.domain + this.range + this.transform;
   }
   post_to_regl_buffer(buffer_name) {
-    if (this.label === "color") {
-      console.log("POSTING", this.textures, this.texture_buffer);
-    }
+    if (this.label === "color") ;
     this.textures[buffer_name].subimage({
       data: this.texture_buffer,
       width: 1,
@@ -19661,11 +19659,9 @@ class Color extends Aesthetic {
         return [r2, g, b, 255];
       });
       this.texture_buffer.set(r.flat());
-      console.log("SETTING BUFFER", r.flat());
     } else {
       console.warn(`request range of ${range$1} for color ${this.field} unknown`);
     }
-    console.log("WITH PARTNER", this.texture_buffer, this.partner.texture_buffer);
   }
 }
 const dimensions = {
@@ -19707,11 +19703,6 @@ class StatefulAesthetic {
     const stringy = JSON.stringify(encoding);
     if (stringy == this.current_encoding || encoding === void 0) {
       if (this.needs_transitions) {
-        if (this.label == "color") {
-          console.log(this.current_encoding, encoding);
-        } else {
-          console.log(this.label);
-        }
         this.states[1].update(JSON.parse(this.current_encoding));
       }
       this.needs_transitions = false;
@@ -43061,6 +43052,7 @@ class Scatterplot {
     if (selector !== void 0) {
       this.bind(selector, width, height);
     }
+    this.ready = Promise.resolve();
     this.d3 = { select };
   }
   bind(selector, width, height) {
@@ -43100,7 +43092,8 @@ class Scatterplot {
     ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
     this._renderer.initialize();
-    return this._root.promise;
+    this.ready = this._root.promise;
+    return this.ready;
   }
   visualize_tiles() {
     const map = this;
@@ -43159,11 +43152,14 @@ class Scatterplot {
     merge(this.prefs, prefs);
   }
   set tooltip_html(func) {
-    this._tooltip_html = func;
-    this._zoom._tooltip_html = func;
+    if (!this._zoom) {
+      setTimeout(() => this.tooltip_html = func, 100);
+    } else {
+      this._zoom._tooltip_html_function = func;
+    }
   }
   get tooltip_html() {
-    return this._tooltip_html;
+    return this._zoom.tooltip_html;
   }
   async plotAPI(prefs = {}) {
     if (prefs === void 0 || prefs === null) {
