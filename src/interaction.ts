@@ -89,9 +89,9 @@ export default class Zoom {
           .style('padding', '10px')
           .style('background', 'ivory')
           .style('opacity', 0.75),
-        (exit) => exit,
         (update) => update
           .html((d) => this.tooltip_html(d.data)),
+        (exit) => exit.call((e) => e.remove())
       );
 
     els
@@ -103,8 +103,8 @@ export default class Zoom {
   }
 
   get tooltip_html() {
-    // a function that 
-    if (this._tooltip_html === undefined) {
+    // a function that
+    if (this._tooltip_html_function === undefined) {
       return label_from_point
     } else {
       return this._tooltip_html
@@ -186,14 +186,9 @@ export default class Zoom {
         },
       ] : [];
 
-      if (!d) return;
-
       const { x_, y_ } = this.scales();
 
-      if (annotations.length) {
-        // When a function is "annotated", this gets called.
-        this.html_annotation(annotations);
-      }
+      this.html_annotation(annotations);
 
       const labelSet = select('#deepscatter-svg')
         .selectAll('circle.label')

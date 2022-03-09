@@ -5327,14 +5327,14 @@ class Zoom {
   }
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
-    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", 0.75), (exit) => exit, (update) => update.html((d) => this.tooltip_html(d.data)));
+    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", 0.75), (update) => update.html((d) => this.tooltip_html(d.data)), (exit) => exit.call((e) => e.remove()));
     els.html((d) => this.tooltip_html(d.data)).style("transform", (d) => {
       const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
       return t;
     });
   }
   get tooltip_html() {
-    if (this._tooltip_html === void 0) {
+    if (this._tooltip_html_function === void 0) {
       return label_from_point;
     } else {
       return this._tooltip_html;
@@ -5386,12 +5386,8 @@ class Zoom {
           dy: 30
         }
       ] : [];
-      if (!d)
-        return;
       const { x_, y_ } = this.scales();
-      if (annotations.length) {
-        this.html_annotation(annotations);
-      }
+      this.html_annotation(annotations);
       select("#deepscatter-svg").selectAll("circle.label").data(data2, (d_) => d_.ix).join((enter) => enter.append("circle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))), (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)), (exit) => exit.call((e) => e.remove())).on("click", (ev, dd) => {
         this.renderers.get("regl").click_function(dd, ev);
       });
