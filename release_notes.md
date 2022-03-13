@@ -1,7 +1,8 @@
 # 2.1.0
 
-1. Major refactor to use typescript. This requires standardizing some of the approaches to API a bit more. Most
-   files renamed from `.js` to `.ts`.
+1. Major refactor to use typescript. This requires standardizing some of the approaches to API a bit more, and 
+   likely will cause some short-term breakage until all changes are found. Most
+   files renamed from `.js` to `.ts`. Not yet passing all typescript checks.
 
 2. Shift texture strategy for lookups to minimize number of samplers; from 16 in the old version to two
    in the new one (one for one-d channels like filters, and the other for color schemes.) Introduces a new 
