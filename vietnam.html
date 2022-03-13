@@ -1,0 +1,96 @@
+<style>
+  .ttooltip {
+    z-index: 99
+  }
+</style>
+
+<body>
+  <h1>Welcome to a demo/test page.</h1>
+  <div id="deepscatter">
+  </div>
+  <div id="overlay" style="z-index:99;position:fixed;"></div>
+  <button id="flip" style="z-index:99;position:fixed;">Change encoding</button>
+  <pre id="ident" style="z-index:99;position:fixed;"></pre>
+
+</body>
+
+<head>
+  <style>
+      dt {
+          float: left;
+          clear: left;
+          width: 90px;
+          font-weight: bold;
+          color: rgb(128, 19, 0);
+      }
+
+      dt::after {
+          content: ":";
+      }
+
+      dd {
+          margin: 0 0 0 80px;
+          padding: 0 0 0.5em 0;
+          width: 180px;
+      }
+  </style>
+</head>
+
+
+<script type="module" lang="ts">
+  import Scatterplot from './src/deepscatter';
+  import { select } from 'd3-selection';
+  window.select = select; // For the click function below.
+  const prefs = {
+    "source_url" : 'https://bmschmidt.github.io/vietnam_war/',
+    "max_points": 1000,
+    "alpha" : .12, // Target saturation for the full page.
+    "zoom_balance" : 0.12, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
+    "point_size": 3, // Default point size before application of size scaling
+    "background_color": "#331122",
+    "click_function": "select('#ident').html(JSON.stringify(datum, undefined, 2))",
+    zoom: {
+      bbox: {"x":[99.15172120932304,114.17888963818825],"y":[7.0849741134400706,23.626158008070647]}
+    },
+    "encoding": {
+      jitter_radius : 0.4,
+      "color": {
+        "field": "COUNTRYFLYINGMISSION",
+        "range": "category10",
+        domain: [-2047, 2047]
+      },
+      "x": {
+        field: "x",
+        transform: "literal"
+      },
+      "y": {
+        field: "y", 
+        transform: "literal"
+      }
+    }
+  };
+
+
+  const scatterplot = new Scatterplot("#deepscatter")
+  const first_draw = scatterplot.plotAPI(prefs);
+  window.plot = scatterplot; // For debugging
+
+
+  // Simple animation demonstration.
+
+  let cycle = 0;
+
+  const width = 600;
+  first_draw.then( () => {
+    const labels = scatterplot._renderer.aes.color.current.scale.domain().slice(0, 10)
+    const holder = select("#overlay")
+    holder.style("display", "flex").style("width", width * .66).style("font-style", "10px sans-serif").style("flex-wrap", "wrap")
+    holder.selectAll("div").data(labels).join("div")
+      .style("margin", "1px")
+    .style("background-color", d => plot._renderer.aes.color.current.scale(d)).text(d => d)
+    .on("mouseover", (event, d) => scatterplot.plotAPI(
+      {'encoding': {'filter': {"lambda" : `subject_1 => subject_1 === "${d}"`
+    }}, 'duration': 0.5}))
+  })
+
+</script>
