@@ -27,37 +27,6 @@ export default class ArrowMetaTable {
     return this._promise;
   }
 
-  get_cached_crosstab_texture(dimensions, orders, regl) {
-    const { x, y, z } = dimensions;
-    const id = `${x}-${y}-${z}`;
-    if (this.textures.get(id)) {
-      return this.textures.get(id);
-    }
-    const {
-      crosstabs, y_domain, x_domain, shape,
-    } = this.crosstab_array(dimensions, orders);
-
-    const z_data = encodeFloatsRGBArange(crosstabs);
-
-    this.textures.set(id, {
-      texture: regl.texture(
-        {
-          type: 'uint8',
-          format: 'rgba',
-          data: z_data.array,
-          height: shape[0],
-          width: crosstabs[0].length,
-        },
-      ),
-      x_domain,
-      y_domain,
-      z_domain: z_data.extent,
-      shape,
-    });
-    console.log(z_data.extent, z_data.array);
-    return this.textures.get(id);
-  }
-
   crosstab_array(dimensions, orders = {}) {
     /* x is the rows of the texture, y the columns, and
     z a value encoded as a floating point. eg:
@@ -73,8 +42,6 @@ export default class ArrowMetaTable {
 
     // This assumes that y will be a date field, and
     // x will produce strings.
-    // console.log(x, y, z)
-    // console.log(tab.schema.fields.map(d => d.name))
     const y_values = tab.getColumn(y).data.values;
     const x_values = tab.getColumn(x).toArray();
     const z_values = tab.getColumn(z).toArray();

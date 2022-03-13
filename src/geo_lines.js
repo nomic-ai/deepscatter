@@ -31,7 +31,6 @@ export default class GeoLines {
         position += 2
       }
     }
-    console.log("Creating topojson buffer")
     this.line_buffer = this.regl.buffer(buffer);
     this.line_meta = start_points;
 

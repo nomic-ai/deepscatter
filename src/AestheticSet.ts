@@ -1,13 +1,19 @@
 /* eslint-disable no-param-reassign */
-import type { Regl } from 'regl';
-import { dimensions as Aesthetic, 
-  default_aesthetics, StatefulAesthetic 
+import type { Regl, Texture2D } from 'regl';
+import { 
+  stateful_aesthetics,
 } from './Aesthetic';
 import type Scatterplot from './deepscatter';
 import type RootTile from './tile';
 import type { Encoding } from './types';
-export const aesthetic_variables = Array.from(Object.keys(Aesthetic))
-  .map((d) => d.toLowerCase());
+import type {StatefulAesthetic} from './Aesthetic';
+//export const aesthetic_variables = Array.from(Object.keys(Aesthetic))
+//  .map((d) => d.toLowerCase());
+
+function capitalize_first_letter(string) {
+  // written by co-pilot!
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
 
 export class AestheticSet {
   public tileSet : RootTile;
@@ -15,40 +21,49 @@ export class AestheticSet {
   public regl : Regl;
   public encoding : Encoding;
   public position_interpolation : boolean;
-  public x : StatefulAesthetic;
-  public y : StatefulAesthetic;
-  public size : StatefulAesthetic
-  public color : StatefulAesthetic;
-  public filter : StatefulAesthetic;
-  public filter2 : StatefulAesthetic;
-  public jitter_speed : StatefulAesthetic;
-  public jitter_radius : StatefulAesthetic;
-  
+  private store : Record<string, StatefulAesthetic<any>>;
+  public aesthetic_map : TextureSet;
   constructor(scatterplot : Scatterplot, regl : Regl, tileSet : RootTile) {
     this.scatterplot = scatterplot;
+    this.store = {};
     this.regl = regl;
     this.tileSet = tileSet;
     this.position_interpolation = false;
-    const rest = [scatterplot, regl, tileSet];
-    this.x= new StatefulAesthetic('X', scatterplot, regl, tileSet);
-    this.y = new StatefulAesthetic('Y', scatterplot, regl, tileSet);
-    this.color = new StatefulAesthetic('Color', scatterplot, regl, tileSet);
-    this.filter = new StatefulAesthetic('Filter', scatterplot, regl, tileSet);
-    this.filter2 = new StatefulAesthetic('Filter2', scatterplot, regl, tileSet);
-    this.jitter_speed = new StatefulAesthetic('Jitter_speed', scatterplot, regl, tileSet);
-    this.jitter_radius = new StatefulAesthetic('Jitter_radius', scatterplot, regl, tileSet);
-    this.size = new StatefulAesthetic('Size', scatterplot, regl, tileSet);
+    this.aesthetic_map = new TextureSet(this.regl);
     return this
   }
+
+  public dim(aesthetic : string) {
+    if (this.store[aesthetic]) {
+      return this.store[aesthetic]
+    }
+    if (stateful_aesthetics[aesthetic] !== undefined) {
+      this.store[aesthetic] = new stateful_aesthetics[aesthetic](
+        this.scatterplot, this.regl, this.tileSet, 
+        this.aesthetic_map
+      );
+      return this.store[aesthetic]
+    }
+  }
   
-  *[Symbol.iterator]() : Iterator<[string, StatefulAesthetic]> {
-    for (let k of ['x', 'y', 'color', 'filter', 'filter2',
-                   'jitter_speed', 'jitter_radius', 'size']) {
-      yield [k, this[k]];
+  *[Symbol.iterator]() : Iterator<[string, StatefulAesthetic<any>]> {
+    for (let [k, v] of Object.entries(this.store)) {
+      yield [k, v]
     }
   }
 
   interpret_position(encoding : Encoding) {
+    /* 
+    I allow a couple weird ways of representing positions.
+
+    First, you can specify just 'position' as a string and it will 
+    parse into 'position.x' and 'position.y'.
+
+    Second, you can specify 'position.x0' and 'position.y0' and
+    for now they will just be mapped into the previous locations
+    of x and y. (maybe not forever, though.)
+    */
+
     if (encoding) {
       // First--set position interpolation mode to
       // true if x0 or position0 has been manually passed.
@@ -105,21 +120,112 @@ export class AestheticSet {
 
     // Make believe that that the x0 and y0 values were there already.
     if (encoding.x0) {
-      this.x.update(encoding.x0);
+      this.dim('x').update(encoding.x0);
     }
 
     if (encoding.y0) {
-      this.y.update(encoding.y0);
+      this.dim('y').update(encoding.y0);
     }
 
-    for (const k of aesthetic_variables) {
+    for (const k of Object.keys(stateful_aesthetics)) {
       if (k === 'x0' || k === 'y0') {
         continue
       }
-      console.log(k)
-
-      this[k].update(encoding[k]);
+      this.dim(k).update(encoding[k]);
     }
+  }
+}
 
+export class TextureSet {
+  private _one_d_texture : Texture2D;
+  private _color_texture : Texture2D;
+  public texture_size : number;
+  public regl : Regl;
+  public id_locs : Record<string, number> = {};
+  public texture_widths : number;
+  private offsets : Record<string, number> = {};
+  private _one_d_position : number;
+  private _color_position : number;
+  constructor(regl, texture_size = 4096, texture_widths = 32) {
+    this.texture_size = texture_size;
+    this.texture_widths = texture_widths
+    this.regl = regl;
+    this._one_d_position = 1
+    this._color_position = -1
+  }
+
+  public get_position(id) {
+    return this.offsets[id] || 0;
+  }
+
+  public set_one_d(id : string, value : number[] | Uint8Array | Float32Array) {
+    // id: a unique identifier for the specific aesthetic.
+    // value: the array to stash onto the texture.
+    let offset;
+    const { offsets } = this;
+    if (offsets[id]) {
+      offset = offsets[id];
+    } else {
+      offset = this._one_d_position++;
+      offsets[id] = offset;
+    }
+    // Draw a stripe with the data of a single pixel width,
+    // going down.
+    this.one_d_texture.subimage({
+      data: value,
+      width: 1,
+      height: this.texture_size
+    }, offset - 1, 0);
+  }
+
+  public set_color(id : string, value) {
+    let offset;
+    const { offsets } = this;
+    if (offsets[id]) {
+      offset = offsets[id];
+    } else {
+      offset = this._color_position--;
+      offsets[id] = offset;
+    }
+    this.color_texture.subimage({
+      data: value,
+      width: 1,
+      height: this.texture_size
+    }, (-offset) - 1, 0);
+    // -offset because we're coding the color buffer
+    // on the negative side of the number line.
+  }
+
+  get one_d_texture() {
+    if (this._one_d_texture) {
+      return this._one_d_texture
+    }
+    const texture_type = this.regl.hasExtension('OES_texture_float') ? 
+       'float' : this.regl.hasExtension('OES_texture_half_float') ? 
+         'half float' : 'uint8';
+    const format = texture_type === 'uint8' ? 'rgba' : 'alpha';
+
+    const params = {
+      width: this.texture_widths,
+      height: this.texture_size,
+      type: texture_type,
+      format,
+    };
+      // Store the current and the last values for transitions.
+    this._one_d_texture = this.regl.texture(params);
+    return this._one_d_texture;
+  }
+  
+  get color_texture() {
+    if (this._color_texture) {
+      return this._color_texture
+    }
+    this._color_texture = this.regl.texture({
+      width: this.texture_widths,
+      height: this.texture_size,
+      type: 'uint8',
+      format: 'rgba',
+    })
+    return this._color_texture;
   }
 }

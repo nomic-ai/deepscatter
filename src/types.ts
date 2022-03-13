@@ -1,16 +1,12 @@
-type ArrayTwoOrMore = {
-  0: number
-  1: number
-} & Array<number>
 
-interface OneArgumentOp {
+type OneArgumentOp = {
   op: "gt" | "lt" | "eq"
   a : number;
   field : string;
 }
 
 type TwoArgumentOp = {
-  op: "within",
+  op: "within" | "between",
   field: string,
   a: number,
   b: number;
@@ -55,7 +51,7 @@ export type BasicColorChannel = BasicChannel & {
 
 export type CategoricalColorChannel = CategoricalChannel & {
   range? : [number, number, number][] | string;
-  domain? : number;
+  domain? : string[];
 }
 
 export type ConstantColorChannel = ConstantChannel & {
@@ -70,10 +66,10 @@ export type OpArray = [
   number,
   number, 
   number
-]
+] // A description of a functional operation to be passsed to the shader.
 
 
-export interface Encoding {
+export type Encoding = {
   x?: null | Channel;
   y?: null | Channel;
   color?: null | ColorChannel;
@@ -91,7 +87,7 @@ export interface Encoding {
   position0? : string;
 }
 
-export interface APICall {
+export type APICall = {
   /** The magnification coefficient for a zooming item */
   zoom_balance: number;
 

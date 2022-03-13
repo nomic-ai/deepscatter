@@ -104,7 +104,6 @@
 
   let cycle = 0;
   select("#jitter").on("change", (event) => {
-    console.log(event.target.value);
     scatterplot.plotAPI({
       'encoding': {
         'jitter_radius': {
@@ -124,7 +123,6 @@
         "color": colors[cycle % colors.length]
       }
     }
-    console.log(new_coding)
     scatterplot.plotAPI(new_coding)
   })
 

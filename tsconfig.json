@@ -7,7 +7,7 @@
     "esModuleInterop": true,
     "noUnusedLocals": true,
     "sourceMap": true,
-    "strict": false,
+    "strict": true,
     "target": "es2020"
   },
   "$schema": "https://json.schemastore.org/tsconfig",

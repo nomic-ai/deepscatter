@@ -240,7 +240,6 @@ export class Tile extends Batch {
     if (this._table) { return this._table; }
     // Constitute table if there's a present buffer.
     if (this._table_buffer && this._table_buffer.byteLength > 0) {
-      console.log('BYTES', this._table_buffer.byteLength);
       return this._table = Table.from(this._table_buffer);
     }
     return undefined;
@@ -747,7 +746,7 @@ export default class RootTile extends QuadTile {
   }
 */
   get tileWorker() {
-    const NUM_WORKERS = 8;
+    const NUM_WORKERS = 4;
 
     if (this._tileWorkers !== undefined) {
       // Apportion the workers randomly whener one is asked for.
@@ -758,7 +757,6 @@ export default class RootTile extends QuadTile {
     }
     this._tileWorkers = [];
     for (const i of range(NUM_WORKERS)) {
-      console.log(`Allocating worker ${i}`);
       this._tileWorkers.push(
         //          Comlink.wrap(new Worker(this.url + '/../worker.js')),
         Comlink.wrap(new TileWorker()),

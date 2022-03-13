@@ -27,6 +27,7 @@ const base_elements = [
 ];
 
 export default class Scatterplot {
+  public _renderer: ReglRenderer;
   width : number;
   height : number;
   div : Selection<any, any, any, any>;
@@ -336,6 +337,7 @@ export default class Scatterplot {
     }
     if (this._renderer.reglframe) {
       this._renderer.reglframe.cancel();
+      this._renderer.reglframe = undefined;
     }
     this._renderer.reglframe = this._renderer.regl.frame(() => {
       this._renderer.tick('Basic');

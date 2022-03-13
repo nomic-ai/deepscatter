@@ -56,7 +56,6 @@ export default class Zoom {
 
   zoom_to(k, x = null, y = null, duration = 4000) {
     const scales = this.scales();
-    console.log;
     const {
       canvas, zoomer, width, height,
     } = this;
@@ -156,8 +155,8 @@ export default class Zoom {
     let last_fired = 0;
     //@ts-ignore Not sure how to guarantee this formally.
     const renderer : ReglRenderer = this.renderers.get('regl');
-    const x_aes = renderer.aes.x.current;
-    const y_aes = renderer.aes.y.current;
+    const x_aes = renderer.aes.dim('x').current;
+    const y_aes = renderer.aes.dim('y').current;
 
     this.canvas.on('mousemove', (event) => {
       // Debouncing this is really important, it turns out.
@@ -205,11 +204,11 @@ export default class Zoom {
             .attr('class', 'label')
             .attr('stroke', '#110022')
             .attr('r', 12)
-            .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd))
+            .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd))
             .attr('cx', (datum) => x_(x_aes.value_for(datum)))
             .attr('cy', (datum) => y_(y_aes.value_for(datum))),
           (update) => update
-            .attr('fill', (dd) => this.renderers.get('regl').aes.color.current.apply(dd)),
+            .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd)),
           (exit) => exit.call((e) => e.remove())
         )
         .on('click', (ev, dd) => {
@@ -353,6 +352,7 @@ export default class Zoom {
     return transform;
   }
 
+  
   tick(force = false) {
     this._start = this._start || Date.now();
 
@@ -363,7 +363,6 @@ export default class Zoom {
       if (this._timer) {
         //@ts-ignore
         if (this._timer.stop_at <= Date.now()) {
-          console.log('Timer ending');
           this._timer.stop();
         }
       }
