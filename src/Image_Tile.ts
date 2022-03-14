@@ -44,7 +44,7 @@ class ImageTile extends BaseTile {
     }
 
     img.onerror = function(err) {
-      console.log(err, "error")
+      console.error(err, "error")
     }
     img.height = img_height
 

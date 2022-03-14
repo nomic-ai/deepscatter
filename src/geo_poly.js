@@ -3,7 +3,6 @@ import frag_shader from './glsl/geopolygons.frag';
 
 export default class FeatureHandler {
   constructor(regl, feature_set) {
-    console.log({regl})
     this.feature_set = feature_set;
     this.element_handler = new Map(); // Elements can't share buffers (?) so just use a map.
     this.coord_handler = new BufferHandler(regl) // Use just a few buffers to store all the data.

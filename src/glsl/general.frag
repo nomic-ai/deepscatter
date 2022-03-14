@@ -4,16 +4,15 @@
 
 precision mediump float;
 
-varying float pic_mode;
 varying vec4 fill;
-varying vec4 stroke;
 varying vec2 letter_pos;
 varying float point_size;
 
 uniform float u_only_color;
 uniform float u_color_picker_mode;
-uniform float u_use_glyphset;
-uniform sampler2D u_glyphset;
+//uniform float u_use_glyphset;
+//uniform sampler2D u_glyphset;
+
 
 float delta = 0.0, alpha = 1.0;
 
@@ -41,16 +40,13 @@ bool out_of_triangle(in vec2 coord) {
 }
 
 void main() {
-
   if (u_only_color >= -1.5) {
     gl_FragColor = vec4(0., 0., 0., 1./255.);
     return;
   }
 
-  // Drop parts of the rectangle outside the unit circle.
-  // I took this from observable.
   float alpha = fill.a;
-  if (u_use_glyphset == 0. || point_size < 5.0) {
+//  if (u_use_glyphset == 0. || point_size < 5.0) {
     if (out_of_circle(gl_PointCoord)) {
       discard;
       return;
@@ -61,14 +57,14 @@ void main() {
       delta = fwidth(r);
       alpha *= (1.0 - smoothstep(1.0 - delta, 1.0 + delta, r));
     #endif
-  } else {
+/*  } else {
     vec2 coords = letter_pos + gl_PointCoord/8.;
 //    vec2 coords = vec2(.2, .2);
     vec4 sprite = texture2D(u_glyphset, coords);
     alpha *= (sprite.a);  
 //    fill = vec4(1.0, 1.0, 1.0, alpha);  
     if (alpha <= 0.03) discard;
-  }
+  }*/
   // Pre-blend the alpha channel.
   if (u_color_picker_mode == 1.) {
     // no alpha when color picking; we use all four channels for that.
@@ -76,4 +72,5 @@ void main() {
   } else {
     gl_FragColor = vec4(fill.rgb * alpha, alpha);
   }
+
 }

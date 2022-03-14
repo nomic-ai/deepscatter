@@ -11,6 +11,8 @@
   <div id="controls" style="z-index:99;position:fixed;">
   <input type="range" min=0 max=.5 step=.01 id="jitter" value=.05 />
   <button id="flip">Change encoding</button>
+
+  <button id="html">Change tooltip HTML</button>
   <pre id="ident"></pre>
   </div>
 </body>
@@ -68,6 +70,10 @@
         field: "y", 
         transform: "literal"
       },
+      "filter": {
+        field: "class",
+        lambda: "d => d !== 'Strawberry'"
+      },
       "size": {
         "field": "quantity",
         "transform": "sqrt",
@@ -77,13 +83,12 @@
     }
   };
 
-
   const colors = [
-    JSON.parse(JSON.stringify(prefs.encoding.color)),
+//    JSON.parse(JSON.stringify(prefs.encoding.color)),
     {
-        "field": "quantity",
-        "range": "viridis",
-        "domain": [0, 1] 
+      "field": "quantity",
+      "range": "viridis",
+      "domain": [0, 1] 
     },
     {
       "field": "x",
@@ -96,12 +101,10 @@
   scatterplot.plotAPI(prefs).then(d => scatterplot.plotAPI(prefs));
   window.plot = scatterplot; // For debugging
 
-
   // Simple animation demonstration.
 
   let cycle = 0;
   select("#jitter").on("change", (event) => {
-    console.log(event.target.value);
     scatterplot.plotAPI({
       'encoding': {
         'jitter_radius': {
@@ -110,6 +113,12 @@
         }
       }
     })
+  })
+  let weird = false;
+  select("#html").on("click", () => {
+    scatterplot.tooltip_html = (datum) => {
+      return `This is point number <span style="color:blue">${datum.ix}</span>`;
+    }
   })
   select("#flip").on("click", () => {
     cycle += 1
@@ -120,7 +129,6 @@
         "color": colors[cycle % colors.length]
       }
     }
-    console.log(new_coding)
     scatterplot.plotAPI(new_coding)
   })
 

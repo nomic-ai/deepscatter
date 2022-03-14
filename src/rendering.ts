@@ -3,7 +3,7 @@ import { select } from 'd3-selection';
 import { min } from 'd3-array';
 import type Scatterplot from './deepscatter'
 import type { Tileset } from './tile';
-import type { APICall } from './d';
+import type { APICall } from './types';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 
@@ -18,12 +18,12 @@ export class Renderer {
   public height : number;
   public deferred_functions : Array<() => void>;
   public _use_scale_to_download_tiles : boolean = true;
-  public zoom : Zoom
+  public zoom : Zoom;
   public aes : AestheticSet;
-  public _current_clik_function_string : string;
+  public _current_click_function_string : string;
   public _click_function : () => void;
   public _zoom : Zoom;
-  
+  public _initializations : Promise<any>[];
   constructor(selector, tileSet, scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
@@ -42,6 +42,10 @@ export class Renderer {
     // For now, I don't actually do it.
     return 0;
   }
+
+  //color_pick() {
+  //  return 1;
+  //}
 
   get optimal_alpha() {
     let { zoom_balance, alpha, point_size } = this.prefs;
@@ -73,11 +77,11 @@ export class Renderer {
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
     return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
   }
-
+  /*
   is_visible(point) {
     return p_in_rect(point, this._zoom.current_corners)
-    && point.ix < this.prefs.max_points * this._zoom.k;
-  }
+    && point.ix < this.prefs.max_points * this._zoom.transform.k;
+  } */
 
   visible_tiles() {
     // yield the currently visible tiles based on the zoom state
@@ -106,18 +110,44 @@ export class Renderer {
     return this;
   }
 
+  _click_function_from_string() {
+    return Function("datum", this.scatterplot.prefs.click_function)
+  }
+
+  _click_function_matches_prefs() {
+    if (this._click_function_type == "string" && this._click_function == this._click_function_from_string()) {
+      return true
+    } else if (this._click_function_type == "function" && this._click_function == this.scatterplot.prefs.click_function) {
+      return true
+    }
+
+    return false
+  }
+
   set click_function(f) {
-    this._current_click_function_string = this.scatterplot.prefs.click_function;
-    this._click_function = Function("datum", this._current_click_function_string)
+    if (typeof(this.scatterplot.prefs.click_function) == "function") {
+      this._click_function_type = "function"
+      this._click_function = this.scatterplot.prefs.click_function
+    } else if (typeof(this.scatterplot.prefs.click_function) == "string") {
+      this._click_function_type = "string"
+      this._click_function = this._click_function_from_string()
+    } else {
+      // Make sure _click_function is always defined, but use a no-op if we
+      // don't recognize the input type.
+      console.log('Unrecognized click_function type; should be string or function.')
+      this._click_function_type = null
+      this._click_function = (function() {})
+    }
   }
 
   get click_function() {
-    if (this._current_click_function_string && this._current_click_function_string === this.scatterplot.prefs.click_function) {
-      return this._click_function;
+    // If the click function is unset or doesn't match the current preferences,
+    // set it before returning it..
+    if ( !(this._click_function) || !(this._click_function_matches_prefs()) ) {
+      this.click_function = this.scatterplot.prefs.click_function
     }
-    this._current_click_function_string = this.scatterplot.prefs.click_function;
-    this._click_function = Function("datum", this.scatterplot.prefs.click_function)
-    return this._click_function;
+
+    return this._click_function
   }
 
   * initialize() {
@@ -129,5 +159,5 @@ export class Renderer {
 }
 
 export class CanvasRenderer extends Renderer {
-  
+
 }

@@ -14,8 +14,8 @@ uniform float u_last_jitter;
 uniform float u_only_color;
 uniform float u_grid_mode;
 
-uniform vec3 u_filter1_numeric; // An override for simple numeric operations.
-uniform vec3 u_last_filter1_numeric; // An override for simple numeric operations.
+uniform vec3 u_filter_numeric; // An override for simple numeric operations.
+uniform vec3 u_last_filter_numeric; // An override for simple numeric operations.
 
 uniform vec3 u_filter2_numeric; // An override for simple numeric operations.
 uniform vec3 u_last_filter2_numeric; // An override for simple numeric operations.
@@ -40,8 +40,10 @@ uniform float u_base_size;
 uniform float u_current_alpha;
 uniform float u_last_alpha;
 
-// The same set of items for a variety of aesthetics.
+uniform sampler2D u_one_d_aesthetic_map;
+uniform sampler2D u_color_aesthetic_map;
 
+// The same set of items for a variety of aesthetics.
 
 // whether to continuously interpolate between
 // x0 and x, y0 and y.
@@ -65,8 +67,8 @@ def autogenerate_code():
   uniform float u_{timek}_transform;
   uniform vec2 u_{timek}_domain;
   uniform vec2 u_{timek}_range;
-  uniform sampler2D u_{timek}_map;
-  uniform float u_{timek}_needs_map;
+  u_{timek}_map = u_aesthetic_maps;
+  uniform float u_{timek}_map_position;
   float a_{timek};
   bool a_{timek}_is_constant;
       """)
@@ -99,8 +101,7 @@ autogenerate_code()
   uniform float u_x_transform;
   uniform vec2 u_x_domain;
   uniform vec2 u_x_range;
-  uniform sampler2D u_x_map;
-  uniform float u_x_needs_map;
+  uniform float u_x_map_position;
   float a_x;
   bool a_x_is_constant;
       
@@ -110,8 +111,7 @@ autogenerate_code()
   uniform float u_last_x_transform;
   uniform vec2 u_last_x_domain;
   uniform vec2 u_last_x_range;
-  uniform sampler2D u_last_x_map;
-  uniform float u_last_x_needs_map;
+  uniform float u_last_x_map_position;
   float a_last_x;
   bool a_last_x_is_constant;
       
@@ -121,8 +121,7 @@ autogenerate_code()
   uniform float u_y_transform;
   uniform vec2 u_y_domain;
   uniform vec2 u_y_range;
-  uniform sampler2D u_y_map;
-  uniform float u_y_needs_map;
+  uniform float u_y_map_position;
   float a_y;
   bool a_y_is_constant;
       
@@ -132,8 +131,7 @@ autogenerate_code()
   uniform float u_last_y_transform;
   uniform vec2 u_last_y_domain;
   uniform vec2 u_last_y_range;
-  uniform sampler2D u_last_y_map;
-  uniform float u_last_y_needs_map;
+  uniform float u_last_y_map_position;
   float a_last_y;
   bool a_last_y_is_constant;
       
@@ -143,8 +141,7 @@ autogenerate_code()
   uniform float u_jitter_radius_transform;
   uniform vec2 u_jitter_radius_domain;
   uniform vec2 u_jitter_radius_range;
-  uniform sampler2D u_jitter_radius_map;
-  uniform float u_jitter_radius_needs_map;
+  uniform float u_jitter_radius_map_position;
   float a_jitter_radius;
   bool a_jitter_radius_is_constant;
       
@@ -154,8 +151,7 @@ autogenerate_code()
   uniform float u_last_jitter_radius_transform;
   uniform vec2 u_last_jitter_radius_domain;
   uniform vec2 u_last_jitter_radius_range;
-  uniform sampler2D u_last_jitter_radius_map;
-  uniform float u_last_jitter_radius_needs_map;
+  uniform float u_last_jitter_radius_map_position;
   float a_last_jitter_radius;
   bool a_last_jitter_radius_is_constant;
       
@@ -165,8 +161,7 @@ autogenerate_code()
   uniform float u_jitter_speed_transform;
   uniform vec2 u_jitter_speed_domain;
   uniform vec2 u_jitter_speed_range;
-  uniform sampler2D u_jitter_speed_map;
-  uniform float u_jitter_speed_needs_map;
+  uniform float u_jitter_speed_map_position;
   float a_jitter_speed;
   bool a_jitter_speed_is_constant;
       
@@ -176,8 +171,7 @@ autogenerate_code()
   uniform float u_last_jitter_speed_transform;
   uniform vec2 u_last_jitter_speed_domain;
   uniform vec2 u_last_jitter_speed_range;
-  uniform sampler2D u_last_jitter_speed_map;
-  uniform float u_last_jitter_speed_needs_map;
+  uniform float u_last_jitter_speed_map_position;
   float a_last_jitter_speed;
   bool a_last_jitter_speed_is_constant;
       
@@ -187,8 +181,7 @@ autogenerate_code()
   uniform float u_size_transform;
   uniform vec2 u_size_domain;
   uniform vec2 u_size_range;
-  uniform sampler2D u_size_map;
-  uniform float u_size_needs_map;
+  uniform float u_size_map_position;
   float a_size;
   bool a_size_is_constant;
       
@@ -198,53 +191,32 @@ autogenerate_code()
   uniform float u_last_size_transform;
   uniform vec2 u_last_size_domain;
   uniform vec2 u_last_size_range;
-  uniform sampler2D u_last_size_map;
-  uniform float u_last_size_needs_map;
+  uniform float u_last_size_map_position;
   float a_last_size;
   bool a_last_size_is_constant;
       
 
-  uniform float u_filter1_buffer_num;
-  uniform float u_filter1_constant;
-  uniform float u_filter1_transform;
-  uniform vec2 u_filter1_domain;
-  uniform vec2 u_filter1_range;
-  uniform sampler2D u_filter1_map;
-  uniform float u_filter1_needs_map;
+  uniform float u_filter_buffer_num;
+  uniform float u_filter_map_position;
   float a_filter1;
-  bool a_filter1_is_constant;
+  bool a_filter_is_constant;
       
 
-  uniform float u_last_filter1_buffer_num;
-  uniform float u_last_filter1_constant;
-  uniform float u_last_filter1_transform;
-  uniform vec2 u_last_filter1_domain;
-  uniform vec2 u_last_filter1_range;
-  uniform sampler2D u_last_filter1_map;
-  uniform float u_last_filter1_needs_map;
+  uniform float u_last_filter_buffer_num;
+  uniform float u_last_filter_map_position;
   float a_last_filter1;
-  bool a_last_filter1_is_constant;
+  bool a_last_filter_is_constant;
 
 
 
   uniform float u_filter2_buffer_num;
-  uniform float u_filter2_constant;
-  uniform float u_filter2_transform;
-  uniform vec2 u_filter2_domain;
-  uniform vec2 u_filter2_range;
-  uniform sampler2D u_filter2_map;
-  uniform float u_filter2_needs_map;
+  uniform float u_filter2_map_position;
   float a_filter2;
   bool a_filter2_is_constant;
       
 
   uniform float u_last_filter2_buffer_num;
-  uniform float u_last_filter2_constant;
-  uniform float u_last_filter2_transform;
-  uniform vec2 u_last_filter2_domain;
-  uniform vec2 u_last_filter2_range;
-  uniform sampler2D u_last_filter2_map;
-  uniform float u_last_filter2_needs_map;
+  uniform float u_last_filter2_map_position;
   float a_last_filter2;
   bool a_last_filter2_is_constant;
 
@@ -253,8 +225,7 @@ autogenerate_code()
   uniform float u_x0_transform;
   uniform vec2 u_x0_domain;
   uniform vec2 u_x0_range;
-  uniform sampler2D u_x0_map;
-  uniform float u_x0_needs_map;
+  uniform float u_x0_map_position;
   float a_x0;
   bool a_x0_is_constant;
       
@@ -264,8 +235,7 @@ autogenerate_code()
   uniform float u_last_x0_transform;
   uniform vec2 u_last_x0_domain;
   uniform vec2 u_last_x0_range;
-  uniform sampler2D u_last_x0_map;
-  uniform float u_last_x0_needs_map;
+  uniform float u_last_x0_map_position;
   float a_last_x0;
   bool a_last_x0_is_constant;
       
@@ -275,8 +245,7 @@ autogenerate_code()
   uniform float u_y0_transform;
   uniform vec2 u_y0_domain;
   uniform vec2 u_y0_range;
-  uniform sampler2D u_y0_map;
-  uniform float u_y0_needs_map;
+  uniform float u_y0_map_position;
   float a_y0;
   bool a_y0_is_constant;
       
@@ -286,8 +255,7 @@ autogenerate_code()
   uniform float u_last_y0_transform;
   uniform vec2 u_last_y0_domain;
   uniform vec2 u_last_y0_range;
-  uniform sampler2D u_last_y0_map;
-  uniform float u_last_y0_needs_map;
+  uniform float u_last_y0_map_position;
   float a_last_y0;
   bool a_last_y0_is_constant;
       
@@ -338,13 +306,13 @@ uniform float u_color_transform;
 uniform float u_last_color_transform;
 uniform vec2 u_color_domain;
 uniform vec2 u_last_color_domain;
-uniform sampler2D u_color_map;
-uniform sampler2D u_last_color_map;
-uniform float u_last_color_needs_map;
-uniform float u_color_needs_map;
+uniform float u_last_color_map_position;
+uniform float u_color_map_position;
 uniform vec3 u_constant_color;
 uniform vec3 u_constant_last_color;
 
+bool a_color_is_constant;
+bool a_last_color_is_constant;
 
 // The fill color.
 varying vec4 fill;
@@ -352,7 +320,6 @@ varying float point_size;
 
 uniform float u_jitter_radius_lookup;
 uniform float u_jitter_radius_lookup_y_constant;
-uniform sampler2D u_jitter_radius_lookup_map;
 uniform vec2 u_jitter_radius_lookup_x_domain;
 uniform vec2 u_jitter_radius_lookup_y_domain;
 
@@ -530,39 +497,22 @@ float run_numeric_filter (in float a_filter,
 
 float choose_and_run_filter(
   in vec3 u_filter_numeric,
-  in vec2 u_filter_domain,
   in float a_filter,
-  in sampler2D filtermap) {
-  if (u_filter_numeric.r < 0.5) {
-    float frac_filter = linstep(u_filter_domain, a_filter);
-    return texture2D(filtermap, vec2(0.5, frac_filter)).a;
-  } else {
-    return run_numeric_filter(a_filter,
-      u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
-  }
-}
-
-
-// Progress through the filters at different rates.
-float combine_filters(
-  in vec3 u_filter_numeric, in vec2 u_filter_domain, in float a_filter,
-  in sampler2D u_filter_map,
-  in vec3 u_last_filter_numeric, in vec2 u_last_filter_domain, in float a_last_filter,
-  in sampler2D u_last_filter_map,
-  in float ease,
-  in float ix
-) {
-  float my_filter = 0.;
-  if (ix_to_random(ix, 13.5) > ease) {
-    return choose_and_run_filter(
-      u_last_filter_numeric, u_last_filter_domain, a_last_filter,
-      u_last_filter_map
-    );
-  } else {
-    return choose_and_run_filter(
-      u_filter_numeric, u_filter_domain, a_filter,
-      u_filter_map);
-  }
+  in float map_location,
+  in bool filter_is_constant
+  ) {
+    if (filter_is_constant) {
+      return 1.;
+    }
+    if (u_filter_numeric.r < 0.5) {
+      // Must be on a dictionary. Unreasonable assumption, maybe?
+      float frac_filter = linstep(vec2(-2047., 2047), a_filter);
+      float map_coords = (map_location - .5) / 32.;
+      return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
+    } else {
+      return run_numeric_filter(a_filter,
+        u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
+    }
 }
 
 #pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
@@ -586,41 +536,39 @@ float RGBAtoFloat(in vec4 floater) {
 }
 
 
-float texture_float_lookup(in sampler2D texture,
-                           in vec2 domain,
+float texture_float_lookup(in vec2 domain,
                            in vec2 range,
                            in float transform,
                            in float attr,
-                           in float use_texture,
-                           in float y_attr,
-                           in vec2 y_range) {
+                           in float texture_position,
+                           in float y_attr,// not used
+                           in vec2 y_range) { // not used.
   if (transform == 4.0) {
     // Literal transforms aren't looked up, just returned as is.
     return attr;
   }
   float inrange = domainify(domain, transform, attr, true);
-  if (use_texture > 0.) {
-    float y_pos = 0.5;// linstep(y_range, y_attr);
-    vec4 encoded = texture2D(texture, vec2(y_pos, inrange));
+  if (texture_position > 0.5) {
+    float y_pos = texture_position / 32. - 0.5 / 32.;
+    vec4 encoded = texture2D(u_one_d_aesthetic_map, vec2(y_pos, inrange));
     return encoded.a;
-    return RGBAtoFloat(encoded);
+    return RGBAtoFloat(encoded); // unreachable.
   } else {
     return mix(range.x, range.y, inrange);
   }
 }
 
-float texture_float_lookup(in sampler2D texture,
-                           in vec2 domain,
+float texture_float_lookup(in vec2 domain,
                            in vec2 range,
                            in float transform,
                            in float attr,
-                           in float use_texture) {
+                           in float texture_pos) {
 
-  return texture_float_lookup(texture,
-                              domain,
+  return texture_float_lookup(domain,
                               range,
                               transform,
-                              attr,use_texture,
+                              attr,
+                              texture_pos,
                               1.,
                               vec2(0., 2.));
 }
@@ -628,24 +576,24 @@ float texture_float_lookup(in sampler2D texture,
 vec2 calculate_position(in vec2 position, in float x_scale_type,
                         in vec2 x_domain, in vec2 x_range, in float y_scale_type,
                         in vec2 y_domain, in vec2 y_range, in mat3 window_scale,
-                        in mat3 zoom, in sampler2D x_map, in float x_needs_map,
-                        in sampler2D y_map, in float y_needs_map
+                        in mat3 zoom, in float x_map_position,
+                        in float y_map_position
                         ) {
     float x;
     float y;
 
     if (x_scale_type < 4.0) {
-      x = texture_float_lookup(x_map, x_domain, x_range,
+      x = texture_float_lookup(x_domain, x_range,
         x_scale_type,
-        position.x, x_needs_map, 1., vec2(0., 2.)
+        position.x, x_map_position, 1., vec2(0., 2.)
         );
     } else {
       x = position.x;
     }
 
     if (x_scale_type < 4.0) {
-      y = texture_float_lookup(y_map, y_domain, y_range, y_scale_type,
-        position.y, y_needs_map, 1., vec2(0., 2.)
+      y = texture_float_lookup(y_domain, y_range, y_scale_type,
+        position.y, y_map_position, 1., vec2(0., 2.)
         );
     } else {
       y = position.y;
@@ -701,19 +649,17 @@ vec2 circle_jitter(in float ix, in float aspect_ratio, in float time,
 vec2 calculate_jitter(
   in float jitter_type,
   in float ix, // distinguishing index
-  in sampler2D jitter_radius_map,
   in vec2 jitter_radius_domain,
   in vec2 jitter_radius_range,
   in float jitter_radius_transform,
   in float jitter_radius,
-  in float jitter_radius_needs_map,
+  in float jitter_radius_map_position,
   in bool jitter_radius_is_constant,
-  in sampler2D jitter_speed_map,
   in vec2 jitter_speed_domain,
   in vec2 jitter_speed_range,
   in float jitter_speed_transform,
   in float jitter_speed,
-  in float jitter_speed_needs_map,
+  in float jitter_speed_map_position,
   in bool jitter_speed_is_constant
 ) {
 
@@ -742,7 +688,6 @@ vec2 calculate_jitter(
     jitter_r = jitter_radius;
   } else {
     jitter_r = texture_float_lookup(
-    jitter_radius_map,
     jitter_radius_domain,
     jitter_radius_range,
     jitter_radius_transform,
@@ -767,10 +712,10 @@ vec2 calculate_jitter(
   /* Jittering that includes motion) */
 
   float p_jitter_speed =
-      texture_float_lookup(jitter_speed_map, jitter_speed_domain,
+      texture_float_lookup(jitter_speed_domain,
                           jitter_speed_range,
                           jitter_speed_transform, jitter_speed,
-                          jitter_speed_needs_map,  1., vec2(0., 2.));
+                          jitter_speed_map_position,  1., vec2(0., 2.));
 
   if (jitter_type == 1.) {
     return logarithmic_spiral_jitter(
@@ -797,7 +742,9 @@ vec2 calculate_jitter(
   }
 }
 
+
 void run_color_fill(in float ease) {
+
   if (u_only_color >= -1.5) {
     if (u_only_color > -.5 && a_color != u_only_color) {
       gl_Position = discard_me;
@@ -808,23 +755,24 @@ void run_color_fill(in float ease) {
       gl_PointSize = 1.;
     }
   } else {
-    if (false) {//u_constant_color.r > -1.) {
+    if (a_color_is_constant) {
       fill = vec4(u_constant_color.rgb, u_current_alpha);
     } else {
       float fractional_color = linstep(u_color_domain, a_color);
-      fill = texture2D(u_color_map, vec2(0.5, fractional_color));
+      float color_pos = (u_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
+      fill = texture2D(u_color_aesthetic_map , vec2(color_pos, fractional_color));
       fill = vec4(fill.rgb, u_current_alpha);
     }
     if (ease < 1.) {
       vec4 last_fill;
-      if (u_constant_last_color.r > 0.) {
+      if (a_last_color_is_constant) {
         last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);
       } else {
         float last_fractional = linstep(u_last_color_domain, a_last_color);
-        last_fill = texture2D(u_last_color_map, vec2(0.5, last_fractional));
+        float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
+        last_fill = texture2D(u_color_aesthetic_map, vec2(color_pos, last_fractional));
         // Alpha channel interpolation already happened.
         last_fill = vec4(last_fill.rgb, u_last_alpha);
-
       }
       // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
       // instead?
@@ -834,16 +782,23 @@ void run_color_fill(in float ease) {
 }
 
 void main() {
-
+  float debug_mode = 0.;
   float ix = buffer_0;
-
-  if (ix > u_maxix) {
-    // throwaway points that are too low.
+  if (ix > u_maxix && debug_mode < 1.) {
+    // throw away points that are too low.
     gl_Position = discard_me;
     return;
   }
 
- 
+  if (debug_mode > 1.5) {
+    // Debug mode.
+//    fill = vec4(ix_to_random(ix, 15.), ix_to_random(ix, 15.), ix_to_random(ix, 11.), 1.);
+    gl_PointSize = 2.;
+    gl_Position = vec4(box_muller(ix, 2.).xy * .33, 0., 1.);
+    return;
+  }
+
+
  // Autogenerated below this point
  if (u_x_buffer_num > -0.5) {
       a_x = get_buffer(u_x_buffer_num);
@@ -925,27 +880,27 @@ void main() {
       a_last_size_is_constant = true;
     }
 
-    if (u_filter1_buffer_num > -0.5) {
-      a_filter1 = get_buffer(u_filter1_buffer_num);
-      a_filter1_is_constant = false;
+    if (u_filter_buffer_num > -0.5) {
+      a_filter1 = get_buffer(u_filter_buffer_num);
+      a_filter_is_constant = false;
     } else {
-      a_filter1 = u_filter1_constant;
-      a_filter1_is_constant = true;
+      a_filter1 = 1.;
+      a_filter_is_constant = true;
     }
 
-    if (u_last_filter1_buffer_num > -0.5) {
-      a_last_filter1 = get_buffer(u_last_filter1_buffer_num);
-      a_last_filter1_is_constant = false;
+    if (u_last_filter_buffer_num > -0.5) {
+      a_last_filter1 = get_buffer(u_last_filter_buffer_num);
+      a_last_filter_is_constant = false;
     } else {
-      a_last_filter1 = u_last_filter1_constant;
-      a_last_filter1_is_constant = true;
+      a_last_filter1 = 1.;
+      a_last_filter_is_constant = true;
     }
 
     if (u_filter2_buffer_num > -0.5) {
       a_filter2 = get_buffer(u_filter2_buffer_num);
       a_filter2_is_constant = false;
     } else {
-      a_filter2 = u_filter2_constant;
+      a_filter2 = 1.;
       a_filter2_is_constant = true;
     }
 
@@ -953,9 +908,11 @@ void main() {
       a_last_filter2 = get_buffer(u_last_filter2_buffer_num);
       a_last_filter2_is_constant = false;
     } else {
-      a_last_filter2 = u_last_filter2_constant;
+      a_last_filter2 = 1.;
       a_last_filter2_is_constant = true;
     }
+
+    /*
     if (u_x0_buffer_num > -0.5) {
       a_x0 = get_buffer(u_x0_buffer_num);
       a_x0_is_constant = false;
@@ -987,22 +944,33 @@ void main() {
       a_last_y0 = u_last_y0_constant;
       a_last_y0_is_constant = true;
     }
-
+    */
 //  END AUTOGENERATED. DO NOT EDIT ABOVE. 
 // ------------------------------------------------    
+  gl_PointSize = 2.;
+  if (debug_mode > 1.5) {
+//    fill = vec4(ix_to_random(ix, 15.), ix_to_random(ix, 15.), ix_to_random(ix, 11.), 1.);
+    gl_PointSize = 2.;
+    gl_Position = vec4(a_x * .1, a_y * .1, 0., 1.);
+  }
 
 
   if (u_color_buffer_num > -0.5) {
     a_color = get_buffer(u_color_buffer_num);
+    a_color_is_constant = false;
   } else {
     a_color = ix;
+    a_color_is_constant = true;
   }
 
   if (u_last_color_buffer_num > -0.5) {
     a_last_color = get_buffer(u_last_color_buffer_num);
+    a_last_color_is_constant = false;
   } else {
     a_last_color = ix;
+    a_last_color_is_constant = true;
   }
+
 
   pixelspace_to_glspace = mat3(
       2. / u_width, 0., -1.,
@@ -1016,25 +984,25 @@ void main() {
   float ease = interpolation;
 
   // I set this sometimes.
-  float debug_mode = 0.;
 
   vec2 position = vec2(a_x, a_y);
+  gl_Position = vec4(position, 0., 1.) * .01;
   vec2 old_position = vec2(a_last_x, a_last_y);
 
   old_position = calculate_position(old_position, u_last_x_transform,
      u_last_x_domain, u_last_x_range,
      u_last_y_transform, u_last_y_domain, u_last_y_range,
      u_last_window_scale,
-     u_zoom, u_last_x_map, u_last_x_needs_map, u_last_y_map,
-     u_last_y_needs_map);
-
+     u_zoom, u_last_x_map_position,      
+     u_last_y_map_position);
+     
   bool plot_actual_position = u_grid_mode < .5;
 
   if (plot_actual_position) {
     position = calculate_position(position, u_x_transform,
       u_x_domain, u_x_range,
-      u_y_transform, u_y_domain, u_y_range, u_window_scale, u_zoom, u_x_map,
-      u_x_needs_map, u_y_map, u_y_needs_map);
+      u_y_transform, u_y_domain, u_y_range, u_window_scale, u_zoom, 
+      u_x_map_position, u_y_map_position);
 
     float xpos = clamp((1. + position.x) / 2., 0., 1.);
     float randy = ix_to_random(ix, 13.76);
@@ -1070,7 +1038,6 @@ void main() {
         mix(midpoint, position, frac),
         frac);
     }
-
   } else {
      position.x = -1. + 2. * linscale(u_x_domain, position.x);
     //position.y = -1.0;
@@ -1082,51 +1049,66 @@ void main() {
     position = position + jitterspec;
   }
 
-  if (debug_mode > 0.) {
-    // Just plot every point.
-    gl_PointSize = 1.;
-    fill = vec4(1., 1., 1., 1.);
-    gl_Position = vec4(position, 1., 1.);
-    return;
+  /* FILTERING */
+
+  float filter1_status = choose_and_run_filter(
+    u_filter_numeric,
+    a_filter1,
+    u_filter_map_position,
+    a_filter_is_constant
+  );
+
+  float last_filter1_status = choose_and_run_filter(
+    u_last_filter_numeric,
+    a_last_filter1,
+    u_last_filter_map_position,
+    a_last_filter_is_constant
+  );
+
+  float filter2_status = choose_and_run_filter(
+    u_filter2_numeric,
+    a_filter2,
+    u_filter2_map_position,
+    a_filter2_is_constant
+  );
+
+  float last_filter2_status = choose_and_run_filter(
+    u_last_filter2_numeric,
+    a_last_filter2,
+    u_last_filter2_map_position,
+    a_last_filter2_is_constant
+  );
+
+  bool was_filtered = last_filter2_status < .5 || last_filter1_status < .5;
+  bool will_be_filtered = filter2_status < .5 || filter1_status < .5;
+
+  bool filter_status = will_be_filtered;
+
+  if (ease < ix_to_random(ix, 1.)) {
+    filter_status = was_filtered;
   }
 
-  float filtered_by_filter1 = combine_filters(u_filter1_numeric, 
-    u_filter1_domain, a_filter1,  
-    u_filter1_map,   
-    u_last_filter1_numeric, u_last_filter1_domain, a_last_filter1, 
-    u_last_filter1_map, ease, ix);
-
-  if (filtered_by_filter1 <= 0.5) {
-    gl_Position = discard_me;
-    return;
-  }
-
-  float filtered_by_filter2 = combine_filters(u_filter2_numeric,
-    u_filter2_domain, a_filter2,
-    u_filter2_map,
-    u_last_filter2_numeric, u_last_filter2_domain, a_last_filter2,
-    u_last_filter2_map, ease, ix);
-
-  if (filtered_by_filter2 <= 0.5) {
+  if (filter_status == true) {
     gl_Position = discard_me;
     return;
   }
 
   float size_multiplier = texture_float_lookup(
-    u_size_map, u_size_domain, u_size_range,
-    u_size_transform, a_size, u_size_needs_map);
+    u_size_domain, u_size_range,
+    u_size_transform, a_size, u_size_map_position);
 
   float last_size_multiplier = texture_float_lookup(
-    u_last_size_map, u_last_size_domain, u_last_size_range,
-                                              u_last_size_transform, a_last_size,
-                                              u_last_size_needs_map);
+    u_last_size_domain, u_last_size_range, u_last_size_transform, a_last_size,
+    u_last_size_map_position);
 
   size_multiplier = u_base_size * 
      mix(last_size_multiplier, size_multiplier, ease);
   
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
-  point_size_adjust = exp(log(u_k) * u_zoom_balance);
+  // It's ugly on new macs when it jumps straight from one to two for a bunch of points at once.
+  float size_fuzz = exp(ix_to_random(ix, 3.1) * .1);
+  point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz;
 
   gl_PointSize = point_size_adjust * size_multiplier;
 
@@ -1136,28 +1118,32 @@ void main() {
     /* JITTER */
     float jitter_radius_fraction;
       jitter = calculate_jitter(
-        u_jitter, ix, u_jitter_radius_map,
+        u_jitter, ix,
         u_jitter_radius_domain,        u_jitter_radius_range,
         u_jitter_radius_transform,        a_jitter_radius,
-        u_jitter_radius_needs_map,        a_jitter_radius_is_constant,
-        u_jitter_speed_map, u_jitter_speed_domain,
+        u_jitter_radius_map_position,        a_jitter_radius_is_constant,
+        u_jitter_speed_domain,
         u_jitter_speed_range,
         u_jitter_speed_transform, a_jitter_speed,
-        u_jitter_speed_needs_map, a_jitter_speed_is_constant
+        u_jitter_speed_map_position, a_jitter_speed_is_constant
       );
 
     vec2 last_jitter;
     if (ease < 1.) {
       last_jitter = calculate_jitter(
         u_last_jitter, ix,
-        u_last_jitter_radius_map,
-        u_last_jitter_radius_domain,        u_last_jitter_radius_range,
-        u_last_jitter_radius_transform,        a_last_jitter_radius,
-        u_last_jitter_radius_needs_map,        a_last_jitter_radius_is_constant,
-        u_last_jitter_speed_map,         u_last_jitter_speed_domain,
+        u_last_jitter_radius_domain,       
+        u_last_jitter_radius_range,
+        u_last_jitter_radius_transform,        
+        a_last_jitter_radius,
+        u_last_jitter_radius_map_position,
+        a_last_jitter_radius_is_constant,
+        u_last_jitter_speed_domain,
         u_last_jitter_speed_range,
-        u_last_jitter_speed_transform, a_last_jitter_speed,
-        u_last_jitter_speed_needs_map,        a_last_jitter_speed_is_constant
+        u_last_jitter_speed_transform,
+        a_last_jitter_speed,
+        u_last_jitter_speed_map_position,
+        a_last_jitter_speed_is_constant
       );
       jitter = mix(last_jitter, jitter, ease);
     }
@@ -1180,6 +1166,9 @@ void main() {
     run_color_fill(ease);
   }
   point_size = gl_PointSize;
+  if (debug_mode > .5) {
+//    fill = vec4(.7, .7, .3, 1.);
+  }
   if (u_use_glyphset > 0. && point_size > 5.0) {
     float random_letter = floor(64. * ix_to_random(ix, 1.3));
     letter_pos = vec2(

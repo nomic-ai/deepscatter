@@ -5,7 +5,7 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import Tile from './tile';
-import { APICall } from './d';
+import { APICall } from './types';
 
 const base_elements = [
   {
@@ -27,6 +27,7 @@ const base_elements = [
 ];
 
 export default class Scatterplot {
+  public _renderer: ReglRenderer;
   width : number;
   height : number;
   div : Selection<any, any, any, any>;
@@ -34,12 +35,15 @@ export default class Scatterplot {
   d3 : Object;
   private _zoom : Zoom;
   prefs : APICall;
+  ready : Promise<void>;
   
   constructor(selector, width, height) {
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
     }
+    // Unresolvable.
+    this.ready = Promise.resolve()
     this.d3 = { select };
   }
 
@@ -119,7 +123,8 @@ export default class Scatterplot {
 
     this._renderer.initialize();
 
-    return this._root.promise;
+    this.ready = this._root.promise;
+    return this.ready;
   }
 
   /*
@@ -255,13 +260,20 @@ export default class Scatterplot {
     for all but a few data keys. CSS styling can make
     these look better.
     */
-    this._tooltip_html = func;
-    this._zoom._tooltip_html = func;
+
+    // aargh. We have to wait for the zoom object to exist to have a
+    // sensible place to stash this function, but there's not an easy
+    // way to wait for that.
+    if (!this._zoom) {
+      setTimeout(() => this.tooltip_html = func, 100);
+    } else {
+      this._zoom._tooltip_html_function = func;
+    }
   }
 
   get tooltip_html() {
     /* PUBLIC see set tooltip_html */
-    return this._tooltip_html;
+    return this._zoom.tooltip_html;
   }
 
   async plotAPI(prefs = {}) {
@@ -336,6 +348,7 @@ export default class Scatterplot {
     }
     if (this._renderer.reglframe) {
       this._renderer.reglframe.cancel();
+      this._renderer.reglframe = undefined;
     }
     this._renderer.reglframe = this._renderer.regl.frame(() => {
       this._renderer.tick('Basic');
@@ -362,7 +375,7 @@ export default class Scatterplot {
 
     const current_corners = _renderer.zoom.current_corners();
     const output = [];
-    const filter1 = _renderer.aes.filter1.current.get_function();
+    const filter1 = _renderer.aes.filter.current.get_function();
     const filter2 = _renderer.aes.filter2.current.get_function();
     for (const p of _root.points(current_corners, true)) {
       if (filter1(p) && filter2(p)) {

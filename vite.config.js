@@ -8,11 +8,12 @@ const __dirname = path.dirname(__filename);
 
 export default {
   build: {
-    target: "esnext",
+    target: "es2019",
+    minify: 'terser',
     lib: {
       entry: path.resolve(__dirname, 'src/deepscatter.ts'),
       name: 'Deepscatter',
-      formats: ['es'],
+      formats: ['es', 'iife', 'cjs', 'umd'],
     },
   },
 
