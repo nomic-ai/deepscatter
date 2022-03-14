@@ -1,25 +1,19 @@
-<style>
-  .ttooltip {
-    z-index: 99
-  }
-</style>
-
-<body>
-  <h1>Welcome to a demo/test page.</h1>
-  <div id="deepscatter">
-  </div>
-  <div id="overlay" style="z-index:99;position:fixed;"></div>
-  <button id="flip" style="z-index:99;position:fixed;">Change encoding</button>
-  <pre id="ident" style="z-index:99;position:fixed;"></pre>
-
-</body>
-
 <head>
   <style>
+      .ttooltip {
+        z-index: 99;
+        min-width: 500px;
+        display : flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+
+      }
+      dl {
+        display : flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
       dt {
-          float: left;
-          clear: left;
-          width: 90px;
           font-weight: bold;
           color: rgb(128, 19, 0);
       }
@@ -29,21 +23,40 @@
       }
 
       dd {
-          margin: 0 0 0 80px;
+          margin: 0 0 0 10px;
           padding: 0 0 0.5em 0;
           width: 180px;
       }
+      #date {
+        width: 100%
+      }
   </style>
 </head>
+
+<body>
+  <h1>Vietnam</h1>
+  <div id="datestring"></div>
+  <input id="date" title="date selector" type="range" min="-1800" max="1500"/>
+  <div id="deepscatter">
+    <div>
+      <div id="left-overlay" class="overlay"></div>
+      <div id="color-legend" class="overlay"> </div>
+    </div>
+  </div>
+
+</body>
+
 
 
 <script type="module" lang="ts">
   import Scatterplot from './src/deepscatter';
   import { select } from 'd3-selection';
+
   window.select = select; // For the click function below.
+
   const prefs = {
     "source_url" : 'https://bmschmidt.github.io/vietnam_war/',
-    "max_points": 1000,
+    "max_points": 10000,
     "alpha" : .12, // Target saturation for the full page.
     "zoom_balance" : 0.12, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
     "point_size": 3, // Default point size before application of size scaling
@@ -81,16 +94,92 @@
   let cycle = 0;
 
   const width = 600;
-  first_draw.then( () => {
-    const labels = scatterplot._renderer.aes.color.current.scale.domain().slice(0, 10)
-    const holder = select("#overlay")
-    holder.style("display", "flex").style("width", width * .66).style("font-style", "10px sans-serif").style("flex-wrap", "wrap")
-    holder.selectAll("div").data(labels).join("div")
-      .style("margin", "1px")
-    .style("background-color", d => plot._renderer.aes.color.current.scale(d)).text(d => d)
-    .on("mouseover", (event, d) => scatterplot.plotAPI(
-      {'encoding': {'filter': {"lambda" : `subject_1 => subject_1 === "${d}"`
-    }}, 'duration': 0.5}))
-  })
+  function redo_scale () {
+    const scale = scatterplot._renderer.aes.store.color.current.scale
+    const domain = scale.domain()
+    const range = scale.range()
+    select("#color-legend").selectAll("div").data(domain.slice(0, 15))
+    .join("div")
+    .attr("class", "legend-div")
+    .text(d => d)
+    .style("background-color", d => scale(d))
 
+  }
+  first_draw.then( () => {
+    const holder = select("#left-overlay")
+    const buttons = holder.selectAll("button").data([
+      "MILSERVICE", "PERIODOFDAY", "UNIT", "GEOZONE",
+      "AIRFORCEGROUP", "TGTTYPE", "MFUNC_DESC"
+    ])
+    redo_scale()
+    buttons.enter().append("div").style("display", "flex").style("flex", "row").append("button").text(d => d).on("click", function(d) {
+      const button = select(this);
+      const field = button.text();
+      scatterplot.plotAPI({
+        duration: 0.500,
+        encoding: {
+          'color': {
+            'field': field,
+            'range': 'category10',
+            'domain': [-2047, 2047]
+          }
+        }
+      }).then(redo_scale)
+    })
+    select("#date").on("input", function(a, b) {
+      console.log(this, a, b)
+      const date1 = new Date(1970, 0, this.valueAsNumber - 15)
+      const date2 = new Date(1970, 0, this.valueAsNumber + 15)
+      document.getElementById("datestring").innerHTML = date1.toDateString() + " to " + date2.toDateString()
+      scatterplot.plotAPI({
+        alpha: 3.5,
+        max_points: 10000,
+        point_size: 5,
+        duration: 0.1,
+        encoding: {
+          'filter': {
+            'field': "MSNDATE",
+            op: 'within',
+            a: 15,
+            b: this.valueAsNumber
+          }
+        }
+      }).then(redo_scale)
+    })
+  })
 </script>
+
+
+<style>
+  #deepscatter {
+    position: relative;
+  }
+  .overlay {
+    position: absolute;
+    top: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+  }
+  #left-overlay {
+    left: 0;
+  }
+  #color-legend {
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: right;
+    justify-content: right;
+
+  }
+  .legend-div {
+    margin: 5px;
+    padding: 5px 15px;
+  }
+  button {
+    margin: 0.1em;
+  }
+  button:hover {
+    background-color: #eee;
+  }
+  
+</style>

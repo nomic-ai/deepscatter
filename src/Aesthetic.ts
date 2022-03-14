@@ -298,6 +298,10 @@ abstract class Aesthetic {
   }
 
   update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
+    if (this.label === 'filter') console.log(encoding)
+    if (encoding === "null") {
+      encoding = null;
+    }
     if (encoding === null) {
       this.current_encoding = {
         constant : this.default_constant
@@ -307,7 +311,6 @@ abstract class Aesthetic {
     if (encoding === undefined) {
       return;
     }
-    this._constant = undefined;
     if (typeof(encoding) === 'string') {
       encoding = this.convert_string_encoding(encoding);
     }
@@ -320,17 +323,10 @@ abstract class Aesthetic {
     }
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
-      this._constant = encoding.constant;
       return;
     }
     this.field = encoding.field;
-    if (encoding['domain'] === undefined) {
-      encoding['domain'] = this.default_domain;
-    }
-    if (encoding['range']) {
-      this._domain = encoding.domain
-      this._range = encoding.range;
-    }
+
     if (isOpChannel(encoding)) {
       return
     }
@@ -348,6 +344,14 @@ abstract class Aesthetic {
       }
       return
     }
+    if (encoding['domain'] === undefined) {
+      encoding['domain'] = this.default_domain;
+    }
+    if (encoding['range']) {
+      this._domain = encoding.domain
+      this._range = encoding.range;
+    }
+
     this._transform = encoding.transform || undefined;
     if (this.label === 'color' || (encoding.range && typeof(encoding.range[0]) === 'string')) {
       this.encode_for_textures(encoding.range);
@@ -382,10 +386,10 @@ abstract class Aesthetic {
   }
 
   get constant() : number | [number, number, number] {
-    if (this._constant === undefined || this._constant === null) {
-      return this.default_constant;
+    if (isConstantChannel(this.current_encoding)) {
+      return this.current_encoding.constant;
     }
-    return this._constant;
+    return this.default_constant;
   }
 
   get use_map_on_regl() {
@@ -402,16 +406,18 @@ abstract class Aesthetic {
 
   apply_function_for_textures(field: string, range : number[], raw_func: Function | string) {
     const { texture_size } = this.aesthetic_map;
-    let func = raw_func;
+    let func : Function;
     if (typeof(raw_func) === 'string') {
       func = lambda_to_function(parseLambdaString(raw_func));
+    } else {
+      func = raw_func;
     }
     //@ts-ignore TEMPORARY XXX
     this.scaleFunc = scaleLinear()
       .range(range)
       .domain([0, texture_size - 1]);
 
-    let input = arange(texture_size);
+    let input : any[] = arange(texture_size);
 
     if (field === undefined || this.tileSet.table === undefined) {
       console.warn("SETTING EMPTY FIELD")
@@ -427,22 +433,18 @@ abstract class Aesthetic {
 
     if (column.type.dictionary) {
       // NB--Assumes string type for dictionaries.
-      input.fill('');
+      input.fill(undefined);
       const dvals = column.data.dictionary.toArray();
-      dvals.forEach((d, i) => { input[i] = d; });
+      dvals.forEach((d, i) => { input[i] = d });
     } else {
-      input = input.map((d) => this.scaleFunc(d));
+      input = input.map((d) => this.scale(d));
     }
-
     const values = input.map((i) => func(i));
-
     this.texture_buffer.set(values);
-    this.post_to_regl_buffer();
   }
 }
 
 abstract class OneDAesthetic extends Aesthetic {
-  public _constant : number ;
   static get default_constant() {return 1.5;}
   static get_default_domain() {return [0, 1]}
   get default_domain() {return [0, 1]}
@@ -485,32 +487,45 @@ class X extends PositionalAesthetic {
   
 }
 
-// class X0 extends X {}
+class X0 extends X {
+  label = 'x0'
+}
 
 class Y extends PositionalAesthetic {
   label = 'y'
 }
 
+class Y0 extends Y {
+  label = 'y0'
+}
+
 abstract class AbstractFilter extends BooleanAesthetic {
-  public current_encoding : LambdaChannel | OpChannel;
+  public current_encoding : LambdaChannel | OpChannel | ConstantChannel;
+
+  constructor(scatterplot: Scatterplot, regl : Regl, tile: RootTile, map: TextureSet) {
+    super(scatterplot, regl, tile, map);
+    this.current_encoding = {constant : 1}
+  }
 
   default_transform : Transform = 'literal';
   default_constant = 1;
   get default_domain() {return [0, 1]};
-  default_range = [0, 1]
+  default_range : [number, number] = [0, 1]
 
-  static get default_constant() {
-    return 1;
-  }
-  static get default_domain() {
-    return [0, 1];
-  }
   get domain() {
 //    return [-2047, 2047];
-    return this.is_dictionary()
+    const domain : [number, number] = this.is_dictionary()
       ? [-2047, 2047] : [0, 1];
+    return domain;
   }
 
+  update(encoding) {
+    console.log({encoding})
+    super.update(encoding)
+  }
+  post_to_regl_buffer(): void {
+    super.post_to_regl_buffer()
+  }
   ops_to_array() : OpArray {
     const input = this.current_encoding;
     if (input === null) return [0, 0, 0];
@@ -598,7 +613,9 @@ class Color extends Aesthetic {
   public default_constant : [number, number, number] = [0.7, 0, 0.5];
   default_transform : Transform = 'linear';
   get default_range() : [number, number] {return  [0, 1]}
-  
+  current_encoding = {
+    constant : [0.7, 0, 0.5]
+  }
   default_data() : Uint8Array {
     return color_palettes.viridis;
   }
@@ -614,17 +631,9 @@ class Color extends Aesthetic {
     return this._texture_buffer;
   }
 
-  set constant(val : string | [number, number, number]) {
-    if (typeof(val) === 'string') {
-      const { r, g, b } = rgb(val);
-      this._constant = [r / 255, g / 255, b / 255];
-    } else {
-      this._constant = val
-    }
-  }
-
-  get constant() : [number, number, number] {
-    return this._constant || this.default_constant;
+  static convert_color(color : string) {
+    const { r, g, b } = rgb(color);
+    return [r / 255, g / 255, b / 255];
   }
 
   post_to_regl_buffer() {
@@ -632,6 +641,15 @@ class Color extends Aesthetic {
       this.id,
       this.texture_buffer
     )
+  }
+  update(encoding : string) {
+    this.current_encoding = encoding;
+    if (isConstantChannel(encoding)) {
+      if (typeof(encoding.constant) === 'string') {
+        encoding.constant = Color.convert_color(encoding.constant);
+      }
+    }
+    super.update(encoding);
   }
 
   encode_for_textures(range) {
@@ -779,7 +797,7 @@ function parseLambdaString(lambdastring : string) {
     lambda: func,
   };
 };
-
+/*
 function safe_expand(range) {
   // the range of a scale can sensibly take several different forms.
 
@@ -800,6 +818,7 @@ function safe_expand(range) {
     return [1, 1];
   }
 }
+*/
 
 function op_to_function(input : OpChannel) : (d : number) => boolean {
   if (input.op == 'gt') {
@@ -822,8 +841,12 @@ function lambda_to_function(input : LambdaChannel) : (d : any) => number {
     lambda,
     field,
   } = input;
+  if (field === undefined) {
+    throw "Must pass a field to lambda."
+  }
   const cleaned = parseLambdaString(lambda).lambda
-  const [arg, code] = cleaned.split('=>', 1).map((d) => d.trim());
-  const func = new Function(arg, code)
-  return (d) => func(d[field]);
+  const [arg, code] = cleaned.split('=>', 2).map((d) => d.trim());
+  //@ts-ignore
+  const func : (d : any) => number = new Function(arg, code)
+  return func;
 }

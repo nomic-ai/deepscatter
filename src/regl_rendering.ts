@@ -758,10 +758,10 @@ export class ReglRenderer extends Renderer {
         u_grid_mode: (_, { grid_mode }) => grid_mode,
         //@ts-ignore
         u_colors_as_grid: regl.prop('colors_as_grid'),
-        u_constant_color: () => (this.aes.dim("color").current.constant !== null
+        u_constant_color: () => (this.aes.dim("color").current.constant !== undefined
           ? this.aes.dim("color").current.constant
           : [-1, -1, -1]),
-        u_constant_last_color: () => (this.aes.dim("color").last.constant != null
+        u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
           ? this.aes.dim("color").last.constant
           : [-1, -1, -1]),
         u_width: ({ viewportWidth }) => viewportWidth,
@@ -808,7 +808,7 @@ export class ReglRenderer extends Renderer {
     // store needed buffers
     for (const i of range(0, 16)) {
       parameters.attributes[`buffer_${i}`] = (_, { manager, buffer_num_to_variable }) => {
-        const c = manager.regl_elements.get(buffer_num_to_variable[i]);
+        const c = manager.regl_elements.get(buffer_num_to_variable[i]);        
         return c || { constant: 0 };
       };
     }
@@ -818,29 +818,35 @@ export class ReglRenderer extends Renderer {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
         parameters.uniforms[`u_${temporal}${k}_map`] = () => {
+          if (k === 'filter') console.log({time}, this.aes.dim(k)[time].constant)
           const aes_holder = this.aes.dim(k)[time];
           return aes_holder.textures.one_d
         };
         parameters.uniforms[`u_${temporal}${k}_map_position`] = () => 
           this.aes.dim(k)[time].map_position;
-        parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
-        parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
-        parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
-          const t = this.aes.dim(k)[time].transform;
-          if (t === 'linear') return 1;
-          if (t === 'sqrt') return 2;
-          if (t === 'log') return 3;
-          if (t === 'literal') return 4;
-          throw 'Invalid transform';
-        };
-        parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
-          return this.aes.dim(k)[time].constant;
-        };
+
         parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
           const val = aes_to_buffer_num[`${k}--${time}`];
           if (val === undefined) { return -1; }
           return val;
         };
+        
+        if (k !== 'filter' && k !== 'filter2') {
+          // These are not meaningful on filters.
+          parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
+          parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
+          parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
+            const t = this.aes.dim(k)[time].transform;
+            if (t === 'linear') return 1;
+            if (t === 'sqrt') return 2;
+            if (t === 'log') return 3;
+            if (t === 'literal') return 4;
+            throw 'Invalid transform';
+          };
+          parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
+            return this.aes.dim(k)[time].constant;
+          };
+        }
       }
     // Copy the parameters from the data name.
     }

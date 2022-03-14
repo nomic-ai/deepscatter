@@ -197,20 +197,12 @@ autogenerate_code()
       
 
   uniform float u_filter_buffer_num;
-  uniform float u_filter_constant;
-  uniform float u_filter_transform;
-  uniform vec2 u_filter_domain;
-  uniform vec2 u_filter_range;
   uniform float u_filter_map_position;
   float a_filter1;
   bool a_filter_is_constant;
       
 
   uniform float u_last_filter_buffer_num;
-  uniform float u_last_filter_constant;
-  uniform float u_last_filter_transform;
-  uniform vec2 u_last_filter_domain;
-  uniform vec2 u_last_filter_range;
   uniform float u_last_filter_map_position;
   float a_last_filter1;
   bool a_last_filter_is_constant;
@@ -218,20 +210,12 @@ autogenerate_code()
 
 
   uniform float u_filter2_buffer_num;
-  uniform float u_filter2_constant;
-  uniform float u_filter2_transform;
-  uniform vec2 u_filter2_domain;
-  uniform vec2 u_filter2_range;
   uniform float u_filter2_map_position;
   float a_filter2;
   bool a_filter2_is_constant;
       
 
   uniform float u_last_filter2_buffer_num;
-  uniform float u_last_filter2_constant;
-  uniform float u_last_filter2_transform;
-  uniform vec2 u_last_filter2_domain;
-  uniform vec2 u_last_filter2_range;
   uniform float u_last_filter2_map_position;
   float a_last_filter2;
   bool a_last_filter2_is_constant;
@@ -513,40 +497,22 @@ float run_numeric_filter (in float a_filter,
 
 float choose_and_run_filter(
   in vec3 u_filter_numeric,
-  in vec2 u_filter_domain,
   in float a_filter,
-  in float map_location) {
-  if (u_filter_numeric.r < 0.5) {
-    float frac_filter = linstep(u_filter_domain, a_filter);
-    float map_coords = map_location / 32. + .5 / 32.;
-    return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
-  } else {
-    return run_numeric_filter(a_filter,
-      u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
-  }
-}
-
-
-// Progress through the filters at different rates.
-float combine_filters(
-  in vec3 u_filter_numeric, in vec2 u_filter_domain, in float a_filter,
-  in float u_filter_map_position,
-  in vec3 u_last_filter_numeric, in vec2 u_last_filter_domain, in float a_last_filter,
-  in float u_last_filter_map_position,
-  in float ease,
-  in float ix
-) {
-  float my_filter = 0.;
-  if (ix_to_random(ix, 13.5) > ease) {
-    return choose_and_run_filter(
-      u_last_filter_numeric, u_last_filter_domain, a_last_filter,
-      u_last_filter_map_position
-    );
-  } else {
-    return choose_and_run_filter(
-      u_filter_numeric, u_filter_domain, a_filter,
-      u_filter_map_position);
-  }
+  in float map_location,
+  in bool filter_is_constant
+  ) {
+    if (filter_is_constant) {
+      return 1.;
+    }
+    if (u_filter_numeric.r < 0.5) {
+      // Must be on a dictionary. Unreasonable assumption, maybe?
+      float frac_filter = linstep(vec2(-2047., 2047), a_filter);
+      float map_coords = (map_location - .5) / 32.;
+      return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
+    } else {
+      return run_numeric_filter(a_filter,
+        u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
+    }
 }
 
 #pragma glslify: logarithmic_spiral_jitter = require('./log_spiral_jitter.vert')
@@ -918,7 +884,7 @@ void main() {
       a_filter1 = get_buffer(u_filter_buffer_num);
       a_filter_is_constant = false;
     } else {
-      a_filter1 = u_filter_constant;
+      a_filter1 = 1.;
       a_filter_is_constant = true;
     }
 
@@ -926,7 +892,7 @@ void main() {
       a_last_filter1 = get_buffer(u_last_filter_buffer_num);
       a_last_filter_is_constant = false;
     } else {
-      a_last_filter1 = u_last_filter_constant;
+      a_last_filter1 = 1.;
       a_last_filter_is_constant = true;
     }
 
@@ -934,7 +900,7 @@ void main() {
       a_filter2 = get_buffer(u_filter2_buffer_num);
       a_filter2_is_constant = false;
     } else {
-      a_filter2 = u_filter2_constant;
+      a_filter2 = 1.;
       a_filter2_is_constant = true;
     }
 
@@ -942,7 +908,7 @@ void main() {
       a_last_filter2 = get_buffer(u_last_filter2_buffer_num);
       a_last_filter2_is_constant = false;
     } else {
-      a_last_filter2 = u_last_filter2_constant;
+      a_last_filter2 = 1.;
       a_last_filter2_is_constant = true;
     }
 
@@ -1083,36 +1049,57 @@ void main() {
     position = position + jitterspec;
   }
 
-  float filtered_by_filter1 = combine_filters(u_filter_numeric, 
-    u_filter_domain, a_filter1,  
-    u_filter_map_position,   
-    u_last_filter_numeric, u_last_filter_domain, a_last_filter1, 
-    u_last_filter_map_position, ease, ix);
-  /*
-  if (filtered_by_filter1 <= 0.5) {
-    gl_Position = discard_me;
-    return;
-  }
+  /* FILTERING */
 
-  float filtered_by_filter2 = combine_filters(u_filter2_numeric,
-    u_filter2_domain, a_filter2,
+  float filter1_status = choose_and_run_filter(
+    u_filter_numeric,
+    a_filter1,
+    u_filter_map_position,
+    a_filter_is_constant
+  );
+
+  float last_filter1_status = choose_and_run_filter(
+    u_last_filter_numeric,
+    a_last_filter1,
+    u_last_filter_map_position,
+    a_last_filter_is_constant
+  );
+
+  float filter2_status = choose_and_run_filter(
+    u_filter2_numeric,
+    a_filter2,
     u_filter2_map_position,
-    u_last_filter2_numeric, u_last_filter2_domain, a_last_filter2,
-    u_last_filter2_map_position, ease, ix);
+    a_filter2_is_constant
+  );
 
-  if (filtered_by_filter2 <= 0.5) {
+  float last_filter2_status = choose_and_run_filter(
+    u_last_filter2_numeric,
+    a_last_filter2,
+    u_last_filter2_map_position,
+    a_last_filter2_is_constant
+  );
+
+  bool was_filtered = last_filter2_status < .5 || last_filter1_status < .5;
+  bool will_be_filtered = filter2_status < .5 || filter1_status < .5;
+
+  bool filter_status = will_be_filtered;
+
+  if (ease < ix_to_random(ix, 1.)) {
+    filter_status = was_filtered;
+  }
+
+  if (filter_status == true) {
     gl_Position = discard_me;
     return;
   }
-  */
+
   float size_multiplier = texture_float_lookup(
     u_size_domain, u_size_range,
     u_size_transform, a_size, u_size_map_position);
 
   float last_size_multiplier = texture_float_lookup(
-    u_last_size_domain, u_last_size_range,
-                                              u_last_size_transform, a_last_size,
-                                              u_last_size_map_position);
+    u_last_size_domain, u_last_size_range, u_last_size_transform, a_last_size,
+    u_last_size_map_position);
 
   size_multiplier = u_base_size * 
      mix(last_size_multiplier, size_multiplier, ease);

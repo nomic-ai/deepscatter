@@ -68,10 +68,10 @@
         field: "y", 
         transform: "literal"
       },
-/*      "filter": {
+      "filter": {
         field: "class",
-        lambda: "class => class !== 'Strawberry'"
-      },*/
+        lambda: "d => d !== 'Strawberry'"
+      },
       "size": {
         "field": "quantity",
         "transform": "sqrt",
@@ -84,9 +84,9 @@
   const colors = [
 //    JSON.parse(JSON.stringify(prefs.encoding.color)),
     {
-        "field": "quantity",
-        "range": "viridis",
-        "domain": [0, 1] 
+      "field": "quantity",
+      "range": "viridis",
+      "domain": [0, 1] 
     },
     {
       "field": "x",
