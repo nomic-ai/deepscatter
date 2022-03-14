@@ -13727,39 +13727,23 @@ autogenerate_code()
       
 
   uniform float u_filter_buffer_num;
-  uniform float u_filter_constant;
-  uniform float u_filter_transform;
-  uniform vec2 u_filter_domain;
-  uniform vec2 u_filter_range;
   uniform float u_filter_map_position;
   float a_filter1;
   bool a_filter_is_constant;
       
 
   uniform float u_last_filter_buffer_num;
-  uniform float u_last_filter_constant;
-  uniform float u_last_filter_transform;
-  uniform vec2 u_last_filter_domain;
-  uniform vec2 u_last_filter_range;
   uniform float u_last_filter_map_position;
   float a_last_filter1;
   bool a_last_filter_is_constant;
 
   uniform float u_filter2_buffer_num;
-  uniform float u_filter2_constant;
-  uniform float u_filter2_transform;
-  uniform vec2 u_filter2_domain;
-  uniform vec2 u_filter2_range;
   uniform float u_filter2_map_position;
   float a_filter2;
   bool a_filter2_is_constant;
       
 
   uniform float u_last_filter2_buffer_num;
-  uniform float u_last_filter2_constant;
-  uniform float u_last_filter2_transform;
-  uniform vec2 u_last_filter2_domain;
-  uniform vec2 u_last_filter2_range;
   uniform float u_last_filter2_map_position;
   float a_last_filter2;
   bool a_last_filter2_is_constant;
@@ -14038,39 +14022,22 @@ float run_numeric_filter (in float a_filter,
 
 float choose_and_run_filter(
   in vec3 u_filter_numeric,
-  in vec2 u_filter_domain,
   in float a_filter,
-  in float map_location) {
-  if (u_filter_numeric.r < 0.5) {
-    float frac_filter = linstep(u_filter_domain, a_filter);
-    float map_coords = map_location / 32. + .5 / 32.;
-    return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
-  } else {
-    return run_numeric_filter(a_filter,
-      u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
-  }
-}
-
-// Progress through the filters at different rates.
-float combine_filters(
-  in vec3 u_filter_numeric, in vec2 u_filter_domain, in float a_filter,
-  in float u_filter_map_position,
-  in vec3 u_last_filter_numeric, in vec2 u_last_filter_domain, in float a_last_filter,
-  in float u_last_filter_map_position,
-  in float ease,
-  in float ix
-) {
-  float my_filter = 0.;
-  if (ix_to_random(ix, 13.5) > ease) {
-    return choose_and_run_filter(
-      u_last_filter_numeric, u_last_filter_domain, a_last_filter,
-      u_last_filter_map_position
-    );
-  } else {
-    return choose_and_run_filter(
-      u_filter_numeric, u_filter_domain, a_filter,
-      u_filter_map_position);
-  }
+  in float map_location,
+  in bool filter_is_constant
+  ) {
+    if (filter_is_constant) {
+      return 1.;
+    }
+    if (u_filter_numeric.r < 0.5) {
+      // Must be on a dictionary. Unreasonable assumption, maybe?
+      float frac_filter = linstep(vec2(-2047., 2047), a_filter);
+      float map_coords = (map_location - .5) / 32.;
+      return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
+    } else {
+      return run_numeric_filter(a_filter,
+        u_filter_numeric.r, u_filter_numeric.g, u_filter_numeric.b);
+    }
 }
 
 const float tau_0 = 2. * 3.14159265359;
@@ -14598,7 +14565,7 @@ void main() {
       a_filter1 = get_buffer(u_filter_buffer_num);
       a_filter_is_constant = false;
     } else {
-      a_filter1 = u_filter_constant;
+      a_filter1 = 1.;
       a_filter_is_constant = true;
     }
 
@@ -14606,7 +14573,7 @@ void main() {
       a_last_filter1 = get_buffer(u_last_filter_buffer_num);
       a_last_filter_is_constant = false;
     } else {
-      a_last_filter1 = u_last_filter_constant;
+      a_last_filter1 = 1.;
       a_last_filter_is_constant = true;
     }
 
@@ -14614,7 +14581,7 @@ void main() {
       a_filter2 = get_buffer(u_filter2_buffer_num);
       a_filter2_is_constant = false;
     } else {
-      a_filter2 = u_filter2_constant;
+      a_filter2 = 1.;
       a_filter2_is_constant = true;
     }
 
@@ -14622,7 +14589,7 @@ void main() {
       a_last_filter2 = get_buffer(u_last_filter2_buffer_num);
       a_last_filter2_is_constant = false;
     } else {
-      a_last_filter2 = u_last_filter2_constant;
+      a_last_filter2 = 1.;
       a_last_filter2_is_constant = true;
     }
 
@@ -14761,36 +14728,57 @@ void main() {
     position = position + jitterspec;
   }
 
-  float filtered_by_filter1 = combine_filters(u_filter_numeric, 
-    u_filter_domain, a_filter1,  
-    u_filter_map_position,   
-    u_last_filter_numeric, u_last_filter_domain, a_last_filter1, 
-    u_last_filter_map_position, ease, ix);
-  /*
-  if (filtered_by_filter1 <= 0.5) {
-    gl_Position = discard_me;
-    return;
-  }
+  /* FILTERING */
 
-  float filtered_by_filter2 = combine_filters(u_filter2_numeric,
-    u_filter2_domain, a_filter2,
+  float filter1_status = choose_and_run_filter(
+    u_filter_numeric,
+    a_filter1,
+    u_filter_map_position,
+    a_filter_is_constant
+  );
+
+  float last_filter1_status = choose_and_run_filter(
+    u_last_filter_numeric,
+    a_last_filter1,
+    u_last_filter_map_position,
+    a_last_filter_is_constant
+  );
+
+  float filter2_status = choose_and_run_filter(
+    u_filter2_numeric,
+    a_filter2,
     u_filter2_map_position,
-    u_last_filter2_numeric, u_last_filter2_domain, a_last_filter2,
-    u_last_filter2_map_position, ease, ix);
+    a_filter2_is_constant
+  );
 
-  if (filtered_by_filter2 <= 0.5) {
+  float last_filter2_status = choose_and_run_filter(
+    u_last_filter2_numeric,
+    a_last_filter2,
+    u_last_filter2_map_position,
+    a_last_filter2_is_constant
+  );
+
+  bool was_filtered = last_filter2_status < .5 || last_filter1_status < .5;
+  bool will_be_filtered = filter2_status < .5 || filter1_status < .5;
+
+  bool filter_status = will_be_filtered;
+
+  if (ease < ix_to_random(ix, 1.)) {
+    filter_status = was_filtered;
+  }
+
+  if (filter_status == true) {
     gl_Position = discard_me;
     return;
   }
-  */
+
   float size_multiplier = texture_float_lookup(
     u_size_domain, u_size_range,
     u_size_transform, a_size, u_size_map_position);
 
   float last_size_multiplier = texture_float_lookup(
-    u_last_size_domain, u_last_size_range,
-                                              u_last_size_transform, a_last_size,
-                                              u_last_size_map_position);
+    u_last_size_domain, u_last_size_range, u_last_size_transform, a_last_size,
+    u_last_size_map_position);
 
   size_multiplier = u_base_size * 
      mix(last_size_multiplier, size_multiplier, ease);
@@ -15267,6 +15255,11 @@ class Aesthetic {
     return encoding;
   }
   update(encoding) {
+    if (this.label === "filter")
+      console.log(encoding);
+    if (encoding === "null") {
+      encoding = null;
+    }
     if (encoding === null) {
       this.current_encoding = {
         constant: this.default_constant
@@ -15276,7 +15269,6 @@ class Aesthetic {
     if (encoding === void 0) {
       return;
     }
-    this._constant = void 0;
     if (typeof encoding === "string") {
       encoding = this.convert_string_encoding(encoding);
     }
@@ -15289,17 +15281,9 @@ class Aesthetic {
     }
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
-      this._constant = encoding.constant;
       return;
     }
     this.field = encoding.field;
-    if (encoding["domain"] === void 0) {
-      encoding["domain"] = this.default_domain;
-    }
-    if (encoding["range"]) {
-      this._domain = encoding.domain;
-      this._range = encoding.range;
-    }
     if (isOpChannel(encoding)) {
       return;
     }
@@ -15316,6 +15300,13 @@ class Aesthetic {
         this.post_to_regl_buffer();
       }
       return;
+    }
+    if (encoding["domain"] === void 0) {
+      encoding["domain"] = this.default_domain;
+    }
+    if (encoding["range"]) {
+      this._domain = encoding.domain;
+      this._range = encoding.range;
     }
     this._transform = encoding.transform || void 0;
     if (this.label === "color" || encoding.range && typeof encoding.range[0] === "string") {
@@ -15345,10 +15336,10 @@ class Aesthetic {
     return this.arrow_column().type.dictionary;
   }
   get constant() {
-    if (this._constant === void 0 || this._constant === null) {
-      return this.default_constant;
+    if (isConstantChannel(this.current_encoding)) {
+      return this.current_encoding.constant;
     }
-    return this._constant;
+    return this.default_constant;
   }
   get use_map_on_regl() {
     if (this.is_dictionary()) {
@@ -15363,9 +15354,11 @@ class Aesthetic {
   }
   apply_function_for_textures(field, range$1, raw_func) {
     const { texture_size } = this.aesthetic_map;
-    let func = raw_func;
+    let func;
     if (typeof raw_func === "string") {
       func = lambda_to_function(parseLambdaString(raw_func));
+    } else {
+      func = raw_func;
     }
     this.scaleFunc = linear().range(range$1).domain([0, texture_size - 1]);
     let input = range(texture_size);
@@ -15379,17 +15372,16 @@ class Aesthetic {
       throw `Column ${field} does not exist on table.`;
     }
     if (column2.type.dictionary) {
-      input.fill("");
+      input.fill(void 0);
       const dvals = column2.data.dictionary.toArray();
       dvals.forEach((d, i) => {
         input[i] = d;
       });
     } else {
-      input = input.map((d) => this.scaleFunc(d));
+      input = input.map((d) => this.scale(d));
     }
     const values = input.map((i) => func(i));
     this.texture_buffer.set(values);
-    this.post_to_regl_buffer();
   }
 }
 class OneDAesthetic extends Aesthetic {
@@ -15453,23 +15445,26 @@ class Y extends PositionalAesthetic {
   }
 }
 class AbstractFilter extends BooleanAesthetic {
-  constructor() {
-    super(...arguments);
+  constructor(scatterplot, regl2, tile, map2) {
+    super(scatterplot, regl2, tile, map2);
     this.default_transform = "literal";
     this.default_constant = 1;
     this.default_range = [0, 1];
+    this.current_encoding = { constant: 1 };
   }
   get default_domain() {
     return [0, 1];
   }
-  static get default_constant() {
-    return 1;
-  }
-  static get default_domain() {
-    return [0, 1];
-  }
   get domain() {
-    return this.is_dictionary() ? [-2047, 2047] : [0, 1];
+    const domain = this.is_dictionary() ? [-2047, 2047] : [0, 1];
+    return domain;
+  }
+  update(encoding) {
+    console.log({ encoding });
+    super.update(encoding);
+  }
+  post_to_regl_buffer() {
+    super.post_to_regl_buffer();
   }
   ops_to_array() {
     const input = this.current_encoding;
@@ -15567,6 +15562,9 @@ class Color extends Aesthetic {
     this.texture_type = "uint8";
     this.default_constant = [0.7, 0, 0.5];
     this.default_transform = "linear";
+    this.current_encoding = {
+      constant: [0.7, 0, 0.5]
+    };
   }
   get default_range() {
     return [0, 1];
@@ -15582,19 +15580,21 @@ class Color extends Aesthetic {
     this._texture_buffer.set(this.default_data());
     return this._texture_buffer;
   }
-  set constant(val) {
-    if (typeof val === "string") {
-      const { r, g, b } = rgb(val);
-      this._constant = [r / 255, g / 255, b / 255];
-    } else {
-      this._constant = val;
-    }
-  }
-  get constant() {
-    return this._constant || this.default_constant;
+  static convert_color(color2) {
+    const { r, g, b } = rgb(color2);
+    return [r / 255, g / 255, b / 255];
   }
   post_to_regl_buffer() {
     this.aesthetic_map.set_color(this.id, this.texture_buffer);
+  }
+  update(encoding) {
+    this.current_encoding = encoding;
+    if (isConstantChannel(encoding)) {
+      if (typeof encoding.constant === "string") {
+        encoding.constant = Color.convert_color(encoding.constant);
+      }
+    }
+    super.update(encoding);
   }
   encode_for_textures(range$1) {
     this._scale = scales[this.transform]().range(range$1).domain(this.domain);
@@ -15755,10 +15755,13 @@ function lambda_to_function(input) {
     lambda,
     field
   } = input;
+  if (field === void 0) {
+    throw "Must pass a field to lambda.";
+  }
   const cleaned = parseLambdaString(lambda).lambda;
-  const [arg, code] = cleaned.split("=>", 1).map((d) => d.trim());
+  const [arg, code] = cleaned.split("=>", 2).map((d) => d.trim());
   const func = new Function(arg, code);
-  return (d) => func(d[field]);
+  return func;
 }
 class AestheticSet {
   constructor(scatterplot, regl2, tileSet) {
@@ -15866,6 +15869,7 @@ class TextureSet {
       offset = this._one_d_position++;
       offsets[id2] = offset;
     }
+    console.log("Setting one-d in slot ", offset - 1, "on id ", id2, " to ", [...value].slice(0, 6).join(","), this.texture_size);
     this.one_d_texture.subimage({
       data: value,
       width: 1,
@@ -16322,8 +16326,8 @@ class ReglRenderer extends Renderer {
         },
         u_grid_mode: (_, { grid_mode }) => grid_mode,
         u_colors_as_grid: regl2.prop("colors_as_grid"),
-        u_constant_color: () => this.aes.dim("color").current.constant !== null ? this.aes.dim("color").current.constant : [-1, -1, -1],
-        u_constant_last_color: () => this.aes.dim("color").last.constant != null ? this.aes.dim("color").last.constant : [-1, -1, -1],
+        u_constant_color: () => this.aes.dim("color").current.constant !== void 0 ? this.aes.dim("color").current.constant : [-1, -1, -1],
+        u_constant_last_color: () => this.aes.dim("color").last.constant !== void 0 ? this.aes.dim("color").last.constant : [-1, -1, -1],
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
@@ -16379,27 +16383,12 @@ class ReglRenderer extends Renderer {
       for (const time2 of ["current", "last"]) {
         const temporal = time2 === "current" ? "" : "last_";
         parameters.uniforms[`u_${temporal}${k}_map`] = () => {
+          if (k === "filter")
+            console.log({ time: time2 }, this.aes.dim(k)[time2].constant);
           const aes_holder = this.aes.dim(k)[time2];
           return aes_holder.textures.one_d;
         };
         parameters.uniforms[`u_${temporal}${k}_map_position`] = () => this.aes.dim(k)[time2].map_position;
-        parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time2].domain;
-        parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time2].range;
-        parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
-          const t = this.aes.dim(k)[time2].transform;
-          if (t === "linear")
-            return 1;
-          if (t === "sqrt")
-            return 2;
-          if (t === "log")
-            return 3;
-          if (t === "literal")
-            return 4;
-          throw "Invalid transform";
-        };
-        parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
-          return this.aes.dim(k)[time2].constant;
-        };
         parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
           const val = aes_to_buffer_num[`${k}--${time2}`];
           if (val === void 0) {
@@ -16407,6 +16396,25 @@ class ReglRenderer extends Renderer {
           }
           return val;
         };
+        if (k !== "filter" && k !== "filter2") {
+          parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time2].domain;
+          parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time2].range;
+          parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
+            const t = this.aes.dim(k)[time2].transform;
+            if (t === "linear")
+              return 1;
+            if (t === "sqrt")
+              return 2;
+            if (t === "log")
+              return 3;
+            if (t === "literal")
+              return 4;
+            throw "Invalid transform";
+          };
+          parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
+            return this.aes.dim(k)[time2].constant;
+          };
+        }
       }
     }
     this._renderer = regl2(parameters);
