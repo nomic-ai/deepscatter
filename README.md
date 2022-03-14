@@ -1,22 +1,20 @@
-# Warning
-
-This library is still unstable, and the API shifts depending on what I'm currently interesting. Open to thoughts, conversations, issues and complaints, but don't
-put this on top of something that can't fail or that needs to change!
-
 # Deep Scatterplots for the Web
 
-This is a WebGL library for displaying more points than are ordinarily possible over the web.
+This is an evolving library for displaying more points than are ordinarily possible over the web.
 
-It's fast for two reasons:
+It's fast for three reasons:
 
 1. All data is sent in the Apache Arrow `feather` format, in a 
    special quadtree format that makes it possible to only load 
    data as needed on zoom. Feather takes no time to load in JS
-   once copied, and can be directly copied to the shaders.
+   once copied, and can be directly copied to the shaders without
+   transformation in JS. This is the way of the future.
 2. Most rendering is done in custom layers using WebGL, with a 
    buffer management strategy handled by REGL. This means that 
-   there are no unnecessary abstractions around points.
-3. All grammar-of-graphics transforms are handled on the GPU,
+   there are no unnecessary abstractions around points or separate draw calls
+   for different objects; a minimum number of buffers are attached for the
+   needed points.
+3. Almost all grammar-of-graphics transforms are handled on the GPU,
    which allows for interpolated transitions with calculations 
    in parallel.
 
