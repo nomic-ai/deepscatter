@@ -298,7 +298,6 @@ abstract class Aesthetic {
   }
 
   update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
-    if (this.label === 'filter') console.log(encoding)
     if (encoding === "null") {
       encoding = null;
     }

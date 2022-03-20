@@ -13529,7 +13529,7 @@ class Renderer {
       this._click_function_type = "string";
       this._click_function = this._click_function_from_string();
     } else {
-      console.log("Unrecognized click_function type; should be string or function.");
+      console.warn("Unrecognized click_function type; should be string or function.");
       this._click_function_type = null;
       this._click_function = function() {
       };
@@ -14809,6 +14809,10 @@ void main() {
   point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz;
 
   gl_PointSize = point_size_adjust * size_multiplier;
+  if (gl_PointSize  <= 0.) {
+    gl_Position = discard_me;
+    return;
+  }
 
   vec2 jitter = vec2(0., 0.);
 
@@ -14825,7 +14829,6 @@ void main() {
         u_jitter_speed_transform, a_jitter_speed,
         u_jitter_speed_map_position, a_jitter_speed_is_constant
       );
-
     vec2 last_jitter;
     if (ease < 1.) {
       last_jitter = calculate_jitter(
@@ -15274,8 +15277,6 @@ class Aesthetic {
     return encoding;
   }
   update(encoding) {
-    if (this.label === "filter")
-      console.log(encoding);
     if (encoding === "null") {
       encoding = null;
     }
@@ -15479,7 +15480,6 @@ class AbstractFilter extends BooleanAesthetic {
     return domain;
   }
   update(encoding) {
-    console.log({ encoding });
     super.update(encoding);
   }
   post_to_regl_buffer() {
@@ -15565,7 +15565,7 @@ class Jitter_radius extends Aesthetic {
     return [0, 1];
   }
   get method() {
-    return this._method || "None";
+    return this.current_encoding && this.current_encoding.method ? this.current_encoding.method : "None";
   }
   set method(value) {
     this._method = value;
@@ -15888,7 +15888,6 @@ class TextureSet {
       offset = this._one_d_position++;
       offsets[id2] = offset;
     }
-    console.log("Setting one-d in slot ", offset - 1, "on id ", id2, " to ", [...value].slice(0, 6).join(","), this.texture_size);
     this.one_d_texture.subimage({
       data: value,
       width: 1,
@@ -16402,8 +16401,6 @@ class ReglRenderer extends Renderer {
       for (const time2 of ["current", "last"]) {
         const temporal = time2 === "current" ? "" : "last_";
         parameters.uniforms[`u_${temporal}${k}_map`] = () => {
-          if (k === "filter")
-            console.log({ time: time2 }, this.aes.dim(k)[time2].constant);
           const aes_holder = this.aes.dim(k)[time2];
           return aes_holder.textures.one_d;
         };
