@@ -1,3 +1,9 @@
+# 2.1.1
+
+Restore some jitter types broken by ts conversion.
+
+Remove some extraneous logging.
+
 # 2.1.0
 
 1. Major refactor to use typescript. This requires standardizing some of the approaches to API a bit more, and 

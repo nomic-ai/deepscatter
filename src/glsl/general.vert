@@ -1111,6 +1111,10 @@ void main() {
   point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz;
 
   gl_PointSize = point_size_adjust * size_multiplier;
+  if (gl_PointSize  <= 0.) {
+    gl_Position = discard_me;
+    return;
+  }
 
   vec2 jitter = vec2(0., 0.);
 
@@ -1127,7 +1131,6 @@ void main() {
         u_jitter_speed_transform, a_jitter_speed,
         u_jitter_speed_map_position, a_jitter_speed_is_constant
       );
-
     vec2 last_jitter;
     if (ease < 1.) {
       last_jitter = calculate_jitter(

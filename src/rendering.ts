@@ -134,7 +134,7 @@ export class Renderer {
     } else {
       // Make sure _click_function is always defined, but use a no-op if we
       // don't recognize the input type.
-      console.log('Unrecognized click_function type; should be string or function.')
+      console.warn('Unrecognized click_function type; should be string or function.')
       this._click_function_type = null
       this._click_function = (function() {})
     }

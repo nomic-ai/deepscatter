@@ -818,7 +818,6 @@ export class ReglRenderer extends Renderer {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
         parameters.uniforms[`u_${temporal}${k}_map`] = () => {
-          if (k === 'filter') console.log({time}, this.aes.dim(k)[time].constant)
           const aes_holder = this.aes.dim(k)[time];
           return aes_holder.textures.one_d
         };

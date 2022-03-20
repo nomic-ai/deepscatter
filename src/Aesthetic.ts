@@ -520,7 +520,6 @@ abstract class AbstractFilter extends BooleanAesthetic {
   }
 
   update(encoding) {
-    console.log({encoding})
     super.update(encoding)
   }
   post_to_regl_buffer(): void {
@@ -594,7 +593,8 @@ class Jitter_radius extends Aesthetic {
   label = "jitter_radius"
 
   get method() {
-    return this._method || "None";
+    return (this.current_encoding && this.current_encoding.method) ?
+     this.current_encoding.method : "None"
   }
 
   set method(value : string) {

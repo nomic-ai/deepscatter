@@ -169,7 +169,6 @@ export class TextureSet {
       offset = this._one_d_position++;
       offsets[id] = offset;
     }
-    console.log("Setting one-d in slot ", offset - 1, "on id ", id, " to ", [...value].slice(0, 6).join(","), this.texture_size)
     // Draw a stripe with the data of a single pixel width,
     // going down.
     this.one_d_texture.subimage({
