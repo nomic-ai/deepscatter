@@ -91,7 +91,12 @@ export class Renderer {
     const { tileSet } = this;
     // Materialize using a tileset method.
     let all_tiles;
-    if (this._use_scale_to_download_tiles) {
+    let natural_display = this.aes.dim('x').current.label == 'x' &&
+      this.aes.dim('y').current.label == 'y' &&
+      this.aes.dim('x').last.field == 'x' &&
+      this.aes.dim('y').last.field == 'y';
+
+    if (natural_display) {
       all_tiles = tileSet.map((d) => d)
         .filter((tile) => tile.is_visible(max_ix, this.zoom.current_corners()));
     } else {
@@ -99,9 +104,6 @@ export class Renderer {
         .filter((tile) => tile.min_ix < this.max_ix);
     }
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
-
-    //    all_tiles.map(d => console.log(`${d.key} (${d.min_ix} - ${d.max_ix})`))
-
     return all_tiles;
   }
 

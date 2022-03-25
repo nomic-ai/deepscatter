@@ -335,19 +335,6 @@ const float e = 1.618282;
 // I've been convinced.
 const float tau = 2. * 3.14159265359;
 
-// uniform vec4 corners;
-
-/*************** COLOR SCALES *******************************/
-
-// Ha! A gazillion version of this function:
-// https://gist.github.com/kylemcdonald/f8df3bc2f8d38ca2b7cb
-/*vec3 hsv2rgb(in vec3 c) {
-  vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0,
-                   0.0, 1.0);
-  rgb = rgb * rgb * (3.0 - 2.0 * rgb);
-  return c.z * mix(vec3(1.0), rgb, c.y);
-}*/
-
 float interpolate_raw(in float x, in float min, in float max) {
   if (x < min) {return 0.;}
   if (x > max) {return 1.;}

@@ -467,7 +467,7 @@ abstract class PositionalAesthetic extends OneDAesthetic {
     super(scatterplot, regl, tile, map);
     this._transform = 'literal';
   }
-  static default_range = [-1, 1]
+  default_range : [number, number] = [-1, 1]
   default_constant = 0;
   default_transform : Transform = 'literal';
 
@@ -482,8 +482,7 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 }
 
 class X extends PositionalAesthetic {
-  label = 'x'
-  
+  label = 'x' 
 }
 
 class X0 extends X {
@@ -761,7 +760,9 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
 }
 
 class StatefulX extends StatefulAesthetic<X> { get Factory() { return X }; get label() { return 'x' }}
+class StatefulX0 extends StatefulAesthetic<X0> { get Factory() { return X0 }; get label() { return 'x0' }}
 class StatefulY extends StatefulAesthetic<Y> { get Factory() { return Y }; get label() { return 'y' }}
+class StatefulY0 extends StatefulAesthetic<Y0> { get Factory() { return Y0 }; get label() { return 'y0' }}
 class StatefulSize extends StatefulAesthetic<Size> { get Factory() { return Size }; get label() { return 'size' }}
 class StatefulJitter_speed extends StatefulAesthetic<Jitter_speed> { get Factory() { return Jitter_speed }; get label() { return 'jitter_speed' }}
 class StatefulJitter_radius extends StatefulAesthetic<Jitter_radius> { get Factory() { return Jitter_radius }; get label() { return 'jitter_radius' }}
@@ -771,7 +772,9 @@ class StatefulFilter2 extends StatefulAesthetic<Filter2> { get Factory() { retur
 
 export const stateful_aesthetics : Record<string, StatefulAesthetic<typeof Aesthetic>> = {
   x : StatefulX,
+  x0 : StatefulX0,
   y : StatefulY,
+  y0 : StatefulY0,
   size : StatefulSize,
   jitter_speed : StatefulJitter_speed,
   jitter_radius : StatefulJitter_radius,

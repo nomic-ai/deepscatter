@@ -7,13 +7,6 @@ import type Scatterplot from './deepscatter';
 import type RootTile from './tile';
 import type { Encoding } from './types';
 import type {StatefulAesthetic} from './Aesthetic';
-//export const aesthetic_variables = Array.from(Object.keys(Aesthetic))
-//  .map((d) => d.toLowerCase());
-
-function capitalize_first_letter(string) {
-  // written by co-pilot!
-  return string.charAt(0).toUpperCase() + string.slice(1);
-}
 
 export class AestheticSet {
   public tileSet : RootTile;
@@ -34,6 +27,7 @@ export class AestheticSet {
   }
 
   public dim(aesthetic : string) {
+    // Returns the stateful aesthetic corresponding to the given aesthetic.
     if (this.store[aesthetic]) {
       return this.store[aesthetic]
     }
@@ -44,6 +38,7 @@ export class AestheticSet {
       );
       return this.store[aesthetic]
     }
+    throw new Error(`Unknown aesthetic ${aesthetic}`)
   }
   
   *[Symbol.iterator]() : Iterator<[string, StatefulAesthetic<any>]> {
@@ -53,15 +48,10 @@ export class AestheticSet {
   }
 
   interpret_position(encoding : Encoding) {
-    /* 
-    I allow a couple weird ways of representing positions.
-
-    First, you can specify just 'position' as a string and it will 
-    parse into 'position.x' and 'position.y'.
-
-    Second, you can specify 'position.x0' and 'position.y0' and
-    for now they will just be mapped into the previous locations
-    of x and y. (maybe not forever, though.)
+    
+    /*
+      You can specify just 'position' or 'position0' as a string and it will 
+      parse into 'position.x' or 'position.x0' and 'position.y' or 'position.y0'.
     */
 
     if (encoding) {
@@ -110,27 +100,13 @@ export class AestheticSet {
       // keeping something other than the encoding.
       encoding = {};
     }
-
     if (encoding.filter1) {
       encoding.filter = encoding.filter1;
       delete encoding.filter1;
     }
     // Overwrite position fields.
     this.interpret_position(encoding);
-
-    // Make believe that that the x0 and y0 values were there already.
-    if (encoding.x0) {
-      this.dim('x').update(encoding.x0);
-    }
-
-    if (encoding.y0) {
-      this.dim('y').update(encoding.y0);
-    }
-
     for (const k of Object.keys(stateful_aesthetics)) {
-      if (k === 'x0' || k === 'y0') {
-        continue
-      }
       this.dim(k).update(encoding[k]);
     }
   }
@@ -146,7 +122,7 @@ export class TextureSet {
   private offsets : Record<string, number> = {};
   private _one_d_position : number;
   private _color_position : number;
-  constructor(regl, texture_size = 4096, texture_widths = 32) {
+  constructor(regl : Regl, texture_size = 4096, texture_widths = 32) {
     this.texture_size = texture_size;
     this.texture_widths = texture_widths
     this.regl = regl;
@@ -154,7 +130,7 @@ export class TextureSet {
     this._color_position = -1
   }
 
-  public get_position(id) {
+  public get_position(id : string) {
     return this.offsets[id] || 0;
   }
 

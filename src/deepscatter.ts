@@ -5,7 +5,7 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import Tile from './tile';
-import { APICall } from './types';
+import { APICall, Channel } from './types';
 
 const base_elements = [
   {
@@ -28,31 +28,32 @@ const base_elements = [
 
 export default class Scatterplot {
   public _renderer: ReglRenderer;
-  width : number;
-  height : number;
+  public width : number;
+  public height : number;
+  public _root : Tile;
   div : Selection<any, any, any, any>;
   bound : boolean;
   d3 : Object;
   private _zoom : Zoom;
-  prefs : APICall;
+  public prefs : APICall;
   ready : Promise<void>;
-  
-  constructor(selector, width, height) {
+
+  constructor(selector : string, width : number, height: number) {
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
     }
+    this.width = width;
+    this.height = height;
     // Unresolvable.
     this.ready = Promise.resolve()
     this.d3 = { select };
   }
 
-  bind(selector, width, height) {
+  bind(selector : string, width : number, height : number) {
     // Attach a plot to a particular DOM element.
     // Binding is a permanent relationship. Shouldn't be, but is.
 
-    this.width = width;
-    this.height = height;
 
     this.div = select(selector)
       .selectAll('div.deepscatter_container')
@@ -165,14 +166,14 @@ export default class Scatterplot {
     ctx.clearRect(0, 0, 10000, 10000);
     const { x_, y_ } = map._zoom.scales();
     ctx.strokeStyle = '#888888';
-    const tiles = map._root.map((t) => t);
+    const tiles = map._root.map((t : Tile) => t);
     for (const i of range(13)) {
       setTimeout(() => {
         for (const tile of tiles) {
           if (tile.codes[0] != i) { continue; }
           if (!tile.extent) { continue; } // Still loading
-          const [x1, x2] = tile.extent.x.map((x) => x_(x));
-          const [y1, y2] = tile.extent.y.map((y) => y_(y));
+          const [x1, x2] = tile.extent.x.map((x : number) => x_(x));
+          const [y1, y2] = tile.extent.y.map((y : number) => y_(y));
           const depth = tile.codes[0];
           ctx.lineWidth = 8 / Math.sqrt(depth);
           ctx.globalAlpha = 0.33;
@@ -186,22 +187,7 @@ export default class Scatterplot {
     }
   }
 
-  update_prefs(prefs) {
-    if (prefs.encoding && prefs.encoding.alpha) {
-      console.warn('Setting alpha through encoding--deprecated.');
-      /// DEPRECATED
-      prefs.alpha = prefs.encoding.alpha;
-    }
-
-    if (prefs.jitter) {
-      console.warn('Setting jitter type through base argument--deprectated');
-      if (typeof (prefs.encoding.jitter_radius) === 'number') {
-        prefs.encoding.jitter_radius = {
-          constant: prefs.encoding.jitter_radius,
-        };
-      }
-      prefs.encoding.jitter_radius.method = prefs.jitter;
-    }
+  update_prefs(prefs : APICall) {
 
     // Stash the previous jitter.
     for (const k in ['jitter', 'alpha', 'max_points']) {
@@ -209,7 +195,7 @@ export default class Scatterplot {
     }
 
     if (this.prefs.encoding && prefs.encoding) {
-      for (const k of Object.keys(this.prefs.encoding)) {
+      for (const k : string of Object.keys(this.prefs.encoding)) {
         if (prefs.encoding[k]) {
           this.prefs.encoding[k] = prefs.encoding[k];
         }
@@ -276,7 +262,7 @@ export default class Scatterplot {
     return this._zoom.tooltip_html;
   }
 
-  async plotAPI(prefs = {}) {
+  async plotAPI(prefs : APICall | null | undefined) {
     if (prefs === undefined || prefs === null) { return Promise.resolve(1); }
 
     this.update_prefs(prefs);
