@@ -91,8 +91,8 @@ export class Renderer {
     const { tileSet } = this;
     // Materialize using a tileset method.
     let all_tiles;
-    let natural_display = this.aes.dim('x').current.label == 'x' &&
-      this.aes.dim('y').current.label == 'y' &&
+    let natural_display = this.aes.dim('x').current.field == 'x' &&
+      this.aes.dim('y').current.field == 'y' &&
       this.aes.dim('x').last.field == 'x' &&
       this.aes.dim('y').last.field == 'y';
 
@@ -100,6 +100,7 @@ export class Renderer {
       all_tiles = tileSet.map((d) => d)
         .filter((tile) => tile.is_visible(max_ix, this.zoom.current_corners()));
     } else {
+      console.log(this.aes.dim('y').last.field, "not using natural display filtering.")
       all_tiles = tileSet.map((d) => d)
         .filter((tile) => tile.min_ix < this.max_ix);
     }

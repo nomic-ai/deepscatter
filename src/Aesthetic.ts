@@ -482,7 +482,8 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 }
 
 class X extends PositionalAesthetic {
-  label = 'x' 
+  label = 'x'
+  field = 'x'
 }
 
 class X0 extends X {
@@ -491,6 +492,7 @@ class X0 extends X {
 
 class Y extends PositionalAesthetic {
   label = 'y'
+  field = 'y'
 }
 
 class Y0 extends Y {

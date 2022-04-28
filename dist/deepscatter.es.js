@@ -1534,7 +1534,7 @@ function boundsPoint(x, y) {
     y1 = y;
 }
 var boundsStream$1 = boundsStream;
-var X0 = 0, Y0 = 0, Z0 = 0, X1 = 0, Y1 = 0, Z1 = 0, X2 = 0, Y2 = 0, Z2 = 0, x00$1, y00$1, x0$1, y0$1;
+var X0$1 = 0, Y0$1 = 0, Z0 = 0, X1 = 0, Y1 = 0, Z1 = 0, X2 = 0, Y2 = 0, Z2 = 0, x00$1, y00$1, x0$1, y0$1;
 var centroidStream = {
   point: centroidPoint,
   lineStart: centroidLineStart,
@@ -1549,14 +1549,14 @@ var centroidStream = {
     centroidStream.lineEnd = centroidLineEnd;
   },
   result: function() {
-    var centroid = Z2 ? [X2 / Z2, Y2 / Z2] : Z1 ? [X1 / Z1, Y1 / Z1] : Z0 ? [X0 / Z0, Y0 / Z0] : [NaN, NaN];
-    X0 = Y0 = Z0 = X1 = Y1 = Z1 = X2 = Y2 = Z2 = 0;
+    var centroid = Z2 ? [X2 / Z2, Y2 / Z2] : Z1 ? [X1 / Z1, Y1 / Z1] : Z0 ? [X0$1 / Z0, Y0$1 / Z0] : [NaN, NaN];
+    X0$1 = Y0$1 = Z0 = X1 = Y1 = Z1 = X2 = Y2 = Z2 = 0;
     return centroid;
   }
 };
 function centroidPoint(x, y) {
-  X0 += x;
-  Y0 += y;
+  X0$1 += x;
+  Y0$1 += y;
   ++Z0;
 }
 function centroidLineStart() {
@@ -13498,9 +13498,11 @@ class Renderer {
     const { max_ix } = this;
     const { tileSet } = this;
     let all_tiles;
-    if (this._use_scale_to_download_tiles) {
+    let natural_display = this.aes.dim("x").current.field == "x" && this.aes.dim("y").current.field == "y" && this.aes.dim("x").last.field == "x" && this.aes.dim("y").last.field == "y";
+    if (natural_display) {
       all_tiles = tileSet.map((d) => d).filter((tile) => tile.is_visible(max_ix, this.zoom.current_corners()));
     } else {
+      console.log(this.aes.dim("y").last.field, "not using natural display filtering.");
       all_tiles = tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
     }
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
@@ -13598,6 +13600,25 @@ uniform sampler2D u_color_aesthetic_map;
 // x0 and x, y0 and y.
 uniform float u_position_interpolation_mode;
 
+float a_color;
+float a_last_color;
+
+uniform float u_color_buffer_num;
+uniform float u_last_color_buffer_num;
+
+uniform vec3 u_color_constant;
+uniform vec3 u_last_color_constant;
+
+uniform float u_color_transform;
+uniform float u_last_color_transform;
+uniform vec2 u_color_domain;
+uniform vec2 u_last_color_domain;
+uniform float u_last_color_map_position;
+uniform float u_color_map_position;
+
+bool a_color_is_constant;
+bool a_last_color_is_constant;
+
 /*
 python code to generate what follows.
 def autogenerate_code():
@@ -13616,7 +13637,6 @@ def autogenerate_code():
   uniform float u_{timek}_transform;
   uniform vec2 u_{timek}_domain;
   uniform vec2 u_{timek}_range;
-  u_{timek}_map = u_aesthetic_maps;
   uniform float u_{timek}_map_position;
   float a_{timek};
   bool a_{timek}_is_constant;
@@ -13749,8 +13769,6 @@ autogenerate_code()
   uniform float u_filter_map_position;
   float a_filter1;
   bool a_filter_is_constant;
-      
-
   uniform float u_last_filter_buffer_num;
   uniform float u_last_filter_map_position;
   float a_last_filter1;
@@ -13760,8 +13778,6 @@ autogenerate_code()
   uniform float u_filter2_map_position;
   float a_filter2;
   bool a_filter2_is_constant;
-      
-
   uniform float u_last_filter2_buffer_num;
   uniform float u_last_filter2_map_position;
   float a_last_filter2;
@@ -13806,6 +13822,7 @@ autogenerate_code()
   float a_last_y0;
   bool a_last_y0_is_constant;
       
+
 attribute float buffer_0;
 attribute float buffer_1;
 attribute float buffer_2;
@@ -13838,27 +13855,6 @@ highp float ix_to_random(in float ix, in float seed) {
   return fract(sin(sn) * c);
 }
 
-float a_color;
-float a_last_color;
-
-uniform float u_color_buffer_num;
-uniform float u_last_color_buffer_num;
-
-uniform vec3 u_color_constant;
-uniform vec3 u_last_color_constant;
-
-uniform float u_color_transform;
-uniform float u_last_color_transform;
-uniform vec2 u_color_domain;
-uniform vec2 u_last_color_domain;
-uniform float u_last_color_map_position;
-uniform float u_color_map_position;
-uniform vec3 u_constant_color;
-uniform vec3 u_constant_last_color;
-
-bool a_color_is_constant;
-bool a_last_color_is_constant;
-
 // The fill color.
 varying vec4 fill;
 varying float point_size;
@@ -13879,19 +13875,6 @@ vec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);
 const float e = 1.618282;
 // I've been convinced.
 const float tau = 2. * 3.14159265359;
-
-// uniform vec4 corners;
-
-/*************** COLOR SCALES *******************************/
-
-// Ha! A gazillion version of this function:
-// https://gist.github.com/kylemcdonald/f8df3bc2f8d38ca2b7cb
-/*vec3 hsv2rgb(in vec3 c) {
-  vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0,
-                   0.0, 1.0);
-  rgb = rgb * rgb * (3.0 - 2.0 * rgb);
-  return c.z * mix(vec3(1.0), rgb, c.y);
-}*/
 
 float interpolate_raw(in float x, in float min, in float max) {
   if (x < min) {return 0.;}
@@ -14227,6 +14210,18 @@ float sineInOut_0(float t) {
 #define PI 3.141592653589793
 #endif
 
+vec2 bezier_interpolate(vec2 p1, vec2 p2, float frac, float ix) {
+  // Interpolates between two points on a Bezier curve around a jittered middle.
+    vec2 midpoint = box_muller(ix, 3.) * .05 *
+         dot(p2 - p1, p2 - p1)
+         + p2 / 2. + p1 / 2.;
+
+      return mix(
+        mix(p2, midpoint, frac),
+        mix(midpoint, p1, frac),
+      frac);
+}
+
 float sineInOut(float t) {
   return -0.5 * (cos(PI * t) - 1.0);
 }
@@ -14457,7 +14452,7 @@ void run_color_fill(in float ease) {
     }
   } else {
     if (a_color_is_constant) {
-      fill = vec4(u_constant_color.rgb, u_current_alpha);
+      fill = vec4(u_color_constant.rgb, u_current_alpha);
     } else {
       float fractional_color = linstep(u_color_domain, a_color);
       float color_pos = (u_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
@@ -14467,7 +14462,7 @@ void run_color_fill(in float ease) {
     if (ease < 1.) {
       vec4 last_fill;
       if (a_last_color_is_constant) {
-        last_fill = vec4(u_constant_last_color.rgb, u_last_alpha);
+        last_fill = vec4(u_last_color_constant.rgb, u_last_alpha);
       } else {
         float last_fractional = linstep(u_last_color_domain, a_last_color);
         float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
@@ -14612,7 +14607,6 @@ void main() {
       a_last_filter2_is_constant = true;
     }
 
-    /*
     if (u_x0_buffer_num > -0.5) {
       a_x0 = get_buffer(u_x0_buffer_num);
       a_x0_is_constant = false;
@@ -14644,15 +14638,9 @@ void main() {
       a_last_y0 = u_last_y0_constant;
       a_last_y0_is_constant = true;
     }
-    */
 //  END AUTOGENERATED. DO NOT EDIT ABOVE. 
 // ------------------------------------------------    
-  gl_PointSize = 2.;
-  if (debug_mode > 1.5) {
-//    fill = vec4(ix_to_random(ix, 15.), ix_to_random(ix, 15.), ix_to_random(ix, 11.), 1.);
-    gl_PointSize = 2.;
-    gl_Position = vec4(a_x * .1, a_y * .1, 0., 1.);
-  }
+  gl_PointSize = 1.;
 
   if (u_color_buffer_num > -0.5) {
     a_color = get_buffer(u_color_buffer_num);
@@ -14684,7 +14672,6 @@ void main() {
   // I set this sometimes.
 
   vec2 position = vec2(a_x, a_y);
-  gl_Position = vec4(position, 0., 1.) * .01;
   vec2 old_position = vec2(a_last_x, a_last_y);
 
   old_position = calculate_position(old_position, u_last_x_transform,
@@ -14697,9 +14684,11 @@ void main() {
   bool plot_actual_position = u_grid_mode < .5;
 
   if (plot_actual_position) {
-    position = calculate_position(position, u_x_transform,
+    position = calculate_position(position, 
+      u_x_transform,
       u_x_domain, u_x_range,
-      u_y_transform, u_y_domain, u_y_range, u_window_scale, u_zoom, 
+      u_y_transform, u_y_domain, 
+      u_y_range, u_window_scale, u_zoom, 
       u_x_map_position, u_y_map_position);
 
     float xpos = clamp((1. + position.x) / 2., 0., 1.);
@@ -14725,16 +14714,8 @@ void main() {
     if (frac <= 0.) {
       position = old_position;
     } else if (frac < 1.) {
-      // position = mix(old_position, position, u_interpolation);
       frac = fract(frac);
-      vec2 midpoint = box_muller(ix, 3.) * .05 *
-         dot(old_position - position, old_position - position)
-         + old_position / 2. + position / 2.;
-
-      position = mix(
-        mix(old_position, midpoint, frac),
-        mix(midpoint, position, frac),
-        frac);
+      position = bezier_interpolate(position, old_position, frac, ix);
     }
   } else {
      position.x = -1. + 2. * linscale(u_x_domain, position.x);
@@ -14805,11 +14786,13 @@ void main() {
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
   // It's ugly on new macs when it jumps straight from one to two for a bunch of points at once.
-  float size_fuzz = exp(ix_to_random(ix, 3.1) * .1);
-  point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz;
+  float size_fuzz = exp(ix_to_random(ix, 3.1) * .5 - .25);
+  point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz * depth_size_adjust;
+//  point_size_adjust = exp(log(u_k) * u_zoom_balance);
 
   gl_PointSize = point_size_adjust * size_multiplier;
-  if (gl_PointSize  <= 0.) {
+
+  if (gl_PointSize  <= 0.01) {
     gl_Position = discard_me;
     return;
   }
@@ -14867,10 +14850,7 @@ void main() {
     run_color_fill(ease);
   }
   point_size = gl_PointSize;
-  if (debug_mode > .5) {
-//    fill = vec4(.7, .7, .3, 1.);
-  }
-  if (u_use_glyphset > 0. && point_size > 5.0) {
+/*  if (u_use_glyphset > 0. && point_size > 5.0) {
     float random_letter = floor(64. * ix_to_random(ix, 1.3));
     letter_pos = vec2(
       // start at a number between 0 and 7.
@@ -14878,7 +14858,7 @@ void main() {
       floor(random_letter / 8.) / 8.
     );
     gl_PointSize *= 3.0;
-  }
+  }*/
 }
 `;
 var frag_shader = "#ifdef GL_OES_standard_derivatives\n#extension GL_OES_standard_derivatives : enable\n#endif\n\nprecision mediump float;\n#define GLSLIFY 1\n\nvarying vec4 fill;\nvarying vec2 letter_pos;\nvarying float point_size;\n\nuniform float u_only_color;\nuniform float u_color_picker_mode;\n//uniform float u_use_glyphset;\n//uniform sampler2D u_glyphset;\n\nfloat delta = 0.0, alpha = 1.0;\n\nbool out_of_circle(in vec2 coord) {\n  vec2 cxy = 2.0 * coord - 1.0;\n  float r_sq = dot(cxy, cxy);\n  if (r_sq > 1.03) {return true;}\n  return false;\n}\n\nbool out_of_hollow_circle(in vec2 coord) {\n  vec2 cxy = 2.0 * coord - 1.0;\n  float r_sq = dot(cxy, cxy);\n  if (r_sq > 1.01) {return true;}\n  float distance_from_edge = (1.0 - r_sq) * point_size;\n  if (distance_from_edge > 4.0) {return true;}\n  return false;\n}\n\nbool out_of_triangle(in vec2 coord) {\n  if (coord.y > (2. * abs(coord.x - .5))) {\n    return false;\n  }\n  return true;\n}\n\nvoid main() {\n  if (u_only_color >= -1.5) {\n    gl_FragColor = vec4(0., 0., 0., 1./255.);\n    return;\n  }\n\n  float alpha = fill.a;\n//  if (u_use_glyphset == 0. || point_size < 5.0) {\n    if (out_of_circle(gl_PointCoord)) {\n      discard;\n      return;\n    }\n    vec2 cxy = 2.0 * gl_PointCoord - 1.0;\n    float r = dot(cxy, cxy);\n    #ifdef GL_OES_standard_derivatives\n      delta = fwidth(r);\n      alpha *= (1.0 - smoothstep(1.0 - delta, 1.0 + delta, r));\n    #endif\n/*  } else {\n    vec2 coords = letter_pos + gl_PointCoord/8.;\n//    vec2 coords = vec2(.2, .2);\n    vec4 sprite = texture2D(u_glyphset, coords);\n    alpha *= (sprite.a);  \n//    fill = vec4(1.0, 1.0, 1.0, alpha);  \n    if (alpha <= 0.03) discard;\n  }*/\n  // Pre-blend the alpha channel.\n  if (u_color_picker_mode == 1.) {\n    // no alpha when color picking; we use all four channels for that.\n    gl_FragColor = fill;\n  } else {\n    gl_FragColor = vec4(fill.rgb * alpha, alpha);\n  }\n\n}\n";
@@ -15438,6 +15418,7 @@ Size.default_range = [0, 1];
 class PositionalAesthetic extends OneDAesthetic {
   constructor(scatterplot, regl2, tile, map2) {
     super(scatterplot, regl2, tile, map2);
+    this.default_range = [-1, 1];
     this.default_constant = 0;
     this.default_transform = "literal";
     this._transform = "literal";
@@ -15451,17 +15432,30 @@ class PositionalAesthetic extends OneDAesthetic {
     return 0;
   }
 }
-PositionalAesthetic.default_range = [-1, 1];
 class X extends PositionalAesthetic {
   constructor() {
     super(...arguments);
     this.label = "x";
+    this.field = "x";
+  }
+}
+class X0 extends X {
+  constructor() {
+    super(...arguments);
+    this.label = "x0";
   }
 }
 class Y extends PositionalAesthetic {
   constructor() {
     super(...arguments);
     this.label = "y";
+    this.field = "y";
+  }
+}
+class Y0 extends Y {
+  constructor() {
+    super(...arguments);
+    this.label = "y0";
   }
 }
 class AbstractFilter extends BooleanAesthetic {
@@ -15686,12 +15680,28 @@ class StatefulX extends StatefulAesthetic {
     return "x";
   }
 }
+class StatefulX0 extends StatefulAesthetic {
+  get Factory() {
+    return X0;
+  }
+  get label() {
+    return "x0";
+  }
+}
 class StatefulY extends StatefulAesthetic {
   get Factory() {
     return Y;
   }
   get label() {
     return "y";
+  }
+}
+class StatefulY0 extends StatefulAesthetic {
+  get Factory() {
+    return Y0;
+  }
+  get label() {
+    return "y0";
   }
 }
 class StatefulSize extends StatefulAesthetic {
@@ -15744,7 +15754,9 @@ class StatefulFilter2 extends StatefulAesthetic {
 }
 const stateful_aesthetics = {
   x: StatefulX,
+  x0: StatefulX0,
   y: StatefulY,
+  y0: StatefulY0,
   size: StatefulSize,
   jitter_speed: StatefulJitter_speed,
   jitter_radius: StatefulJitter_radius,
@@ -15800,6 +15812,7 @@ class AestheticSet {
       this.store[aesthetic] = new stateful_aesthetics[aesthetic](this.scatterplot, this.regl, this.tileSet, this.aesthetic_map);
       return this.store[aesthetic];
     }
+    throw new Error(`Unknown aesthetic ${aesthetic}`);
   }
   *[Symbol.iterator]() {
     for (let [k, v] of Object.entries(this.store)) {
@@ -15852,16 +15865,7 @@ class AestheticSet {
       delete encoding.filter1;
     }
     this.interpret_position(encoding);
-    if (encoding.x0) {
-      this.dim("x").update(encoding.x0);
-    }
-    if (encoding.y0) {
-      this.dim("y").update(encoding.y0);
-    }
     for (const k of Object.keys(stateful_aesthetics)) {
-      if (k === "x0" || k === "y0") {
-        continue;
-      }
       this.dim(k).update(encoding[k]);
     }
   }
@@ -16344,8 +16348,6 @@ class ReglRenderer extends Renderer {
         },
         u_grid_mode: (_, { grid_mode }) => grid_mode,
         u_colors_as_grid: regl2.prop("colors_as_grid"),
-        u_constant_color: () => this.aes.dim("color").current.constant !== void 0 ? this.aes.dim("color").current.constant : [-1, -1, -1],
-        u_constant_last_color: () => this.aes.dim("color").last.constant !== void 0 ? this.aes.dim("color").last.constant : [-1, -1, -1],
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
@@ -16392,6 +16394,8 @@ class ReglRenderer extends Renderer {
       "y",
       "color",
       "jitter_radius",
+      "x0",
+      "y0",
       "jitter_speed",
       "size",
       "filter",
@@ -16442,6 +16446,8 @@ class ReglRenderer extends Renderer {
       "x",
       "y",
       "color",
+      "x0",
+      "y0",
       "size",
       "jitter_radius",
       "jitter_speed",
@@ -36258,12 +36264,12 @@ class Scatterplot {
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
     }
+    this.width = width;
+    this.height = height;
     this.ready = Promise.resolve();
     this.d3 = { select };
   }
   bind(selector2, width, height) {
-    this.width = width;
-    this.height = height;
     this.div = select(selector2).selectAll("div.deepscatter_container").data([1]).join("div").attr("class", "deepscatter_container").style("position", "absolute");
     if (this.div.empty()) {
       console.error(selector2);
@@ -36332,19 +36338,6 @@ class Scatterplot {
     }
   }
   update_prefs(prefs) {
-    if (prefs.encoding && prefs.encoding.alpha) {
-      console.warn("Setting alpha through encoding--deprecated.");
-      prefs.alpha = prefs.encoding.alpha;
-    }
-    if (prefs.jitter) {
-      console.warn("Setting jitter type through base argument--deprectated");
-      if (typeof prefs.encoding.jitter_radius === "number") {
-        prefs.encoding.jitter_radius = {
-          constant: prefs.encoding.jitter_radius
-        };
-      }
-      prefs.encoding.jitter_radius.method = prefs.jitter;
-    }
     for (const k in ["jitter", "alpha", "max_points"]) {
       prefs[`last_${k}`] = this.prefs[k] || void 0;
     }
@@ -36367,7 +36360,7 @@ class Scatterplot {
   get tooltip_html() {
     return this._zoom.tooltip_html;
   }
-  async plotAPI(prefs = {}) {
+  async plotAPI(prefs) {
     if (prefs === void 0 || prefs === null) {
       return Promise.resolve(1);
     }

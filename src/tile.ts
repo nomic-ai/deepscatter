@@ -9,6 +9,13 @@ import Counter from './Counter';
 import TileWorker from './tileworker.worker.js?worker&inline';
 import Zoom from './interaction';
 
+
+type Rectangle = {
+  x: [number, number],
+  y: [number, number]
+}
+type Point = [number, number]
+
 class Batch {
   // Can this usefully do anything?
 }
@@ -132,7 +139,7 @@ export class Tile extends Batch {
     });
   }
 
-  * points(bounding = undefined, sorted = false) {
+  * points(bounding : Rectangle | undefined = undefined, sorted = false) {
     if (!this.is_visible(1e100, bounding)) {
       return;
     }
@@ -766,14 +773,14 @@ export default class RootTile extends QuadTile {
     return this._tileWorkers[0];
   }
 
-  map(callback, after = false) {
+  map(callback : (tile: Tile) => any, after = false) {
     // perform a function on each tile and return the values in order.
-    const q = [];
-    this.visit((d) => { q.push(callback(d)); }, after = after);
+    const q : any[] = [];
+    this.visit((d : any) => { q.push(callback(d)); }, after = after);
     return q;
   }
 
-  visit(callback, after = false, filter = () => true) {
+  visit(callback :  (tile: Tile) => any, after = false, filter = () => true) {
     // Visit all children with a callback function.
     // The general architecture here is taken from the
     // d3 quadtree functions. That's why, for example, it doesn't
@@ -820,7 +827,7 @@ function corner_distance(corners, x, y) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function p_in_rect(p, rect) {
+function p_in_rect(p : Point, rect : Rectangle | undefined) {
   if (rect === undefined) { return true; }
   const c = rect;
   return (p[0] < rect.x[1]
@@ -829,11 +836,11 @@ function p_in_rect(p, rect) {
              && p[1] > rect.y[0]);
 }
 
-function area(rect) {
+function area(rect : Rectangle) {
   return (rect.x[1] - rect.x[0]) * (rect.y[1] - rect.y[0]);
 }
 
-const thrower = function (r) {
+const thrower = function (r : Rectangle) {
   if (r.x[1] < r.x[0]) {
     throw 'x';
   }

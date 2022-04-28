@@ -758,12 +758,12 @@ export class ReglRenderer extends Renderer {
         u_grid_mode: (_, { grid_mode }) => grid_mode,
         //@ts-ignore
         u_colors_as_grid: regl.prop('colors_as_grid'),
-        u_constant_color: () => (this.aes.dim("color").current.constant !== undefined
+/*        u_constant_color: () => (this.aes.dim("color").current.constant !== undefined
           ? this.aes.dim("color").current.constant
           : [-1, -1, -1]),
         u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
           ? this.aes.dim("color").last.constant
-          : [-1, -1, -1]),
+          : [-1, -1, -1]),*/
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
@@ -813,7 +813,7 @@ export class ReglRenderer extends Renderer {
       };
     }
 
-    for (const k of ['x', 'y', 'color', 'jitter_radius',
+    for (const k of ['x', 'y', 'color', 'jitter_radius', 'x0', 'y0',
       'jitter_speed', 'size', 'filter', 'filter2', 'character']) {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
@@ -860,7 +860,7 @@ export class ReglRenderer extends Renderer {
     // how important it is to capture transitions for them.
 
     const buffers = [];
-    const priorities = ['x', 'y', 'color', 'size', 'jitter_radius',
+    const priorities = ['x', 'y', 'color', 'x0', 'y0', 'size', 'jitter_radius',
       'jitter_speed', 'filter', 'filter2'];
 
     for (const aesthetic of priorities) {
