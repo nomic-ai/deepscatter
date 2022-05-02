@@ -3,3 +3,5 @@ public/tiles
 .vscode
 
 dist/tiles
+test-results/
+playwright-report/

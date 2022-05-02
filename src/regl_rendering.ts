@@ -217,7 +217,13 @@ export class ReglRenderer extends Renderer {
         console.warn(err, current);
       }
     }
-    this.render_all(props);
+    try {
+      this.render_all(props);
+    } catch(err) {
+      console.log("ERROR NOTED")
+      this.reglframe.cancel();
+      throw err
+    }
   }
 
   render_jpeg(props) {
@@ -983,16 +989,16 @@ class TileBufferManager {
     if (regl_elements.has('_count')) {
       return regl_elements.get('_count');
     }
-    if (tile.ready) {
-      regl_elements.set('_count', tile.table.length);
+    if (tile.ready && tile._table) {
+      regl_elements.set('_count', tile.table.getChild("ix").length);
       return regl_elements.get('_count');
     }
   }
   /*
   create_position_buffer() {
     const { table } = this.tile;
-    const x = table.getColumn('x').data.values;
-    const y = table.getColumn('y').data.values;
+    const x = table.getChild('x').data.values;
+    const y = table.getChild('y').data.values;
     const buffer = new Float32Array(this.count * 2);
     for (let i = 0; i < this.count; i += 1) {
       buffer[i * 2] = x[i];
@@ -1003,11 +1009,13 @@ class TileBufferManager {
 
   create_buffer_data(key) {
     const { tile } = this;
+
     if (!tile.ready) {
       throw 'Tile table not present.';
     }
-    const column = tile.table.getColumn(`${key}_dict_index`) || tile.table.getColumn(key);
 
+    const column = tile.table.getChild(`${key}_dict_index`) || tile.table.getChild(key);
+    
     /* if (key == 'position') {
       console.warn('CREATING POSITION BUFFER (DEPRECATED)');
       return this.create_position_buffer();
@@ -1017,25 +1025,17 @@ class TileBufferManager {
       const col_names = tile.table.schema.fields.map((d) => d.name);
       throw `Requested ${key} but table has columns ${col_names.join(', ')}`;
     }
+  if (column.type.typeId !== 3) {
 
-    if (column.dictionary) {
-      const buffer = new Float32Array(tile.table.length);
-      let row = 0;
-      for (const val of column.data.values) {
-        const char_value = tile.local_dictionary_lookups[key].get(val);
-        buffer[row] = tile.dictionary_lookups[key].get(char_value);
-        row += 1;
-      }
-      return buffer;
-    } if (column.data.values.constructor !== Float32Array) {
+      console.log(column)
       const buffer = new Float32Array(tile.table.length);
       for (let i = 0; i < tile.table.length; i++) {
-        buffer[i] = column.data.values[i];
+        buffer[i] = column.data[0].values[i];
       }
       return buffer;
     }
     // For numeric data, it's safe to simply return the data straight up.
-    return column.data.values;
+    return column.data[0].values;
   }
 
   create_regl_buffer(key) {

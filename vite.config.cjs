@@ -1,17 +1,17 @@
-import glslify from 'rollup-plugin-glslify';
+const glslify = require('rollup-plugin-glslify')
 //import worker from 'rollup-plugin-web-worker-loader';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+//import { fileURLToPath } from 'url';
+
+//const __filename = fileURLToPath(import.meta.url);
+//const __dirname = path.dirname(__filename);
 
 export default {
   build: {
     target: "es2019",
     minify: 'terser',
     lib: {
-      entry: path.resolve(__dirname, 'src/deepscatter.ts'),
+      entry: __dirname + '/src/deepscatter.ts',
       name: 'Deepscatter',
       formats: ['es', 'iife', 'cjs', 'umd'],
     },

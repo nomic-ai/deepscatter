@@ -24,7 +24,7 @@ import type {
   ConstantColorChannel, ColorChannel, OpArray
 
 } from './types';
-import { ArrowJSONLike, Column } from '@apache-arrow/es5-cjs';
+import { Vector } from 'apache-arrow';
 
 const scales : {[key : string] : Function} = {
   sqrt: scaleSqrt,
@@ -192,8 +192,8 @@ abstract class Aesthetic {
       scale = scaleOrdinal()
         .domain(this.domain);
       if (typeof(range) === "string" && schemes[range]) {
-        if (this.column.dictionary === null) {throw new Error("Dictionary is null");}
-        scale.range(schemes[range]).domain(this.column.dictionary.toArray());
+        if (this.column.data[0].dictionary === null) {throw new Error("Dictionary is null");}
+        scale.range(schemes[range]).domain(this.column.data[0].dictionary.toArray());
       } else {
         scale.range(this.range)
       }
@@ -201,12 +201,16 @@ abstract class Aesthetic {
     return scale
   }
 
-  get column() : Column {
+  get column() : Vector {
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
     if (this.tileSet.table) {
-      return this.tileSet.table.getColumn(this.field);
+      const col = this.tileSet.table.getChild(this.field)
+      if (col === undefined || col === null) {
+        throw new Error("Can't find column " + this.field);
+      }
+      return col;
     }
     throw new Error("Table is null");
   }
@@ -370,7 +374,7 @@ abstract class Aesthetic {
   }
 
   arrow_column() {
-    const c = this.tileSet.table.getColumn(this.field);
+    const c = this.tileSet.table.getChild(this.field);
     if (c === null) {
       throw `No column ${this.field} on arrow table for aesthetic ${this.label}`;
     }
@@ -433,7 +437,7 @@ abstract class Aesthetic {
     if (column.type.dictionary) {
       // NB--Assumes string type for dictionaries.
       input.fill(undefined);
-      const dvals = column.data.dictionary.toArray();
+      const dvals = column.data[0].dictionary.toArray();
       dvals.forEach((d, i) => { input[i] = d });
     } else {
       input = input.map((d) => this.scale(d));
@@ -604,7 +608,7 @@ class Jitter_radius extends Aesthetic {
   get jitter_int_format() {
     return encode_jitter_to_int(this.method);
   }
-  
+ 
 }
 
 class Color extends Aesthetic {

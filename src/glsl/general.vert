@@ -300,7 +300,7 @@ attribute float buffer_15;
 
 highp float ix_to_random(in float ix, in float seed) {
   // For high numbers, taking the log avoids coincidence.
-  highp float seed2 = log(ix) + 1.;
+  highp float seed2 = log(ix + 1.) + 1.;
   vec2 co = vec2(seed2, seed);
   highp float a = 12.9898;
   highp float b = 78.233;
@@ -537,9 +537,7 @@ float texture_float_lookup(in vec2 domain,
                            in vec2 range,
                            in float transform,
                            in float attr,
-                           in float texture_position,
-                           in float y_attr,// not used
-                           in vec2 y_range) { // not used.
+                           in float texture_position) {
   if (transform == 4.0) {
     // Literal transforms aren't looked up, just returned as is.
     return attr;
@@ -555,21 +553,6 @@ float texture_float_lookup(in vec2 domain,
   }
 }
 
-float texture_float_lookup(in vec2 domain,
-                           in vec2 range,
-                           in float transform,
-                           in float attr,
-                           in float texture_pos) {
-
-  return texture_float_lookup(domain,
-                              range,
-                              transform,
-                              attr,
-                              texture_pos,
-                              1.,
-                              vec2(0., 2.));
-}
-
 vec2 calculate_position(in vec2 position, in float x_scale_type,
                         in vec2 x_domain, in vec2 x_range, in float y_scale_type,
                         in vec2 y_domain, in vec2 y_range, in mat3 window_scale,
@@ -582,15 +565,15 @@ vec2 calculate_position(in vec2 position, in float x_scale_type,
     if (x_scale_type < 4.0) {
       x = texture_float_lookup(x_domain, x_range,
         x_scale_type,
-        position.x, x_map_position, 1., vec2(0., 2.)
+        position.x, x_map_position
         );
     } else {
       x = position.x;
     }
 
-    if (x_scale_type < 4.0) {
+    if (y_scale_type < 4.0) {
       y = texture_float_lookup(y_domain, y_range, y_scale_type,
-        position.y, y_map_position, 1., vec2(0., 2.)
+        position.y, y_map_position
         );
     } else {
       y = position.y;
@@ -661,7 +644,6 @@ vec2 calculate_jitter(
 ) {
 
   // Jitter is calculated based on speed, so requires two full maps in.
-
   if (jitter_type == 0.) {
     // No jitter
     return vec2(0., 0.);
@@ -689,7 +671,7 @@ vec2 calculate_jitter(
     jitter_radius_range,
     jitter_radius_transform,
     jitter_radius,
-    0., 0., vec2(-1., 1.));
+    0.);
   }
   if (jitter_type == 3.) {
     float r = box_muller(ix, 1.).r * jitter_r;
@@ -712,7 +694,7 @@ vec2 calculate_jitter(
       texture_float_lookup(jitter_speed_domain,
                           jitter_speed_range,
                           jitter_speed_transform, jitter_speed,
-                          jitter_speed_map_position,  1., vec2(0., 2.));
+                          jitter_speed_map_position);
 
   if (jitter_type == 1.) {
     return logarithmic_spiral_jitter(
@@ -781,7 +763,7 @@ void run_color_fill(in float ease) {
 void main() {
   float debug_mode = 0.;
   float ix = buffer_0;
-  if (ix > u_maxix && debug_mode < 1.) {
+  if (ix > u_maxix) {
     // throw away points that are too low.
     gl_Position = discard_me;
     return;
@@ -944,8 +926,6 @@ void main() {
 // ------------------------------------------------    
   gl_PointSize = 1.;
 
-
-
   if (u_color_buffer_num > -0.5) {
     a_color = get_buffer(u_color_buffer_num);
     a_color_is_constant = false;
@@ -1008,11 +988,11 @@ void main() {
       u_transition_duration + delay
     );
 
-    if (u_position_interpolation_mode > 0.) {
+/*    if (u_position_interpolation_mode > 0.) {
       // If it's a continuous loop, just choose a random point along that loop.
       frac = fract(u_update_time/u_transition_duration);
       frac = fract(frac + randy);
-    }
+    } */
 
     frac = easeCubic(frac);
 
@@ -1023,16 +1003,19 @@ void main() {
       position = bezier_interpolate(position, old_position, frac, ix);
     }
   } else {
-     position.x = -1. + 2. * linscale(u_x_domain, position.x);
+    position.x = -1. + 2. * linscale(u_x_domain, position.x);
     //position.y = -1.0;
     vec2 jitterspec = vec2(
       (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,
       (ix_to_random(ix, 1.5) * a_jitter_speed ) * 2.
     );
-
     position = position + jitterspec;
   }
 
+/*  position = vec2(
+    ix_to_random(ix, .1),
+    ix_to_random(ix, .2)
+  );*/
   /* FILTERING */
 
   float filter1_status = choose_and_run_filter(
@@ -1078,8 +1061,10 @@ void main() {
   }
 
   float size_multiplier = texture_float_lookup(
-    u_size_domain, u_size_range,
-    u_size_transform, a_size, u_size_map_position);
+    u_size_domain,
+    u_size_range,
+    u_size_transform, a_size,
+    u_size_map_position);
 
   float last_size_multiplier = texture_float_lookup(
     u_last_size_domain, u_last_size_range, u_last_size_transform, a_last_size,
@@ -1092,16 +1077,13 @@ void main() {
 
   // It's ugly on new macs when it jumps straight from one to two for a bunch of points at once.
   float size_fuzz = exp(ix_to_random(ix, 3.1) * .5 - .25);
-  point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz * depth_size_adjust;
+  point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz;// * depth_size_adjust;
 //  point_size_adjust = exp(log(u_k) * u_zoom_balance);
-
   gl_PointSize = point_size_adjust * size_multiplier;
-
-  if (gl_PointSize  <= 0.01) {
+  if (gl_PointSize <= 0.01) {
     gl_Position = discard_me;
     return;
   }
-
   vec2 jitter = vec2(0., 0.);
 
   if (plot_actual_position && (u_jitter > 0. || u_last_jitter > 0.)) {
@@ -1154,6 +1136,7 @@ void main() {
   } else {
     run_color_fill(ease);
   }
+//  gl_PointSize = 2.1;
   point_size = gl_PointSize;
 /*  if (u_use_glyphset > 0. && point_size > 5.0) {
     float random_letter = floor(64. * ix_to_random(ix, 1.3));

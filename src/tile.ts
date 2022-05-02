@@ -2,12 +2,13 @@ import {
   extent, range, min, max, bisectLeft,
 } from 'd3-array';
 
-import { Table } from '@apache-arrow/es5-cjs';
+import { tableFromIPC, Table } from 'apache-arrow';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
 
 import TileWorker from './tileworker.worker.js?worker&inline';
 import Zoom from './interaction';
+import { StructRowProxy } from 'apache-arrow/row/struct';
 
 
 type Rectangle = {
@@ -30,20 +31,20 @@ export class Tile extends Batch {
   max_ix : number;
   promise : Promise<void>;
   download_state : string;
-  public _table : Table;
-  public _current_mutations: Record<string, any>;
-  parent : Tile;
-  _table_buffer: ArrayBuffer;
-  children : Array<Tile>;
-  public _children : Array<Tile>;
-  public _highest_known_ix : number;
-  public _min_ix : number;
-  public _max_ix : number;
-  public download : () => Promise<Table>;
-  public _download : Promise<Table>;
-  __schema : schema_entry[];
-  local_dictionary_lookups : Map<string, any>;
-  codes : [number, number, number];
+  public _table? : Table;
+  public _current_mutations?: Record<string, any>;
+  parent? : Tile;
+  _table_buffer?: ArrayBuffer;
+  children? : Array<Tile>;
+  public _children? : Array<Tile>;
+  public _highest_known_ix? : number;
+  public _min_ix? : number;
+  public _max_ix? : number;
+  public download? : () => Promise<Table>;
+  public _download? : Promise<Table>;
+  __schema?: schema_entry[];
+  local_dictionary_lookups? : Map<string, any>;
+  codes? : [number, number, number];
   public _extent? : {'x' : minmax, 'y': minmax};
 
   constructor() {
@@ -133,13 +134,12 @@ export class Tile extends Batch {
 
           this.local_dictionary_lookups = codes;
           this.update_master_dictionary_lookups();
-
           return 'changed';
         });
     });
   }
 
-  * points(bounding : Rectangle | undefined = undefined, sorted = false) {
+  *points(bounding : Rectangle | undefined = undefined, sorted = false) : Iterable<StructRowProxy> {
     if (!this.is_visible(1e100, bounding)) {
       return;
     }
@@ -247,9 +247,9 @@ export class Tile extends Batch {
     if (this._table) { return this._table; }
     // Constitute table if there's a present buffer.
     if (this._table_buffer && this._table_buffer.byteLength > 0) {
-      return this._table = Table.from(this._table_buffer);
+      return this._table = tableFromIPC(this._table_buffer);
     }
-    return undefined;
+    throw new Error("Attempted to access table on tile without table buffer.");
   }
 
   get min_ix() {
@@ -320,10 +320,9 @@ export class Tile extends Batch {
       return this.__schema;
     }
     const attributes : schema_entry[] = [];
-
     for (const field of this.table.schema.fields) {
-      const { name, type, nullable } = field;
-      if (type && type.typeId == 5) {
+      const { name, type } = field;
+      if (type?.typeId == 5) {
         // character
         attributes.push({
           name,
@@ -335,21 +334,20 @@ export class Tile extends Batch {
         attributes.push({
           name,
           type: 'dictionary',
-          keys: this.table.getColumn(name).data.dictionary.toArray(),
-          extent: [-2047, this.table.getColumn(name).data.dictionary.length - 2047],
-
+          keys: this.table.getChild(name).data[0].dictionary.toArray(),
+          extent: [-2047, this.table.getChild(name).data[0].dictionary.length - 2047],
         });
       }
       if (type && type.typeId == 8) {
         attributes.push({
           name,
           type: 'date',
-          extent: extent(this.table.getColumn(name).data.values),
+          extent: extent(this.table.getChild(name).data[0].values),
         });
       }
       if (type && type.typeId == 3) {
         attributes.push({
-          name, type: 'float', extent: extent(this.table.getColumn(name).data.values),
+          name, type: 'float', extent: extent(this.table.getChild(name).data[0].values),
         });
       }
     }
@@ -423,7 +421,7 @@ export class Tile extends Batch {
   count(...category_names) {
     const cols = [];
     for (const k of category_names) {
-      cols.push(this.table.getColumn(k));
+      cols.push(this.table.getChild(k));
     }
     const counts = new Counter();
     for (let i = 0; i < this.table.length; i++) {
@@ -514,22 +512,28 @@ export class QuadTile extends Tile {
 
     this._download = this.tileWorker
       .fetch(url, this.needed_mutations)
-      .catch((err) => {
+/*      .catch((err) => {
+        console.log("ERROR")
+
         this.download_state = 'Errored';
         throw err;
-      })
-      .then(([buffer, metadata, codes]) => {
+      })*/
+      .then(([buffer, metadata, codes]): Table<any> => {
         this.download_state = 'Complete';
 
         // metadata is passed separately b/c I dont know
         // how to fix it on the table in javascript, just python.
         this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
         this._table_buffer = buffer;
-        this._table = Table.from(buffer);
-        this._extent = JSON.parse(metadata.get('extent'));
-        this.child_locations = JSON.parse(metadata.get('children'));
-        this._min_ix = this.table.getColumn('ix').get(0);
-        this.max_ix = 0 + this.table.getColumn('ix').get(this.table.length - 1);
+        this._table = tableFromIPC(buffer);
+        this._extent = JSON.parse(metadata.get('extent')?? '{}');
+        this.child_locations = JSON.parse(metadata.get('children') ?? '{}');
+        const ixes = this.table.getChild('ix')
+        if (ixes === null) {
+          throw ('No ix column in table');
+        }
+        this._min_ix = Number(ixes.get(0));
+        this.max_ix = Number(ixes.get(ixes.length - 1));
         this.highest_known_ix = this.max_ix;
         this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
         //    this.setDataTypes()
@@ -709,12 +713,12 @@ export default class RootTile extends QuadTile {
       ? this._mutations : this._mutations = new Map();
   }
 
-  findPoint(ix) {
+  findPoint(ix : number) {
     return this
       .map((t) => t) // iterates over children.
-      .filter((t) => t.table && t.min_ix <= ix && t.max_ix >= ix)
+      .filter((t) => t.ready && t.table && t.min_ix <= ix && t.max_ix >= ix)
       .map((t) => {
-        const mid = bisectLeft(t.table.getColumn('ix').data.values, ix);
+        const mid = bisectLeft([...t.table.getChild('ix').data[0].values], ix);
         if (t.table.get(mid) && t.table.get(mid).ix === ix) {
           return t.table.get(mid);
         }

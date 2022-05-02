@@ -39,7 +39,6 @@
   </style>
 </head>
 
-
 <script type="module">
   import Scatterplot from './src/deepscatter';
   import { select } from 'd3-selection';
@@ -49,7 +48,7 @@
     "max_points" : 10000, // a full cap.
     "alpha" : .9, // Target saturation for the full page.
     "zoom_balance" : 0.09, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
-    "point_size": 7, // Default point size before application of size scaling
+    "point_size": 2, // Default point size before application of size scaling
     "background_color": "#EEEDDE",
     "click_function": "select('#ident').html(JSON.stringify(datum, undefined, 2))",
     "encoding": {

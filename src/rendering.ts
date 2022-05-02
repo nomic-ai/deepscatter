@@ -11,7 +11,7 @@ export class Renderer {
   // A renderer handles drawing to a display element.
   public scatterplot : Scatterplot;
   public holder : d3.Selection<any, any, any, any>;
-  public canvas : d3.Selection<HTMLCanvasElement, any, any, any>;
+  public canvas : d3.Selection<any, any, any, any>;
   public tileSet : Tileset;
   public prefs : APICall;
   public width : number;
@@ -97,10 +97,12 @@ export class Renderer {
       this.aes.dim('y').last.field == 'y';
 
     if (natural_display) {
-      all_tiles = tileSet.map((d) => d)
-        .filter((tile) => tile.is_visible(max_ix, this.zoom.current_corners()));
+      all_tiles = tileSet.map((d) => d)      
+        .filter((tile) => {
+          const visible = tile.is_visible(max_ix, this.zoom.current_corners())
+          return visible
+        });
     } else {
-      console.log(this.aes.dim('y').last.field, "not using natural display filtering.")
       all_tiles = tileSet.map((d) => d)
         .filter((tile) => tile.min_ix < this.max_ix);
     }

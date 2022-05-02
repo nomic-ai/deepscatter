@@ -3,22 +3,20 @@ import { select } from 'd3-selection';
 import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
-import { scaleLinear } from 'd3-scale';
-import { APICall } from './types';
+import { ScaleLinear, scaleLinear } from 'd3-scale';
+import { APICall, Encoding } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type {Renderer} from './rendering'
 import type RootTile from './tile';
 import { ReglRenderer } from './regl_rendering';
 
-
-
 export default class Zoom {
   public prefs : APICall;
-  public canvas : d3.Selection<Element, any, any, any>;
+  public canvas : d3.Selection<d3.ContainerElement, any, any, any>;
   public width : number;
   public height : number;
   public renderers : Map<string, Renderer>;
-  public tileSet : RootTile;
+  public tileSet? : RootTile;
   public _tooltip_html : () => string;
   public _timer : d3.Timer;
   public _scales : Record<string, d3.ScaleLinear<number, number>>;
@@ -27,7 +25,7 @@ export default class Zoom {
   public _start : number;
   public _tooltip_html_string? : string;
   public _tooltip_html_function? : Function;
-  constructor(selector, prefs) {
+  constructor(selector: string, prefs: APICall) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
     // also registers events.
@@ -43,20 +41,20 @@ export default class Zoom {
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles) {
+  attach_tiles(tiles : RootTile) {
     this.tileSet = tiles;
     this.tileSet._zoom = this;
     return this;
   }
 
-  attach_renderer(key, renderer) {
+  attach_renderer(key : string, renderer : Renderer) {
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
     renderer.zoom.initialize_zoom();
     return this;
   }
 
-  zoom_to(k, x = null, y = null, duration = 4000) {
+  zoom_to(k : number, x = null, y = null, duration = 4000) {
     const scales = this.scales();
     const {
       canvas, zoomer, width, height,
@@ -292,12 +290,15 @@ export default class Zoom {
     }
 
     const { width, height } = this;
-
+    if (this.tileSet === undefined) {
+      throw new Error('Error--scales created before tileSet present.');
+    }
     const { extent } = this.tileSet;
 
     const scales : Record<string, any> = {};
     if (extent === undefined) {
-      return undefined;
+      throw new Error('Error--scales created before extent present.');
+      return {};
     }
 
     interface Scale_datum {
@@ -381,7 +382,7 @@ export default class Zoom {
   }
 }
 
-export function window_transform(x_scale, y_scale) {
+export function window_transform(x_scale : ScaleLinear, y_scale) {
   // width and height are svg parameters; x and y scales project from the data x and y into the
   // the webgl space.
 
@@ -406,7 +407,6 @@ export function window_transform(x_scale, y_scale) {
     [0, ymulti, -ymulti * y_mid + mean(y_scale.range())],
     [0, 0, 1],
   ];
-
   // Note--at the end, you need to multiply by this matrix.
   // I calculate it directly on the GPU.
   // translate from scaled space to webgl space.
@@ -424,10 +424,9 @@ function label_from_point(point, defaults : null | Set<string> = null) {
   // defaults: a Set of keys to include.
   let output = '<dl>';
   const nope = new Set([
-    'x', 'y', 'ix', 'bookstack', null, 'tile_key',
+    'x', 'y', 'ix', null, 'tile_key',
   ]);
-
-  for (const [k, v] of point.entries()) {
+  for (const [k, v] of [...point]) {
     if (defaults !== null) {
       if (!defaults.has(k)) {
         continue;
