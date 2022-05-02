@@ -1007,9 +1007,8 @@ class TileBufferManager {
     return buffer;
   } */
 
-  create_buffer_data(key) {
+  create_buffer_data(key : string) {
     const { tile } = this;
-
     if (!tile.ready) {
       throw 'Tile table not present.';
     }
@@ -1026,7 +1025,7 @@ class TileBufferManager {
       throw `Requested ${key} but table has columns ${col_names.join(', ')}`;
     }
   if (column.type.typeId !== 3) {
-
+      console.log(column.type)
       console.log(column)
       const buffer = new Float32Array(tile.table.length);
       for (let i = 0; i < tile.table.length; i++) {
@@ -1035,6 +1034,9 @@ class TileBufferManager {
       return buffer;
     }
     // For numeric data, it's safe to simply return the data straight up.
+    if (column.data[0].values.constructor === Float64Array) {
+      return new Float32Array(column.data[0].values);
+    }
     return column.data[0].values;
   }
 
@@ -1042,6 +1044,10 @@ class TileBufferManager {
     const { regl_elements } = this;
 
     const data = this.create_buffer_data(key);
+    if (data.constructor !== Float32Array) {
+      console.log(typeof(data), data)
+      throw 'Buffer data must be a Float32Array';
+    }
     const item_size = 4;
     const data_length = data.length;
 

@@ -1,3 +1,7 @@
+# 2.2.0
+
+Switch to Arrow JS 7.0 backend, requiring substantial rewrite.
+
 # 2.1.1
 
 Restore some jitter types broken by ts conversion.

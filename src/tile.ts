@@ -21,12 +21,15 @@ class Batch {
   // Can this usefully do anything?
 }
 
-interface schema_entry{name: string,
-   type : string, 
-   extent: Array<any>,
-   keys ? : Array<any>,
-  }
-type minmax = [number, number]
+interface schema_entry{
+  name: string,
+  type : string, 
+  extent: Array<any>,
+  keys ? : Array<any>,
+}
+
+type MinMax = [number, number];
+
 export class Tile extends Batch {
   max_ix : number;
   promise : Promise<void>;
@@ -35,17 +38,15 @@ export class Tile extends Batch {
   public _current_mutations?: Record<string, any>;
   parent? : Tile;
   _table_buffer?: ArrayBuffer;
-  children? : Array<Tile>;
-  public _children? : Array<Tile>;
+  public _children : Array<Tile> = [];
   public _highest_known_ix? : number;
   public _min_ix? : number;
   public _max_ix? : number;
-  public download? : () => Promise<Table>;
-  public _download? : Promise<Table>;
+  public _download? : Promise<void>;
   __schema?: schema_entry[];
   local_dictionary_lookups? : Map<string, any>;
   codes? : [number, number, number];
-  public _extent? : {'x' : minmax, 'y': minmax};
+  public _extent? : {'x' : MinMax, 'y': MinMax};
 
   constructor() {
     // Accepts prefs only for the case of the root tile.
@@ -53,30 +54,35 @@ export class Tile extends Batch {
     this.max_ix = undefined;
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
+  }
 
+  get children() {
+    return this._children;
   }
 
   get dictionary_lookups() {
     return this.parent.dictionary_lookups;
   }
 
-  is_visible(max_ix, viewport_limits) {
+  download() {
+    throw new Error('Not implemented');
+  }
+
+  is_visible(max_ix : number, viewport_limits : Rectangle ) : boolean {
     // viewport_limits is in coordinate points.
     // Will typically be got by calling current_corners.
 
     // Top tile is always visible (even if offscreen).
     // if (!this.parent) {return true}
+    if (this.min_ix === undefined) {
+      return false
+    }
 
     if (this.min_ix > max_ix) {
       return false;
     }
 
-    if (viewport_limits === undefined) {
-      return false;
-    }
-
     const c = this.extent;
-
     return (
       !(c.x[0] > viewport_limits.x[1]
         || c.x[1] < viewport_limits.x[0]
@@ -138,7 +144,7 @@ export class Tile extends Batch {
         });
     });
   }
-
+  
   *points(bounding : Rectangle | undefined = undefined, sorted = false) : Iterable<StructRowProxy> {
     if (!this.is_visible(1e100, bounding)) {
       return;
@@ -171,7 +177,7 @@ export class Tile extends Batch {
           f.next = f.iterator.next();
           return f;
         });
-      children = children.filter((d) => d.next.value);
+      children = children.filter((d) => d?.next?.value);
       while (children.length > 0) {
         let mindex = 0;
         for (let i = 1; i < children.length; i++) {
@@ -188,7 +194,7 @@ export class Tile extends Batch {
     }
   }
 
-  forEach(callback) {
+  forEach(callback : (p : StructRowProxy) => void) {
     for (const p of this.points()) {
       if (p === undefined) {
         continue;
@@ -262,14 +268,12 @@ export class Tile extends Batch {
     return undefined;
   }
 
-
-  get schema() {
-    return this.download().then(
-      (results) => this._schema,
-    );
+  async schema() {
+    await this.download()
+    return this._schema;
   }
 
-  extend_promise(callback) {
+  extend_promise(callback : () => Promise<any>) {
     this.promise = this.promise.then(() => callback());
     return this.promise;
   }
@@ -322,6 +326,7 @@ export class Tile extends Batch {
     const attributes : schema_entry[] = [];
     for (const field of this.table.schema.fields) {
       const { name, type } = field;
+      console.log({type, id: type.typeId})
       if (type?.typeId == 5) {
         // character
         attributes.push({
@@ -339,6 +344,7 @@ export class Tile extends Batch {
         });
       }
       if (type && type.typeId == 8) {
+        console.log(type)
         attributes.push({
           name,
           type: 'date',
@@ -346,6 +352,7 @@ export class Tile extends Batch {
         });
       }
       if (type && type.typeId == 3) {
+        console.log({type})
         attributes.push({
           name, type: 'float', extent: extent(this.table.getChild(name).data[0].values),
         });
@@ -386,7 +393,7 @@ export class Tile extends Batch {
     this.dictionary_lookups;
   }
 
-  get theoretical_extent() { 
+  get theoretical_extent() : Rectangle { 
     const base = this.root_extent;
     const [z, x, y] = this.codes;
 
@@ -403,7 +410,7 @@ export class Tile extends Batch {
     };
   }
 
-  get extent() {
+  get extent() : Rectangle {
     if (this._extent) {
       return this._extent;
     }
@@ -421,31 +428,39 @@ export class Tile extends Batch {
   count(...category_names) {
     const cols = [];
     for (const k of category_names) {
-      cols.push(this.table.getChild(k));
+      const column = this.table.getChild(k);
+      if (column) cols.push(column);
     }
     const counts = new Counter();
-    for (let i = 0; i < this.table.length; i++) {
+    for (let i = 0; i < this.table.data[0].length; i++) {
       const k = cols.map((d) => d.get(i));
       counts.inc(...k);
     }
     return counts;
   }
 
-  get root_extent() {
+  get root_extent() : Rectangle {
+    if (this.parent === undefined) {
+      // infinite extent
+      return {
+        x: [-Infinity, Infinity],
+        y: [-Infinity, Infinity],
+      };
+    }
     return this.parent.root_extent;
   }
 }
 
 export class QuadTile extends Tile {
   url : string;
-  _mutations : Map<string, any>;
+  _mutations : Map<string, any> = new Map();
   key : string;
-  _children : QuadTile[];
+  public _children : Array<QuadTile> = [];
   class : Tile;
   codes : [number, number, number];
   _already_called = false;
-  public ChildLocations : Record<string, string>;
-  constructor(base_url, key, parent = undefined, prefs) {
+  public child_locations : String[] = [];
+  constructor(base_url : string, key : string, parent : QuadTile, prefs) {
     super();
     this.url = base_url;
     this.parent = parent;
@@ -459,12 +474,14 @@ export class QuadTile extends Tile {
     this.class = new.target;
   }
 
-  download_to_depth(depth, corners = { x: [-1, 1], y: [-1, 1] }, recurse = false) {
+  async download_to_depth(depth : number, corners : Rectangle = { x: [-1, 1], y: [-1, 1] }, recurse = false) : Promise<QuadTile[]>{
     // First, execute the download to populate this.max_ix
-
+    console.log("Downloading")
     if (this.max_ix < depth && this.is_visible(depth, corners) && !recurse) {
+      console.log("Recursing")
       const promises = this.children.map((child) => child.download());
-      if (this._children) {
+      console.log(this.children)
+      if (this.children.length) {
         // Already-downloaded children must also launch downloads.
         for (const child of this._children) {
           promises.concat(
@@ -476,32 +493,31 @@ export class QuadTile extends Tile {
       // return this.children().map(child => child.download_to_depth(depth, corners, false))
     }
 
-    return this.download()
-      .then(() => {
-      // If the last point here is less than the target depth, keep going.
-        if (this.max_ix < depth
+    await this.download()
+
+    // If the last point here is less than the target depth, keep going.
+      if (this.max_ix < depth
         && this.is_visible(depth, corners) && recurse
         ) {
         // Create the children.
-          const child_processes = this.children
+          const child_processes = this._children
           // Filter to visible. Newly generated children
           // will return invisible.
             .map((child) => child.download_to_depth(depth, corners));
           return Promise.all(child_processes)
-          // .catch(err => undefined)
             .then((d) => this);
-        }
-        return this;
-      });
+      }
+      return this;
   }
 
-  download() {
+  download() : Promise<Table> {
     // This should only be called once per tile.
-    if (this._download) { return this._download; }
+    if (this._download) { return this._download }
 
     if (this._already_called) {
       throw ('Illegally attempting to download twice');
     }
+
     this._already_called = true;
 
     const url = this.url.match('//')
@@ -512,12 +528,6 @@ export class QuadTile extends Tile {
 
     this._download = this.tileWorker
       .fetch(url, this.needed_mutations)
-/*      .catch((err) => {
-        console.log("ERROR")
-
-        this.download_state = 'Errored';
-        throw err;
-      })*/
       .then(([buffer, metadata, codes]): Table<any> => {
         this.download_state = 'Complete';
 
@@ -526,8 +536,8 @@ export class QuadTile extends Tile {
         this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
         this._table_buffer = buffer;
         this._table = tableFromIPC(buffer);
-        this._extent = JSON.parse(metadata.get('extent')?? '{}');
-        this.child_locations = JSON.parse(metadata.get('children') ?? '{}');
+        this._extent = JSON.parse(metadata.get('extent'));
+        this.child_locations = JSON.parse(metadata.get('children'));
         const ixes = this.table.getChild('ix')
         if (ixes === null) {
           throw ('No ix column in table');
@@ -545,19 +555,16 @@ export class QuadTile extends Tile {
     return this._download;
   }
 
-  
-  get children() {
+  get children() : Array<QuadTile> {
     // create or return children.
-    if (this._children !== undefined) {
-      return this._children;
-    }
     if (this.download_state !== 'Complete') {
       return [];
     }
-    this._children = [];
-
-    for (const key of this.child_locations) {
-      this._children.push(new this.class(this.url, key, this));
+    if (this._children.length < this.child_locations.length) {
+      for (const key of this.child_locations) {
+        //this._children.push(key)
+        this._children.push(new this.class(this.url, key, this));
+      }
     }
     // }
     // }
@@ -574,8 +581,8 @@ export default class RootTile extends QuadTile {
   // For clarity, I keep those elements in this class.
   public _tileWorkers : TileWorker[];
   public _download_queue : Set<Key>;
-  public key : Key;
-  public _zoom : Zoom;
+  public key : Key = "0/0/0";
+  public _zoom? : Zoom;
   constructor(base_url, prefs = {}) {
     let key;
 
@@ -592,16 +599,18 @@ export default class RootTile extends QuadTile {
     this._min_ix = 1;
   }
 
-  get root_extent() {
+  get root_extent() : Rectangle {
     // this is the extent
     if (this._extent) {
       return this._extent;
     }
-    // avoid infinite doom loop.
-    return undefined;
+    return {
+      x: [parseFloat("-inf"), parseFloat("inf")],
+      y: [parseFloat("-inf"), parseFloat("inf")]
+    }
   }
 
-  log_tiles(depth = 1, f = (tile) => `${tile.children.length}`) {
+  log_tiles(depth = 1, f = (tile : Tile) => `${tile.children.length}`) {
     const array = [];
     const w = range(2 ** depth);
     for (const i of w) {
@@ -625,7 +634,7 @@ export default class RootTile extends QuadTile {
     });
   }
 
-  download_most_needed_tiles(bbox, max_ix, queue_length = 4) {
+  download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length = 4) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
       unneeded parts of the database. So the tile handles its own queue for dispatching
@@ -657,12 +666,12 @@ export default class RootTile extends QuadTile {
 
     } */
 
-    const scores = [];
-    const callback = (tile) => {
-      //      if (tile.download_state == "Unattempted") {
-      const distance = check_overlap(tile, bbox);
-      scores.push([distance, tile, bbox, tile.download_state]);
-      //      }
+    const scores : [number, Tile, Rectangle][] = [];
+    function callback (tile : Tile) {
+      if (tile.download_state === 'Unattempted') {
+        const distance = check_overlap(tile, bbox);
+        scores.push([distance, tile, bbox]);
+      }
     };
 
     this.visit(
@@ -670,11 +679,10 @@ export default class RootTile extends QuadTile {
     );
     scores.sort((a, b) => a[0] - b[0]);
     while (scores.length && queue.size < queue_length) {
-      const [distance, tile, bbox, _] = scores.pop();
-      if (tile.min_ix > max_ix || distance < 0) {
-        continue;
-      }
-      if (tile.download_state !== 'Unattempted') {
+      const upnext = scores.pop();
+      if (upnext === undefined) {throw new Error("Ran out of tiles unexpectedly");}
+      const [distance, tile, _] = upnext;
+      if ((tile.min_ix && tile.min_ix > max_ix) || distance < 0) {
         continue;
       }
 
@@ -690,21 +698,18 @@ export default class RootTile extends QuadTile {
     }
   }
 
-  get children() {
+  get children() : Array<QuadTile> {
     // create or return children.
-    if (this._children !== undefined) {
-      return this._children;
-    }
     if (this.download_state !== 'Complete') {
       return [];
     }
-
-    this._children = [];
-
-    for (const key of this.child_locations) {
-      this._children.push(new QuadTile(this.url, key, this));
+    if (this._children.length < this.child_locations.length) {
+      for (const key of this.child_locations) {
+        this._children.push(new QuadTile(this.url, key, this, {}));
+      }
     }
-
+    // }
+    // }
     return this._children;
   }
 
@@ -784,7 +789,7 @@ export default class RootTile extends QuadTile {
     return q;
   }
 
-  visit(callback :  (tile: Tile) => any, after = false, filter = () => true) {
+  visit(callback :  (tile: Tile) => void, after = false, filter = () => true) {
     // Visit all children with a callback function.
     // The general architecture here is taken from the
     // d3 quadtree functions. That's why, for example, it doesn't
@@ -804,7 +809,7 @@ export default class RootTile extends QuadTile {
         continue;
       }
       // Only create children for downloaded tiles.
-      if (current.download_state == 'Complete') {
+      if (current.download_state == 'Complete') {        
         stack.push(...current.children);
       }
     }
@@ -853,23 +858,25 @@ const thrower = function (r : Rectangle) {
   }
 };
 
-function check_overlap(tile, bbox) {
+function check_overlap(tile : Tile, bbox : Rectangle) : number {
   /* the area of Intersect(tile, bbox) expressed
      as a percentage of the area of bbox */
-  const c = tile.extent;
-//  thrower(c);
-//  thrower(bbox);
+  const c : Rectangle = tile.extent;
 
+  if (bbox.x === undefined || bbox.y === undefined) {
+    throw 'no corners';
+  }
   if (c.x[0] > bbox.x[1]
       || c.x[1] < bbox.x[0]
       || c.y[0] > bbox.y[1]
       || c.y[1] < bbox.y[0]
   ) {
-
+    return 0;
   }
 
-  const intersection = {
-    x: [max([bbox.x[0], c.x[0]]),
+  const intersection : Rectangle = {
+    x: [
+      max([bbox.x[0], c.x[0]]),
       min([bbox.x[1], c.x[1]]),
     ],
     y: [
