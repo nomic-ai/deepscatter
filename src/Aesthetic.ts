@@ -636,6 +636,7 @@ class Color extends Aesthetic {
   }
 
   static convert_color(color : string) {
+    // Convert from string to RGB space (0-1).
     const { r, g, b } = rgb(color);
     return [r / 255, g / 255, b / 255];
   }
@@ -646,6 +647,7 @@ class Color extends Aesthetic {
       this.texture_buffer
     )
   }
+  
   update(encoding : string) {
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
