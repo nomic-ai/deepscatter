@@ -5,23 +5,31 @@ This is an evolving library for displaying more points than are ordinarily possi
 It's fast for three reasons:
 
 1. All data is sent in the Apache Arrow `feather` format, in a 
-   special quadtree format that makes it possible to only load 
-   data as needed on zoom. Feather takes no time to load in JS
-   once copied, and can be directly copied to the shaders without
-   transformation in JS. This is the way of the future.
+   custom quadtree format that makes it possible to only load 
+   data as needed on zoom. Feather takes no time to parse in the browser
+   once transferred, compresses pretty well, and can be directly copied to the GPU without
+   transformation in JS. This is [the way of the future.](https://benschmidt.org/post/2020-01-15/2020-01-15-webgpu/)
 2. Most rendering is done in custom layers using WebGL, with a 
    buffer management strategy handled by REGL. This means that 
    there are no unnecessary abstractions around points or separate draw calls
    for different objects; a minimum number of buffers are attached for the
    needed points.
-3. Almost all grammar-of-graphics transforms are handled on the GPU,
+3. Almost all grammar-of-graphics transforms such are handled on the GPU,
    which allows for interpolated transitions with calculations 
-   in parallel.
+   done in parallel.
+
+It also runs in completely static settings, so you can host a million-point scatterplot over something like Github Pages.
 
 # Examples
 
-* [1 million+ documents from arxiv.com](https://observablehq.com/@bmschmidt/arxiv) rendered inside an Observable notebook.
-* [Every person in the 2010 and 2020 US Censuses](https://all-of-us.benschmidt.org) displayed in an interactive svelte-kit app.
+* [1 million+ documents from arxiv.com](https://observablehq.com/@bmschmidt/arxiv) rendered inside an Observable notebook. (Ben Schmidt)
+* [Every person in the 2010 and 2020 US Censuses](https://all-of-us.benschmidt.org) displayed in an interactive svelte-kit app. (Ben Schmidt)
+* [Newspaper Articles at the Library of Congress from the Reconstruction Era](https://situating.us/explore). (By Andromeda Yelton while in residency at the Library of Congress).
+
+# Get help
+
+Github issues, even low quality ones, are welcom here. There is also a dedicated [Deepscatter Slack](https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw) which you are welcome to join.
+I came into doing this stuff from a very non-technical background and welcome people to join with naive questions.
 
 # Quick start
 
