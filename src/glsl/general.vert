@@ -723,7 +723,6 @@ vec2 calculate_jitter(
 
 
 void run_color_fill(in float ease) {
-
   if (u_only_color >= -1.5) {
     if (u_only_color > -.5 && a_color != u_only_color) {
       gl_Position = discard_me;
@@ -760,6 +759,80 @@ void run_color_fill(in float ease) {
   }
 }
 
+vec2 calc_and_interpolate_positions(
+  inout vec2 old_position,
+  in float u_last_x_transform,
+  in vec2 u_last_x_domain,
+  in vec2 u_last_x_range,
+  in float u_last_y_transform,
+  in vec2 u_last_y_domain,
+  in vec2 u_last_y_range,
+  in mat3 u_last_window_scale,
+  in mat3 u_zoom,
+  in float u_last_x_map_position,
+  in float u_last_y_map_position,
+  inout vec2 position,
+  in float u_x_transform,
+  in vec2 u_x_domain,
+  in vec2 u_x_range,
+  in float u_y_transform,
+  in vec2 u_y_domain,
+  in vec2 u_y_range,
+  in mat3 u_window_scale,
+  in float u_x_map_position,
+  in float u_y_map_position,
+  in float interpolation,
+  in float u_grid_mode, 
+  in float ix) {
+  old_position = calculate_position(old_position, u_last_x_transform,
+    u_last_x_domain, u_last_x_range,
+    u_last_y_transform, u_last_y_domain, u_last_y_range,
+    u_last_window_scale,
+    u_zoom, u_last_x_map_position,      
+    u_last_y_map_position);
+    
+  bool plot_actual_position = u_grid_mode < .5;
+
+  if (plot_actual_position) {
+    position = calculate_position(position, 
+      u_x_transform,
+      u_x_domain, u_x_range,
+      u_y_transform, u_y_domain, 
+      u_y_range, u_window_scale, u_zoom, 
+      u_x_map_position, u_y_map_position);
+
+    float xpos = clamp((1. + position.x) / 2., 0., 1.);
+    float randy = ix_to_random(ix, 13.76);
+    float delay = xpos + randy * .1;
+    delay = delay * 3.;
+
+    float frac = interpolate(
+      u_update_time,
+      delay,
+      u_transition_duration + delay
+    );
+
+    frac = easeCubic(frac);
+
+    if (frac <= 0.) {
+      position = old_position;
+    } else if (frac < 1.) {
+      frac = fract(frac);
+      position = bezier_interpolate(position, old_position, frac, ix);
+    }
+  } else {
+    position.x = -1. + 2. * linscale(u_x_domain, position.x);
+    //position.y = -1.0;
+    vec2 jitterspec = vec2(
+      (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,
+      (ix_to_random(ix, 1.5) * a_jitter_speed ) * 2.
+    );
+    position = position + jitterspec;
+  }
+  return position;
+}
+
+
 void main() {
   float debug_mode = 0.;
   float ix = buffer_0;
@@ -771,7 +844,6 @@ void main() {
 
   if (debug_mode > 1.5) {
     // Debug mode.
-//    fill = vec4(ix_to_random(ix, 15.), ix_to_random(ix, 15.), ix_to_random(ix, 11.), 1.);
     gl_PointSize = 2.;
     gl_Position = vec4(box_muller(ix, 2.).xy * .33, 0., 1.);
     return;
@@ -959,57 +1031,73 @@ void main() {
   vec2 position = vec2(a_x, a_y);
   vec2 old_position = vec2(a_last_x, a_last_y);
 
-  old_position = calculate_position(old_position, u_last_x_transform,
-     u_last_x_domain, u_last_x_range,
-     u_last_y_transform, u_last_y_domain, u_last_y_range,
-     u_last_window_scale,
-     u_zoom, u_last_x_map_position,      
-     u_last_y_map_position);
-     
+  position = calc_and_interpolate_positions(
+    old_position,
+    u_last_x_transform,
+    u_last_x_domain, u_last_x_range,
+    u_last_y_transform,
+    u_last_y_domain, u_last_y_range,
+    u_last_window_scale,
+    u_zoom,
+    u_last_x_map_position,
+    u_last_y_map_position,
+    position,
+    u_x_transform,
+    u_x_domain, u_x_range,
+    u_y_transform,
+    u_y_domain, u_y_range,
+    u_window_scale,
+    u_x_map_position,
+    u_y_map_position,
+    interpolation,
+    u_grid_mode,
+    ix
+  );
+
+  if (u_x0_buffer_num > 0.) {
+    vec2 position0 = vec2(a_x0, a_y0);
+    vec2 old_position0 = vec2(a_last_x0, a_last_y0);
+
+    position0 = calc_and_interpolate_positions(
+      old_position0,
+      u_last_x0_transform,
+      u_last_x0_domain, u_last_x0_range,
+      u_last_y0_transform,
+      u_last_y0_domain, u_last_y0_range,
+      u_last_window_scale,
+      u_zoom,
+      u_last_x0_map_position,
+      u_last_y0_map_position,
+      position0,
+      u_x0_transform,
+      u_x0_domain, u_x0_range,
+      u_y0_transform,
+      u_y0_domain, u_y0_range,
+      u_window_scale,
+      u_x0_map_position,
+      u_y0_map_position,
+      interpolation,
+      u_grid_mode,
+      ix
+    );
+
+    if (u_position_interpolation_mode > 0.) {
+      float rand2 = ix_to_random(ix, 11.76);
+
+      // If it's a continuous loop, just choose a random point along that loop.
+      float rand_offset = fract(u_update_time/u_transition_duration / 10. + rand2);
+      position = mix(position0, position, rand_offset);
+    }
+  }
+
   bool plot_actual_position = u_grid_mode < .5;
 
-  if (plot_actual_position) {
-    position = calculate_position(position, 
-      u_x_transform,
-      u_x_domain, u_x_range,
-      u_y_transform, u_y_domain, 
-      u_y_range, u_window_scale, u_zoom, 
-      u_x_map_position, u_y_map_position);
+  if (u_position_interpolation_mode > 0.) {
+    float rand2 = ix_to_random(ix, 11.76);
 
-    float xpos = clamp((1. + position.x) / 2., 0., 1.);
-    float randy = ix_to_random(ix, 13.76);
-    float delay = xpos + randy * .1;
-
-    delay = delay * 3.;
-    // delay = 0.;
-    float frac = interpolate(
-      u_update_time,
-      delay,
-      u_transition_duration + delay
-    );
-
-/*    if (u_position_interpolation_mode > 0.) {
-      // If it's a continuous loop, just choose a random point along that loop.
-      frac = fract(u_update_time/u_transition_duration);
-      frac = fract(frac + randy);
-    } */
-
-    frac = easeCubic(frac);
-
-    if (frac <= 0.) {
-      position = old_position;
-    } else if (frac < 1.) {
-      frac = fract(frac);
-      position = bezier_interpolate(position, old_position, frac, ix);
-    }
-  } else {
-    position.x = -1. + 2. * linscale(u_x_domain, position.x);
-    //position.y = -1.0;
-    vec2 jitterspec = vec2(
-      (ix_to_random(ix, 3.) * a_jitter_radius ) * 2.,
-      (ix_to_random(ix, 1.5) * a_jitter_speed ) * 2.
-    );
-    position = position + jitterspec;
+    // If it's a continuous loop, just choose a random point along that loop.
+    float rand_offset = fract(u_update_time/u_transition_duration + rand2);
+    
   }
 
 /*  position = vec2(
@@ -1077,6 +1165,7 @@ void main() {
 
   // It's ugly on new macs when it jumps straight from one to two for a bunch of points at once.
   float size_fuzz = exp(ix_to_random(ix, 3.1) * .5 - .25);
+
   point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz;// * depth_size_adjust;
 //  point_size_adjust = exp(log(u_k) * u_zoom_balance);
   gl_PointSize = point_size_adjust * size_multiplier;
@@ -1085,9 +1174,11 @@ void main() {
     return;
   }
   vec2 jitter = vec2(0., 0.);
+//  
 
   if (plot_actual_position && (u_jitter > 0. || u_last_jitter > 0.)) {
     /* JITTER */
+    jitter = vec2(ix_to_random(ix, 2. + u_time), ix_to_random(ix, 3. + u_time)) * .01;
     float jitter_radius_fraction;
       jitter = calculate_jitter(
         u_jitter, ix,

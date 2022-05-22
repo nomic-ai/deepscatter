@@ -1,3 +1,7 @@
+# 2.2.2
+
+Hopefully fix issue with points of index zero breaking display size rules.
+
 # 2.2.0
 
 Switch to Arrow JS 7.0 backend, requiring substantial rewrite.

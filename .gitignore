@@ -5,3 +5,4 @@ public/tiles
 dist/tiles
 test-results/
 playwright-report/
+dist/tiles/*
