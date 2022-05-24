@@ -1,3 +1,11 @@
+# 2.2.4
+
+Support int32 dates as floats (without null mask for now.)
+
+# 2.2.3
+
+Use of 'x0' and 'y0' positions produce smooth interpolation between two different points.
+
 # 2.2.2
 
 Hopefully fix issue with points of index zero breaking display size rules.

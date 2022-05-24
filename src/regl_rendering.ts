@@ -1013,8 +1013,8 @@ class TileBufferManager {
       throw 'Tile table not present.';
     }
 
-    const column = tile.table.getChild(`${key}_dict_index`) || tile.table.getChild(key);
-    
+    const column = tile.table.getChild(`${key}_float_version`) || tile.table.getChild(key);
+    console.log(key, column.data[0].values)
     /* if (key == 'position') {
       console.warn('CREATING POSITION BUFFER (DEPRECATED)');
       return this.create_position_buffer();

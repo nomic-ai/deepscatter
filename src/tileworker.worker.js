@@ -10,7 +10,6 @@ import {
   tableFromArrays,
   makeBuilder,
   makeVector
-
 } from 'apache-arrow';
 
 // Somehow have to keep these independent.
@@ -47,6 +46,7 @@ const WorkerTile = {
       });
   },
   run_transforms(map, table_buffer) {
+    console.log("transforming")
     const buffer = mutate(map, table_buffer);
     const codes = get_dictionary_codes(buffer);
     return [transfer(buffer, [buffer]), codes];
@@ -78,6 +78,7 @@ function mutate(map, table_buffer, metadata) {
   const table = tableFromIPC(table_buffer);
   const data = new Map();
   const funcmap = new Map();
+
   for (const [k, v] of Object.entries(map)) {
     data.set(k, Array(table.length));
     // Materialize the mutate functions from strings.
@@ -120,7 +121,11 @@ function mutate(map, table_buffer, metadata) {
         // range through which integers are exactly right.
           float_version[i] = col.data[0].values[i] - 2047;
         }
-        columns[`${name}_dict_index`] = makeVector(float_version);
+        columns[`${name}_float_version`] = makeVector(float_version);
+      }
+      if (type.typeId === 8) {
+        // date
+        columns[`${name}_float_version`] = vectorFromArray([...col.data[0].values].map(d => Number(d)), new Float32());
       }
     }
   }
@@ -131,6 +136,7 @@ function mutate(map, table_buffer, metadata) {
   if (highest_dict_id < 0) { highest_dict_id = -1; }
 
   for (const [k, vector] of data) {
+    console.log({k})
     let column;
     if (typeof (vector[0]) === 'string') {
       highest_dict_id++;
