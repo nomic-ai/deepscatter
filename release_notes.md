@@ -1,4 +1,4 @@
-# 2.2.4
+# 2.2.5
 
 Support int32 dates as floats (without null mask for now.)
 

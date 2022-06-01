@@ -477,10 +477,11 @@ export class QuadTile extends Tile {
   async download_to_depth(depth : number, corners : Rectangle = { x: [-1, 1], y: [-1, 1] }, recurse = false) : Promise<QuadTile[]>{
     // First, execute the download to populate this.max_ix
     console.log("Downloading")
-    if (this.max_ix < depth && this.is_visible(depth, corners) && !recurse) {
-      console.log("Recursing")
+    if (!this.is_visible(depth, corners)) {
+      return [];
+    }
+    if (this.max_ix < depth && recurse) {
       const promises = this.children.map((child) => child.download());
-      console.log(this.children)
       if (this.children.length) {
         // Already-downloaded children must also launch downloads.
         for (const child of this._children) {
@@ -493,21 +494,21 @@ export class QuadTile extends Tile {
       // return this.children().map(child => child.download_to_depth(depth, corners, false))
     }
 
-    await this.download()
+  await this.download()
 
-    // If the last point here is less than the target depth, keep going.
-      if (this.max_ix < depth
-        && this.is_visible(depth, corners) && recurse
-        ) {
-        // Create the children.
-          const child_processes = this._children
-          // Filter to visible. Newly generated children
-          // will return invisible.
-            .map((child) => child.download_to_depth(depth, corners));
-          return Promise.all(child_processes)
-            .then((d) => this);
-      }
-      return this;
+  // If the last point here is less than the target depth, keep going.
+    if (this.max_ix < depth
+      && this.is_visible(depth, corners) && recurse
+      ) {
+      // Create the children.
+        const child_processes = this._children
+        // Filter to visible. Newly generated children
+        // will return invisible.
+          .map((child) => child.download_to_depth(depth, corners));
+        return Promise.all(child_processes)
+          .then((d) => this);
+    }
+    return this;
   }
 
   download() : Promise<Table> {
@@ -551,6 +552,13 @@ export class QuadTile extends Tile {
         this.local_dictionary_lookups = codes;
         this.update_master_dictionary_lookups();
         return this.table;
+      })
+      .catch((e) => {        
+        this.download_state = 'Failed';
+        console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
+        
+        `);
+        throw e;
       });
     return this._download;
   }
@@ -682,11 +690,9 @@ export default class RootTile extends QuadTile {
       const upnext = scores.pop();
       if (upnext === undefined) {throw new Error("Ran out of tiles unexpectedly");}
       const [distance, tile, _] = upnext;
-      if ((tile.min_ix && tile.min_ix > max_ix) || distance < 0) {
+      if ((tile.min_ix && tile.min_ix > max_ix) || distance <= 0) {
         continue;
       }
-
-      //      console.log("Getting", {distance, tile: tile.key, bbox, abbox: area(bbox), a_tile: area(tile.extent), e: tile.extent})
       queue.add(tile.key);
       tile.download()
         .catch((err) => {

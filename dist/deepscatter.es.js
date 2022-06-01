@@ -16032,6 +16032,7 @@ class ReglRenderer extends Renderer {
       })
     ];
     this.initialize();
+    this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
   }
   get buffers() {
     this._buffers = this._buffers || new MultipurposeBufferSet(this.regl, this.buffer_size);
@@ -16631,7 +16632,6 @@ class TileBufferManager {
       throw "Tile table not present.";
     }
     const column = tile.table.getChild(`${key}_float_version`) || tile.table.getChild(key);
-    console.log(key, column.data[0].values);
     if (!column) {
       const col_names = tile.table.schema.fields.map((d) => d.name);
       throw `Requested ${key} but table has columns ${col_names.join(", ")}`;
@@ -25984,10 +25984,11 @@ class QuadTile extends Tile {
   }
   async download_to_depth(depth, corners = { x: [-1, 1], y: [-1, 1] }, recurse = false) {
     console.log("Downloading");
-    if (this.max_ix < depth && this.is_visible(depth, corners) && !recurse) {
-      console.log("Recursing");
+    if (!this.is_visible(depth, corners)) {
+      return [];
+    }
+    if (this.max_ix < depth && recurse) {
       const promises = this.children.map((child) => child.download());
-      console.log(this.children);
       if (this.children.length) {
         for (const child of this._children) {
           promises.concat(child.download_to_depth(depth, corners, false));
@@ -26030,6 +26031,12 @@ class QuadTile extends Tile {
       this.local_dictionary_lookups = codes;
       this.update_master_dictionary_lookups();
       return this.table;
+    }).catch((e) => {
+      this.download_state = "Failed";
+      console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
+        
+        `);
+      throw e;
     });
     return this._download;
   }
@@ -26111,7 +26118,7 @@ class RootTile extends QuadTile {
         throw new Error("Ran out of tiles unexpectedly");
       }
       const [distance, tile, _] = upnext;
-      if (tile.min_ix && tile.min_ix > max_ix || distance < 0) {
+      if (tile.min_ix && tile.min_ix > max_ix || distance <= 0) {
         continue;
       }
       queue.add(tile.key);

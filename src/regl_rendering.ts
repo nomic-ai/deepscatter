@@ -63,6 +63,8 @@ export class ReglRenderer extends Renderer {
       },
     );
 
+
+
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
 
     // allocate buffers in 64 MB blocks.
@@ -79,6 +81,7 @@ export class ReglRenderer extends Renderer {
         }),
     ];
     this.initialize();
+    this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
   }
 
   get buffers() {
@@ -199,6 +202,7 @@ export class ReglRenderer extends Renderer {
     if (this._use_scale_to_download_tiles) {
       tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix);
     } else {
+//      console.log("YIIIKES")
       tileSet.download_to_depth(prefs.max_points);
     }
 
@@ -1014,7 +1018,7 @@ class TileBufferManager {
     }
 
     const column = tile.table.getChild(`${key}_float_version`) || tile.table.getChild(key);
-    console.log(key, column.data[0].values)
+//    console.log(key, column.data[0].values)
     /* if (key == 'position') {
       console.warn('CREATING POSITION BUFFER (DEPRECATED)');
       return this.create_position_buffer();

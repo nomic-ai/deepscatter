@@ -1,7 +1,7 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "2.2.4",
+  "version": "2.2.6",
   "description": "Zoomable scatterplots with billions of points",
   "files": [
     "dist"
