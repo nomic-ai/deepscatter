@@ -1,5 +1,6 @@
 /* eslint-disable no-underscore-dangle */
-import { range as arange, shuffle, extent, thresholdFreedmanDiaconis } from 'd3-array';
+import { range as arange, extent, shuffler } from 'd3-array';
+import { randomLcg } from 'd3-random';
 import {
   scaleLinear, scaleSqrt, 
   scaleLog, scaleIdentity,
@@ -72,6 +73,8 @@ for (const [k, v] of Object.entries(d3Chromatic)) {
     const name = k.replace('interpolate', '').toLowerCase();
     color_palettes[name] = materialize_color_interplator(v);
     if (name === 'rainbow') {
+      // Deterministic random shuffle orders
+      const shuffle = shuffler(randomLcg(1));
       color_palettes.shufbow = shuffle(color_palettes[name]);
     }
   }
