@@ -185,6 +185,8 @@ export default class Scatterplot {
         }
       }, i * 400);
     }
+    setTimeout(() => ctx.clearRect(0, 0, 10000, 10000), 17 * 400)
+
   }
 
   update_prefs(prefs : APICall) {
