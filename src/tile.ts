@@ -521,12 +521,9 @@ export class QuadTile extends Tile {
 
     this._already_called = true;
 
-    const url = this.url.match('//')
-      ? `${this.url}/${this.key}.feather`
-      : `${window.location.origin}/${this.url}/${this.key}.feather`;
-
+    // new: must include protocol and hostname.
+    const url = `${this.url}/${this.key}.feather`
     this.download_state = 'In progress';
-
     this._download = this.tileWorker
       .fetch(url, this.needed_mutations)
       .then(([buffer, metadata, codes]): Table<any> => {
@@ -578,8 +575,6 @@ export class QuadTile extends Tile {
     // }
     return this._children;
   }
-
-
 }
 
 type Key = string;
@@ -901,3 +896,19 @@ function check_overlap(tile : Tile, bbox : Rectangle) : number {
 }
 
 export type Tileset = RootTile;
+
+
+export class ArrowTile extends Tile {
+  
+  constructor(table_buffer : ArrayBuffer) {
+    super();
+    this.download_state = 'Complete';
+    this._table_buffer = table_buffer;
+    this._table = tableFromIPC(table_buffer);
+  }
+  
+  download() : Promise<Table> {
+    return Promise.resolve(this._table);
+  }
+
+}

@@ -136,8 +136,11 @@ export class ReglRenderer extends Renderer {
       zoom_balance: prefs.zoom_balance,
       transform,
       max_ix: this.max_ix,
-      time: (Date.now() - this.zoom._start) / 1000,
-      update_time: (Date.now() - this.most_recent_restart) / 1000,
+      point_size: this.point_size,
+      alpha: this.optimal_alpha,
+      time: (Date.now() - this.zoom._start),
+      update_time: (Date.now() - this.most_recent_restart),
+      relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
       string_index: 0,
       prefs: JSON.parse(JSON.stringify(prefs)),
       color_type: undefined,
@@ -156,6 +159,7 @@ export class ReglRenderer extends Renderer {
         [0, 0, 1],
       ].flat(),
     }
+
     // Clone.
     return JSON.parse(JSON.stringify(props));
   }
@@ -224,7 +228,7 @@ export class ReglRenderer extends Renderer {
     try {
       this.render_all(props);
     } catch(err) {
-      console.log("ERROR NOTED")
+      console.warn("ERROR NOTED")
       this.reglframe.cancel();
       throw err
     }
@@ -737,8 +741,7 @@ export class ReglRenderer extends Renderer {
         //@ts-ignore
         u_update_time: regl.prop('update_time'),
         u_transition_duration(_, props) {
-        // const fraction = (props.time)/props.prefs.duration;
-          return props.prefs.duration;
+          return props.prefs.duration; // Using seconds, not milliseconds, in there
         },
         u_only_color(_, props) {
           if (props.only_color !== undefined) {
@@ -781,9 +784,10 @@ export class ReglRenderer extends Renderer {
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
         //@ts-ignore
         u_zoom_balance: regl.prop('zoom_balance'),
-        u_base_size: (_, { prefs }) => prefs.point_size,
-        u_maxix: (_, props) => props.max_ix,
-        u_k(_, props) {
+        u_base_size: (_, {point_size}) => point_size,
+        u_maxix: (_, {max_ix}) => max_ix,
+        u_alpha: (_, {alpha}) => alpha,
+        u_k: (_, props) => {
           return props.transform.k;
         },
         // Allow interpolation between different coordinate systems.
@@ -804,8 +808,6 @@ export class ReglRenderer extends Renderer {
         u_last_filter2_numeric() {
           return this.aes.dim("filter").last.ops_to_array();
         },
-        u_current_alpha: () => this.optimal_alpha,
-        u_last_alpha: () => this.optimal_alpha,
         u_jitter: () => this.aes.dim("jitter_radius").current.jitter_int_format,
         u_last_jitter: () => this.aes.dim("jitter_radius").last.jitter_int_format,
         u_zoom(_, props) {
@@ -961,9 +963,6 @@ class TileBufferManager {
     }
     for (const key of ['ix', ...needed_dimensions]) {
       const current = this.regl_elements.get(key);
-      if (key === 'ix') {
-//        console.log("______\n\n", key)
-      }
       if (current === null) {
       // It's in the process of being built.
         return false;
@@ -1018,19 +1017,12 @@ class TileBufferManager {
     }
 
     const column = tile.table.getChild(`${key}_float_version`) || tile.table.getChild(key);
-//    console.log(key, column.data[0].values)
-    /* if (key == 'position') {
-      console.warn('CREATING POSITION BUFFER (DEPRECATED)');
-      return this.create_position_buffer();
-    } */
 
     if (!column) {
       const col_names = tile.table.schema.fields.map((d) => d.name);
       throw `Requested ${key} but table has columns ${col_names.join(', ')}`;
     }
   if (column.type.typeId !== 3) {
-      console.log(column.type)
-      console.log(column)
       const buffer = new Float32Array(tile.table.length);
       for (let i = 0; i < tile.table.length; i++) {
         buffer[i] = column.data[0].values[i];
@@ -1067,6 +1059,26 @@ class TileBufferManager {
   }
 }
 
+function interpolate_regl_property(props, name : string, weight : 'linear' | 'log' | 'sqrt' = 'linear') {
+  const { relative_time, prefs } = props
+  if (relative_time >= 1) {
+    return prefs[name];
+  }
+  const start = prefs[`last_${name}`] || prefs[name];
+  const end = prefs[name];
+  if (weight === 'linear') {
+//    console.log(start, end, relative_time)
+    return start * (1 - relative_time) + end * relative_time;
+  } else if (weight === 'log') {
+    return Math.exp(Math.log(start) * (1 - relative_time) + Math.log(end) * relative_time);
+  } else if (weight === 'sqrt') {
+    return Math.sqrt(
+      (Math.sqrt(start) * (1 - relative_time)) ** 2 +
+      (Math.sqrt(end) * relative_time) ** 2
+    )
+  }
+}
+
 class MultipurposeBufferSet {
 
   public regl : Regl;
@@ -1083,6 +1095,7 @@ class MultipurposeBufferSet {
     this.buffer_offsets = [];
     this.generate_new_buffer();
   }
+
 
   generate_new_buffer() {
   // Adds to beginning of list.

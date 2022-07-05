@@ -116,7 +116,7 @@ export default class Zoom {
   }
 
 
-  zoom_to_bbox(corners, duration = 4) {
+  zoom_to_bbox(corners, duration = 4000) {
     // Zooms to two points.
     const scales = this.scales();
     const [x0, x1] = corners.x.map(scales.x);
@@ -133,7 +133,7 @@ export default class Zoom {
 
     canvas
       .transition()
-      .duration(duration * 1000)
+      .duration(duration)
       .call(zoomer.transform, t);
   }
 

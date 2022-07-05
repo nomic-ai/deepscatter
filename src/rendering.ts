@@ -6,6 +6,107 @@ import type { Tileset } from './tile';
 import type { APICall } from './types';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
+import { timer, Timer } from 'd3-timer';
+
+abstract class PlotSetting {
+  abstract start: number;
+  abstract value: number;
+  abstract target: number;
+  timer : Timer | undefined;
+  transform: "geometric" | "arithmetic";
+  constructor() {
+    this.transform = "arithmetic";
+  }
+  update(value: number, duration: number) {
+    if (duration === 0) {
+      this.value = value;
+      if (this.timer !== undefined) {
+        this.timer.stop();
+      }
+      return
+    }
+    this.start = this.value;
+    this.target = value;
+    this.start_timer(duration);
+  }
+  start_timer(duration: number) {
+    if (this.timer !== undefined) {
+      this.timer.stop();
+    }
+    const timer_object = timer((elapsed) => {
+      let t = elapsed / duration;
+      if (t >= 1) {
+        this.value = this.target
+        timer_object.stop();
+        return
+      }
+      const w1 = 1 - t;
+      const w2 = t;
+      if (this.transform === 'geometric') {
+        this.value = this.start ** (w1) * this.target ** (w2)
+      } else {
+        this.value = this.start * (w1) + this.target * (w2);
+      }
+    })
+    this.timer = timer_object;
+  }
+}
+
+class MaxPoints extends PlotSetting {
+  value: number = 10000;
+  start: number = 10000;
+  target: number = 10000;
+  constructor() {
+    super();
+    this.transform = 'geometric'
+  }
+}
+
+class TargetOpacity extends PlotSetting {
+  value: number = 10
+  start: number = 10
+  target: number = 10
+}
+
+class PointSize extends PlotSetting {
+  value: number = 2;
+  start: number = 2;
+  target: number = 2;
+  constructor() {
+    super();
+    this.transform = 'geometric'
+  }
+}
+
+class RenderProps {
+  // Aesthetics that adhere to the state of the _renderer_
+  // as opposed to the individual points.
+  // These can transition a little more beautifully.
+  maxPoints: MaxPoints;
+  targetOpacity: TargetOpacity;
+  pointSize: PointSize;
+  constructor() {
+    this.maxPoints = new MaxPoints();
+    this.targetOpacity = new TargetOpacity();
+    this.pointSize = new PointSize();
+  }
+  apply_prefs(prefs : APICall) {
+
+    const {duration} = prefs;
+    this.maxPoints.update(prefs.max_points, duration);
+    this.targetOpacity.update(prefs.alpha, duration);
+    this.pointSize.update(prefs.point_size, duration);
+  }
+  get max_points() {
+    return this.maxPoints.value
+  }
+  get alpha() {
+    return this.targetOpacity.value;
+  }
+  get point_size() {
+    return this.pointSize.value;
+  }
+}
 
 export class Renderer {
   // A renderer handles drawing to a display element.
@@ -24,6 +125,7 @@ export class Renderer {
   public _click_function : () => void;
   public _zoom : Zoom;
   public _initializations : Promise<any>[];
+  public render_props : RenderProps;
   constructor(selector, tileSet, scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
@@ -34,6 +136,7 @@ export class Renderer {
     this.height = +this.canvas.attr('height');
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
+    this.render_props = new RenderProps();
   }
 
   get discard_share() {
@@ -43,50 +146,55 @@ export class Renderer {
     return 0;
   }
 
+
+
   //color_pick() {
   //  return 1;
   //}
 
+  get alpha() {
+    return this.render_props.alpha;
+  }
   get optimal_alpha() {
-    let { zoom_balance, alpha, point_size } = this.prefs;
+    // This is extends a formula suggested by Ricky Reusser.
+
+    let { zoom_balance } = this.prefs;
     const {
+      alpha, point_size,
       max_ix, width, discard_share, height,
     } = this;
     const { k } = this.zoom.transform;
-    alpha = alpha === undefined ? 0.25 : alpha;
     const target_share = alpha;
     const fraction_of_total_visible = 1 / k ** 2;
     const pixel_area = width * height;
-    const total_intended_points = min([max_ix, this.tileSet.highest_known_ix]);
+    const total_intended_points = min([max_ix, this.tileSet.highest_known_ix || 1e10]);
     const total_points = total_intended_points * (1 - discard_share);
     const area_of_point = (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2;
-    // average_alpha * pixel_area = total_points * fraction_of_total_visible *
-    // area_of_point * target_opacity
     const target = (target_share * pixel_area)
       / (total_points * fraction_of_total_visible * area_of_point);
+    // constrain within realistic bounds.
+    // would also be possible to adjust size to meet the goal.
     return target > 1 ? 1 : target < 1 / 255 ? 1 / 255 : target;
   }
 
+  get point_size() {
+    return this.render_props.point_size;
+  }
   get max_ix() {
     // By default, prefer dropping points to dropping alpha.
     const { prefs } = this;
+    const { max_points } = this.render_props;
     if (!this._use_scale_to_download_tiles) {
-      return prefs.max_points;
+      return max_points;
     }
     const { k } = this.zoom.transform;
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
-    return prefs.max_points * k * k / point_size_adjust / point_size_adjust;
+    return max_points * k * k / point_size_adjust / point_size_adjust;
   }
-  /*
-  is_visible(point) {
-    return p_in_rect(point, this._zoom.current_corners)
-    && point.ix < this.prefs.max_points * this._zoom.transform.k;
-  } */
 
   visible_tiles() {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
-    //    console.log({ix: this.max_ix})
     const { max_ix } = this;
     const { tileSet } = this;
     // Materialize using a tileset method.
@@ -145,21 +253,20 @@ export class Renderer {
     }
   }
 
-  get click_function() {
+/*  get click_function() {
     // If the click function is unset or doesn't match the current preferences,
     // set it before returning it..
     if ( !(this._click_function) || !(this._click_function_matches_prefs()) ) {
-      this.click_function = this.scatterplot.prefs.click_function
-    }
+      this._click_function = this.scatterplot.prefs.click_function
+    } 
 
     return this._click_function
-  }
+  }*/
 
-  * initialize() {
+  async initialize() {
     // Asynchronously wait for the basic elements to be done.
-    return Promise.all(this._initializations).then((d) => {
-      this.zoom.restart_timer(500000);
-    });
+    await this._initializations;
+    this.zoom.restart_timer(500000);
   }
 }
 

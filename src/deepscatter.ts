@@ -74,7 +74,9 @@ export default class Scatterplot {
 
     this.prefs = {
       zoom_balance: 0.35,
-      duration: 2,
+      duration: 2000,
+      max_points: 100,
+      encoding: {},
       point_size: 1, // base size before aes modifications.
       alpha: 0.4, // Overall screen saturation target.
       click_function: 'alert(`You clicked on a point with data ${JSON.stringify(datum)}`)',
@@ -190,11 +192,7 @@ export default class Scatterplot {
   }
 
   update_prefs(prefs : APICall) {
-
-    // Stash the previous jitter.
-    for (const k in ['jitter', 'alpha', 'max_points']) {
-      prefs[`last_${k}`] = this.prefs[k] || undefined;
-    }
+    // Stash the previous values for interpolation.
 
     if (this.prefs.encoding && prefs.encoding) {
       for (const k : string of Object.keys(this.prefs.encoding)) {
@@ -264,8 +262,7 @@ export default class Scatterplot {
     return this._zoom.tooltip_html;
   }
 
-  async plotAPI(prefs : APICall | null | undefined) {
-    if (prefs === undefined || prefs === null) { return Promise.resolve(1); }
+  async plotAPI(prefs : APICall) {
 
     this.update_prefs(prefs);
 
@@ -273,17 +270,6 @@ export default class Scatterplot {
     // this is a spot to defer the tasks.
 
     const tasks = [];
-
-    if (prefs.lookup_tables) {
-      const table_loads = [];
-      this.lookup_promises = this.lookup_promises || new Map();
-      for (const table of prefs.lookup_tables) {
-        if (!this.lookup_promises.get(table)) {
-          table_loads.push(this.load_lookup_table(table));
-        }
-      }
-      await Promise.all(table_loads);
-    }
 
     if (prefs.source_url && prefs.source_url !== this.source_url) {
       this.source_url = prefs.source_url;
@@ -309,7 +295,10 @@ export default class Scatterplot {
       }
     }
     */
+
     await this._root.promise;
+
+    this._renderer.render_props.apply_prefs(this.prefs)
 
     // Doesn't block.
     if (prefs.mutate) {
