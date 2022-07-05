@@ -46,7 +46,7 @@ and generate a million points of test data in tiles of 50000 apiece.
 ```sh
 python3 -m pip install git+https://github.com/bmschmidt/quadfeather
 quadfeather-test-data 1_000_000
-quadfeather --files tmp.csv --tile_size 50_000 --destination public/tiles
+quadfeather --files tmp.csv --tile_size 50_000 --destination tiles
 ```
 
 Then setup this library to run. It will start a local dev server.
@@ -57,15 +57,15 @@ npm run dev
 ```
 
 If you go to localhost:3000, it should have an interactive scatterplot waiting.
-This development site only works in Chrome, not Safari or Firefox, because uses ES6 module syntax inside the webworker. The distributed version of 
-the module should work in all browsers, although the low float precision on iOs means it doesn't look ideal on iPads compared to Android tablets.
+(In 2021, this development site works in Chrome, not Safari or Firefox, because it uses ES6 module syntax inside the webworker. The distributed version of 
+the module should work in all browsers.)
 
 ## Your own data.
 
-1. Create a CSV file that has columns called 'x' and 'y'. (Or a feather file that has columns `x`, `y`, and `ix`, where `ix` is display order). Any other columns (categorical information, etc.) can be included as additional columns.
+1. Create a CSV, parquet, or feather file that has columns called 'x' and 'y'. (Or a feather file that has columns `x`, `y`). Any other columns (categorical information, etc.) can be included as additional columns.
 3. Tile it:
   ```sh
-  quadfeather --files tmp.csv --tile_size 50000 --destination public/tiles
+  quadfeather --files tmp.csv --tile_size 50000 --destination tiles
   ```
 3. Edit the file at `index.html` to use an encoding scheme that matches your data. The API call describing the basic plot is at [lines 45-78 in the example code]( https://github.com/CreatingData/deepscatter/blob/master/index.html#L45-L78), and includes some aesthetic descriptions like [`{field : "class"}`](https://github.com/CreatingData/deepscatter/blob/master/index.html#L55) on various lines that refer to CSV columns that are likely *not* in your data. So if you have a field called `species`, for example, you might change `{field : "class"}` to `{field : "species"}`, and replace 
    ```
@@ -96,7 +96,7 @@ will create an ES module at `dist/deepscatter.es.js` The mechanics of
 importing this are very slightly different than `index.html`.
 
 Note that this is an ESM module and so requires you to use `<script type="module">` in your code.
-Don't worry! It's 2021, we're allowed to 
+Don't worry! We're allowed to 
 do this now! But do be aware that this will not work on computers running very old browsers.
 
 Snippet:
@@ -117,7 +117,6 @@ top of it, but the core plotting components are separate and should work as a st
 plot requests via an API. 
 
 
-
 # Code strategy 
 
 Any interaction logic that changes the API call directly does not belong in this library. The only
@@ -133,8 +132,7 @@ using, say, `arquero` or a WASM port of `DuckDB`.
 
 # API
 
-This is still subject to change and is not yet documented. The encoding portion of the 
-API mimics Vega-Lite with some minor distinctions.
+This is still subject to change and is not fully documented. The encoding portion of the API mimics Vega-Lite with some minor distinctions to avoid deeply-nested queries and to add animation and jitter parameters.
 
 ```js
 {
@@ -174,9 +172,15 @@ API mimics Vega-Lite with some minor distinctions.
 
 Jitter is a little overloaded with features right now, but some are quite fun.
 
+jitter method is set on 'method' key of the 'jitter_radius' field. Possible values are:
+1. `circle`
+2. `spiral`
+3. `time`
+4. `normal`
+
 # Principles
 
-1. This is a 2d library.
+1. This is a 2d library. No fake 3d.
 2. The central zoom state is handled by d3-zoom.
 3. That zoom state can be used to render to webgl. Don't know webgl? You
    should be able to use the zoom state to draw to canvas or svg layers using the

@@ -928,6 +928,7 @@ export class ReglRenderer extends Renderer {
   }
 }
 
+
 class TileBufferManager {
   // Handle the interactions of a tile with a regl state.
 
@@ -939,7 +940,7 @@ class TileBufferManager {
   public regl_elements : Map<string, any>;
   public image;
 
-  constructor(regl, tile, renderer) {
+  constructor(regl : Regl, tile : Tile, renderer : ReglRenderer) {
     this.tile = tile;
     this.regl = regl;
     this.renderer = renderer;
@@ -947,14 +948,14 @@ class TileBufferManager {
     this.regl_elements = tile._regl_elements;
   }
 
-  ready(prefs, block_for_buffers = true) {
+  ready(_, block_for_buffers = true) {
+    // Is the buffer ready with all the aesthetics for the current plot?
+
+    //Block for buffers: 
     const { renderer, regl_elements } = this;
     // Don't allocate buffers for dimensions until they're needed.
     const needed_dimensions : Set<string> = new Set()
     for (let [k, v] of renderer.aes) {
-//      if (aesthetic_variables.indexOf(k) === -1) {
-//        continue
-//      }
       for (const aesthetic of [v.current, v.last]) {
         if (aesthetic.field) {
           needed_dimensions.add(aesthetic.field);            
@@ -964,7 +965,7 @@ class TileBufferManager {
     for (const key of ['ix', ...needed_dimensions]) {
       const current = this.regl_elements.get(key);
       if (current === null) {
-      // It's in the process of being built.
+        // It's in the process of being built.
         return false;
       } if (current === undefined) {
         if (!this.tile.ready) {
@@ -986,8 +987,8 @@ class TileBufferManager {
     }
     return true;
   }
-
   get count() {
+    // Returns the number of points in this table.
     const { tile, regl_elements } = this;
     if (regl_elements.has('_count')) {
       return regl_elements.get('_count');
@@ -1022,7 +1023,7 @@ class TileBufferManager {
       const col_names = tile.table.schema.fields.map((d) => d.name);
       throw `Requested ${key} but table has columns ${col_names.join(', ')}`;
     }
-  if (column.type.typeId !== 3) {
+    if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.table.length);
       for (let i = 0; i < tile.table.length; i++) {
         buffer[i] = column.data[0].values[i];
@@ -1036,7 +1037,7 @@ class TileBufferManager {
     return column.data[0].values;
   }
 
-  create_regl_buffer(key) {
+  create_regl_buffer(key : string) {
     const { regl_elements } = this;
 
     const data = this.create_buffer_data(key);
@@ -1059,6 +1060,7 @@ class TileBufferManager {
   }
 }
 
+/*
 function interpolate_regl_property(props, name : string, weight : 'linear' | 'log' | 'sqrt' = 'linear') {
   const { relative_time, prefs } = props
   if (relative_time >= 1) {
@@ -1078,27 +1080,36 @@ function interpolate_regl_property(props, name : string, weight : 'linear' | 'lo
     )
   }
 }
+*/
 
 class MultipurposeBufferSet {
+  // An abstraction creating an expandable set of buffers that can be subdivided 
+  // to put more than one variable on the same
+  // block of memory. Reusing buffers this way can have performance benefits over allocating
+  // multiple different buffers for each small block used.
 
+  // The general purpose here is to call 'allocate_block' that releases a block of memory
+  // to use in creating a new array to be passed to regl.
   public regl : Regl;
   public buffers : Buffer[];
   public buffer_size : number;
   public buffer_offsets : number[];
   public pointer : number;
 
-  constructor(regl, buffer_size) {
+  constructor(regl : Regl, buffer_size : number) {
     this.regl = regl;
     this.buffer_size = buffer_size;
     this.buffers = [];
     // Track the ends in case we want to allocate smaller items.
     this.buffer_offsets = [];
+    this.pointer = 0;
     this.generate_new_buffer();
+
   }
 
 
   generate_new_buffer() {
-  // Adds to beginning of list.
+    // Adds to beginning of list.
     if (this.pointer) { this.buffer_offsets.unshift(this.pointer); }
     this.pointer = 0;
     this.buffers.unshift(
@@ -1110,9 +1121,9 @@ class MultipurposeBufferSet {
     );
   }
 
-  allocate_block(items, bytes_per_item) {
-  // Allocate a block of this buffer.
-  // NB size is in **bytes**
+  allocate_block(items, bytes_per_item : number) {
+    // Allocate a block of this buffer.
+    // NB size is in **bytes**
     if (this.pointer + items * bytes_per_item > this.buffer_size) {
     // May lead to ragged ends. Could be smarter about reallocation here,
     // too.
