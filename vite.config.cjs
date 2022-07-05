@@ -13,7 +13,7 @@ export default {
     lib: {
       entry: __dirname + '/src/deepscatter.ts',
       name: 'Deepscatter',
-      formats: ['es', 'iife', 'cjs', 'umd'],
+      formats: ['es'],
     },
   },
 

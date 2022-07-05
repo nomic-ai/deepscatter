@@ -1,3 +1,13 @@
+# 2.3.0 
+
+BREAKING API CHANGE: 'duration' argument is now in milliseconds, not seconds, for greater consistency with d3 tooling. 
+
+Create new class of "plot settings" for aesthetics scaled at the plot level rather than the point level. This allows smooth updates to overall point size, target alpha, etc.
+
+"Shufbow" scheme uses deterministic order. [commit](https://github.com/CreatingData/deepscatter/commit/a54fad1fcc2650b6fe5d08823be26e286e0e2edd)
+
+
+
 # 2.2.5
 
 Support int32 dates as floats (without null mask for now.)

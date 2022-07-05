@@ -257,6 +257,10 @@ export class Tile extends Batch {
     }
     throw new Error("Attempted to access table on tile without table buffer.");
   }
+  /*
+  column(key : string) : ColumnProxy {
+    return new ColumnProxy(this, key);
+  } */
 
   get min_ix() {
     if (this._min_ix !== undefined) {
@@ -896,7 +900,6 @@ function check_overlap(tile : Tile, bbox : Rectangle) : number {
 }
 
 export type Tileset = RootTile;
-
 
 export class ArrowTile extends Tile {
   
