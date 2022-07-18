@@ -121,8 +121,6 @@ export class Renderer {
   public _use_scale_to_download_tiles : boolean = true;
   public zoom : Zoom;
   public aes : AestheticSet;
-  public _current_click_function_string : string;
-  public _click_function : () => void;
   public _zoom : Zoom;
   public _initializations : Promise<any>[];
   public render_props : RenderProps;
@@ -223,53 +221,9 @@ export class Renderer {
     return this;
   }
 
-  _click_function_from_string() {
-    return Function("datum", this.scatterplot.prefs.click_function)
-  }
-
-  _click_function_matches_prefs() {
-    if (this._click_function_type == "string" && this._click_function == this._click_function_from_string()) {
-      return true
-    } else if (this._click_function_type == "function" && this._click_function == this.scatterplot.prefs.click_function) {
-      return true
-    }
-
-    return false
-  }
-
-  set click_function(f) {
-    if (typeof(this.scatterplot.prefs.click_function) == "function") {
-      this._click_function_type = "function"
-      this._click_function = this.scatterplot.prefs.click_function
-    } else if (typeof(this.scatterplot.prefs.click_function) == "string") {
-      this._click_function_type = "string"
-      this._click_function = this._click_function_from_string()
-    } else {
-      // Make sure _click_function is always defined, but use a no-op if we
-      // don't recognize the input type.
-      console.warn('Unrecognized click_function type; should be string or function.')
-      this._click_function_type = null
-      this._click_function = (function() {})
-    }
-  }
-
-/*  get click_function() {
-    // If the click function is unset or doesn't match the current preferences,
-    // set it before returning it..
-    if ( !(this._click_function) || !(this._click_function_matches_prefs()) ) {
-      this._click_function = this.scatterplot.prefs.click_function
-    } 
-
-    return this._click_function
-  }*/
-
   async initialize() {
     // Asynchronously wait for the basic elements to be done.
     await this._initializations;
     this.zoom.restart_timer(500000);
   }
-}
-
-export class CanvasRenderer extends Renderer {
-
 }

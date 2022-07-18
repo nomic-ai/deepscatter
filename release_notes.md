@@ -1,3 +1,16 @@
+
+# 2.3.2
+
+FEATURES: Clarify and cleanup the API around `tooltip_html` and `click_function`. Now both can be *either* by assigning a function to the base scatterplot object, or by passing a string that defines a function with an implied argument of `datum` to the JSON-based API.
+
+BUGFIX: Fix problem breaking secondary filters.
+
+CODE: Slightly simplify aesthetic code by removing 'label' attribute.
+
+# 2.3.1 
+
+Publication fix
+
 # 2.3.0 
 
 BREAKING API CHANGE: 'duration' argument is now in milliseconds, not seconds, for greater consistency with d3 tooling. 

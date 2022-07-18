@@ -803,10 +803,10 @@ export class ReglRenderer extends Renderer {
           return this.aes.dim("filter").last.ops_to_array();
         },
         u_filter2_numeric() {
-          return this.aes.dim("filter").current.ops_to_array();
+          return this.aes.dim("filter2").current.ops_to_array();
         },
         u_last_filter2_numeric() {
-          return this.aes.dim("filter").last.ops_to_array();
+          return this.aes.dim("filter2").last.ops_to_array();
         },
         u_jitter: () => this.aes.dim("jitter_radius").current.jitter_int_format,
         u_last_jitter: () => this.aes.dim("jitter_radius").last.jitter_int_format,

@@ -37,6 +37,8 @@ export default class Scatterplot {
   private _zoom : Zoom;
   public prefs : APICall;
   ready : Promise<void>;
+  public click_handler : ClickFunction;
+  public tooltip_handler : TooltipHTML;
 
   constructor(selector : string, width : number, height: number) {
     this.bound = false;
@@ -47,13 +49,15 @@ export default class Scatterplot {
     this.height = height;
     // Unresolvable.
     this.ready = Promise.resolve()
+    this.click_handler = new ClickFunction(this)
+    this.tooltip_handler = new TooltipHTML(this)
+
     this.d3 = { select };
   }
 
   bind(selector : string, width : number, height : number) {
     // Attach a plot to a particular DOM element.
-    // Binding is a permanent relationship. Shouldn't be, but is.
-
+    // Binding is a permanent relationship. Maybe shouldn't be, but is.
 
     this.div = select(selector)
       .selectAll('div.deepscatter_container')
@@ -79,7 +83,6 @@ export default class Scatterplot {
       encoding: {},
       point_size: 1, // base size before aes modifications.
       alpha: 0.4, // Overall screen saturation target.
-      click_function: 'alert(`You clicked on a point with data ${JSON.stringify(datum)}`)',
     };
 
     for (const d of base_elements) {
@@ -111,7 +114,7 @@ export default class Scatterplot {
       this._root,
       this,
     );
-    this._zoom = new Zoom('#deepscatter-svg', this.prefs);
+    this._zoom = new Zoom('#deepscatter-svg', this.prefs, this);
     this._zoom.attach_tiles(this._root);
     this._zoom.attach_renderer('regl', this._renderer);
     this._zoom.initialize_zoom();
@@ -203,6 +206,7 @@ export default class Scatterplot {
     }
 
     merge(this.prefs, prefs);
+
   }
 
   /*  load_lookup_table(item) {
@@ -223,47 +227,32 @@ export default class Scatterplot {
     return undefined;
   } */
 
+
   set tooltip_html(func) {
-    /* PUBLIC */
-    /*
-
-    Set a function to run during mouseover that defines the content of
-    a tooltip.
-
-    // Arguments: func: A function that takes a single argument:
-    the datum for the particular point. This is a row from the arrow
-    table; it can generally be
-    safely treated as an object with indexes for the data keys.
-
-    So if you run
-    ```js
-    plot.tooltip_html = (d => 1 + d.x)
-    ```
-    the content of the tooltip will be a number one greater than the x-value of the point.
-
-    The default function is label_from_point, which
-    returns a <dl> element with <dt><dd> pairs
-    for all but a few data keys. CSS styling can make
-    these look better.
-    */
-
-    // aargh. We have to wait for the zoom object to exist to have a
-    // sensible place to stash this function, but there's not an easy
-    // way to wait for that.
-    if (!this._zoom) {
-      setTimeout(() => this.tooltip_html = func, 100);
-    } else {
-      this._zoom._tooltip_html_function = func;
-    }
+    this.tooltip_handler.f = func;
   }
 
   get tooltip_html() {
     /* PUBLIC see set tooltip_html */
-    return this._zoom.tooltip_html;
+    return this.tooltip_handler.f;
+  }
+  set click_function(func) {
+    this.click_handler.f = func
+  }
+  get click_function() {
+    /* PUBLIC see set click_function */
+    return this.click_handler.f;
   }
 
   async plotAPI(prefs : APICall) {
 
+    if (prefs.click_function) {
+      this.click_function = Function("datum", prefs.click_function);
+    }
+    if (prefs.tooltip_html) {
+      this.tooltip_html = Function("datum", prefs.tooltip_html);
+    }
+    
     this.update_prefs(prefs);
 
     // Some things have to be done *before* we can actually run this;
@@ -407,4 +396,67 @@ export default class Scatterplot {
     fix_point(data);
     this.drawContours(data);
   }
+}
+
+import type StructRowProxy from 'apache-arrow-types';
+
+abstract class SettableFunction<FuncType> {
+  // A function that can be set by a string or directly with a function,
+  // Used for handling interaction
+  public _f : undefined | ((arg0 : StructRowProxy) => FuncType);
+  public string_rep : string;
+  abstract default : (arg0 : StructRowProxy) => FuncType;
+  public plot : Scatterplot;
+  constructor(plot : Scatterplot) {
+    this.string_rep = "";
+    this.plot = plot;
+  }
+  get f() : (arg0 : StructRowProxy) => FuncType {
+    if (this._f === undefined) {
+      return this.default
+    }
+    return this._f;
+  }
+  set f(f : string | ((arg0 : StructRowProxy) => FuncType)) {
+    if (typeof f === 'string') {
+      if (this.string_rep !== f) {
+        this.string_rep = f;
+        //@ts-ignore
+        this._f = Function("datum", f)
+      }
+    }
+    else {
+      this._f = f;
+    }
+  }
+}
+
+class ClickFunction extends SettableFunction<void> {
+  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
+  default(datum : StructRowProxy) {
+    console.log({...datum})
+  }
+}
+
+class TooltipHTML extends SettableFunction<string> {
+  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
+  default(point : StructRowProxy) {
+    // By default, this returns a 
+    let output = '<dl>';
+    const nope = new Set([
+      'x', 'y', 'ix', null, 'tile_key',
+    ]);
+    for (const [k, v] of [...point]) {
+      if (nope.has(k)) { continue; }
+      // Private value.
+      if (k.match(/_float_version/)) { continue; }
+      // Don't show missing data.
+      if (v === null) { continue; }
+      // Don't show empty data.
+      if (v === '') { continue; }
+      output += ` <dt>${k}</dt>\n`;
+      output += `   <dd>${v}<dd>\n`;
+    }
+    return `${output}</dl>\n`;
+    }
 }

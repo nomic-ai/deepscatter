@@ -9,6 +9,9 @@ import { APICall, Encoding } from './types';
 import type {Renderer} from './rendering'
 import type RootTile from './tile';
 import { ReglRenderer } from './regl_rendering';
+import Scatterplot from './deepscatter';
+import { StructRow } from 'apache-arrow';
+
 
 export default class Zoom {
   public prefs : APICall;
@@ -17,15 +20,13 @@ export default class Zoom {
   public height : number;
   public renderers : Map<string, Renderer>;
   public tileSet? : RootTile;
-  public _tooltip_html : () => string;
   public _timer : d3.Timer;
   public _scales : Record<string, d3.ScaleLinear<number, number>>;
   public zoomer : d3.ZoomBehavior<Element, any>;
   public transform : d3.ZoomTransform;
   public _start : number;
-  public _tooltip_html_string? : string;
-  public _tooltip_html_function? : Function;
-  constructor(selector: string, prefs: APICall) {
+  public scatterplot : Scatterplot;
+  constructor(selector: string, prefs: APICall, plot : Scatterplot) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
     // also registers events.
@@ -35,6 +36,7 @@ export default class Zoom {
     this.width = +this.canvas.attr('width');
     this.height = +this.canvas.attr('height');
     this.renderers = new Map();
+    this.scatterplot = plot;
     // A zoom keeps track of all the renderers
     // that it's in charge of adjusting.
 
@@ -90,31 +92,17 @@ export default class Zoom {
           .style('background', 'ivory')
           .style('opacity', 0.75),
         (update) => update
-          .html((d) => this.tooltip_html(d.data)),
+          .html((d) => this.scatterplot.tooltip_html(d.data)),
         (exit) => exit.call((e) => e.remove())
       );
 
     els
-      .html((d) => this.tooltip_html(d.data))
+      .html((d) => this.scatterplot.tooltip_html(d.data))
       .style('transform', (d) => {
         const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
         return t;
       });
   }
-
-  get tooltip_html() {
-    // a function that
-    if (this._tooltip_html_function === undefined) {
-      return label_from_point
-    } else {
-      return this._tooltip_html_function
-    }
-  }
-
-  set tooltip_html(f) {
-    throw new Error('Don\'t set this directly; set on the parent scatterplot.');
-  }
-
 
   zoom_to_bbox(corners, duration = 4000) {
     // Zooms to two points.
@@ -212,7 +200,7 @@ export default class Zoom {
           (exit) => exit.call((e) => e.remove())
         )
         .on('click', (ev, dd) => {
-          this.renderers.get('regl').click_function(dd, ev);
+          this.scatterplot.click_function(dd);
         });
     });
   }
@@ -420,7 +408,7 @@ export function window_transform(x_scale : ScaleLinear, y_scale) {
   return m1;
 }
 
-function label_from_point(point, defaults : null | Set<string> = null) {
+function label_from_point(point : StructRow) {
   // defaults: a Set of keys to include.
   let output = '<dl>';
   const nope = new Set([
@@ -440,8 +428,8 @@ function label_from_point(point, defaults : null | Set<string> = null) {
       // Don't show empty data.
       if (v === '') { continue; }
     }
-    output += `<dt>${k}</dt>`;
-    output += `<dd>${v}<dd>`;
+    output += ` <dt>${k}</dt>\n`;
+    output += `   <dd>${v}<dd>\n`;
   }
-  return `${output}</dl>`;
+  return `${output}</dl>\n`;
 }

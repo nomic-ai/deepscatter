@@ -119,7 +119,6 @@ abstract class Aesthetic {
 //  public scaleFunc : (x : number | string) => number;
   public aesthetic_map : TextureSet
   public id : string;
-  public abstract label : string;
 
   constructor(
      scatterplot : Scatterplot, 
@@ -359,11 +358,7 @@ abstract class Aesthetic {
     }
 
     this._transform = encoding.transform || undefined;
-    if (this.label === 'color' || (encoding.range && typeof(encoding.range[0]) === 'string')) {
-      this.encode_for_textures(encoding.range);
-      this.post_to_regl_buffer();
-    }
-  }
+``  }
 
   encode_for_textures(range) {
     const { texture_size } = this.aesthetic_map;
@@ -379,7 +374,7 @@ abstract class Aesthetic {
   arrow_column() {
     const c = this.tileSet.table.getChild(this.field);
     if (c === null) {
-      throw `No column ${this.field} on arrow table for aesthetic ${this.label}`;
+      throw `No column ${this.field} on arrow table for aesthetic`;
     }
     return c;
   }
@@ -404,9 +399,6 @@ abstract class Aesthetic {
         return 1;
       }
     }
-    if (this.label === 'color') {
-      return 1
-    }
     return 0;
   }
 
@@ -426,7 +418,12 @@ abstract class Aesthetic {
     let input : any[] = arange(texture_size);
 
     if (field === undefined || this.tileSet.table === undefined) {
-      console.warn("SETTING EMPTY FIELD")
+      if (field === undefined) {
+        console.warn("SETTING EMPTY FIELD")
+      }
+      if (this.tileSet.table === undefined) {
+        console.warn("SETTING EMPTY TABLE")
+      }
       this.texture_buffer.set(arange(texture_size).map((i) => 1));
       //      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return;
@@ -465,7 +462,6 @@ class Size extends OneDAesthetic {
   get default_domain() {return [0, 10]}
   static default_range = [0, 1];
   default_constant = 1;
-  label = 'size';
   default_transform : Transform = 'sqrt';
 }
 
@@ -480,7 +476,7 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 
 
   get range() : [number, number] {
-    if (this.tileSet.extent && this.tileSet.extent[this.label]) return this.tileSet.extent[this.label] 
+    if (this.tileSet.extent && this.tileSet.extent[this.field]) return this.tileSet.extent[this.field] 
     return [-20, 20];
   }
 
@@ -489,21 +485,17 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 }
 
 class X extends PositionalAesthetic {
-  label = 'x'
   field = 'x'
 }
 
 class X0 extends X {
-  label = 'x0'
 }
 
 class Y extends PositionalAesthetic {
-  label = 'y'
   field = 'y'
 }
 
 class Y0 extends Y {
-  label = 'y0'
 }
 
 abstract class AbstractFilter extends BooleanAesthetic {
@@ -555,15 +547,10 @@ abstract class AbstractFilter extends BooleanAesthetic {
 
 
 class Filter extends AbstractFilter {
-  label = 'filter'
 }
 
-class Filter2 extends AbstractFilter {
-  label = 'filter2'
-}
 
 class Jitter_speed extends Aesthetic {
-  label = 'jitter_speed'
   default_transform : Transform = 'linear';
   get default_domain() {return [0, 1]}
   static default_range : [number, number] = [0, 1];
@@ -597,7 +584,6 @@ class Jitter_radius extends Aesthetic {
   get default_domain() {return [0, 1]}
   get default_range() : [number, number] { return [0, 1] }
   public _method : string = "None";
-  label = "jitter_radius"
 
   get method() {
     return (this.current_encoding && this.current_encoding.method) ?
@@ -614,17 +600,22 @@ class Jitter_radius extends Aesthetic {
  
 }
 
+const default_color : [number, number, number] = [0.7, 0, 0.5];
+
 class Color extends Aesthetic {
-  public label = 'color';
   public texture_type : "uint8" = "uint8";
   public default_constant : [number, number, number] = [0.7, 0, 0.5];
   default_transform : Transform = 'linear';
   get default_range() : [number, number] {return  [0, 1]}
-  current_encoding = {
-    constant : [0.7, 0, 0.5]
+  current_encoding : ColorChannel = {
+    constant : default_color
   }
   default_data() : Uint8Array {
     return color_palettes.viridis;
+  }
+  get use_map_on_regl() {
+    // Always use a map for colors.
+    return 1;
   }
 
   get texture_buffer() {
@@ -651,7 +642,7 @@ class Color extends Aesthetic {
     )
   }
   
-  update(encoding : string) {
+  update(encoding : ColorChannel) {
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
       if (typeof(encoding.constant) === 'string') {
@@ -659,6 +650,10 @@ class Color extends Aesthetic {
       }
     }
     super.update(encoding);
+    if ((encoding.range && typeof(encoding.range[0]) === 'string')) {
+      this.encode_for_textures(encoding.range);
+      this.post_to_regl_buffer();
+    }
   }
 
   encode_for_textures(range) {
@@ -687,7 +682,7 @@ export const dimensions = {
   jitter_radius : Jitter_radius, 
   color : Color, 
   filter : Filter, 
-  filter2 : Filter2, 
+  filter2 : Filter, 
   x : X, 
   y : Y
 };
@@ -698,8 +693,7 @@ type concrete_aesthetics = X |
     Jitter_speed |
     Jitter_radius | 
     Color | 
-    Filter | 
-    Filter2;
+    Filter;
 
 export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   // An aesthetic that tracks two states--current and last.
@@ -713,7 +707,6 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   public scatterplot : Scatterplot;
   public current_encoding : Channel;
   public needs_transitions = false;
-  public abstract label : string;
   public aesthetic_map : TextureSet;
   constructor(
     scatterplot: Scatterplot, regl : Regl, tile : RootTile, aesthetic_map : TextureSet) {
@@ -770,16 +763,16 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   }
 }
 
-class StatefulX extends StatefulAesthetic<X> { get Factory() { return X }; get label() { return 'x' }}
-class StatefulX0 extends StatefulAesthetic<X0> { get Factory() { return X0 }; get label() { return 'x0' }}
-class StatefulY extends StatefulAesthetic<Y> { get Factory() { return Y }; get label() { return 'y' }}
-class StatefulY0 extends StatefulAesthetic<Y0> { get Factory() { return Y0 }; get label() { return 'y0' }}
-class StatefulSize extends StatefulAesthetic<Size> { get Factory() { return Size }; get label() { return 'size' }}
-class StatefulJitter_speed extends StatefulAesthetic<Jitter_speed> { get Factory() { return Jitter_speed }; get label() { return 'jitter_speed' }}
-class StatefulJitter_radius extends StatefulAesthetic<Jitter_radius> { get Factory() { return Jitter_radius }; get label() { return 'jitter_radius' }}
-class StatefulColor extends StatefulAesthetic<Color> { get Factory() { return Color }; get label() { return 'color' }}
-class StatefulFilter extends StatefulAesthetic<Filter> { get Factory() { return Filter }; get label() { return 'filter' }}
-class StatefulFilter2 extends StatefulAesthetic<Filter2> { get Factory() { return Filter2 }; get label() { return 'filter2' }}
+class StatefulX extends StatefulAesthetic<X> { get Factory() { return X }}; 
+class StatefulX0 extends StatefulAesthetic<X0> { get Factory() { return X0 }};
+class StatefulY extends StatefulAesthetic<Y> { get Factory() { return Y }};
+class StatefulY0 extends StatefulAesthetic<Y0> { get Factory() { return Y0 }}; 
+class StatefulSize extends StatefulAesthetic<Size> { get Factory() { return Size }}; 
+class StatefulJitter_speed extends StatefulAesthetic<Jitter_speed> { get Factory() { return Jitter_speed }}; 
+class StatefulJitter_radius extends StatefulAesthetic<Jitter_radius> { get Factory() { return Jitter_radius }};
+class StatefulColor extends StatefulAesthetic<Color> { get Factory() { return Color }};
+class StatefulFilter extends StatefulAesthetic<Filter> { get Factory() { return Filter }}; 
+class StatefulFilter2 extends StatefulAesthetic<Filter> { get Factory() { return Filter }};
 
 export const stateful_aesthetics : Record<string, StatefulAesthetic<typeof Aesthetic>> = {
   x : StatefulX,
