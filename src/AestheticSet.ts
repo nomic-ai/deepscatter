@@ -4,19 +4,19 @@ import {
   stateful_aesthetics,
 } from './Aesthetic';
 import type Scatterplot from './deepscatter';
-import type RootTile from './tile';
+import type QuadtreeRoot from './tile';
 import type { Encoding } from './types';
 import type {StatefulAesthetic} from './Aesthetic';
 
 export class AestheticSet {
-  public tileSet : RootTile;
+  public tileSet : QuadtreeRoot;
   public scatterplot : Scatterplot;
   public regl : Regl;
   public encoding : Encoding;
   public position_interpolation : boolean;
   private store : Record<string, StatefulAesthetic<any>>;
   public aesthetic_map : TextureSet;
-  constructor(scatterplot : Scatterplot, regl : Regl, tileSet : RootTile) {
+  constructor(scatterplot : Scatterplot, regl : Regl, tileSet : QuadtreeRoot) {
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl;

@@ -7,7 +7,7 @@ import { ScaleLinear, scaleLinear } from 'd3-scale';
 import { APICall, Encoding } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type {Renderer} from './rendering'
-import type RootTile from './tile';
+import type QuadtreeRoot from './tile';
 import { ReglRenderer } from './regl_rendering';
 import Scatterplot from './deepscatter';
 import { StructRow } from 'apache-arrow';
@@ -19,7 +19,7 @@ export default class Zoom {
   public width : number;
   public height : number;
   public renderers : Map<string, Renderer>;
-  public tileSet? : RootTile;
+  public tileSet? : QuadtreeRoot;
   public _timer : d3.Timer;
   public _scales : Record<string, d3.ScaleLinear<number, number>>;
   public zoomer : d3.ZoomBehavior<Element, any>;
@@ -43,7 +43,7 @@ export default class Zoom {
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles : RootTile) {
+  attach_tiles(tiles : QuadtreeRoot) {
     this.tileSet = tiles;
     this.tileSet._zoom = this;
     return this;
@@ -73,7 +73,7 @@ export default class Zoom {
       .call(zoomer.transform, t);
   }
 
-  html_annotation(points) {
+  html_annotation(points : Array<Record<string, string | number>>) {
     const div = this.canvas.node().parentNode.parentNode;
 
     const els = select(div)
@@ -295,7 +295,7 @@ export default class Zoom {
       pixels_per_unit : number;
     }
     const scale_dat : Record<string, Scale_datum> = {}
-
+    console.log({extent})
     for (const [name, dim] of [['x', width], ['y', height]]) {
       const limits = extent[name];
       const size_range = limits[1] - limits[0];
@@ -406,30 +406,4 @@ export function window_transform(x_scale : ScaleLinear, y_scale) {
   ] */
 
   return m1;
-}
-
-function label_from_point(point : StructRow) {
-  // defaults: a Set of keys to include.
-  let output = '<dl>';
-  const nope = new Set([
-    'x', 'y', 'ix', null, 'tile_key',
-  ]);
-  for (const [k, v] of [...point]) {
-    if (defaults !== null) {
-      if (!defaults.has(k)) {
-        continue;
-      }
-    } else {
-      if (nope.has(k)) { continue; }
-      // Private value.
-      if (k.match(/_dict_index/)) { continue; }
-      // Don't show missing data.
-      if (v === null) { continue; }
-      // Don't show empty data.
-      if (v === '') { continue; }
-    }
-    output += ` <dt>${k}</dt>\n`;
-    output += `   <dd>${v}<dd>\n`;
-  }
-  return `${output}</dl>\n`;
 }

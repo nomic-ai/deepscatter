@@ -88,6 +88,10 @@ export type Encoding = {
 }
 
 export type APICall = {
+
+  /** The URL of the data. */
+  source_url: string;
+  
   /** The magnification coefficient for a zooming item */
   zoom_balance: number;
 

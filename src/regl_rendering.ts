@@ -74,7 +74,7 @@ export class ReglRenderer extends Renderer {
     this._initializations = [
     // some things that need to be initialized before the renderer is loaded.
       this.tileSet
-        .promise
+        .ready
         .then(() => {
           this.remake_renderer();
           this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
@@ -998,18 +998,6 @@ class TileBufferManager {
       return regl_elements.get('_count');
     }
   }
-  /*
-  create_position_buffer() {
-    const { table } = this.tile;
-    const x = table.getChild('x').data.values;
-    const y = table.getChild('y').data.values;
-    const buffer = new Float32Array(this.count * 2);
-    for (let i = 0; i < this.count; i += 1) {
-      buffer[i * 2] = x[i];
-      buffer[i * 2 + 1] = y[i];
-    }
-    return buffer;
-  } */
 
   create_buffer_data(key : string) {
     const { tile } = this;

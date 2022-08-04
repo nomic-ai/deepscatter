@@ -12,7 +12,6 @@ import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 import type Scatterplot from './deepscatter';
 import type { Regl, Texture2D } from 'regl';
-import type RootTile from './tile';
 import type {
   TextureSet
 } from './AestheticSet'
@@ -25,6 +24,7 @@ import type {
   ConstantColorChannel, ColorChannel, OpArray
 
 } from './types';
+import type { Dataset, QuadtileSet } from './Dataset'
 import { Vector } from 'apache-arrow';
 
 const scales : {[key : string] : Function} = {
@@ -110,7 +110,7 @@ abstract class Aesthetic {
   public _domain : [number, number];
   public _range : [number, number] | Uint8Array;
   public _transform : "log" | "sqrt" | "linear" | "literal" | undefined;
-  public tileSet : RootTile;
+  public dataset : Dataset;
   public partner : Aesthetic | null = null;
   public _textures : Record<string, Texture2D> = {};
   public _constant : any;
@@ -123,7 +123,7 @@ abstract class Aesthetic {
   constructor(
      scatterplot : Scatterplot, 
      regl : Regl,
-     tile : RootTile, 
+     dataset : QuadtileSet, 
      aesthetic_map : TextureSet
     ) {
     this.aesthetic_map = aesthetic_map;
@@ -134,7 +134,7 @@ abstract class Aesthetic {
     this.regl = regl;
     this._domain = this.default_domain;
     this._range = [0, 1];
-    this.tileSet = tile;
+    this.dataset = dataset;
     // A flag that will be turned on and off in AestheticSet.
     this._domains = {};
     this.id = "" + Math.random() 
@@ -207,8 +207,8 @@ abstract class Aesthetic {
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
-    if (this.tileSet.table) {
-      const col = this.tileSet.table.getChild(this.field)
+    if (this.dataset.root_tile.table) {
+      const col = this.dataset.root_tile.table.getChild(this.field)
       if (col === undefined || col === null) {
         throw new Error("Can't find column " + this.field);
       }
@@ -232,7 +232,7 @@ abstract class Aesthetic {
       return this._domains[this.field];
     }
     // Maybe the table is checked out
-    if (!this.tileSet.table) { return [1, 1]; }
+    if (!this.dataset.root_tile.table) { return [1, 1]; }
     const { column } = this;
     if (!column) { return [1, 1]; }
     if (column.type.dictionary) {
@@ -372,7 +372,7 @@ abstract class Aesthetic {
   }
 
   arrow_column() {
-    const c = this.tileSet.table.getChild(this.field);
+    const c = this.dataset.root_tile.table.getChild(this.field);
     if (c === null) {
       throw `No column ${this.field} on arrow table for aesthetic`;
     }
@@ -417,11 +417,11 @@ abstract class Aesthetic {
 
     let input : any[] = arange(texture_size);
 
-    if (field === undefined || this.tileSet.table === undefined) {
+    if (field === undefined || this.dataset.root_tile.table === undefined) {
       if (field === undefined) {
         console.warn("SETTING EMPTY FIELD")
       }
-      if (this.tileSet.table === undefined) {
+      if (this.dataset.root_tile.table === undefined) {
         console.warn("SETTING EMPTY TABLE")
       }
       this.texture_buffer.set(arange(texture_size).map((i) => 1));
@@ -466,7 +466,7 @@ class Size extends OneDAesthetic {
 }
 
 abstract class PositionalAesthetic extends OneDAesthetic {
-  constructor(scatterplot: Scatterplot, regl : Regl, tile: RootTile, map: TextureSet) {
+  constructor(scatterplot: Scatterplot, regl : Regl, tile: QuadtreeRoot, map: TextureSet) {
     super(scatterplot, regl, tile, map);
     this._transform = 'literal';
   }
@@ -476,7 +476,7 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 
 
   get range() : [number, number] {
-    if (this.tileSet.extent && this.tileSet.extent[this.field]) return this.tileSet.extent[this.field] 
+    if (this.dataset.extent && this.dataset.extent[this.field]) return this.dataset.extent[this.field] 
     return [-20, 20];
   }
 
@@ -501,7 +501,7 @@ class Y0 extends Y {
 abstract class AbstractFilter extends BooleanAesthetic {
   public current_encoding : LambdaChannel | OpChannel | ConstantChannel;
 
-  constructor(scatterplot: Scatterplot, regl : Regl, tile: RootTile, map: TextureSet) {
+  constructor(scatterplot: Scatterplot, regl : Regl, tile: QuadtreeRoot, map: TextureSet) {
     super(scatterplot, regl, tile, map);
     this.current_encoding = {constant : 1}
   }
@@ -702,14 +702,14 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   // diminishing returns.
   abstract Factory : new (a, b, c, d) => T;
   public _states : [T, T] | undefined;
-  public tile : RootTile;
+  public dataset : Dataset;
   public regl : Regl;
   public scatterplot : Scatterplot;
   public current_encoding : Channel;
   public needs_transitions = false;
   public aesthetic_map : TextureSet;
   constructor(
-    scatterplot: Scatterplot, regl : Regl, tile : RootTile, aesthetic_map : TextureSet) {
+    scatterplot: Scatterplot, regl : Regl, tile : QuadtreeRoot, aesthetic_map : TextureSet) {
     if (aesthetic_map === undefined) {
       throw new Error(`Aesthetic map is undefined.`);
     }

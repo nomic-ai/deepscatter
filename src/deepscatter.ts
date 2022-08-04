@@ -4,7 +4,7 @@ import { max, range } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
-import Tile from './tile';
+import { Dataset } from './Dataset';
 import { APICall, Channel } from './types';
 
 const base_elements = [
@@ -30,7 +30,7 @@ export default class Scatterplot {
   public _renderer: ReglRenderer;
   public width : number;
   public height : number;
-  public _root : Tile;
+  public _root;
   div : Selection<any, any, any, any>;
   bound : boolean;
   d3 : Object;
@@ -106,9 +106,13 @@ export default class Scatterplot {
   }
 
   async reinitialize() {
+
     const { prefs } = this;
-    this._root = new Tile(this.source_url, prefs);
-    await this._root.download();
+    if ( prefs.source_url !== undefined ) {
+      this._root = Dataset.from_quadfeather(prefs.source_url, prefs, this);
+    }
+
+    await this._root.ready;
     this._renderer = new ReglRenderer(
       '#container-for-webgl-canvas',
       this._root,
