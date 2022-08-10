@@ -5,11 +5,8 @@ import { range, sum } from 'd3-array';
 import unpackFloat from 'glsl-read-float';
 import Zoom, { window_transform } from './interaction';
 import { Renderer } from './rendering';
-//@ts-ignore
 import gaussian_blur from './glsl/gaussian_blur.frag';
-//@ts-ignore
 import vertex_shader from './glsl/general.vert';
-//@ts-ignore
 import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './AestheticSet';
 
