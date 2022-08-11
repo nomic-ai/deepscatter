@@ -16,16 +16,16 @@ import type {
   TextureSet
 } from './AestheticSet'
 import {isOpChannel, isLambdaChannel,
-   isConstantChannel,
-   Encoding} from './types';
+   isConstantChannel} from './types';
 import type {
   OpChannel, LambdaChannel,
   Channel, BasicChannel, ConstantChannel,
-  ConstantColorChannel, ColorChannel, OpArray
-
+  ColorChannel, OpArray
 } from './types';
 import type { Dataset, QuadtileSet } from './Dataset'
 import { Vector } from 'apache-arrow';
+import { StructRowProxy } from 'apache-arrow/row/struct';
+import { QuadTile } from './tile';
 
 const scales : {[key : string] : Function} = {
   sqrt: scaleSqrt,
@@ -54,6 +54,7 @@ const color_palettes : Record<string, Uint8Array> = {
 };
 
 const schemes : Record<string, (p: number) => string> = {};
+
 for (const [k, v] of Object.entries(d3Chromatic)) {
   if (k.startsWith('scheme') && typeof (v[0]) === 'string') {
     const colors = new Array(palette_size);
@@ -99,7 +100,7 @@ okabe();
 
 type Transform = "log" | "sqrt" | "linear" | "literal";
 
-abstract class Aesthetic {
+abstract class Aesthetic<ChannelType extends Channel> {
   public abstract default_range : [number, number];
   public abstract default_constant : number | [number, number, number];
   public abstract default_transform : "log" | "sqrt" | "linear" | "literal";
@@ -110,7 +111,7 @@ abstract class Aesthetic {
   public _domain : [number, number];
   public _range : [number, number] | Uint8Array;
   public _transform : "log" | "sqrt" | "linear" | "literal" | undefined;
-  public dataset : Dataset;
+  public dataset : QuadtileSet;
   public partner : Aesthetic | null = null;
   public _textures : Record<string, Texture2D> = {};
   public _constant : any;
@@ -141,7 +142,7 @@ abstract class Aesthetic {
     this.current_encoding = {constant : 1}
   }
   
-  apply(point) {
+  apply(point : StructRowProxy) {
     // Takes an arrow point and returns the aesthetic value. 
     // Used for generating points in SVG over the scatterplot.
     return this.scale(this.value_for(point));
@@ -153,7 +154,9 @@ abstract class Aesthetic {
   }
 
   set transform(transform) {
+
     this._transform = transform;
+
   }
 
   get scale() {
@@ -190,6 +193,7 @@ abstract class Aesthetic {
         }
       }
     }
+
     if (this.is_dictionary()) {
       scale = scaleOrdinal()
         .domain(this.domain);
@@ -232,7 +236,7 @@ abstract class Aesthetic {
       return this._domains[this.field];
     }
     // Maybe the table is checked out
-    if (!this.dataset.root_tile.table) { return [1, 1]; }
+    if (!this.dataset.ready) { return [1, 1]; }
     const { column } = this;
     if (!column) { return [1, 1]; }
     if (column.type.dictionary) {
@@ -255,7 +259,10 @@ abstract class Aesthetic {
     return this._range || this.default_range;
   }
 
-  value_for(point) {
+  value_for(point: StructRowProxy) {
+    if (this.field === null) {
+      return this.default_constant;
+    }
     return point[this.field];
   }
   
@@ -278,10 +285,12 @@ abstract class Aesthetic {
     return this._texture_buffer;
   }
 
+  /* Delete?
   key() {
     return this.field + this.domain + this.range + this.transform;
   }
-
+  */
+  
   post_to_regl_buffer() {
     this.aesthetic_map.set_one_d(
       this.id, 
@@ -319,6 +328,7 @@ abstract class Aesthetic {
     if (typeof(encoding) === 'string') {
       encoding = this.convert_string_encoding(encoding);
     }
+
     if (typeof (encoding) !== 'object') {
       let x : ConstantChannel = {
         constant: encoding,
@@ -358,7 +368,7 @@ abstract class Aesthetic {
     }
 
     this._transform = encoding.transform || undefined;
-``  }
+  }
 
   encode_for_textures(range) {
     const { texture_size } = this.aesthetic_map;
@@ -372,6 +382,9 @@ abstract class Aesthetic {
   }
 
   arrow_column() {
+    if (this.field === null) {
+      throw new Error("Can't retrieve column for aesthetic without a field");
+    }
     const c = this.dataset.root_tile.table.getChild(this.field);
     if (c === null) {
       throw `No column ${this.field} on arrow table for aesthetic`;
@@ -380,7 +393,7 @@ abstract class Aesthetic {
   }
 
   is_dictionary() {
-    if (this.field == undefined) {
+    if (this.field === null) {
       return false;
     }
     return this.arrow_column().type.dictionary;
@@ -501,7 +514,7 @@ class Y0 extends Y {
 abstract class AbstractFilter extends BooleanAesthetic {
   public current_encoding : LambdaChannel | OpChannel | ConstantChannel;
 
-  constructor(scatterplot: Scatterplot, regl : Regl, tile: QuadtreeRoot, map: TextureSet) {
+  constructor(scatterplot: Scatterplot, regl : Regl, tile: QuadtileSet, map: TextureSet) {
     super(scatterplot, regl, tile, map);
     this.current_encoding = {constant : 1}
   }
@@ -553,7 +566,7 @@ class Filter extends AbstractFilter {
 class Jitter_speed extends Aesthetic {
   default_transform : Transform = 'linear';
   get default_domain() {return [0, 1]}
-  static default_range : [number, number] = [0, 1];
+  default_range : [number, number] = [0, 1];
   public default_constant = 0.5;
 }
 

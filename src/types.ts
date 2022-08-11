@@ -1,8 +1,8 @@
-
+// Operations that can be performed on the GPU.
 type OneArgumentOp = {
   op: "gt" | "lt" | "eq"
-  a : number;
   field : string;
+  a : number;
 }
 
 type TwoArgumentOp = {
@@ -14,6 +14,7 @@ type TwoArgumentOp = {
 
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
 
+// Functions that are defined as strings and executed in JS.
 export type LambdaChannel = {
   lambda : string;
   field : string;
@@ -23,9 +24,13 @@ export type LambdaChannel = {
 
 export type FunctionalChannel = LambdaChannel | OpChannel;
 
+// check if a channel is a functional channel
+
 export type ConstantChannel = {
   constant : number;
 }
+
+
 
 export interface BasicChannel {
   /** A field present in the data. */
@@ -59,7 +64,6 @@ export type ConstantColorChannel = ConstantChannel & {
 }
 
 export type ColorChannel = BasicColorChannel | CategoricalColorChannel | ConstantColorChannel;
-
 export type Channel = BasicChannel | string | ConstantChannel | OpChannel | LambdaChannel;
 
 export type OpArray = [

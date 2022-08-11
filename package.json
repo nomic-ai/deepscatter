@@ -54,7 +54,6 @@
     "glsl-easings": "^1.0.0",
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",
-    "lodash-es": "^4.17.21",
     "lodash.merge": "^4.6.2"
   },
   "deprecated": false,
