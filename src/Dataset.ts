@@ -15,11 +15,12 @@ type Key = string;
 
 export abstract class Dataset<T extends Tile> {
   abstract root_tile : T;
-//  public mutations : 
   public max_ix : number = -1;
   protected plot : Scatterplot;
   protected _tileworkers: TileWorker[] = [];
   abstract ready : Promise<void>;
+  abstract download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length : number) : void;
+
   constructor(plot : Scatterplot) {
     this.plot = plot;
   }
@@ -32,20 +33,17 @@ export abstract class Dataset<T extends Tile> {
 
   get extent() : Rectangle {
     return {
-      x: [-1e16, 1e16],
-      y: [-1e16, 1e16],
+      x: [-Infinity, Infinity],
+      y: [-Infinity, Infinity],
     }
   }
 
-  download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length : number) {
-    throw new Error('Tile download not implemented');
-  }
-
-  map(callback : (tile: T) => any, after = false) {
+  map<U extends any>(callback : (tile: T) => U, after = false) : U[] {
     // perform a function on each tile and return the values in order.
-    const q : any[] = [];
-    this.visit((d : any) => { q.push(callback(d)); }, after = after);
-    return q;
+    // after: whether to perform the function in bottom-up order
+    const results : U[] = [];
+    this.visit((d : T) => { results.push(callback(d)); }, after = after);
+    return results;
   }
 
   visit(callback :  (tile: T) => void, after = false, filter :  (t : T) => boolean = (x) => true) {
@@ -114,8 +112,6 @@ export abstract class Dataset<T extends Tile> {
 
 }
 
-
-
 export class QuadtileSet extends Dataset<QuadTile> {
   protected _tileWorkers : TileWorker[] = [];
   protected _download_queue : Set<Key> = new Set();
@@ -176,7 +172,6 @@ export class QuadtileSet extends Dataset<QuadTile> {
         .then(() => queue.delete(tile.key));
     }
   }
-
 }
 
 
