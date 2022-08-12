@@ -1,3 +1,5 @@
+import { Table } from "apache-arrow";
+
 // Operations that can be performed on the GPU.
 type OneArgumentOp = {
   op: "gt" | "lt" | "eq"
@@ -31,17 +33,36 @@ export type ConstantChannel = {
 }
 
 
-
+/**
+ * A channel represents the information necessary to map a single dimension
+ * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
+ * to construct a scale and to pass any other necessary information to assist
+ * in converting tabular data to visual representation.
+ */
 export interface BasicChannel {
-  /** A field present in the data. */
-  field: string;
-  /** A function that transforms the field. */
+  /** The name of a column in the data table to be encoded. */
+  field: string; // .
+  /** 
+   * A transformation to apply on the field. 
+   * 'literal' maps in the implied dataspace set by 'x', 'y', while
+   * 'linear' transforms the data by the range and domain.
+  */
   transform? : "log" | "linear" | "sqrt" | "literal";
-  range? : [number, number];
+  // The domain over which the data extends 
   domain? : [number, number];
+  // The range into which to map the data.
+  range? : [number, number];
 }
 
 export type JitterChannel = {
+  /**
+   * Jitter channels have a method.
+   * 'spiral' animates along a log spiral.
+   * 'uniform' jitters around a central point.
+   * 'normal' jitters around a central point biased towards the middle.
+   * 'circle' animates a circle around the point.
+   * 'time' lapses the point in and out of view.
+   */
   method : null | "spiral" | "uniform" | "normal" | "circle" | "time"
 }
 
@@ -72,7 +93,9 @@ export type OpArray = [
   number
 ] // A description of a functional operation to be passsed to the shader.
 
-
+/**
+ * And encoding.
+ */
 export type Encoding = {
   x?: null | Channel;
   y?: null | Channel;
@@ -81,7 +104,7 @@ export type Encoding = {
   shape?: null | Channel;
   alpha?: null | Channel;
   filter?: null | FunctionalChannel;
-  filter1?: null | FunctionalChannel;
+//  filter1?: null | FunctionalChannel;
   filter2?: null | FunctionalChannel;
   jitter_radius?: Channel;
   jitter_speed?: Channel;
@@ -91,11 +114,20 @@ export type Encoding = {
   position0? : string;
 }
 
-export type APICall = {
+export type Dimension = keyof Encoding;
 
-  /** The URL of the data. */
-  source_url: string;
-  
+// Data can be passed in three ways:
+// 1. A Table object.
+// 2. A URL to a Quadtile source.
+// 3. An array buffer that contains a serialized Table.
+
+type DataSpec = {} & (
+      | { source_url?: never; arrow_table?: never; arrow_buffer: ArrayBuffer; }
+      | { source_url: string; arrow_table?: never; arrow_buffer?: never; }
+      | { source_url?: never; arrow_table: Table; arrow_buffer?: never; }
+  )
+
+export type APICall = { 
   /** The magnification coefficient for a zooming item */
   zoom_balance: number;
 
@@ -112,7 +144,7 @@ export type APICall = {
   click_function : string;
 
   encoding: Encoding
-}
+} & DataSpec;
 
 export function isOpChannel(input: Channel): input is OpChannel {
   return (input as OpChannel).op !== undefined;

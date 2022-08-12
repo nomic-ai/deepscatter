@@ -110,14 +110,19 @@ export default class Scatterplot {
     const { prefs } = this;
     if ( prefs.source_url !== undefined ) {
       this._root = Dataset.from_quadfeather(prefs.source_url, prefs, this);
+    } else if (prefs.arrow_table !== undefined) {
+      this._root = Dataset.from_arrow_table(prefs.arrow_table, prefs, this);
+    } else {
+      throw new Error('No source_url or arrow_table specified');
     }
-
     await this._root.ready;
+
     this._renderer = new ReglRenderer(
       '#container-for-webgl-canvas',
       this._root,
       this,
     );
+
     this._zoom = new Zoom('#deepscatter-svg', this.prefs, this);
     this._zoom.attach_tiles(this._root);
     this._zoom.attach_renderer('regl', this._renderer);
@@ -264,10 +269,10 @@ export default class Scatterplot {
 
     const tasks = [];
 
-    if (prefs.source_url && prefs.source_url !== this.source_url) {
-      this.source_url = prefs.source_url;
+    if (this._root === undefined) {
       await this.reinitialize();
     }
+
 
     // Doesn't block.
     /*

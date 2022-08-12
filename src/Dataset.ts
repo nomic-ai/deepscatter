@@ -1,6 +1,6 @@
 // A Dataset manages the production and manipulation of *tiles*.
 
-import { Tile, Rectangle, QuadTile } from './tile';
+import { Tile, Rectangle, QuadTile, ArrowTile } from './tile';
 import {
   extent, range, min, max, bisectLeft,
 } from 'd3-array';
@@ -11,6 +11,7 @@ import * as Comlink from 'comlink';
 import TileWorker from './tileworker.worker.js?worker&inline';
 import { APICall } from './types';
 import Scatterplot from './deepscatter';
+import { Table } from 'apache-arrow';
 type Key = string;
 
 export abstract class Dataset<T extends Tile> {
@@ -19,26 +20,20 @@ export abstract class Dataset<T extends Tile> {
   protected plot : Scatterplot;
   protected _tileworkers: TileWorker[] = [];
   abstract ready : Promise<void>;
+  abstract get extent() : Rectangle;
   abstract download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length : number) : void;
 
   constructor(plot : Scatterplot) {
     this.plot = plot;
   }
   static from_quadfeather(url : string, prefs: APICall, plot: Scatterplot) : QuadtileSet {
-    if (url.match(/(\/[0-9]+){3}/)) {
-      throw new Error('Quadfeathers must be loaded from a base URL.');
-    }
     return new QuadtileSet(url, prefs, plot);
   }
-
-  get extent() : Rectangle {
-    return {
-      x: [-Infinity, Infinity],
-      y: [-Infinity, Infinity],
-    }
+  static from_arrow_table(table: Table, prefs: APICall, plot: Scatterplot) : ArrowDataset {
+    return new ArrowDataset(table, prefs, plot);
   }
 
-  map<U extends any>(callback : (tile: T) => U, after = false) : U[] {
+  map<U>(callback : (tile: T) => U, after = false) : U[] {
     // perform a function on each tile and return the values in order.
     // after: whether to perform the function in bottom-up order
     const results : U[] = [];
@@ -83,10 +78,14 @@ export abstract class Dataset<T extends Tile> {
       .filter((t) => t.ready && t.table && t.min_ix <= ix && t.max_ix >= ix)
       .map((t) => {
         const mid = bisectLeft([...t.table.getChild('ix').data[0].values], ix);
-        if (t.table.get(mid) && t.table.get(mid).ix === ix) {
-          return t.table.get(mid);
+        const val = t.table.get(mid)
+        if (val === null) {
+          return null
         }
-        return null;
+        if (val.ix === ix) {
+          return val
+        }
+        return null
       })
       .filter((d) => d);
   }
@@ -110,6 +109,27 @@ export abstract class Dataset<T extends Tile> {
     return this._tileworkers[0];
   }
 
+}
+
+export class ArrowDataset extends Dataset<ArrowTile> {
+
+  constructor(table: Table, prefs: APICall, plot: Scatterplot) {
+    super(plot);
+    this.root_tile = new ArrowTile(table, this, 0, plot);
+  }
+
+  get extent() {
+    return this.root_tile.extent;
+  } 
+  
+  get ready() {
+    return Promise.resolve()
+  }
+
+  download_most_needed_tiles(bbox: Rectangle, max_ix: number, queue_length: number): void {
+    // Definitionally there.
+    return undefined;
+  }
 }
 
 export class QuadtileSet extends Dataset<QuadTile> {
@@ -173,7 +193,6 @@ export class QuadtileSet extends Dataset<QuadTile> {
     }
   }
 }
-
 
 function area(rect : Rectangle) {
   return (rect.x[1] - rect.x[0]) * (rect.y[1] - rect.y[0]);

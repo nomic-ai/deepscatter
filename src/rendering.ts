@@ -129,7 +129,9 @@ export class Renderer {
     this.holder = select(selector);
     this.canvas = select(this.holder.node().firstElementChild);
     this.tileSet = tileSet;
-    this.prefs = scatterplot.prefs;
+    this.prefs = {...scatterplot.prefs};
+    this.prefs.arrow_table = undefined;
+    this.prefs.arrow_buffer = undefined;
     this.width = +this.canvas.attr('width');
     this.height = +this.canvas.attr('height');
     this.deferred_functions = [];
@@ -201,9 +203,9 @@ export class Renderer {
       this.aes.dim('y').current.field == 'y' &&
       this.aes.dim('x').last.field == 'x' &&
       this.aes.dim('y').last.field == 'y';
-
+    
     if (natural_display) {
-      all_tiles = tileSet.map((d) => d)      
+      all_tiles = tileSet.map((d : Tile) => d)      
         .filter((tile) => {
           const visible = tile.is_visible(max_ix, this.zoom.current_corners())
           return visible
@@ -216,7 +218,7 @@ export class Renderer {
     return all_tiles;
   }
 
-  bind_zoom(zoom) {
+  bind_zoom(zoom : Zoom) {
     this.zoom = zoom;
     return this;
   }

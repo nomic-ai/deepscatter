@@ -9,13 +9,14 @@ import TileWorker from './tileworker.worker.js?worker&inline';
 import Zoom from './interaction';
 import { APICall } from './types';
 import type { Dataset, QuadtileSet } from './Dataset'
+import Scatterplot from './deepscatter';
 type MinMax = [number, number];
 
 export type Rectangle = {
   x:  MinMax,
   y:  MinMax
 }
-type Point = [number, number]
+
 
 interface schema_entry{
   name: string,
@@ -41,7 +42,6 @@ export abstract class Tile {
   public _download? : Promise<void>;
   __schema?: schema_entry[];
   local_dictionary_lookups? : Map<string, any>;
-  codes? : [number, number, number];
   public _extent? : {'x' : MinMax, 'y': MinMax};
 
   constructor(dataset : QuadtileSet) {
@@ -52,7 +52,7 @@ export abstract class Tile {
     this.parent = null;
     this.dataset = dataset;
     if (dataset === undefined) {
-      throw "YIKES"
+      throw new Error('No dataset provided');
     }
   }
 
@@ -168,7 +168,7 @@ export abstract class Tile {
   }
 
   get highest_known_ix() : number {
-    return this._highest_known_ix;
+    return this._highest_known_ix || -1;
   }
 
   get table() {
@@ -195,6 +195,11 @@ export abstract class Tile {
     return this._schema;
   }
 
+  /**
+   * 
+   * @param callback A function (possibly async) to execute before this cell is ready. 
+   * @returns A promise that includes the callback and all previous promises.
+   */
   extend_promise(callback : () => Promise<any>) {
     this.promise = this.promise.then(() => callback());
     return this.promise;
@@ -208,7 +213,7 @@ export abstract class Tile {
     return this._table_buffer !== undefined && this._table_buffer.byteLength > 0;
   }
 
-  get _schema() {
+  protected get _schema() {
     // Infer datatypes from the first file.
     if (this.__schema) {
       return this.__schema;
@@ -252,13 +257,14 @@ export abstract class Tile {
     return attributes;
   }
 
-  * yielder() {
+  *yielder() {
     for (const row of this.table) {
       if (row) {
         yield row;
       }
     }
   }
+
   get theoretical_extent() : Rectangle { 
     // QUADTREE SPECIFIC CODE.
     const base = this.dataset.extent;
@@ -364,7 +370,7 @@ export class QuadTile extends Tile {
     return this._download;
   }
 
-  get children() : Array<QuadTile> {
+  get children() : Array<this> {
     // create or return children.
     if (this.download_state !== 'Complete') {
       return [];
@@ -382,15 +388,48 @@ export class QuadTile extends Tile {
 }
 
 export class ArrowTile extends Tile {
-  
-  constructor(table_buffer : ArrayBuffer) {
-    super();
+  batch_num: number;
+  full_tab: Table;
+  constructor(table: Table, dataset : Dataset<ArrowTile>, batch_num : number, plot: Scatterplot, parent = null) {
+    super(dataset);
+    this.full_tab = table;
+    this._table = new Table(table.batches[batch_num]);
     this.download_state = 'Complete';
-    this._table_buffer = table_buffer;
-    this._table = tableFromIPC(table_buffer);
+    this.batch_num = batch_num;
+    this._extent = {
+      x: [-4, 4],
+      y: [-4, 4],
+    }
+    this.parent = parent;
+    const row_last = this._table.get(this._table.numRows - 1)
+    if (row_last === null) {
+      throw ('No rows in table');
+    }
+    this.max_ix = row_last.ix;
+    this.highest_known_ix = this.max_ix;
+    const row_1 = this._table.get(0)
+    if (row_1 === null) {
+      throw ('No rows in table');
+    }
+    this._min_ix = row_1.ix;
+    this.highest_known_ix = this.max_ix;
+    this.create_children()
   }
-  
+
+  create_children() {
+    let ix = this.batch_num * 4;
+    while (++ix <= (this.batch_num * 4 + 4)) {
+      if (ix < this.full_tab.batches.length) {
+        this._children.push(new ArrowTile(this.full_tab, this.dataset, ix, this.plot, this));
+      }
+    }
+    console.log(this._children, this.children)
+  }  
   download() : Promise<Table> {
     return Promise.resolve(this._table);
+  }
+  get ready() : boolean {
+    // Arrow tables are always ready.
+    return true;
   }
 }

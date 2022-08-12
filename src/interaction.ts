@@ -282,7 +282,6 @@ export default class Zoom {
       throw new Error('Error--scales created before tileSet present.');
     }
     const { extent } = this.tileSet;
-
     const scales : Record<string, any> = {};
     if (extent === undefined) {
       throw new Error('Error--scales created before extent present.');
@@ -295,7 +294,6 @@ export default class Zoom {
       pixels_per_unit : number;
     }
     const scale_dat : Record<string, Scale_datum> = {}
-    console.log({extent})
     for (const [name, dim] of [['x', width], ['y', height]]) {
       const limits = extent[name];
       const size_range = limits[1] - limits[0];
@@ -337,7 +335,6 @@ export default class Zoom {
   }
 
   webgl_scale(flatten = true) {
-    const { width, height } = this;
     const { x, y } = this.scales();
     const transform = window_transform(x, y).flat();
     return transform;

@@ -3,7 +3,7 @@ import wrapREGL, { Framebuffer2D, Regl, Texture2D, Buffer } from 'regl';
 import { range, sum } from 'd3-array';
 // import { contours } from 'd3-contour';
 import unpackFloat from 'glsl-read-float';
-import Zoom, { window_transform } from './interaction';
+import Zoom from './interaction';
 import { Renderer } from './rendering';
 //@ts-ignore
 import gaussian_blur from './glsl/gaussian_blur.frag';
@@ -13,10 +13,8 @@ import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './AestheticSet';
 
-import type {Tileset, Tile} from './tile'
-import type { ZoomBehavior } from 'd3-zoom';
-import { APICall } from './types';
-import { window } from 'd3-selection';
+import type {Tile} from './tile'
+import { APICall, Encoding, Dimension } from './types';
 import REGL from 'regl';
 
 // eslint-disable-next-line import/prefer-default-export
@@ -179,19 +177,21 @@ export class ReglRenderer extends Renderer {
     // Do the binding operation; returns truthy if it's already done.
       const manager = new TileBufferManager(this.regl, tile, this);
       if (!manager.ready(props.prefs, props.block_for_buffers)) {
+        console.log("Not ready");
       // The 'ready' call also pushes a creation request into
       // the deferred_functions queue.
         continue;
       }
       const this_props = {
         manager,
-        image_locations: manager.image_locations,
+//        image_locations: manager.image_locations,
         sprites: this.sprites,
       };
       Object.assign(this_props, props);
       prop_list.push(this_props);
     }
     prop_list.reverse();
+//    console.log(prop_list)
     this._renderer(prop_list);
   }
 
@@ -206,7 +206,6 @@ export class ReglRenderer extends Renderer {
     if (this._use_scale_to_download_tiles) {
       tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix);
     } else {
-//      console.log("YIIIKES")
       tileSet.download_to_depth(prefs.max_points);
     }
 
@@ -232,10 +231,6 @@ export class ReglRenderer extends Renderer {
       this.reglframe.cancel();
       throw err
     }
-  }
-
-  render_jpeg(props) {
-
   }
 
   single_blur_pass(fbo1, fbo2, direction) {
@@ -603,10 +598,10 @@ export class ReglRenderer extends Renderer {
     return v;
   }
 
-  color_pick(x, y) {
+  color_pick(x: number, y: number) {
     const { props, height } = this;
     props.color_picker_mode = 1;
-    let color_at_point;
+    let color_at_point : [number, number, number, number] = [0, 0, 0, 0];
 
     this.fbos.colorpicker.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
@@ -622,7 +617,6 @@ export class ReglRenderer extends Renderer {
         console.warn('Read bad data from', {
           x, y, height, attempted: height - y,
         });
-        color_at_point = [0, 0, 0, 0];
       }
     });
 
@@ -673,7 +667,7 @@ export class ReglRenderer extends Renderer {
     return this._fill_buffer;
   }
 
-  draw_contour_buffer(field, ix) {
+  draw_contour_buffer(field : string, ix : number) {
     let { width, height } = this;
     width = Math.floor(width);
     height = Math.floor(height);
@@ -866,15 +860,21 @@ export class ReglRenderer extends Renderer {
     return this._renderer;
   }
 
-  allocate_aesthetic_buffers() {
+  private allocate_aesthetic_buffers() {
     // There are only 15 attribute buffers available to use,
     // once we pass in the index. The order here determines
-    // how important it is to capture transitions for them.
+    // how important it is to capture transitions for them; if
+    // we run out of buffers, the previous state of the requested aesthetic will just be thrown 
+    // away.
 
-    const buffers = [];
+    type BufferSummary = {
+      aesthetic : keyof Encoding;
+      time : "current" | "last";
+      field: string;
+    }
+    const buffers : BufferSummary[] = [];
     const priorities = ['x', 'y', 'color', 'x0', 'y0', 'size', 'jitter_radius',
       'jitter_speed', 'filter', 'filter2'];
-
     for (const aesthetic of priorities) {
       for (const time of ['current', 'last']) {
         try {
@@ -895,10 +895,12 @@ export class ReglRenderer extends Renderer {
       if (b.time < a.time) { return 1; }
       return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
     });
-    const aes_to_buffer_num = {}; // eg 'x' => 3
+    type encodingkey = keyof Encoding
+    //todo not all encoding keys.
+    const aes_to_buffer_num : Record<encodingkey, number> = {}; // eg 'x' => 3
 
     // Pre-allocate the 'ix' buffer.
-    const variable_to_buffer_num = { ix: 0 }; // eg 'year' =>  3
+    const variable_to_buffer_num : Record<string, number>= { ix: 0 }; // eg 'year' =>  3
     let num = 0;
     for (const { aesthetic, time, field } of buffers) {
       const k = `${aesthetic}--${time}`;
@@ -912,7 +914,8 @@ export class ReglRenderer extends Renderer {
         continue;
       } else {
         // Don't use the last value, use the current value.
-        // Strategy will break if more than 15 base channels are defined.
+        // Strategy will break if more than 15 base channels are defined, 
+        // which is not currently possible.
         aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
       }
     }
@@ -938,7 +941,7 @@ class TileBufferManager {
   public regl: Regl;
   public renderer : ReglRenderer;
   public regl_elements : Map<string, any>;
-  public image;
+//  public image;
 
   constructor(regl : Regl, tile : Tile, renderer : ReglRenderer) {
     this.tile = tile;
@@ -950,11 +953,10 @@ class TileBufferManager {
 
   ready(_, block_for_buffers = true) {
     // Is the buffer ready with all the aesthetics for the current plot?
-
     //Block for buffers: 
     const { renderer, regl_elements } = this;
     // Don't allocate buffers for dimensions until they're needed.
-    const needed_dimensions : Set<string> = new Set()
+    const needed_dimensions : Set<Dimension> = new Set()
     for (let [k, v] of renderer.aes) {
       for (const aesthetic of [v.current, v.last]) {
         if (aesthetic.field) {
@@ -966,6 +968,7 @@ class TileBufferManager {
       const current = this.regl_elements.get(key);
       if (current === null) {
         // It's in the process of being built.
+        console.log("Building", key);
         return false;
       } if (current === undefined) {
         if (!this.tile.ready) {
@@ -1027,11 +1030,10 @@ class TileBufferManager {
 
   create_regl_buffer(key : string) {
     const { regl_elements } = this;
-
     const data = this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {
       console.log(typeof(data), data)
-      throw 'Buffer data must be a Float32Array';
+      throw new Error('Buffer data must be a Float32Array')
     }
     const item_size = 4;
     const data_length = data.length;
