@@ -29,7 +29,11 @@
         "@typescript-eslint/indent": ["error", 2],
         "@typescript-eslint/quotes": ["error", "single"],
         "@typescript-eslint/semi": ["error", "never"],
-        "@typescript-eslint/object-curly-spacing": ["error", "always"]
+        "@typescript-eslint/object-curly-spacing": ["error", "always"],
+
+        // NOTE: The below rules violate best practices and allow for code
+        // debt and should be removed.
+        "camelcase": "off"
     },
     "overrides": [
         {
