@@ -17,7 +17,8 @@
   "scripts": {
     "dev": "vite --port 3000",
     "build": "vite build",
-    "test": "playwright test"
+    "test": "playwright test",
+    "lint": "eslint src"
   },
   "repository": {
     "type": "git",
@@ -59,14 +60,17 @@
     "lodash.merge": "^4.6.2",
     "regl": "^2.1.0"
   },
-  "deprecated": false,
   "devDependencies": {
     "@playwright/test": "^1.25.0",
     "@types/d3": "^7.4.0",
     "@types/d3-geo": "^3.0.2",
     "@types/d3-selection": "^3.0.3",
     "@types/lodash.merge": "^4.6.7",
-    "eslint": "^8.21.0",
+    "@typescript-eslint/eslint-plugin": "^5.33.0",
+    "@typescript-eslint/parser": "^5.33.0",
+    "eslint": "^8.19.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-unicorn": "^43.0.2",
     "glslify": "^7.1.1",
     "glslify-hex": "^2.1.1",
     "glslify-loader": "^2.0.0",
