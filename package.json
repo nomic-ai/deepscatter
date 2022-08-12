@@ -16,7 +16,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "lint": "eslint src"
   },
   "repository": {
     "type": "git",
@@ -65,6 +66,8 @@
     "@types/d3-geo": "^3.0.2",
     "@types/d3-selection": "^3.0.2",
     "@types/lodash.merge": "^4.6.7",
+    "@typescript-eslint/eslint-plugin": "^5.33.0",
+    "@typescript-eslint/parser": "^5.33.0",
     "eslint": "^8.19.0",
     "glslify": "^7.1.1",
     "glslify-hex": "^2.1.1",
