@@ -23,9 +23,6 @@
         "**/demo/**",
         "**/public/**"
     ],
-    "files": [
-        "src/**"
-    ],
     "rules": {
         // Base ESLint rules that @typescript-eslint extends must be disabled
         // for the extended rules to work. See the below link for info.
