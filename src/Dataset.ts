@@ -21,7 +21,6 @@ export abstract class Dataset<T extends Tile> {
   protected _tileworkers: TileWorker[] = [];
   abstract ready : Promise<void>;
   abstract get extent() : Rectangle;
-  abstract download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length : number) : void;
 
   constructor(plot : Scatterplot) {
     this.plot = plot;
@@ -32,6 +31,7 @@ export abstract class Dataset<T extends Tile> {
   static from_arrow_table(table: Table, prefs: APICall, plot: Scatterplot) : ArrowDataset {
     return new ArrowDataset(table, prefs, plot);
   }
+  abstract download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length : number) : void;
 
   /**
    * Map a function against all tiles.

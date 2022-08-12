@@ -1,11 +1,17 @@
 import { Table } from "apache-arrow";
 
-// Operations that can be performed on the GPU.
+/**
+ * Operations to be performed on the GPU taking a single argument.
+ */
 type OneArgumentOp = {
   op: "gt" | "lt" | "eq"
   field : string;
   a : number;
 }
+
+/**
+ * Operations to be performed on the GPU taking two arguments
+ */
 
 type TwoArgumentOp = {
   op: "within" | "between",
@@ -26,8 +32,6 @@ export type LambdaChannel = {
 
 export type FunctionalChannel = LambdaChannel | OpChannel;
 
-// check if a channel is a functional channel
-
 export type ConstantChannel = {
   constant : number;
 }
@@ -37,7 +41,12 @@ export type ConstantChannel = {
  * A channel represents the information necessary to map a single dimension
  * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
  * to construct a scale and to pass any other necessary information to assist
- * in converting tabular data to visual representation.
+ * in converting tabular data to visual representation. In some cases it is a scale;
+ * in others it is parameters used to define a function on the GPU.
+ * 
+ * The names and design are taken largely from channels as defined in Vega-Lite, 
+ * but the syntax differs for a number of operations.
+ * https://vega.github.io/vega-lite/docs/encoding.html
  */
 export interface BasicChannel {
   /** The name of a column in the data table to be encoded. */
