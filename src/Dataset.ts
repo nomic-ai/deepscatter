@@ -11,7 +11,7 @@ import * as Comlink from 'comlink';
 import TileWorker from './tileworker.worker.js?worker&inline';
 import { APICall } from './types';
 import Scatterplot from './deepscatter';
-import { Table } from 'apache-arrow';
+import { StructRowProxy, Table } from 'apache-arrow';
 type Key = string;
 
 export abstract class Dataset<T extends Tile> {
@@ -33,21 +33,34 @@ export abstract class Dataset<T extends Tile> {
     return new ArrowDataset(table, prefs, plot);
   }
 
+  /**
+   * Map a function against all tiles.
+   * It is often useful simply to invoke Dataset.map(d => d) to 
+   * get a list of all tiles in the dataset at any moment.
+   * 
+   * @param callback A function to apply to each tile.
+   * @param after Whether to perform the function in bottom-up order
+   * @returns A list of the results of the function in an order determined by 'after.'
+   */
   map<U>(callback : (tile: T) => U, after = false) : U[] {
-    // perform a function on each tile and return the values in order.
-    // after: whether to perform the function in bottom-up order
     const results : U[] = [];
     this.visit((d : T) => { results.push(callback(d)); }, after = after);
     return results;
   }
 
-  visit(callback :  (tile: T) => void, after = false, filter :  (t : T) => boolean = (x) => true) {
-    // Visit all children with a callback function.
-    // The general architecture here is taken from the
-    // d3 quadtree functions. That's why, for example, it doesn't
-    // recurse.
+  /**
+   * Invoke a function on all tiles in the dataset that have been downloaded.
+   * The general architecture here is taken from the
+   * d3 quadtree functions. That's why, for example, it doesn't
+   * recurse.
 
-    // filter is a condition to stop descending a node.
+   * @param callback The function to invoke on each tile.
+   * @param after Whether to execute the visit in bottom-up order. Default false.
+   * @param filter 
+   */
+  visit(callback: (tile: T) => void, after = false, filter : (t : T) => boolean = (x) => true) {
+    // Visit all children with a callback function.
+
     const stack : T[] = [this.root_tile];
     const after_stack = [];
     let current;
@@ -71,23 +84,24 @@ export abstract class Dataset<T extends Tile> {
       }
     }
   }
-
-  findPoint(ix : number) {
-    return this
-      .map((t) => t) // iterates over children.
-      .filter((t) => t.ready && t.table && t.min_ix <= ix && t.max_ix >= ix)
-      .map((t) => {
-        const mid = bisectLeft([...t.table.getChild('ix').data[0].values], ix);
-        const val = t.table.get(mid)
-        if (val === null) {
-          return null
-        }
-        if (val.ix === ix) {
-          return val
-        }
-        return null
-      })
-      .filter((d) => d);
+  /**
+   * 
+   * @param ix The index of the point to get.
+   * @returns 
+   */
+  findPoint(ix : number) : StructRowProxy[] {
+    const matches : StructRowProxy[] = [];
+    this.visit((tile : T) => {
+      if (!(tile.ready && tile.table && tile.min_ix <= ix && tile.max_ix >= ix)) {
+        return;
+      }
+      const mid = bisectLeft([...tile.table.getChild('ix').data[0].values], ix);
+      const val = tile.table.get(mid)
+      if (val.ix === ix) {
+        matches.push(val)
+      }
+    })
+    return matches;
   }
 
 
@@ -121,7 +135,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   get extent() {
     return this.root_tile.extent;
   } 
-  
+
   get ready() {
     return Promise.resolve()
   }

@@ -100,7 +100,7 @@ okabe();
 
 type Transform = "log" | "sqrt" | "linear" | "literal";
 
-abstract class Aesthetic<ChannelType extends Channel> {
+abstract class Aesthetic {
   public abstract default_range : [number, number];
   public abstract default_constant : number | [number, number, number];
   public abstract default_transform : "log" | "sqrt" | "linear" | "literal";
@@ -381,7 +381,7 @@ abstract class Aesthetic<ChannelType extends Channel> {
     }
   }
 
-  arrow_column() {
+  arrow_column() : Vector {
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
@@ -392,11 +392,11 @@ abstract class Aesthetic<ChannelType extends Channel> {
     return c;
   }
 
-  is_dictionary() {
-    if (this.field === null) {
+  is_dictionary() : boolean {
+    if (this.field === null || this.field === undefined) {
       return false;
     }
-    return this.arrow_column().type.dictionary;
+    return this.arrow_column().type.dictionary !== undefined;
   }
 
   get constant() : number | [number, number, number] {
@@ -406,7 +406,7 @@ abstract class Aesthetic<ChannelType extends Channel> {
     return this.default_constant;
   }
 
-  get use_map_on_regl() {
+  get use_map_on_regl() : 1 | 0 {
     if (this.is_dictionary()) {
       if (this.domain[0] === -2047 && this.domain[1] == 2047) {
         return 1;
@@ -444,7 +444,7 @@ abstract class Aesthetic<ChannelType extends Channel> {
     const { column } = this;
 
     if (!column) {
-      throw (`Column ${field} does not exist on table.`);
+      throw Error(`Column ${field} does not exist on table.`);
     }
 
     if (column.type.dictionary) {
