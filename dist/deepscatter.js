@@ -17373,7 +17373,7 @@ const color_palettes = {
 const schemes = {};
 for (const [k, v] of Object.entries(d3Chromatic)) {
   if (k.startsWith("scheme") && typeof v[0] === "string") {
-    const colors2 = new Array(palette_size);
+    const colors2 = Array(palette_size);
     const scheme2 = v.map((v2) => {
       const col = rgb(v2);
       return [col.r, col.g, col.b, 255];
@@ -17474,8 +17474,8 @@ class Aesthetic {
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
-    if (this.dataset.root_tile.table) {
-      const col = this.dataset.root_tile.table.getChild(this.field);
+    if (this.dataset.root_tile.record_batch) {
+      const col = this.dataset.root_tile.record_batch.getChild(this.field);
       if (col === void 0 || col === null) {
         throw new Error("Can't find column " + this.field);
       }
@@ -17607,7 +17607,7 @@ class Aesthetic {
   }
   encode_for_textures(range2) {
     const { texture_size } = this.aesthetic_map;
-    const values = new Array(texture_size);
+    const values = Array(texture_size);
     this.scaleFunc = scales[this.transform]().range(range2).domain([0, texture_size - 1]);
     for (let i = 0; i < texture_size; i += 1) {
       values[i] = this.scaleFunc(i);
@@ -17617,7 +17617,7 @@ class Aesthetic {
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
-    const c2 = this.dataset.root_tile.table.getChild(this.field);
+    const c2 = this.dataset.root_tile.record_batch.getChild(this.field);
     if (c2 === null) {
       throw `No column ${this.field} on arrow table for aesthetic`;
     }
@@ -17653,11 +17653,11 @@ class Aesthetic {
     }
     this.scaleFunc = linear().range(range$1).domain([0, texture_size - 1]);
     let input = range(texture_size);
-    if (field === void 0 || this.dataset.root_tile.table === void 0) {
+    if (field === void 0 || this.dataset.root_tile.record_batch === void 0) {
       if (field === void 0) {
         console.warn("SETTING EMPTY FIELD");
       }
-      if (this.dataset.root_tile.table === void 0) {
+      if (this.dataset.root_tile.record_batch === void 0) {
         console.warn("SETTING EMPTY TABLE");
       }
       this.texture_buffer.set(range(texture_size).map((i) => 1));
@@ -18783,7 +18783,7 @@ class TileBufferManager {
   ready(_, block_for_buffers = true) {
     const { renderer, regl_elements } = this;
     const needed_dimensions = /* @__PURE__ */ new Set();
-    for (let [k, v] of renderer.aes) {
+    for (const [k, v] of renderer.aes) {
       for (const aesthetic of [v.current, v.last]) {
         if (aesthetic.field) {
           needed_dimensions.add(aesthetic.field);
@@ -18819,8 +18819,8 @@ class TileBufferManager {
     if (regl_elements.has("_count")) {
       return regl_elements.get("_count");
     }
-    if (tile.ready && tile._table) {
-      regl_elements.set("_count", tile.table.getChild("ix").length);
+    if (tile.ready && tile._batch) {
+      regl_elements.set("_count", tile.record_batch.getChild("ix").length);
       return regl_elements.get("_count");
     }
   }
@@ -18829,14 +18829,14 @@ class TileBufferManager {
     if (!tile.ready) {
       throw "Tile table not present.";
     }
-    const column = tile.table.getChild(`${key}_float_version`) || tile.table.getChild(key);
+    const column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
     if (!column) {
-      const col_names = tile.table.schema.fields.map((d) => d.name);
+      const col_names = tile.record_batch.schema.fields.map((d) => d.name);
       throw `Requested ${key} but table has columns ${col_names.join(", ")}`;
     }
     if (column.type.typeId !== 3) {
-      const buffer = new Float32Array(tile.table.length);
-      for (let i = 0; i < tile.table.length; i++) {
+      const buffer = new Float32Array(tile.record_batch.length);
+      for (let i = 0; i < tile.record_batch.numRows; i++) {
         buffer[i] = column.data[0].values[i];
       }
       return buffer;
@@ -27567,12 +27567,12 @@ class Tile {
   get highest_known_ix() {
     return this._highest_known_ix || -1;
   }
-  get table() {
-    if (this._table) {
-      return this._table;
+  get record_batch() {
+    if (this._batch) {
+      return this._batch;
     }
     if (this._table_buffer && this._table_buffer.byteLength > 0) {
-      return this._table = tableFromIPC(this._table_buffer);
+      return this._batch = tableFromIPC(this._table_buffer).batches[0];
     }
     throw new Error("Attempted to access table on tile without table buffer.");
   }
@@ -27601,7 +27601,7 @@ class Tile {
       return this.__schema;
     }
     const attributes = [];
-    for (const field of this.table.schema.fields) {
+    for (const field of this.record_batch.schema.fields) {
       const { name, type } = field;
       if ((type == null ? void 0 : type.typeId) == 5) {
         attributes.push({
@@ -27614,22 +27614,22 @@ class Tile {
         attributes.push({
           name,
           type: "dictionary",
-          keys: this.table.getChild(name).data[0].dictionary.toArray(),
-          extent: [-2047, this.table.getChild(name).data[0].dictionary.length - 2047]
+          keys: this.record_batch.getChild(name).data[0].dictionary.toArray(),
+          extent: [-2047, this.record_batch.getChild(name).data[0].dictionary.length - 2047]
         });
       }
       if (type && type.typeId == 8) {
         attributes.push({
           name,
           type: "date",
-          extent: extent(this.table.getChild(name).data[0].values)
+          extent: extent(this.record_batch.getChild(name).data[0].values)
         });
       }
       if (type && type.typeId == 3) {
         attributes.push({
           name,
           type: "float",
-          extent: extent(this.table.getChild(name).data[0].values)
+          extent: extent(this.record_batch.getChild(name).data[0].values)
         });
       }
     }
@@ -27637,7 +27637,7 @@ class Tile {
     return attributes;
   }
   *yielder() {
-    for (const row of this.table) {
+    for (const row of this.record_batch) {
       if (row) {
         yield row;
       }
@@ -27700,10 +27700,10 @@ class QuadTile extends Tile {
     this._download = this.tileWorker.fetch(url, {}).then(([buffer, metadata, codes]) => {
       this.download_state = "Complete";
       this._table_buffer = buffer;
-      this._table = tableFromIPC(buffer).batches[0];
+      this._batch = tableFromIPC(buffer).batches[0];
       this._extent = JSON.parse(metadata.get("extent"));
       this.child_locations = JSON.parse(metadata.get("children"));
-      const ixes = this.table.getChild("ix");
+      const ixes = this.record_batch.getChild("ix");
       if (ixes === null) {
         throw "No ix column in table";
       }
@@ -27711,7 +27711,7 @@ class QuadTile extends Tile {
       this.max_ix = Number(ixes.get(ixes.length - 1));
       this.highest_known_ix = this.max_ix;
       this.local_dictionary_lookups = codes;
-      return this.table;
+      return this.record_batch;
     }).catch((e) => {
       this.download_state = "Failed";
       console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
@@ -27737,21 +27737,21 @@ class ArrowTile extends Tile {
   constructor(table, dataset, batch_num, plot, parent = null) {
     super(dataset);
     this.full_tab = table;
-    this._table = table.batches[batch_num];
+    this._batch = table.batches[batch_num];
     this.download_state = "Complete";
     this.batch_num = batch_num;
     this._extent = {
-      x: extent(this._table.getChild("x")),
-      y: extent(this._table.getChild("y"))
+      x: extent(this._batch.getChild("x")),
+      y: extent(this._batch.getChild("y"))
     };
     this.parent = parent;
-    const row_last = this._table.get(this._table.numRows - 1);
+    const row_last = this._batch.get(this._batch.numRows - 1);
     if (row_last === null) {
       throw "No rows in table";
     }
     this.max_ix = row_last.ix;
     this.highest_known_ix = this.max_ix;
-    const row_1 = this._table.get(0);
+    const row_1 = this._batch.get(0);
     if (row_1 === null) {
       throw "No rows in table";
     }
@@ -27768,7 +27768,7 @@ class ArrowTile extends Tile {
     }
   }
   download() {
-    return Promise.resolve(this._table);
+    return Promise.resolve(this._batch);
   }
   get ready() {
     return true;
@@ -28089,11 +28089,11 @@ class Dataset {
   findPoint(ix) {
     const matches = [];
     this.visit((tile) => {
-      if (!(tile.ready && tile.table && tile.min_ix <= ix && tile.max_ix >= ix)) {
+      if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
         return;
       }
-      const mid = bisectLeft([...tile.table.getChild("ix").data[0].values], ix);
-      const val = tile.table.get(mid);
+      const mid = bisectLeft([...tile.record_batch.getChild("ix").data[0].values], ix);
+      const val = tile.record_batch.get(mid);
       if (val.ix === ix) {
         matches.push(val);
       }
@@ -28106,7 +28106,7 @@ class Dataset {
       this._tileworkers.unshift(this._tileworkers.pop());
       return this._tileworkers[0];
     }
-    for (const i of range(NUM_WORKERS)) {
+    for (const {} of range(NUM_WORKERS)) {
       this._tileworkers.push(
         wrap(new WorkerWrapper())
       );
@@ -28116,11 +28116,8 @@ class Dataset {
 }
 class ArrowDataset extends Dataset {
   constructor(table, prefs, plot) {
-    console.log("1");
     super(plot);
-    console.log("2");
     this.root_tile = new ArrowTile(table, this, 0, plot);
-    console.log("3");
   }
   get extent() {
     return this.root_tile.extent;
@@ -28161,7 +28158,7 @@ class QuadtileSet extends Dataset {
       callback
     );
     scores.sort((a, b) => a[0] - b[0]);
-    while (scores.length && queue.size < queue_length) {
+    while (scores.length > 0 && queue.size < queue_length) {
       const upnext = scores.pop();
       if (upnext === void 0) {
         throw new Error("Ran out of tiles unexpectedly");
@@ -28171,10 +28168,10 @@ class QuadtileSet extends Dataset {
         continue;
       }
       queue.add(tile.key);
-      tile.download().catch((err) => {
+      tile.download().catch((error) => {
         console.warn("Error on", tile.key);
         queue.delete(tile.key);
-        throw err;
+        throw error;
       }).then(() => queue.delete(tile.key));
     }
   }
@@ -28397,34 +28394,18 @@ class Scatterplot {
     p.zoom = { bbox: this._renderer.zoom.current_corners() };
     return p;
   }
-  top_n_points(n = 20) {
-    const { _root, _renderer } = this;
-    const current_corners = _renderer.zoom.current_corners();
-    const output = [];
-    const filter1 = _renderer.aes.filter.current.get_function();
-    const filter2 = _renderer.aes.filter2.current.get_function();
-    for (const p of _root.points(current_corners, true)) {
-      if (filter1(p) && filter2(p)) {
-        output.push(p);
-      }
-      if (output.length >= n) {
-        return output;
-      }
-    }
-    return output;
-  }
   drawContours(contours, drawTo) {
     const drawTwo = drawTo || select("body");
     const canvas = drawTwo.select("#canvas-2d");
-    const ctx = canvas.node().getContext("2d");
+    const context = canvas.node().getContext("2d");
     for (const contour of contours) {
-      ctx.fillStyle = "rgba(25, 25, 29, 1)";
-      ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
-      ctx.strokeStyle = "#8a0303";
-      ctx.fillStyle = "rgba(30, 30, 34, 1)";
-      ctx.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))]);
-      const path = geoPath(geoIdentity().scale(this._zoom.transform.k).translate([this._zoom.transform.x, this._zoom.transform.y]), ctx);
-      ctx.beginPath(), path(contour), ctx.fill();
+      context.fillStyle = "rgba(25, 25, 29, 1)";
+      context.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
+      context.strokeStyle = "#8a0303";
+      context.fillStyle = "rgba(30, 30, 34, 1)";
+      context.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))]);
+      const path = geoPath(geoIdentity().scale(this._zoom.transform.k).translate([this._zoom.transform.x, this._zoom.transform.y]), context);
+      context.beginPath(), path(contour), context.fill();
     }
   }
   contours(aes) {
@@ -28442,10 +28423,10 @@ class Scatterplot {
       if (p.coordinates) {
         return fix_point(p.coordinates);
       }
-      if (!p.length) {
+      if (p.length === 0) {
         return;
       }
-      if (p[0].length) {
+      if (p[0].length > 0) {
         return p.map(fix_point);
       }
       p[0] = x(x_.invert(p[0]));
