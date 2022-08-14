@@ -16346,7 +16346,7 @@ vec2 calculate_jitter(
   }
   if (jitter_type == 3.) {
     float r = box_muller(ix, 1.).r * jitter_r;
-    r = r / u_k;    
+    r = r * point_size_adjust;
     float theta = ix_to_random(ix, 15.) * tau;
     return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);
   }
@@ -16355,7 +16355,7 @@ vec2 calculate_jitter(
     // uniform in the circle.
     float theta = ix_to_random(ix, 15.) * tau;
     float r = jitter_r * sqrt(ix_to_random(ix, 115.));
-    r = r / u_k;
+    r = r * point_size_adjust;
     return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);
   }
 
@@ -16877,6 +16877,7 @@ void main() {
       jitter = mix(last_jitter, jitter, ease);
     }
     if (u_jitter == 5.) {
+      // temporal jitter: rescale the point from the first dimension
       gl_PointSize *= jitter.x;
       jitter = vec2(0., 0.);
       if (gl_PointSize < 0.05) {
@@ -27525,7 +27526,7 @@ class Tile {
     this._children = [];
     this.promise = Promise.resolve();
     this.download_state = "Unattempted";
-    this.key = "" + Math.random();
+    this.key = String(Math.random());
     this.parent = null;
     this.dataset = dataset;
     if (dataset === void 0) {
@@ -27664,7 +27665,7 @@ class Tile {
     return this.yielder();
   }
   get root_extent() {
-    if (this.parent === void 0) {
+    if (this.parent === null) {
       return {
         x: [-Infinity, Infinity],
         y: [-Infinity, Infinity]
@@ -27686,7 +27687,7 @@ class QuadTile extends Tile {
     this.codes = [z, x, y];
     this.class = new.target;
   }
-  download() {
+  async download() {
     if (this._download) {
       return this._download;
     }
@@ -27699,7 +27700,7 @@ class QuadTile extends Tile {
     this._download = this.tileWorker.fetch(url, {}).then(([buffer, metadata, codes]) => {
       this.download_state = "Complete";
       this._table_buffer = buffer;
-      this._table = tableFromIPC(buffer);
+      this._table = tableFromIPC(buffer).batches[0];
       this._extent = JSON.parse(metadata.get("extent"));
       this.child_locations = JSON.parse(metadata.get("children"));
       const ixes = this.table.getChild("ix");
@@ -27736,12 +27737,12 @@ class ArrowTile extends Tile {
   constructor(table, dataset, batch_num, plot, parent = null) {
     super(dataset);
     this.full_tab = table;
-    this._table = new Table(table.batches[batch_num]);
+    this._table = table.batches[batch_num];
     this.download_state = "Complete";
     this.batch_num = batch_num;
     this._extent = {
-      x: [-4, 4],
-      y: [-4, 4]
+      x: extent(this._table.getChild("x")),
+      y: extent(this._table.getChild("y"))
     };
     this.parent = parent;
     const row_last = this._table.get(this._table.numRows - 1);
@@ -27765,7 +27766,6 @@ class ArrowTile extends Tile {
         this._children.push(new ArrowTile(this.full_tab, this.dataset, ix, this.plot, this));
       }
     }
-    console.log(this._children, this.children);
   }
   download() {
     return Promise.resolve(this._table);
@@ -28116,8 +28116,11 @@ class Dataset {
 }
 class ArrowDataset extends Dataset {
   constructor(table, prefs, plot) {
+    console.log("1");
     super(plot);
+    console.log("2");
     this.root_tile = new ArrowTile(table, this, 0, plot);
+    console.log("3");
   }
   get extent() {
     return this.root_tile.extent;

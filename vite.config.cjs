@@ -8,7 +8,7 @@ const glslify = require('rollup-plugin-glslify')
 
 export default {
   build: {
-    target: "es2019",
+    target: 'es2019',
     minify: 'terser',
     lib: {
       entry: __dirname + '/src/deepscatter.ts',

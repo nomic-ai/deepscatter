@@ -1,9 +1,13 @@
 {
     "extends": [
         "plugin:@typescript-eslint/recommended",
+        "plugin:unicorn/recommended"
     ],
     "plugins": [
-        "@typescript-eslint"
+        "@typescript-eslint",
+        "import",
+        "unicorn"
+        // TODO: add prettier
     ],
     "env": {
         "browser": true,
@@ -30,6 +34,22 @@
         "@typescript-eslint/quotes": ["error", "single"],
         "@typescript-eslint/semi": ["error", "always"],
         "@typescript-eslint/object-curly-spacing": ["error", "always"],
+
+        // Import plugin rules
+        // https://github.com/import-js/eslint-plugin-import
+        "import/no-unresolved": "error",
+        "import/export": "warn",
+        "import/no-nodejs-modules": "warn", // Deepscatter runs on the browser
+        "import/no-default-export": "warn", // default exports are an antipattern
+
+        // Unicorn plugin rules
+        // https://github.com/sindresorhus/eslint-plugin-unicorn
+        "unicorn/filename-case": ["error", {
+            "cases": {
+                "pascalCase": true,
+                "snakeCase": true
+            }
+        }],
 
         // NOTE: The below rules violate best practices and allow for code
         // debt and should be removed.
