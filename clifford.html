@@ -21,8 +21,11 @@
       const batch_number_here = batch_no++;
       // make a batch of clifford generator data starting at start and of length length
       const {a, b, c, d} = constants;
+
       let x = new Float32Array(length);
       let y = new Float32Array(length);
+      let x0 = new Float32Array(length);
+      let y0 = new Float32Array(length);
       let ix = new Float32Array(length);
       let batch_id = new Float32Array(length).fill(batch_number_here)
 
@@ -30,13 +33,18 @@
         ix[i - start] = i;
         x[i - start] = Math.sin(a * constants.y0) + c * Math.cos(a * constants.x0) + center[0];
         y[i - start] = Math.sin(b * constants.x0) + d * Math.cos(b * constants.y0) + center[1];
+        if (i - start <= length) {
+          x0[i - start + 1] = x[i - start];
+          y0[i - start + 1] = y[i - start];
+        }
         constants.x0 = x[i - start] - center[0];
         constants.y0 = y[i - start] - center[1];
       }
-      console.log(batch_id)
       return tableFromArrays({
         x: x,
         y: y,
+        x0,
+        y0,
         ix: ix,
         batch_id
       });
@@ -57,7 +65,7 @@
     d : -1.90866735205054,
     x0 : 0,
     y0 : 0
-  }, [1, -1], 1);
+  }, [1, -1], 4);
 
   const t2 = attractor({
     a : -1.14458046630025,
@@ -66,7 +74,7 @@
     d : -1.90866735205054,
     x0 : 0,
     y0 : 0
-  }, [-1, 1], 12);
+  }, [-1, 1], 96);
 
   const table = t1.concat(t2)
   const plot = new Scatterplot("#deepscatter");
@@ -74,15 +82,25 @@
   plot.plotAPI({
     arrow_table: table,
     point_size: 2,
-    max_points: 130000,
-    opacity: 90,
+    max_points: 2.5e6,
+    alpha: 50,
     background_color: "#EEEDDE",
+    zoom_balance: .5,
+    duration: 12000,
     encoding: {
       'x': {
+        field: 'x0',
+        transform: 'literal'
+      },
+      'x0': {
         field: 'x',
         transform: 'literal'
       },
       'y': {
+        field: 'y0',
+        transform: 'literal'
+      },
+      'y0': {
         field: 'y',
         transform: 'literal'
       },

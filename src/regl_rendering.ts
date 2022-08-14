@@ -868,7 +868,7 @@ export class ReglRenderer extends Renderer {
       aesthetic : keyof Encoding;
       time : "current" | "last";
       field: string;
-    }
+    };
     const buffers : BufferSummary[] = [];
     const priorities = ['x', 'y', 'color', 'x0', 'y0', 'size', 'jitter_radius',
       'jitter_speed', 'filter', 'filter2'];

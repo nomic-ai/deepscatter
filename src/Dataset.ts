@@ -16,7 +16,7 @@ type Key = string;
 
 export abstract class Dataset<T extends Tile> {
   abstract root_tile : T;
-  public max_ix : number = -1;
+  public max_ix = -1;
   protected plot : Scatterplot;
   protected _tileworkers: TileWorker[] = [];
   abstract ready : Promise<void>;
@@ -42,6 +42,7 @@ export abstract class Dataset<T extends Tile> {
    * @param after Whether to perform the function in bottom-up order
    * @returns A list of the results of the function in an order determined by 'after.'
    */
+  
   map<U>(callback : (tile: T) => U, after = false) : U[] {
     const results : U[] = [];
     this.visit((d : T) => { results.push(callback(d)); }, after = after);
@@ -96,11 +97,11 @@ export abstract class Dataset<T extends Tile> {
         return;
       }
       const mid = bisectLeft([...tile.table.getChild('ix').data[0].values], ix);
-      const val = tile.table.get(mid)
+      const val = tile.table.get(mid);
       if (val.ix === ix) {
-        matches.push(val)
+        matches.push(val);
       }
-    })
+    });
     return matches;
   }
 
@@ -128,8 +129,11 @@ export abstract class Dataset<T extends Tile> {
 export class ArrowDataset extends Dataset<ArrowTile> {
 
   constructor(table: Table, prefs: APICall, plot: Scatterplot) {
+    console.log("1")
     super(plot);
+    console.log("2")
     this.root_tile = new ArrowTile(table, this, 0, plot);
+    console.log("3")
   }
 
   get extent() {
@@ -137,7 +141,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   } 
 
   get ready() {
-    return Promise.resolve()
+    return Promise.resolve();
   }
 
   download_most_needed_tiles(bbox: Rectangle, max_ix: number, queue_length: number): void {
@@ -152,7 +156,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
   root_tile : QuadTile;
 
   constructor(base_url : string, prefs: APICall, plot: Scatterplot) {
-    super(plot)
+    super(plot);
     this.root_tile = new QuadTile(base_url, "0/0/0", null, this);
   }
 
@@ -182,7 +186,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
         const distance = check_overlap(tile, bbox);
         scores.push([distance, tile, bbox]);
       }
-    };
+    }
 
     this.visit(
       callback,

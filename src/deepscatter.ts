@@ -5,7 +5,7 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
-import { APICall, Channel } from './types';
+import { APICall } from './types';
 
 const base_elements = [
   {
@@ -30,7 +30,7 @@ export default class Scatterplot {
   public _renderer: ReglRenderer;
   public width : number;
   public height : number;
-  public _root;
+  public _root : Dataset<any>;
   div : Selection<any, any, any, any>;
   bound : boolean;
   d3 : Object;
@@ -48,10 +48,17 @@ export default class Scatterplot {
     this.width = width;
     this.height = height;
     // Unresolvable.
-    this.ready = Promise.resolve()
-    this.click_handler = new ClickFunction(this)
-    this.tooltip_handler = new TooltipHTML(this)
-
+    this.ready = Promise.resolve();
+    this.click_handler = new ClickFunction(this);
+    this.tooltip_handler = new TooltipHTML(this);
+    this.prefs = {
+      zoom_balance: 0.35,
+      duration: 2000,
+      max_points: 100,
+      encoding: {},
+      point_size: 1, // base size before aes modifications.
+      alpha: 0.4, // Overall screen saturation target.
+    };
     this.d3 = { select };
   }
 
@@ -75,15 +82,6 @@ export default class Scatterplot {
     }
 
     this.elements = [];
-
-    this.prefs = {
-      zoom_balance: 0.35,
-      duration: 2000,
-      max_points: 100,
-      encoding: {},
-      point_size: 1, // base size before aes modifications.
-      alpha: 0.4, // Overall screen saturation target.
-    };
 
     for (const d of base_elements) {
       const container = this.div
@@ -199,7 +197,7 @@ export default class Scatterplot {
         }
       }, i * 400);
     }
-    setTimeout(() => ctx.clearRect(0, 0, 10000, 10000), 17 * 400)
+    setTimeout(() => ctx.clearRect(0, 0, 10000, 10000), 17 * 400);
 
   }
 
@@ -246,7 +244,7 @@ export default class Scatterplot {
     return this.tooltip_handler.f;
   }
   set click_function(func) {
-    this.click_handler.f = func
+    this.click_handler.f = func;
   }
   get click_function() {
     /* PUBLIC see set click_function */
@@ -256,10 +254,10 @@ export default class Scatterplot {
   async plotAPI(prefs : APICall) {
 
     if (prefs.click_function) {
-      this.click_function = Function("datum", prefs.click_function);
+      this.click_function = Function('datum', prefs.click_function);
     }
     if (prefs.tooltip_html) {
-      this.tooltip_html = Function("datum", prefs.tooltip_html);
+      this.tooltip_html = Function('datum', prefs.tooltip_html);
     }
     
     this.update_prefs(prefs);
@@ -296,7 +294,7 @@ export default class Scatterplot {
 
     await this._root.promise;
 
-    this._renderer.render_props.apply_prefs(this.prefs)
+    this._renderer.render_props.apply_prefs(this.prefs);
 
     // Doesn't block.
     if (prefs.mutate) {
@@ -417,12 +415,12 @@ abstract class SettableFunction<FuncType> {
   abstract default : (arg0 : StructRowProxy) => FuncType;
   public plot : Scatterplot;
   constructor(plot : Scatterplot) {
-    this.string_rep = "";
+    this.string_rep = '';
     this.plot = plot;
   }
   get f() : (arg0 : StructRowProxy) => FuncType {
     if (this._f === undefined) {
-      return this.default
+      return this.default;
     }
     return this._f;
   }
@@ -431,7 +429,7 @@ abstract class SettableFunction<FuncType> {
       if (this.string_rep !== f) {
         this.string_rep = f;
         //@ts-ignore
-        this._f = Function("datum", f)
+        this._f = Function('datum', f);
       }
     }
     else {
@@ -443,7 +441,7 @@ abstract class SettableFunction<FuncType> {
 class ClickFunction extends SettableFunction<void> {
   //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(datum : StructRowProxy) {
-    console.log({...datum})
+    console.log({...datum});
   }
 }
 

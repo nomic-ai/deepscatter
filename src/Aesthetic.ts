@@ -14,20 +14,20 @@ import type Scatterplot from './deepscatter';
 import type { Regl, Texture2D } from 'regl';
 import type {
   TextureSet
-} from './AestheticSet'
-import {isOpChannel, isLambdaChannel,
-   isConstantChannel} from './types';
+} from './AestheticSet';
+import { isOpChannel, isLambdaChannel,
+  isConstantChannel } from './types';
 import type {
   OpChannel, LambdaChannel,
   Channel, BasicChannel, ConstantChannel,
   ColorChannel, OpArray
 } from './types';
-import type { Dataset, QuadtileSet } from './Dataset'
+import type { Dataset, QuadtileSet } from './Dataset';
 import { Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { QuadTile } from './tile';
 
-const scales : {[key : string] : Function} = {
+const scales : { [key : string] : Function } = {
   sqrt: scaleSqrt,
   log: scaleLog,
   linear: scaleLinear,
@@ -98,38 +98,38 @@ function okabe() {
 
 okabe();
 
-type Transform = "log" | "sqrt" | "linear" | "literal";
+type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
 abstract class Aesthetic {
   public abstract default_range : [number, number];
   public abstract default_constant : number | [number, number, number];
-  public abstract default_transform : "log" | "sqrt" | "linear" | "literal";
+  public abstract default_transform : 'log' | 'sqrt' | 'linear' | 'literal';
   public scatterplot : Scatterplot;
   public field: string | null = null;
-  public regl : Regl
+  public regl : Regl;
   public _texture_buffer : Float32Array | Uint8Array | null = null;
   public _domain : [number, number];
   public _range : [number, number] | Uint8Array;
-  public _transform : "log" | "sqrt" | "linear" | "literal" | undefined;
+  public _transform : 'log' | 'sqrt' | 'linear' | 'literal' | undefined;
   public dataset : QuadtileSet;
   public partner : Aesthetic | null = null;
   public _textures : Record<string, Texture2D> = {};
   public _constant : any;
   public _scale : (p: number | string) => number | [number, number, number] = (p) => 1;
   public current_encoding : BasicChannel | OpChannel | LambdaChannel | ConstantChannel;
-//  public scaleFunc : (x : number | string) => number;
-  public aesthetic_map : TextureSet
+  //  public scaleFunc : (x : number | string) => number;
+  public aesthetic_map : TextureSet;
   public id : string;
 
   constructor(
-     scatterplot : Scatterplot, 
-     regl : Regl,
-     dataset : QuadtileSet, 
-     aesthetic_map : TextureSet
-    ) {
+    scatterplot : Scatterplot, 
+    regl : Regl,
+    dataset : QuadtileSet, 
+    aesthetic_map : TextureSet
+  ) {
     this.aesthetic_map = aesthetic_map;
     if (this.aesthetic_map === undefined) {
-      throw new Error("Aesthetic map is undefined");
+      throw new Error('Aesthetic map is undefined');
     }
     this.scatterplot = scatterplot;
     this.regl = regl;
@@ -138,8 +138,8 @@ abstract class Aesthetic {
     this.dataset = dataset;
     // A flag that will be turned on and off in AestheticSet.
     this._domains = {};
-    this.id = "" + Math.random() 
-    this.current_encoding = {constant : 1}
+    this.id = '' + Math.random(); 
+    this.current_encoding = { constant : 1 };
   }
   
   apply(point : StructRowProxy) {
@@ -174,7 +174,7 @@ abstract class Aesthetic {
     if (typeof(range) == 'string') {
       // Convert range from 'viridis' to InterpolateViridis.
 
-      const interpolator = d3Chromatic["interpolate" + capitalize(range)]
+      const interpolator = d3Chromatic['interpolate' + capitalize(range)];
       if (interpolator !== undefined) {
         // linear maps to nothing, but.
         // scaleLinear, and scaleLog but 
@@ -182,14 +182,14 @@ abstract class Aesthetic {
         if (this.transform === 'sqrt') {
           return scaleSequentialPow(interpolator)
             //@ts-ignore
-              .exponent(0.5)
-              .domain(this.domain);
+            .exponent(0.5)
+            .domain(this.domain);
         } else if (this.transform === 'log') {
           return scaleSequentialLog(interpolator)
-              .domain(this.domain);
+            .domain(this.domain);
         } else {
           return scaleSequential(interpolator)
-              .domain(this.domain);
+            .domain(this.domain);
         }
       }
     }
@@ -197,33 +197,33 @@ abstract class Aesthetic {
     if (this.is_dictionary()) {
       scale = scaleOrdinal()
         .domain(this.domain);
-      if (typeof(range) === "string" && schemes[range]) {
-        if (this.column.data[0].dictionary === null) {throw new Error("Dictionary is null");}
+      if (typeof(range) === 'string' && schemes[range]) {
+        if (this.column.data[0].dictionary === null) {throw new Error('Dictionary is null');}
         scale.range(schemes[range]).domain(this.column.data[0].dictionary.toArray());
       } else {
-        scale.range(this.range)
+        scale.range(this.range);
       }
     }
-    return scale
+    return scale;
   }
 
   get column() : Vector {
     if (this.field === null) {
-      throw new Error("Can't retrieve column for aesthetic without a field");
+      throw new Error('Can\'t retrieve column for aesthetic without a field');
     }
     if (this.dataset.root_tile.table) {
-      const col = this.dataset.root_tile.table.getChild(this.field)
+      const col = this.dataset.root_tile.table.getChild(this.field);
       if (col === undefined || col === null) {
-        throw new Error("Can't find column " + this.field);
+        throw new Error('Can\'t find column ' + this.field);
       }
       return col;
     }
-    throw new Error("Table is null");
+    throw new Error('Table is null');
   }
 
   _domains: {
     [key: string]: any;
-  }
+  };
 
 
   get default_domain() {
@@ -271,9 +271,9 @@ abstract class Aesthetic {
     // for this field. Gives a column on the texture
     // that stores the values already created for this.
     if (this.use_map_on_regl === 0) {
-      return 0
+      return 0;
     }
-    return this.aesthetic_map.get_position(this.id)
+    return this.aesthetic_map.get_position(this.id);
   }
   
   get texture_buffer() {
@@ -295,7 +295,7 @@ abstract class Aesthetic {
     this.aesthetic_map.set_one_d(
       this.id, 
       this.texture_buffer
-    )
+    );
   }
 
   convert_string_encoding(channel : string) : BasicChannel {
@@ -303,17 +303,17 @@ abstract class Aesthetic {
       field : channel,
       domain : this.default_domain,
       range : this.default_range,
-    }
-    return v
+    };
+    return v;
   }
 
   complete_domain(encoding : BasicChannel) {
     encoding.domain = encoding.domain || this.default_domain;
-    return encoding
+    return encoding;
   }
 
   update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
-    if (encoding === "null") {
+    if (encoding === 'null') {
       encoding = null;
     }
     if (encoding === null) {
@@ -332,7 +332,7 @@ abstract class Aesthetic {
     if (typeof (encoding) !== 'object') {
       let x : ConstantChannel = {
         constant: encoding,
-      }
+      };
       this.current_encoding = x;
       return;
     }
@@ -343,7 +343,7 @@ abstract class Aesthetic {
     this.field = encoding.field;
 
     if (isOpChannel(encoding)) {
-      return
+      return;
     }
     if (isLambdaChannel(encoding)) {
       const {
@@ -357,13 +357,13 @@ abstract class Aesthetic {
         this.encode_for_textures(this.range);
         this.post_to_regl_buffer();
       }
-      return
+      return;
     }
     if (encoding['domain'] === undefined) {
       encoding['domain'] = this.default_domain;
     }
     if (encoding['range']) {
-      this._domain = encoding.domain
+      this._domain = encoding.domain;
       this._range = encoding.range;
     }
 
@@ -383,7 +383,7 @@ abstract class Aesthetic {
 
   arrow_column() : Vector {
     if (this.field === null) {
-      throw new Error("Can't retrieve column for aesthetic without a field");
+      throw new Error('Can\'t retrieve column for aesthetic without a field');
     }
     const c = this.dataset.root_tile.table.getChild(this.field);
     if (c === null) {
@@ -432,10 +432,10 @@ abstract class Aesthetic {
 
     if (field === undefined || this.dataset.root_tile.table === undefined) {
       if (field === undefined) {
-        console.warn("SETTING EMPTY FIELD")
+        console.warn('SETTING EMPTY FIELD');
       }
       if (this.dataset.root_tile.table === undefined) {
-        console.warn("SETTING EMPTY TABLE")
+        console.warn('SETTING EMPTY TABLE');
       }
       this.texture_buffer.set(arange(texture_size).map((i) => 1));
       //      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
@@ -451,7 +451,7 @@ abstract class Aesthetic {
       // NB--Assumes string type for dictionaries.
       input.fill(undefined);
       const dvals = column.data[0].dictionary.toArray();
-      dvals.forEach((d, i) => { input[i] = d });
+      dvals.forEach((d, i) => { input[i] = d; });
     } else {
       input = input.map((d) => this.scale(d));
     }
@@ -462,8 +462,8 @@ abstract class Aesthetic {
 
 abstract class OneDAesthetic extends Aesthetic {
   static get default_constant() {return 1.5;}
-  static get_default_domain() {return [0, 1]}
-  get default_domain() {return [0, 1]}
+  static get_default_domain() {return [0, 1];}
+  get default_domain() {return [0, 1];}
 }
 
 abstract class BooleanAesthetic extends Aesthetic {
@@ -471,8 +471,8 @@ abstract class BooleanAesthetic extends Aesthetic {
 
 class Size extends OneDAesthetic {
   static get default_constant() {return 1.5;}
-  static get_default_domain() {return [0, 10]}
-  get default_domain() {return [0, 10]}
+  static get_default_domain() {return [0, 10];}
+  get default_domain() {return [0, 10];}
   static default_range = [0, 1];
   default_constant = 1;
   default_transform : Transform = 'sqrt';
@@ -483,13 +483,13 @@ abstract class PositionalAesthetic extends OneDAesthetic {
     super(scatterplot, regl, tile, map);
     this._transform = 'literal';
   }
-  default_range : [number, number] = [-1, 1]
+  default_range : [number, number] = [-1, 1];
   default_constant = 0;
   default_transform : Transform = 'literal';
 
 
   get range() : [number, number] {
-    if (this.dataset.extent && this.dataset.extent[this.field]) return this.dataset.extent[this.field] 
+    if (this.dataset.extent && this.dataset.extent[this.field]) return this.dataset.extent[this.field]; 
     return [-20, 20];
   }
 
@@ -498,14 +498,14 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 }
 
 class X extends PositionalAesthetic {
-  field = 'x'
+  field = 'x';
 }
 
 class X0 extends X {
 }
 
 class Y extends PositionalAesthetic {
-  field = 'y'
+  field = 'y';
 }
 
 class Y0 extends Y {
@@ -516,26 +516,26 @@ abstract class AbstractFilter extends BooleanAesthetic {
 
   constructor(scatterplot: Scatterplot, regl : Regl, tile: QuadtileSet, map: TextureSet) {
     super(scatterplot, regl, tile, map);
-    this.current_encoding = {constant : 1}
+    this.current_encoding = { constant : 1 };
   }
 
   default_transform : Transform = 'literal';
   default_constant = 1;
-  get default_domain() {return [0, 1]};
-  default_range : [number, number] = [0, 1]
+  get default_domain() {return [0, 1];}
+  default_range : [number, number] = [0, 1];
 
   get domain() {
-//    return [-2047, 2047];
+    //    return [-2047, 2047];
     const domain : [number, number] = this.is_dictionary()
       ? [-2047, 2047] : [0, 1];
     return domain;
   }
 
   update(encoding) {
-    super.update(encoding)
+    super.update(encoding);
   }
   post_to_regl_buffer(): void {
-    super.post_to_regl_buffer()
+    super.post_to_regl_buffer();
   }
   ops_to_array() : OpArray {
     const input = this.current_encoding;
@@ -545,7 +545,7 @@ abstract class AbstractFilter extends BooleanAesthetic {
       return [0, 0, 0];
     }
     if (input.op === 'within') {
-      return [4, input.a, input.b]
+      return [4, input.a, input.b];
     }
     const val : OpArray = [
       // Encoding of op as number.
@@ -565,7 +565,7 @@ class Filter extends AbstractFilter {
 
 class Jitter_speed extends Aesthetic {
   default_transform : Transform = 'linear';
-  get default_domain() {return [0, 1]}
+  get default_domain() {return [0, 1];}
   default_range : [number, number] = [0, 1];
   public default_constant = 0.5;
 }
@@ -592,15 +592,15 @@ function encode_jitter_to_int(jitter : string) {
 
 class Jitter_radius extends Aesthetic {
   public jitter_int_formatted : 0 | 1 | 2 | 3 | 4 | 5 = 0;
-  get default_constant() { return 0 };
+  get default_constant() { return 0; }
   default_transform : Transform = 'linear';
-  get default_domain() {return [0, 1]}
-  get default_range() : [number, number] { return [0, 1] }
-  public _method : string = "None";
+  get default_domain() {return [0, 1];}
+  get default_range() : [number, number] { return [0, 1]; }
+  public _method = 'None';
 
   get method() {
     return (this.current_encoding && this.current_encoding.method) ?
-     this.current_encoding.method : "None"
+      this.current_encoding.method : 'None';
   }
 
   set method(value : string) {
@@ -616,13 +616,13 @@ class Jitter_radius extends Aesthetic {
 const default_color : [number, number, number] = [0.7, 0, 0.5];
 
 class Color extends Aesthetic {
-  public texture_type : "uint8" = "uint8";
+  public texture_type : 'uint8' = 'uint8';
   public default_constant : [number, number, number] = [0.7, 0, 0.5];
   default_transform : Transform = 'linear';
-  get default_range() : [number, number] {return  [0, 1]}
+  get default_range() : [number, number] {return  [0, 1];}
   current_encoding : ColorChannel = {
     constant : default_color
-  }
+  };
   default_data() : Uint8Array {
     return color_palettes.viridis;
   }
@@ -652,7 +652,7 @@ class Color extends Aesthetic {
     this.aesthetic_map.set_color(
       this.id,
       this.texture_buffer
-    )
+    );
   }
   
   update(encoding : ColorChannel) {
@@ -701,12 +701,12 @@ export const dimensions = {
 };
 
 type concrete_aesthetics = X | 
-    Y |
-    Size | 
-    Jitter_speed |
-    Jitter_radius | 
-    Color | 
-    Filter;
+Y |
+Size | 
+Jitter_speed |
+Jitter_radius | 
+Color | 
+Filter;
 
 export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   // An aesthetic that tracks two states--current and last.
@@ -724,7 +724,7 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   constructor(
     scatterplot: Scatterplot, regl : Regl, tile : QuadtreeRoot, aesthetic_map : TextureSet) {
     if (aesthetic_map === undefined) {
-      throw new Error(`Aesthetic map is undefined.`);
+      throw new Error('Aesthetic map is undefined.');
     }
     this.scatterplot = scatterplot;
     this.regl = regl;
@@ -733,7 +733,7 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
     this.aesthetic_map = aesthetic_map;
     this.current_encoding = {
       constant : 1
-    }
+    };
   }
 
   get current() {
@@ -776,16 +776,16 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   }
 }
 
-class StatefulX extends StatefulAesthetic<X> { get Factory() { return X }}; 
-class StatefulX0 extends StatefulAesthetic<X0> { get Factory() { return X0 }};
-class StatefulY extends StatefulAesthetic<Y> { get Factory() { return Y }};
-class StatefulY0 extends StatefulAesthetic<Y0> { get Factory() { return Y0 }}; 
-class StatefulSize extends StatefulAesthetic<Size> { get Factory() { return Size }}; 
-class StatefulJitter_speed extends StatefulAesthetic<Jitter_speed> { get Factory() { return Jitter_speed }}; 
-class StatefulJitter_radius extends StatefulAesthetic<Jitter_radius> { get Factory() { return Jitter_radius }};
-class StatefulColor extends StatefulAesthetic<Color> { get Factory() { return Color }};
-class StatefulFilter extends StatefulAesthetic<Filter> { get Factory() { return Filter }}; 
-class StatefulFilter2 extends StatefulAesthetic<Filter> { get Factory() { return Filter }};
+class StatefulX extends StatefulAesthetic<X> { get Factory() { return X; }} 
+class StatefulX0 extends StatefulAesthetic<X0> { get Factory() { return X0; }}
+class StatefulY extends StatefulAesthetic<Y> { get Factory() { return Y; }}
+class StatefulY0 extends StatefulAesthetic<Y0> { get Factory() { return Y0; }} 
+class StatefulSize extends StatefulAesthetic<Size> { get Factory() { return Size; }} 
+class StatefulJitter_speed extends StatefulAesthetic<Jitter_speed> { get Factory() { return Jitter_speed; }} 
+class StatefulJitter_radius extends StatefulAesthetic<Jitter_radius> { get Factory() { return Jitter_radius; }}
+class StatefulColor extends StatefulAesthetic<Color> { get Factory() { return Color; }}
+class StatefulFilter extends StatefulAesthetic<Filter> { get Factory() { return Filter; }} 
+class StatefulFilter2 extends StatefulAesthetic<Filter> { get Factory() { return Filter; }}
 
 export const stateful_aesthetics : Record<string, StatefulAesthetic<typeof Aesthetic>> = {
   x : StatefulX,
@@ -815,7 +815,7 @@ function parseLambdaString(lambdastring : string) {
     field,
     lambda: func,
   };
-};
+}
 /*
 function safe_expand(range) {
   // the range of a scale can sensibly take several different forms.
@@ -854,18 +854,18 @@ function op_to_function(input : OpChannel) : (d : number) => boolean {
 
 function lambda_to_function(input : LambdaChannel) : (d : any) => number {
   if (typeof(input.lambda) === 'function') {
-    throw "Must pass a string to lambda, not a function."
+    throw 'Must pass a string to lambda, not a function.';
   }
   const {
     lambda,
     field,
   } = input;
   if (field === undefined) {
-    throw "Must pass a field to lambda."
+    throw 'Must pass a field to lambda.';
   }
-  const cleaned = parseLambdaString(lambda).lambda
+  const cleaned = parseLambdaString(lambda).lambda;
   const [arg, code] = cleaned.split('=>', 2).map((d) => d.trim());
   //@ts-ignore
-  const func : (d : any) => number = new Function(arg, code)
+  const func : (d : any) => number = new Function(arg, code);
   return func;
 }

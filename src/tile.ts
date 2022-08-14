@@ -1,21 +1,18 @@
 import {
-  extent, range, min, max, bisectLeft,
+  extent
 } from 'd3-array';
 
-import { tableFromIPC, Table } from 'apache-arrow';
-import Counter from './Counter';
+import { tableFromIPC, Table, RecordBatch } from 'apache-arrow';
 
 import TileWorker from './tileworker.worker.js?worker&inline';
-import Zoom from './interaction';
-import { APICall } from './types';
-import type { Dataset, QuadtileSet } from './Dataset'
+import type { Dataset, QuadtileSet } from './Dataset';
 import Scatterplot from './deepscatter';
 type MinMax = [number, number];
 
 export type Rectangle = {
   x:  MinMax,
   y:  MinMax
-}
+};
 
 
 interface schema_entry{
@@ -27,11 +24,11 @@ interface schema_entry{
 
 
 export abstract class Tile {
-  public max_ix : number = -1;
+  public max_ix  = -1;
   readonly key : string; // A unique identifier for this tile.
   promise : Promise<void>;
   download_state : string;
-  public _table? : Table;
+  public _table? : RecordBatch;
   parent: this | null;
   _table_buffer?: ArrayBuffer;
   public _children : Array<this> = [];
@@ -42,13 +39,13 @@ export abstract class Tile {
   public _download? : Promise<void>;
   __schema?: schema_entry[];
   local_dictionary_lookups? : Map<string, any>;
-  public _extent? : {'x' : MinMax, 'y': MinMax};
+  public _extent? : { 'x' : MinMax, 'y': MinMax };
 
   constructor(dataset : QuadtileSet) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
-    this.key = '' + Math.random()
+    this.key = String(Math.random());
     this.parent = null;
     this.dataset = dataset;
     if (dataset === undefined) {
@@ -75,7 +72,7 @@ export abstract class Tile {
     // Top tile is always visible (even if offscreen).
     // if (!this.parent) {return true}
     if (this.min_ix === undefined) {
-      return false
+      return false;
     }
 
     if (this.min_ix > max_ix) {
@@ -91,8 +88,8 @@ export abstract class Tile {
   }
 
   get tileWorker() : TileWorker {
-    const worker = this.dataset.tileWorker;
-    return worker
+    const worker : TileWorker = this.dataset.tileWorker;
+    return worker;
   }
 
 
@@ -177,7 +174,7 @@ export abstract class Tile {
     if (this._table_buffer && this._table_buffer.byteLength > 0) {
       return this._table = tableFromIPC(this._table_buffer);
     }
-    throw new Error("Attempted to access table on tile without table buffer.");
+    throw new Error('Attempted to access table on tile without table buffer.');
   }
 
   get min_ix() {
@@ -191,7 +188,7 @@ export abstract class Tile {
   }
 
   async schema() {
-    await this.download()
+    await this.download();
     return this._schema;
   }
 
@@ -221,7 +218,6 @@ export abstract class Tile {
     const attributes : schema_entry[] = [];
     for (const field of this.table.schema.fields) {
       const { name, type } = field;
-      console.log({type, id: type.typeId})
       if (type?.typeId == 5) {
         // character
         attributes.push({
@@ -239,7 +235,6 @@ export abstract class Tile {
         });
       }
       if (type && type.typeId == 8) {
-        console.log(type)
         attributes.push({
           name,
           type: 'date',
@@ -247,7 +242,6 @@ export abstract class Tile {
         });
       }
       if (type && type.typeId == 3) {
-        console.log({type})
         attributes.push({
           name, type: 'float', extent: extent(this.table.getChild(name).data[0].values),
         });
@@ -275,7 +269,6 @@ export abstract class Tile {
 
     const y_step = base.y[1] - base.y[0];
     const each_y = y_step / (2 ** z);
-    //    console.log({key: this.key, each_y, pow: 2**z})
 
     return {
       x: [base.x[0] + x * each_x, base.x[0] + (x + 1) * each_x],
@@ -295,7 +288,7 @@ export abstract class Tile {
   }
 
   get root_extent() : Rectangle {
-    if (this.parent === undefined) {
+    if (this.parent === null) {
       // infinite extent
       return {
         x: [-Infinity, Infinity],
@@ -312,8 +305,8 @@ export class QuadTile extends Tile {
   public _children : Array<this> = [];
   codes : [number, number, number];
   _already_called = false;
-  public child_locations : String[] = [];
-  constructor(base_url : string, key : string, parent : null | this, dataset : Dataset) {
+  public child_locations : string[] = [];
+  constructor(base_url : string, key : string, parent : null | this, dataset : QuadtileSet) {
     super(dataset);
     this.url = base_url;
     this.parent = parent;
@@ -323,9 +316,9 @@ export class QuadTile extends Tile {
     this.class = new.target;
   }
 
-  download() : Promise<void> {
+  async download() : Promise<void> {
     // This should only be called once per tile.
-    if (this._download) { return this._download }
+    if (this._download) { return this._download; }
 
     if (this._already_called) {
       throw ('Illegally attempting to download twice');
@@ -334,7 +327,7 @@ export class QuadTile extends Tile {
     this._already_called = true;
 
     // new: must include protocol and hostname.
-    const url = `${this.url}/${this.key}.feather`
+    const url = `${this.url}/${this.key}.feather`;
     this.download_state = 'In progress';
 
     this._download = this.tileWorker
@@ -345,10 +338,10 @@ export class QuadTile extends Tile {
         // metadata is passed separately b/c I dont know
         // how to fix it on the table in javascript, just python.
         this._table_buffer = buffer;
-        this._table = tableFromIPC(buffer);
+        this._table = tableFromIPC(buffer).batches[0];
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
-        const ixes = this.table.getChild('ix')
+        const ixes = this.table.getChild('ix');
         if (ixes === null) {
           throw ('No ix column in table');
         }
@@ -393,27 +386,27 @@ export class ArrowTile extends Tile {
   constructor(table: Table, dataset : Dataset<ArrowTile>, batch_num : number, plot: Scatterplot, parent = null) {
     super(dataset);
     this.full_tab = table;
-    this._table = new Table(table.batches[batch_num]);
+    this._table = table.batches[batch_num];
     this.download_state = 'Complete';
     this.batch_num = batch_num;
     this._extent = {
-      x: [-4, 4],
-      y: [-4, 4],
-    }
+      x: extent(this._table.getChild('x')),
+      y: extent(this._table.getChild('y'))
+    };
     this.parent = parent;
-    const row_last = this._table.get(this._table.numRows - 1)
+    const row_last = this._table.get(this._table.numRows - 1);
     if (row_last === null) {
       throw ('No rows in table');
     }
     this.max_ix = row_last.ix;
     this.highest_known_ix = this.max_ix;
-    const row_1 = this._table.get(0)
+    const row_1 = this._table.get(0);
     if (row_1 === null) {
       throw ('No rows in table');
     }
     this._min_ix = row_1.ix;
     this.highest_known_ix = this.max_ix;
-    this.create_children()
+    this.create_children();
   }
 
   create_children() {
@@ -423,7 +416,6 @@ export class ArrowTile extends Tile {
         this._children.push(new ArrowTile(this.full_tab, this.dataset, ix, this.plot, this));
       }
     }
-    console.log(this._children, this.children)
   }  
   download() : Promise<Table> {
     return Promise.resolve(this._table);
