@@ -673,7 +673,7 @@ vec2 calculate_jitter(
   }
   if (jitter_type == 3.) {
     float r = box_muller(ix, 1.).r * jitter_r;
-    r = r / u_k;    
+    r = r * point_size_adjust;
     float theta = ix_to_random(ix, 15.) * tau;
     return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);
   }
@@ -682,7 +682,7 @@ vec2 calculate_jitter(
     // uniform in the circle.
     float theta = ix_to_random(ix, 15.) * tau;
     float r = jitter_r * sqrt(ix_to_random(ix, 115.));
-    r = r / u_k;
+    r = r * point_size_adjust;
     return vec2(cos(theta) * r, sin(theta) * r * u_width / u_height);
   }
 
@@ -1208,6 +1208,7 @@ void main() {
       jitter = mix(last_jitter, jitter, ease);
     }
     if (u_jitter == 5.) {
+      // temporal jitter: rescale the point from the first dimension
       gl_PointSize *= jitter.x;
       jitter = vec2(0., 0.);
       if (gl_PointSize < 0.05) {
