@@ -57,7 +57,7 @@ const schemes : Record<string, (p: number) => string> = {};
 
 for (const [k, v] of Object.entries(d3Chromatic)) {
   if (k.startsWith('scheme') && typeof (v[0]) === 'string') {
-    const colors = new Array(palette_size);
+    const colors = Array(palette_size);
     //@ts-ignore The startsWith filters this.
     const scheme = v.map((v) => {
       const col = rgb(v);
@@ -211,8 +211,8 @@ abstract class Aesthetic {
     if (this.field === null) {
       throw new Error('Can\'t retrieve column for aesthetic without a field');
     }
-    if (this.dataset.root_tile.table) {
-      const col = this.dataset.root_tile.table.getChild(this.field);
+    if (this.dataset.root_tile.record_batch) {
+      const col = this.dataset.root_tile.record_batch.getChild(this.field);
       if (col === undefined || col === null) {
         throw new Error('Can\'t find column ' + this.field);
       }
@@ -226,7 +226,7 @@ abstract class Aesthetic {
   };
 
 
-  get default_domain() {
+  get default_domain() : [number, number] {
     // Look at the data to determine a reasonable default domain.
     // Cached to _domains.
     if (this.field == undefined) {
@@ -370,9 +370,9 @@ abstract class Aesthetic {
     this._transform = encoding.transform || undefined;
   }
 
-  encode_for_textures(range) {
+  encode_for_textures(range: [number, number]) {
     const { texture_size } = this.aesthetic_map;
-    const values = new Array(texture_size);
+    const values = Array(texture_size);
     this.scaleFunc = scales[this.transform]()
       .range(range)
       .domain([0, texture_size - 1]);
@@ -385,7 +385,7 @@ abstract class Aesthetic {
     if (this.field === null) {
       throw new Error('Can\'t retrieve column for aesthetic without a field');
     }
-    const c = this.dataset.root_tile.table.getChild(this.field);
+    const c = this.dataset.root_tile.record_batch.getChild(this.field);
     if (c === null) {
       throw `No column ${this.field} on arrow table for aesthetic`;
     }
@@ -430,11 +430,11 @@ abstract class Aesthetic {
 
     let input : any[] = arange(texture_size);
 
-    if (field === undefined || this.dataset.root_tile.table === undefined) {
+    if (field === undefined || this.dataset.root_tile.record_batch === undefined) {
       if (field === undefined) {
         console.warn('SETTING EMPTY FIELD');
       }
-      if (this.dataset.root_tile.table === undefined) {
+      if (this.dataset.root_tile.record_batch === undefined) {
         console.warn('SETTING EMPTY TABLE');
       }
       this.texture_buffer.set(arange(texture_size).map((i) => 1));

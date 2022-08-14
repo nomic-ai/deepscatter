@@ -2,13 +2,13 @@
 
 import { Tile, Rectangle, QuadTile, ArrowTile } from './tile';
 import {
-  extent, range, min, max, bisectLeft,
+  range, min, max, bisectLeft,
 } from 'd3-array';
-import Zoom from './interaction';
 import * as Comlink from 'comlink';
 
 //@ts-ignore
 import TileWorker from './tileworker.worker.js?worker&inline';
+
 import { APICall } from './types';
 import Scatterplot from './deepscatter';
 import { StructRowProxy, Table } from 'apache-arrow';
@@ -93,11 +93,11 @@ export abstract class Dataset<T extends Tile> {
   findPoint(ix : number) : StructRowProxy[] {
     const matches : StructRowProxy[] = [];
     this.visit((tile : T) => {
-      if (!(tile.ready && tile.table && tile.min_ix <= ix && tile.max_ix >= ix)) {
+      if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
         return;
       }
-      const mid = bisectLeft([...tile.table.getChild('ix').data[0].values], ix);
-      const val = tile.table.get(mid);
+      const mid = bisectLeft([...tile.record_batch.getChild('ix').data[0].values], ix);
+      const val = tile.record_batch.get(mid);
       if (val.ix === ix) {
         matches.push(val);
       }
@@ -115,7 +115,7 @@ export abstract class Dataset<T extends Tile> {
       this._tileworkers.unshift(this._tileworkers.pop());
       return this._tileworkers[0];
     }
-    for (const i of range(NUM_WORKERS)) {
+    for (const {} of range(NUM_WORKERS)) {
       this._tileworkers.push(
         //          Comlink.wrap(new Worker(this.url + '/../worker.js')),
         Comlink.wrap(new TileWorker()),
@@ -129,11 +129,8 @@ export abstract class Dataset<T extends Tile> {
 export class ArrowDataset extends Dataset<ArrowTile> {
 
   constructor(table: Table, prefs: APICall, plot: Scatterplot) {
-    console.log("1")
     super(plot);
-    console.log("2")
     this.root_tile = new ArrowTile(table, this, 0, plot);
-    console.log("3")
   }
 
   get extent() {
@@ -157,7 +154,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
 
   constructor(base_url : string, prefs: APICall, plot: Scatterplot) {
     super(plot);
-    this.root_tile = new QuadTile(base_url, "0/0/0", null, this);
+    this.root_tile = new QuadTile(base_url, '0/0/0', null, this);
   }
 
   get ready() {
@@ -193,19 +190,19 @@ export class QuadtileSet extends Dataset<QuadTile> {
     );
 
     scores.sort((a, b) => a[0] - b[0]);
-    while (scores.length && queue.size < queue_length) {
+    while (scores.length > 0 && queue.size < queue_length) {
       const upnext = scores.pop();
-      if (upnext === undefined) {throw new Error("Ran out of tiles unexpectedly");}
+      if (upnext === undefined) {throw new Error('Ran out of tiles unexpectedly');}
       const [distance, tile, _] = upnext;
       if ((tile.min_ix && tile.min_ix > max_ix) || distance <= 0) {
         continue;
       }
       queue.add(tile.key);
       tile.download()
-        .catch((err) => {
+        .catch((error) => {
           console.warn('Error on', tile.key);
           queue.delete(tile.key);
-          throw (err);
+          throw (error);
         })
         .then(() => queue.delete(tile.key));
     }

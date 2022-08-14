@@ -174,7 +174,7 @@ export class ReglRenderer extends Renderer {
     // Do the binding operation; returns truthy if it's already done.
       const manager = new TileBufferManager(this.regl, tile, this);
       if (!manager.ready(props.prefs, props.block_for_buffers)) {
-        console.log("Not ready");
+        console.log('Not ready');
       // The 'ready' call also pushes a creation request into
       // the deferred_functions queue.
         continue;
@@ -224,7 +224,7 @@ export class ReglRenderer extends Renderer {
     try {
       this.render_all(props);
     } catch(err) {
-      console.warn("ERROR NOTED")
+      console.warn('ERROR NOTED')
       this.reglframe.cancel();
       throw err
     }
@@ -788,19 +788,19 @@ export class ReglRenderer extends Renderer {
         u_last_window_scale: regl.prop('last_webgl_scale'),
         u_time: ({ time }) => time,
         u_filter_numeric() {
-          return this.aes.dim("filter").current.ops_to_array();
+          return this.aes.dim('filter').current.ops_to_array();
         },
         u_last_filter_numeric() {
-          return this.aes.dim("filter").last.ops_to_array();
+          return this.aes.dim('filter').last.ops_to_array();
         },
         u_filter2_numeric() {
-          return this.aes.dim("filter2").current.ops_to_array();
+          return this.aes.dim('filter2').current.ops_to_array();
         },
         u_last_filter2_numeric() {
-          return this.aes.dim("filter2").last.ops_to_array();
+          return this.aes.dim('filter2').last.ops_to_array();
         },
-        u_jitter: () => this.aes.dim("jitter_radius").current.jitter_int_format,
-        u_last_jitter: () => this.aes.dim("jitter_radius").last.jitter_int_format,
+        u_jitter: () => this.aes.dim('jitter_radius').current.jitter_int_format,
+        u_last_jitter: () => this.aes.dim('jitter_radius').last.jitter_int_format,
         u_zoom(_, props) {
           return props.zoom_matrix;
         },
@@ -866,7 +866,7 @@ export class ReglRenderer extends Renderer {
 
     type BufferSummary = {
       aesthetic : keyof Encoding;
-      time : "current" | "last";
+      time : 'current' | 'last';
       field: string;
     };
     const buffers : BufferSummary[] = [];
@@ -954,7 +954,7 @@ class TileBufferManager {
     const { renderer, regl_elements } = this;
     // Don't allocate buffers for dimensions until they're needed.
     const needed_dimensions : Set<Dimension> = new Set()
-    for (let [k, v] of renderer.aes) {
+    for (const [k, v] of renderer.aes) {
       for (const aesthetic of [v.current, v.last]) {
         if (aesthetic.field) {
           needed_dimensions.add(aesthetic.field);            
@@ -965,7 +965,7 @@ class TileBufferManager {
       const current = this.regl_elements.get(key);
       if (current === null) {
         // It's in the process of being built.
-        console.log("Building", key);
+        console.log('Building', key);
         return false;
       } if (current === undefined) {
         if (!this.tile.ready) {
@@ -993,8 +993,8 @@ class TileBufferManager {
     if (regl_elements.has('_count')) {
       return regl_elements.get('_count');
     }
-    if (tile.ready && tile._table) {
-      regl_elements.set('_count', tile.table.getChild("ix").length);
+    if (tile.ready && tile._batch) {
+      regl_elements.set('_count', tile.record_batch.getChild('ix').length);
       return regl_elements.get('_count');
     }
   }
@@ -1005,15 +1005,15 @@ class TileBufferManager {
       throw 'Tile table not present.';
     }
 
-    const column = tile.table.getChild(`${key}_float_version`) || tile.table.getChild(key);
+    const column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
 
     if (!column) {
-      const col_names = tile.table.schema.fields.map((d) => d.name);
+      const col_names = tile.record_batch.schema.fields.map((d) => d.name);
       throw `Requested ${key} but table has columns ${col_names.join(', ')}`;
     }
     if (column.type.typeId !== 3) {
-      const buffer = new Float32Array(tile.table.length);
-      for (let i = 0; i < tile.table.length; i++) {
+      const buffer = new Float32Array(tile.record_batch.length);
+      for (let i = 0; i < tile.record_batch.numRows; i++) {
         buffer[i] = column.data[0].values[i];
       }
       return buffer;

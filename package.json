@@ -54,6 +54,7 @@
     "d3-timer": "^3.0.1",
     "d3-transition": "^3.0.1",
     "d3-zoom": "^3.0.0",
+    "eslint-formatter-summary-chart": "^0.2.1",
     "glsl-easings": "^1.0.0",
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",

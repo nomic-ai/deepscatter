@@ -28,7 +28,7 @@ export abstract class Tile {
   readonly key : string; // A unique identifier for this tile.
   promise : Promise<void>;
   download_state : string;
-  public _table? : RecordBatch;
+  public _batch? : RecordBatch;
   parent: this | null;
   _table_buffer?: ArrayBuffer;
   public _children : Array<this> = [];
@@ -168,11 +168,11 @@ export abstract class Tile {
     return this._highest_known_ix || -1;
   }
 
-  get table() {
-    if (this._table) { return this._table; }
+  get record_batch() {
+    if (this._batch) { return this._batch; }
     // Constitute table if there's a present buffer.
     if (this._table_buffer && this._table_buffer.byteLength > 0) {
-      return this._table = tableFromIPC(this._table_buffer);
+      return this._batch = tableFromIPC(this._table_buffer).batches[0];
     }
     throw new Error('Attempted to access table on tile without table buffer.');
   }
@@ -216,7 +216,7 @@ export abstract class Tile {
       return this.__schema;
     }
     const attributes : schema_entry[] = [];
-    for (const field of this.table.schema.fields) {
+    for (const field of this.record_batch.schema.fields) {
       const { name, type } = field;
       if (type?.typeId == 5) {
         // character
@@ -230,20 +230,20 @@ export abstract class Tile {
         attributes.push({
           name,
           type: 'dictionary',
-          keys: this.table.getChild(name).data[0].dictionary.toArray(),
-          extent: [-2047, this.table.getChild(name).data[0].dictionary.length - 2047],
+          keys: this.record_batch.getChild(name).data[0].dictionary.toArray(),
+          extent: [-2047, this.record_batch.getChild(name).data[0].dictionary.length - 2047],
         });
       }
       if (type && type.typeId == 8) {
         attributes.push({
           name,
           type: 'date',
-          extent: extent(this.table.getChild(name).data[0].values),
+          extent: extent(this.record_batch.getChild(name).data[0].values),
         });
       }
       if (type && type.typeId == 3) {
         attributes.push({
-          name, type: 'float', extent: extent(this.table.getChild(name).data[0].values),
+          name, type: 'float', extent: extent(this.record_batch.getChild(name).data[0].values),
         });
       }
     }
@@ -252,7 +252,7 @@ export abstract class Tile {
   }
 
   *yielder() {
-    for (const row of this.table) {
+    for (const row of this.record_batch) {
       if (row) {
         yield row;
       }
@@ -338,10 +338,10 @@ export class QuadTile extends Tile {
         // metadata is passed separately b/c I dont know
         // how to fix it on the table in javascript, just python.
         this._table_buffer = buffer;
-        this._table = tableFromIPC(buffer).batches[0];
+        this._batch = tableFromIPC(buffer).batches[0];
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
-        const ixes = this.table.getChild('ix');
+        const ixes = this.record_batch.getChild('ix');
         if (ixes === null) {
           throw ('No ix column in table');
         }
@@ -351,7 +351,7 @@ export class QuadTile extends Tile {
         //    this.setDataTypes()
 
         this.local_dictionary_lookups = codes;
-        return this.table;
+        return this.record_batch;
       })
       .catch((e) => {        
         this.download_state = 'Failed';
@@ -386,21 +386,21 @@ export class ArrowTile extends Tile {
   constructor(table: Table, dataset : Dataset<ArrowTile>, batch_num : number, plot: Scatterplot, parent = null) {
     super(dataset);
     this.full_tab = table;
-    this._table = table.batches[batch_num];
+    this._batch = table.batches[batch_num];
     this.download_state = 'Complete';
     this.batch_num = batch_num;
     this._extent = {
-      x: extent(this._table.getChild('x')),
-      y: extent(this._table.getChild('y'))
+      x: extent(this._batch.getChild('x')),
+      y: extent(this._batch.getChild('y'))
     };
     this.parent = parent;
-    const row_last = this._table.get(this._table.numRows - 1);
+    const row_last = this._batch.get(this._batch.numRows - 1);
     if (row_last === null) {
       throw ('No rows in table');
     }
     this.max_ix = row_last.ix;
     this.highest_known_ix = this.max_ix;
-    const row_1 = this._table.get(0);
+    const row_1 = this._batch.get(0);
     if (row_1 === null) {
       throw ('No rows in table');
     }
@@ -418,7 +418,7 @@ export class ArrowTile extends Tile {
     }
   }  
   download() : Promise<Table> {
-    return Promise.resolve(this._table);
+    return Promise.resolve(this._batch);
   }
   get ready() : boolean {
     // Arrow tables are always ready.

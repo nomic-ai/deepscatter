@@ -1,4 +1,18 @@
 
+# 2.4.0
+
+FEATURES:
+
+Preliminary ability to pass an arrow table directly to Deepscatter without tiling it using quadfeather. Each record batch is treated as a tile, and every batch will be drawn in most draw passes; this works well for up to a few million points.
+
+DESIGN:
+
+Extensive refactor to allow 'datasets' to be drawn, which provide an abstraction between individual tiles and the full renderer. This is currentoy used to draw arrow tables; I may also allow it to use duckdb soon. 
+
+CODE QUALITY:
+
+Thanks to Don Isaac, a number of improvements to linting and ts typing that should help increase code quality going forward. 
+
 # 2.3.2
 
 FEATURES: Clarify and cleanup the API around `tooltip_html` and `click_function`. Now both can be *either* by assigning a function to the base scatterplot object, or by passing a string that defines a function with an implied argument of `datum` to the JSON-based API.

@@ -6,6 +6,7 @@ import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
 import { APICall } from './types';
+import { StructRowProxy } from 'apache-arrow';
 
 const base_elements = [
   {
@@ -337,46 +338,34 @@ export default class Scatterplot {
     return this._root.table;
   }
 
+  /**
+   * Return the current state of the query. Can be used to save an API
+   * call for use programatically.
+   */
   get query() {
     const p = JSON.parse(JSON.stringify(this.prefs));
     p.zoom = { bbox: this._renderer.zoom.current_corners() };
     return p;
   }
 
-  top_n_points(n = 20) {
-    const { _root, _renderer } = this;
-
-    const current_corners = _renderer.zoom.current_corners();
-    const output = [];
-    const filter1 = _renderer.aes.filter.current.get_function();
-    const filter2 = _renderer.aes.filter2.current.get_function();
-    for (const p of _root.points(current_corners, true)) {
-      if (filter1(p) && filter2(p)) {
-        output.push(p);
-      }
-      if (output.length >= n) { return output; }
-    }
-    return output;
-  }
-
   drawContours(contours, drawTo) {
     const drawTwo = drawTo || select('body');
     const canvas = drawTwo.select('#canvas-2d');
-    const ctx = canvas.node().getContext('2d');
+    const context : CanvasRenderingContext2D = canvas.node().getContext('2d');
 
     for (const contour of contours) {
-      ctx.fillStyle = 'rgba(25, 25, 29, 1)';
-      ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
+      context.fillStyle = 'rgba(25, 25, 29, 1)';
+      context.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
-      ctx.strokeStyle = '#8a0303';// "rbga(255, 255, 255, 1)"
-      ctx.fillStyle = 'rgba(30, 30, 34, 1)';
+      context.strokeStyle = '#8a0303';// "rbga(255, 255, 255, 1)"
+      context.fillStyle = 'rgba(30, 30, 34, 1)';
 
-      ctx.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))]);
+      context.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))]);
 
       const path = geoPath(geoIdentity()
         .scale(this._zoom.transform.k)
-        .translate([this._zoom.transform.x, this._zoom.transform.y]), ctx);
-      ctx.beginPath(), path(contour), ctx.fill();
+        .translate([this._zoom.transform.x, this._zoom.transform.y]), context);
+      context.beginPath(), path(contour), context.fill();
     }
   }
 
@@ -391,10 +380,10 @@ export default class Scatterplot {
       if (p.coordinates) {
         return fix_point(p.coordinates);
       }
-      if (!p.length) {
+      if (p.length === 0) {
         return;
       }
-      if (p[0].length) {
+      if (p[0].length > 0) {
         return p.map(fix_point);
       }
       p[0] = x(x_.invert(p[0]));
@@ -404,8 +393,6 @@ export default class Scatterplot {
     this.drawContours(data);
   }
 }
-
-import type StructRowProxy from 'apache-arrow-types';
 
 abstract class SettableFunction<FuncType> {
   // A function that can be set by a string or directly with a function,
@@ -441,7 +428,7 @@ abstract class SettableFunction<FuncType> {
 class ClickFunction extends SettableFunction<void> {
   //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(datum : StructRowProxy) {
-    console.log({...datum});
+    console.log({ ...datum });
   }
 }
 
@@ -465,5 +452,5 @@ class TooltipHTML extends SettableFunction<string> {
       output += `   <dd>${v}<dd>\n`;
     }
     return `${output}</dl>\n`;
-    }
+  }
 }

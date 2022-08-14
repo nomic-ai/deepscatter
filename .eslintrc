@@ -50,6 +50,9 @@
                 "snakeCase": true
             }
         }],
+        "unicorn/consistent-destructuring": "off",
+        "unicorn/new-for-builtins": "off",
+        "unicorn/prevent-abbreviations": "off",
 
         // NOTE: The below rules violate best practices and allow for code
         // debt and should be removed.
