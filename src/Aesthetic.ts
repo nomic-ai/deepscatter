@@ -342,7 +342,7 @@ abstract class Aesthetic {
       return;
     }
     if (encoding['range'] && Array.isArray(encoding['range']) && typeof(encoding['range'][0]) === 'string'){
-      if (encoding['field'] == "isSelected"){
+      if (encoding['field'] == '_isSelected'){
         var all_tiles = [this.tileSet];
         var current_tiles = [this.tileSet];
         if(this.tileSet.children.length > 0){
@@ -362,22 +362,22 @@ abstract class Aesthetic {
           }
           var set = new Set(encoding['domain']);
           all_tiles.forEach(function(tile,idx){
-            tile.table.getChild('isSelected').data[0].values.forEach(function(val, idx){
+            tile.table.getChild('_isSelected').data[0].values.forEach(function(val, idx){
               if(tile.table.getChild('_id').data[0].values[idx] && set.has(tile.table.getChild('_id').data[0].values[idx].toString())){
-                tile.table.getChild('isSelected').data[0].values[idx] = '1';
-                tile.table.getChild('isSelected_float_version').data[0].values[idx] = -2046;
+                tile.table.getChild('_isSelected').data[0].values[idx] = '1';
+                tile.table.getChild('_isSelected_float_version').data[0].values[idx] = -2046;
               }else{
-                tile.table.getChild('isSelected').data[0].values[idx] = '0';
-                tile.table.getChild('isSelected_float_version').data[0].values[idx] = -2047;
+                tile.table.getChild('_isSelected').data[0].values[idx] = '0';
+                tile.table.getChild('_isSelected_float_version').data[0].values[idx] = -2047;
               }
             });
           });
         }
         encoding['domain'] = ['0','1']
       }
-      let color_by_values = this.tileSet.local_dictionary_lookups[encoding['field']];
-      let lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
-      let new_range = Array(lowercase_values.length).fill("#000000");
+      var color_by_values = this.tileSet.local_dictionary_lookups[encoding['field']];
+      var lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
+      var new_range = Array(lowercase_values.length).fill("#000000");
       if(encoding['domain'] && Array.isArray(encoding['domain']) && typeof(encoding['domain'][0] === 'string')){
         if(encoding['domain'].length === encoding['range'].length){
           encoding['domain'].map(function(val, idx){

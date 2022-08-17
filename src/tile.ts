@@ -2,7 +2,20 @@ import {
   extent, range, min, max, bisectLeft,
 } from 'd3-array';
 
-import { tableFromIPC, Table } from 'apache-arrow';
+import {
+  Table, Vector, Utf8, Float32, Float, Int,
+  Uint32, Int32, Int64, Dictionary,
+  tableFromIPC,
+  tableToIPC,
+  vectorFromArray,
+  tableFromArrays,
+  makeBuilder,
+  makeVector,
+  RecordBatch,
+  Schema,
+  Data,
+  Field
+} from 'apache-arrow';
 import * as Comlink from 'comlink';
 import Counter from './Counter';
 
@@ -538,6 +551,37 @@ export class QuadTile extends Tile {
         this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
         this._table_buffer = buffer;
         this._table = tableFromIPC(buffer);
+        if(!this._table.getChild('_isSelected')){
+        const isSelectedArray = Array(this._table.numRows).fill('0');
+        isSelectedArray[0] = '1';
+        const isSelectedVector = vectorFromArray(isSelectedArray, new Utf8);
+        const isSelectedDictionary = makeVector({
+          data: isSelectedArray.map((v) => parseInt(v)),
+          dictionary: isSelectedVector,
+          type: new Dictionary(new Utf8, new Uint32)
+        });
+        var buffers = [undefined,isSelectedDictionary.data[0].values,this._table.batches[0].data.children[0].nullBitmap,undefined];
+        const isSelectedData = new Data(new Dictionary(new Utf8, new Uint32), 0, this._table.numRows, 0, buffers, isSelectedDictionary);
+        isSelectedData.dictionary = isSelectedDictionary.memoize();
+        isSelectedData.children = [];
+        var isSelectedSchemaField = new Field('_isSelected', new Dictionary(new Utf8, new Uint32), false);
+        this._table.schema.fields.push(isSelectedSchemaField);
+        this._table.batches[0].data.children.push(isSelectedData);
+        const float_version = new Float32Array(this._table.numRows);
+        for (let i = 0; i < this._table.numRows; i++) {
+          float_version[i] = this._table.getChild('_isSelected').data[0].values[i] - 2047;
+        }
+        const float_vector = makeVector(float_version);
+        var float_buffers = [undefined,float_vector.data[0].values,this._table.batches[0].data.children[0].nullBitmap,undefined];
+        const float_data = new Data(new Float(), 0, this._table.numRows, 0, float_buffers);
+        var float_field = new Field('_isSelected_float_version', new Float(), false);
+        this._table.batches[0].data.children.push(float_data);
+        this._table.schema.fields.push(float_field);
+        var selected_codes = new Map();
+        selected_codes.set(0, '1');
+        selected_codes.set(1, '0');
+        codes['_isSelected'] = selected_codes;
+        }
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
         const ixes = this.table.getChild('ix')
