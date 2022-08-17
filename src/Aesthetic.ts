@@ -342,7 +342,7 @@ abstract class Aesthetic {
       return;
     }
     if (encoding['range'] && Array.isArray(encoding['range']) && typeof(encoding['range'][0]) === 'string'){
-      if (encoding['field'] == '_isSelected'){
+      if (encoding['field'] == 'isSelected'){
         var all_tiles = [this.tileSet];
         var current_tiles = [this.tileSet];
         if(this.tileSet.children.length > 0){
@@ -361,14 +361,31 @@ abstract class Aesthetic {
             current_tiles = children_tiles;
           }
           var set = new Set(encoding['domain']);
+          if(this.tileSet.currentSelected == undefined){
+            this.tileSet.currentSelected = 0;
+            this.tileSet.isSelectedIndex = this.tileSet.table.batches[0].data.children.length - 2;
+          }else{
+            this.tileSet.currentSelected += 1;
+            encoding['field'] = encoding['field'] + this.tileSet.currentSelected.toString();
+          }
+          var selected = this.tileSet.currentSelected;
+          var selectedIndex = this.tileSet.isSelectedIndex;
           all_tiles.forEach(function(tile,idx){
-            tile.table.getChild('_isSelected').data[0].values.forEach(function(val, idx){
+            if(selected > 0){
+              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex].clone());
+              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex+1].clone());
+              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex].clone());
+              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding['field'];
+              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex+1].clone());
+              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding['field']+"_float_version";
+            }
+            tile.table.getChild(encoding['field']).data[0].values.forEach(function(val, idx){
               if(tile.table.getChild('_id').data[0].values[idx] && set.has(tile.table.getChild('_id').data[0].values[idx].toString())){
-                tile.table.getChild('_isSelected').data[0].values[idx] = '1';
-                tile.table.getChild('_isSelected_float_version').data[0].values[idx] = -2046;
+                tile.table.getChild(encoding['field']).data[0].values[idx] = '1';
+                tile.table.getChild(encoding["field"]+'_float_version').data[0].values[idx] = -2046;
               }else{
-                tile.table.getChild('_isSelected').data[0].values[idx] = '0';
-                tile.table.getChild('_isSelected_float_version').data[0].values[idx] = -2047;
+                tile.table.getChild(encoding['field']).data[0].values[idx] = '0';
+                tile.table.getChild(encoding["field"]+'_float_version').data[0].values[idx] = -2047;
               }
             });
           });
@@ -376,7 +393,11 @@ abstract class Aesthetic {
         encoding['domain'] = ['0','1']
       }
       var color_by_values = this.tileSet.local_dictionary_lookups[encoding['field']];
+      if(color_by_values == undefined){
+        var lowercase_values = ['1','0']
+      }else{
       var lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
+      }
       var new_range = Array(lowercase_values.length).fill("#000000");
       if(encoding['domain'] && Array.isArray(encoding['domain']) && typeof(encoding['domain'][0] === 'string')){
         if(encoding['domain'].length === encoding['range'].length){
@@ -692,7 +713,6 @@ class Color extends Aesthetic {
 
     this._texture_buffer = new Uint8Array(this.aesthetic_map.texture_size * 4);
     this._texture_buffer.set(this.default_data());
-
     return this._texture_buffer;
   }
 

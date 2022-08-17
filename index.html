@@ -78,29 +78,30 @@
     }
   };
   //list of ids 1 - 100000
-  var ids = [];
+  var ids_1 = [];
+  var ids_2 = [];
   for(var i = 1; i < 500000; i++)
   {
-    ids.push(i.toString());
+    ids_1.push(i.toString());
   }
 
   //list of ids 1 - 20000 increment by 2
-  //for(var i = 1; i < 20000; i+= 2)
-  //{
-  //  ids.push(i.toString());
-  //}
+  for(var i = 1; i < 20000; i++)
+  {
+    ids_2.push(i.toString());
+  }
   const colors = [
 //    JSON.parse(JSON.stringify(prefs.encoding.color)),
     {
-      "field": "_isSelected",
-      "range": ['#ffffff','#000000'],
-      "domain": ids,
+      "field": "isSelected",
+      "range": ['#000000','#ffffff'],
+      "domain": ids_1,
     },
     {
-      "field": "x",
-      "range": "viridis",
-      "domain": [-3, 3] 
-    }
+      "field": "isSelected",
+      "range": ['#000000','#ffffff'],
+      "domain": ids_2,
+    },
   ]
 
   const scatterplot = new Scatterplot("#deepscatter")
