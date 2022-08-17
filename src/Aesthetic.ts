@@ -25,7 +25,7 @@ import type {
   ConstantColorChannel, ColorChannel, OpArray
 
 } from './types';
-import { Vector } from 'apache-arrow';
+import { Vector, tableToIPC } from 'apache-arrow';
 
 const scales : {[key : string] : Function} = {
   sqrt: scaleSqrt,
@@ -121,9 +121,9 @@ abstract class Aesthetic {
   public id : string;
 
   constructor(
-     scatterplot : Scatterplot, 
+     scatterplot : Scatterplot,
      regl : Regl,
-     tile : RootTile, 
+     tile : RootTile,
      aesthetic_map : TextureSet
     ) {
     this.aesthetic_map = aesthetic_map;
@@ -137,17 +137,17 @@ abstract class Aesthetic {
     this.tileSet = tile;
     // A flag that will be turned on and off in AestheticSet.
     this._domains = {};
-    this.id = "" + Math.random() 
+    this.id = "" + Math.random()
     this.current_encoding = {constant : 1}
   }
-  
+
   apply(point) {
-    // Takes an arrow point and returns the aesthetic value. 
+    // Takes an arrow point and returns the aesthetic value.
     // Used for generating points in SVG over the scatterplot.
     return this.scale(this.value_for(point));
   }
 
-  get transform() {    
+  get transform() {
     if (this._transform) return this._transform;
     return this.default_transform;
   }
@@ -174,8 +174,8 @@ abstract class Aesthetic {
       const interpolator = d3Chromatic["interpolate" + capitalize(range)]
       if (interpolator !== undefined) {
         // linear maps to nothing, but.
-        // scaleLinear, and scaleLog but 
-        // scaleSequential and scaleSequentialLog. 
+        // scaleLinear, and scaleLog but
+        // scaleSequential and scaleSequentialLog.
         if (this.transform === 'sqrt') {
           return scaleSequentialPow(interpolator)
             //@ts-ignore
@@ -258,7 +258,7 @@ abstract class Aesthetic {
   value_for(point) {
     return point[this.field];
   }
-  
+
   get map_position() {
     // Returns the location on the color map to use
     // for this field. Gives a column on the texture
@@ -268,7 +268,7 @@ abstract class Aesthetic {
     }
     return this.aesthetic_map.get_position(this.id)
   }
-  
+
   get texture_buffer() {
     if (this._texture_buffer) {
       return this._texture_buffer;
@@ -284,7 +284,7 @@ abstract class Aesthetic {
 
   post_to_regl_buffer() {
     this.aesthetic_map.set_one_d(
-      this.id, 
+      this.id,
       this.texture_buffer
     )
   }
@@ -301,6 +301,21 @@ abstract class Aesthetic {
   complete_domain(encoding : BasicChannel) {
     encoding.domain = encoding.domain || this.default_domain;
     return encoding
+  }
+
+  custom(values) {
+    // Custom color values
+    const custom_palette = values;
+    const colors = new Array(palette_size);
+    const scheme = custom_palette.map((v) => {
+      const col = rgb(v);
+      return [col.r, col.g, col.b, 255];
+    });
+    for (const i of arange(palette_size)) {
+      colors[i] = scheme[i % custom_palette.length];
+    }
+    color_palettes.custom = to_buffer(colors);
+    schemes['custom'] = custom_palette;
   }
 
   update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
@@ -326,6 +341,58 @@ abstract class Aesthetic {
       this.current_encoding = x;
       return;
     }
+    if (encoding['range'] && Array.isArray(encoding['range']) && typeof(encoding['range'][0]) === 'string'){
+      if (encoding['field'] == "isSelected"){
+        var all_tiles = [this.tileSet];
+        var current_tiles = [this.tileSet];
+        if(this.tileSet.children.length > 0){
+          while(true)
+          {
+            if(current_tiles.length == 0){
+                break;
+            }
+            var children_tiles = [];
+            current_tiles.map(function(tile, idx){
+              if(tile.children.length > 0){
+                all_tiles.push.apply(all_tiles, tile.children);
+                children_tiles.push.apply(children_tiles, tile.children);
+              }
+            });
+            current_tiles = children_tiles;
+          }
+          var set = new Set(encoding['domain']);
+          all_tiles.forEach(function(tile,idx){
+            tile.table.getChild('isSelected').data[0].values.forEach(function(val, idx){
+              if(tile.table.getChild('_id').data[0].values[idx] && set.has(tile.table.getChild('_id').data[0].values[idx].toString())){
+                tile.table.getChild('isSelected').data[0].values[idx] = '1';
+                tile.table.getChild('isSelected_float_version').data[0].values[idx] = -2046;
+              }else{
+                tile.table.getChild('isSelected').data[0].values[idx] = '0';
+                tile.table.getChild('isSelected_float_version').data[0].values[idx] = -2047;
+              }
+            });
+          });
+        }
+        encoding['domain'] = ['0','1']
+      }
+      let color_by_values = this.tileSet.local_dictionary_lookups[encoding['field']];
+      let lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
+      let new_range = Array(lowercase_values.length).fill("#000000");
+      if(encoding['domain'] && Array.isArray(encoding['domain']) && typeof(encoding['domain'][0] === 'string')){
+        if(encoding['domain'].length === encoding['range'].length){
+          encoding['domain'].map(function(val, idx){
+            if(lowercase_values.includes(val.toLowerCase())){
+              new_range[lowercase_values.indexOf(val.toLowerCase())] = encoding['range'][idx];
+            }
+          });
+          encoding['range'] = 'custom';
+          encoding['domain'] = [-2047, 2047];
+          this.custom(new_range);
+        }else{
+          encoding['domain'] = [-2047, 2047];
+        }
+      }
+    }
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
       return;
@@ -339,13 +406,13 @@ abstract class Aesthetic {
       const {
         lambda,
         field,
-      } = encoding;  
+      } = encoding;
       if (lambda) {
         this.apply_function_for_textures(field, this.domain, lambda);
         this.post_to_regl_buffer();
       } else if (encoding.range) {
         this.encode_for_textures(this.range);
-        this.post_to_regl_buffer();
+       this.post_to_regl_buffer();
       }
       return
     }
@@ -358,7 +425,7 @@ abstract class Aesthetic {
     }
 
     this._transform = encoding.transform || undefined;
-``  }
+  }
 
   encode_for_textures(range) {
     const { texture_size } = this.aesthetic_map;
@@ -476,7 +543,7 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 
 
   get range() : [number, number] {
-    if (this.tileSet.extent && this.tileSet.extent[this.field]) return this.tileSet.extent[this.field] 
+    if (this.tileSet.extent && this.tileSet.extent[this.field]) return this.tileSet.extent[this.field]
     return [-20, 20];
   }
 
@@ -597,7 +664,7 @@ class Jitter_radius extends Aesthetic {
   get jitter_int_format() {
     return encode_jitter_to_int(this.method);
   }
- 
+
 }
 
 const default_color : [number, number, number] = [0.7, 0, 0.5];
@@ -641,7 +708,7 @@ class Color extends Aesthetic {
       this.texture_buffer
     )
   }
-  
+
   update(encoding : ColorChannel) {
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
@@ -658,7 +725,6 @@ class Color extends Aesthetic {
 
   encode_for_textures(range) {
     this._scale = scales[this.transform]().range(range).domain(this.domain);
-  
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range]);
     } else if (range.length === this.aesthetic_map.texture_size * 4) {

@@ -45,9 +45,9 @@
   window.select = select; // For the click function below.
   const prefs = {
     "source_url" : "/tiles",
-    "max_points" : 10000, // a full cap.
-    "alpha" : .9, // Target saturation for the full page.
-    "zoom_balance" : 0.09, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
+    "max_points" : 1000000, // a full cap.
+    "alpha" : 5, // Target saturation for the full page.
+    "zoom_balance" : 0.22, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
     "point_size": 2, // Default point size before application of size scaling
     "background_color": "#EEEDDE",
     "click_function": "select('#ident').html(JSON.stringify(datum, undefined, 2))",
@@ -69,10 +69,6 @@
         field: "y", 
         transform: "literal"
       },
-      "filter": {
-        field: "class",
-        lambda: "d => d !== 'Strawberry'"
-      },
       "size": {
         "field": "quantity",
         "transform": "sqrt",
@@ -81,13 +77,24 @@
       }
     }
   };
+  //list of ids 1 - 100000
+  var ids = [];
+  for(var i = 1; i < 500000; i++)
+  {
+    ids.push(i.toString());
+  }
 
+  //list of ids 1 - 20000 increment by 2
+  //for(var i = 1; i < 20000; i+= 2)
+  //{
+  //  ids.push(i.toString());
+  //}
   const colors = [
 //    JSON.parse(JSON.stringify(prefs.encoding.color)),
     {
-      "field": "quantity",
-      "range": "viridis",
-      "domain": [0, 1] 
+      "field": "isSelected",
+      "range": ['#ff0000','#00ff00'],
+      "domain": ids,
     },
     {
       "field": "x",
@@ -123,8 +130,6 @@
     cycle += 1
     const new_coding = {
       "encoding": {
-        "x": {"field": cycle % 2 == 0 ? "x": "y"},
-        "y": {"field": cycle % 2 == 0 ? "y": "x"},
         "color": colors[cycle % colors.length]
       }
     }
