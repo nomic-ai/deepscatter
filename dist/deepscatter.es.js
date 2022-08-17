@@ -15421,7 +15421,7 @@ class Aesthetic {
       return;
     }
     if (encoding["range"] && Array.isArray(encoding["range"]) && typeof encoding["range"][0] === "string") {
-      if (encoding["field"] == "isSelected") {
+      if (encoding["field"] == "_isSelected") {
         var all_tiles = [this.tileSet];
         var current_tiles = [this.tileSet];
         if (this.tileSet.children.length > 0) {
