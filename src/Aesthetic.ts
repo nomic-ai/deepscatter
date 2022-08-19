@@ -360,7 +360,7 @@ abstract class Aesthetic {
             });
             current_tiles = children_tiles;
           }
-          var set = new Set(encoding['domain']);
+          var set2 = new Set(encoding['domain']);
           if(this.tileSet.currentSelected == undefined){
             this.tileSet.currentSelected = 0;
             this.tileSet.isSelectedIndex = this.tileSet.table.batches[0].data.children.length - 2;
@@ -379,13 +379,23 @@ abstract class Aesthetic {
               tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex+1].clone());
               tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding['field']+"_float_version";
             }
-            tile.table.getChild(encoding['field']).data[0].values.forEach(function(val, idx){
-              if(tile.table.getChild('_id').data[0].values[idx] && set.has(tile.table.getChild('_id').data[0].values[idx].toString())){
-                tile.table.getChild(encoding['field']).data[0].values[idx] = '1';
-                tile.table.getChild(encoding["field"]+'_float_version').data[0].values[idx] = -2046;
-              }else{
-                tile.table.getChild(encoding['field']).data[0].values[idx] = '0';
-                tile.table.getChild(encoding["field"]+'_float_version').data[0].values[idx] = -2047;
+            tile.table.getChild(encoding['field']).data[0].values.forEach(function(val, idx2){
+              if (tile.table.getChild("_id").data[0].typeId != 5){
+                if (tile.table.getChild("_id").data[0].values[idx2] && set2.has(tile.table.getChild("_id").data[0].values[idx2].toString())) {
+                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "1";
+                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2046;
+                } else {
+                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "0";
+                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2047;
+                }
+              } else {
+                if (set2.has(String.fromCharCode(...tile.table.getChild("_id").data[0].values.slice(tile.table.getChild("_id").data[0].valueOffsets[idx2],tile.table.getChild("_id").data[0].valueOffsets[idx2+1])))){
+                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "1";
+                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2046;
+                } else {
+                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "0";
+                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2047;
+                }
               }
             });
           });
