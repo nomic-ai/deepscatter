@@ -16,10 +16,10 @@ import {
 function dictVector(input, id) {
   const dictionary = makeBuilder({
     type: new Dictionary(new Uint32(), new Utf8()),
-    highWaterMark: 1000000,
+    highWaterMark: 1_000_000,
   });
-  input.forEach(d => dictionary.append(d));
-  return dictionary.finish().toVector()
+  for (const d of input) dictionary.append(d);
+  return dictionary.finish().toVector();
 }
 
 
@@ -36,17 +36,13 @@ const WorkerTile = {
         const { metadata } = table.schema;
         let buffer;
         // For now, always mutate to ensure dict indexes are cast.
-        if (Object.keys(mutations).length || true) {
-          buffer = mutate(mutations, response, metadata);
-        } else {
-          buffer = response;
-        }
+        buffer = Object.keys(mutations).length > 0 || true ? mutate(mutations, response, metadata) : response;
         const codes = get_dictionary_codes(buffer);
         return [transfer(buffer, [buffer]), metadata, codes];
       });
   },
   run_transforms(map, table_buffer) {
-    console.log("transforming")
+    console.log('transforming');
     const buffer = mutate(map, table_buffer);
     const codes = get_dictionary_codes(buffer);
     return [transfer(buffer, [buffer]), codes];
@@ -99,7 +95,7 @@ function mutate(map, table_buffer, metadata) {
   // First, populate the old columns
   for (const { name, type } of table.schema.fields) {
     if (type === undefined) {
-      throw "NO SUCH TYPE"
+      throw 'NO SUCH TYPE';
     }
     const { typeId } = type;
     if (!funcmap.has(name)) {
@@ -109,7 +105,7 @@ function mutate(map, table_buffer, metadata) {
         // Coerce the ix field to float.
         // Ultimately, may need to
         // pack it across a few different channels.
-        columns[name] = vectorFromArray([...col].map(d => Number(d)), new Float32());
+        columns[name] = vectorFromArray([...col].map(Number), new Float32());
       } else {
         columns[name] = col;
       }
@@ -125,7 +121,7 @@ function mutate(map, table_buffer, metadata) {
       }
       if (type.typeId === 8) {
         // date
-        columns[`${name}_float_version`] = vectorFromArray([...col.data[0].values].map(d => Number(d)), new Float32());
+        columns[`${name}_float_version`] = vectorFromArray([...col.data[0].values].map(Number), new Float32());
       }
     }
   }
@@ -136,7 +132,7 @@ function mutate(map, table_buffer, metadata) {
   if (highest_dict_id < 0) { highest_dict_id = -1; }
 
   for (const [k, vector] of data) {
-    console.log({k})
+    console.log({ k });
     let column;
     if (typeof (vector[0]) === 'string') {
       highest_dict_id++;
@@ -147,7 +143,7 @@ function mutate(map, table_buffer, metadata) {
     columns[k] = column;
   }
   const return_table = tableFromArrays(columns);
-  const { buffer } = tableToIPC(return_table)
+  const { buffer } = tableToIPC(return_table);
   return buffer;
 }
 
