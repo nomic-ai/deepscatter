@@ -176,7 +176,7 @@ export default class Scatterplot {
     const ctx = map.elements[2]
       .selectAll('canvas').node().getContext('2d');
 
-    ctx.clearRect(0, 0, 10000, 10000);
+    ctx.clearRect(0, 0, 10_000, 10_000);
     const { x_, y_ } = map._zoom.scales();
     ctx.strokeStyle = '#888888';
     const tiles = map._root.map((t : Tile) => t);
@@ -198,7 +198,7 @@ export default class Scatterplot {
         }
       }, i * 400);
     }
-    setTimeout(() => ctx.clearRect(0, 0, 10000, 10000), 17 * 400);
+    setTimeout(() => ctx.clearRect(0, 0, 10_000, 10_000), 17 * 400);
 
   }
 
@@ -327,7 +327,7 @@ export default class Scatterplot {
       this._renderer.tick('Basic');
     });
 
-    this._zoom.restart_timer(60000);
+    this._zoom.restart_timer(60_000);
   }
 
   async root_table() {
@@ -439,10 +439,10 @@ class TooltipHTML extends SettableFunction<string> {
     const nope = new Set([
       'x', 'y', 'ix', null, 'tile_key',
     ]);
-    for (const [k, v] of [...point]) {
+    for (const [k, v] of point) {
       if (nope.has(k)) { continue; }
       // Private value.
-      if (k.match(/_float_version/)) { continue; }
+      if (/_float_version/.test(k)) { continue; }
       // Don't show missing data.
       if (v === null) { continue; }
       // Don't show empty data.

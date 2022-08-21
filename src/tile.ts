@@ -184,7 +184,7 @@ export abstract class Tile {
     if (this.parent) {
       return this.parent.max_ix + 1;
     }
-    return undefined;
+    return;
   }
 
   async schema() {
@@ -346,12 +346,12 @@ export class QuadTile extends Tile {
         this.local_dictionary_lookups = codes;
         return this.record_batch;
       })
-      .catch((e) => {        
+      .catch((error) => {        
         this.download_state = 'Failed';
         console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
         
         `);
-        throw e;
+        throw error;
       });
     return this._download;
   }

@@ -6,7 +6,7 @@ import { mean } from 'd3-array';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
 import { APICall, Encoding } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
-import type {Renderer} from './rendering'
+import type { Renderer } from './rendering';
 import type QuadtreeRoot from './tile';
 import { ReglRenderer } from './regl_rendering';
 import Scatterplot from './deepscatter';
@@ -130,7 +130,7 @@ export default class Zoom {
     this.transform = zoomIdentity;
 
     const zoomer = zoom()
-      .scaleExtent([1 / 3, 100000])
+      .scaleExtent([1 / 3, 100_000])
       .extent([[0, 0], [width, height]])
       .on('zoom', (event) => {
         this.transform = event.transform;
@@ -168,7 +168,7 @@ export default class Zoom {
         dx: number,
         dy: number,
         data: any,
-      }
+      };
       const annotations : Annotation[] = d ? [
         {
           x: event.layerX,
@@ -212,7 +212,7 @@ export default class Zoom {
     // Use the rescaled versions of the scales.
     const scales = this.scales();
     if (scales === undefined) {
-      return undefined;
+      return;
     }
     const { x_, y_ } = scales;
 
@@ -231,7 +231,7 @@ export default class Zoom {
     ];
   }
 
-  restart_timer(run_at_least = 10000) {
+  restart_timer(run_at_least = 10_000) {
     // Restart the timer and run it for
     // run_at_least milliseconds or the current timeout,
     // whichever is greater.
@@ -293,7 +293,7 @@ export default class Zoom {
       size_range : number;
       pixels_per_unit : number;
     }
-    const scale_dat : Record<string, Scale_datum> = {}
+    const scale_dat : Record<string, Scale_datum> = {};
     for (const [name, dim] of [['x', width], ['y', height]]) {
       const limits = extent[name];
       const size_range = limits[1] - limits[0];
@@ -301,7 +301,7 @@ export default class Zoom {
         limits,
         size_range,
         pixels_per_unit : dim / size_range
-      }
+      };
     }
 
     const data_aspect_ratio = scale_dat.x.pixels_per_unit / scale_dat.y.pixels_per_unit;
@@ -347,13 +347,9 @@ export default class Zoom {
     // Force indicates that the tick must run even the timer metadata
     // says we are not animating.
 
-    if (force !== true) {
-      if (this._timer) {
-        //@ts-ignore
-        if (this._timer.stop_at <= Date.now()) {
-          this._timer.stop();
-        }
-      }
+    if (force !== true && this._timer && //@ts-ignore
+        this._timer.stop_at <= Date.now()) {
+      this._timer.stop();
     }
     /*
     for (const renderer of this.renderers.values()) {

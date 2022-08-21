@@ -6,7 +6,7 @@ import {
 import type Scatterplot from './deepscatter';
 import type QuadtreeRoot from './tile';
 import type { Encoding } from './types';
-import type {StatefulAesthetic} from './Aesthetic';
+import type { StatefulAesthetic } from './Aesthetic';
 
 export class AestheticSet {
   public tileSet : QuadtreeRoot;
@@ -23,27 +23,27 @@ export class AestheticSet {
     this.tileSet = tileSet;
     this.position_interpolation = false;
     this.aesthetic_map = new TextureSet(this.regl);
-    return this
+    return this;
   }
 
   public dim(aesthetic : string) {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
     if (this.store[aesthetic]) {
-      return this.store[aesthetic]
+      return this.store[aesthetic];
     }
     if (stateful_aesthetics[aesthetic] !== undefined) {
       this.store[aesthetic] = new stateful_aesthetics[aesthetic](
         this.scatterplot, this.regl, this.tileSet, 
         this.aesthetic_map
       );
-      return this.store[aesthetic]
+      return this.store[aesthetic];
     }
-    throw new Error(`Unknown aesthetic ${aesthetic}`)
+    throw new Error(`Unknown aesthetic ${aesthetic}`);
   }
   
   *[Symbol.iterator]() : Iterator<[string, StatefulAesthetic<any>]> {
-    for (let [k, v] of Object.entries(this.store)) {
-      yield [k, v]
+    for (const [k, v] of Object.entries(this.store)) {
+      yield [k, v];
     }
   }
 
@@ -124,10 +124,10 @@ export class TextureSet {
   private _color_position : number;
   constructor(regl : Regl, texture_size = 4096, texture_widths = 32) {
     this.texture_size = texture_size;
-    this.texture_widths = texture_widths
+    this.texture_widths = texture_widths;
     this.regl = regl;
-    this._one_d_position = 1
-    this._color_position = -1
+    this._one_d_position = 1;
+    this._color_position = -1;
   }
 
   public get_position(id : string) {
@@ -174,11 +174,11 @@ export class TextureSet {
 
   get one_d_texture() {
     if (this._one_d_texture) {
-      return this._one_d_texture
+      return this._one_d_texture;
     }
     const texture_type = this.regl.hasExtension('OES_texture_float') ? 
-       'float' : this.regl.hasExtension('OES_texture_half_float') ? 
-         'half float' : 'uint8';
+      'float' : (this.regl.hasExtension('OES_texture_half_float') ? 
+        'half float' : 'uint8');
     const format = texture_type === 'uint8' ? 'rgba' : 'alpha';
 
     const params = {
@@ -194,14 +194,14 @@ export class TextureSet {
   
   get color_texture() {
     if (this._color_texture) {
-      return this._color_texture
+      return this._color_texture;
     }
     this._color_texture = this.regl.texture({
       width: this.texture_widths,
       height: this.texture_size,
       type: 'uint8',
       format: 'rgba',
-    })
+    });
     return this._color_texture;
   }
 }

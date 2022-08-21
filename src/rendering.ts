@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 import { select } from 'd3-selection';
 import { min } from 'd3-array';
-import type Scatterplot from './deepscatter'
+import type Scatterplot from './deepscatter';
 import type { Tileset } from './tile';
 import type { APICall } from './types';
 import type Zoom from './interaction';
@@ -13,9 +13,9 @@ abstract class PlotSetting {
   abstract value: number;
   abstract target: number;
   timer : Timer | undefined;
-  transform: "geometric" | "arithmetic";
+  transform: 'geometric' | 'arithmetic';
   constructor() {
-    this.transform = "arithmetic";
+    this.transform = 'arithmetic';
   }
   update(value: number, duration: number) {
     if (duration === 0) {
@@ -23,7 +23,7 @@ abstract class PlotSetting {
       if (this.timer !== undefined) {
         this.timer.stop();
       }
-      return
+      return;
     }
     this.start = this.value;
     this.target = value;
@@ -34,47 +34,43 @@ abstract class PlotSetting {
       this.timer.stop();
     }
     const timer_object = timer((elapsed) => {
-      let t = elapsed / duration;
+      const t = elapsed / duration;
       if (t >= 1) {
-        this.value = this.target
+        this.value = this.target;
         timer_object.stop();
-        return
+        return;
       }
       const w1 = 1 - t;
       const w2 = t;
-      if (this.transform === 'geometric') {
-        this.value = this.start ** (w1) * this.target ** (w2)
-      } else {
-        this.value = this.start * (w1) + this.target * (w2);
-      }
-    })
+      this.value = this.transform === 'geometric' ? this.start ** (w1) * this.target ** (w2) : this.start * (w1) + this.target * (w2);
+    });
     this.timer = timer_object;
   }
 }
 
 class MaxPoints extends PlotSetting {
-  value: number = 10000;
-  start: number = 10000;
-  target: number = 10000;
+  value = 10_000;
+  start = 10_000;
+  target = 10_000;
   constructor() {
     super();
-    this.transform = 'geometric'
+    this.transform = 'geometric';
   }
 }
 
 class TargetOpacity extends PlotSetting {
-  value: number = 10
-  start: number = 10
-  target: number = 10
+  value = 10;
+  start = 10;
+  target = 10;
 }
 
 class PointSize extends PlotSetting {
-  value: number = 2;
-  start: number = 2;
-  target: number = 2;
+  value = 2;
+  start = 2;
+  target = 2;
   constructor() {
     super();
-    this.transform = 'geometric'
+    this.transform = 'geometric';
   }
 }
 
@@ -92,13 +88,13 @@ class RenderProps {
   }
   apply_prefs(prefs : APICall) {
 
-    const {duration} = prefs;
+    const { duration } = prefs;
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
     this.pointSize.update(prefs.point_size, duration);
   }
   get max_points() {
-    return this.maxPoints.value
+    return this.maxPoints.value;
   }
   get alpha() {
     return this.targetOpacity.value;
@@ -117,7 +113,7 @@ export class Renderer {
   public width : number;
   public height : number;
   public deferred_functions : Array<() => void>;
-  public _use_scale_to_download_tiles : boolean = true;
+  public _use_scale_to_download_tiles  = true;
   public zoom : Zoom;
   public aes : AestheticSet;
   public _zoom : Zoom;
@@ -160,7 +156,7 @@ export class Renderer {
   get optimal_alpha() {
     // This is extends a formula suggested by Ricky Reusser.
 
-    let { zoom_balance } = this.prefs;
+    const { zoom_balance } = this.prefs;
     const {
       alpha, point_size,
       max_ix, width, discard_share, height,
@@ -176,7 +172,7 @@ export class Renderer {
       / (total_points * fraction_of_total_visible * area_of_point);
     // constrain within realistic bounds.
     // would also be possible to adjust size to meet the goal.
-    return target > 1 ? 1 : target < 1 / 255 ? 1 / 255 : target;
+    return target > 1 ? 1 : (target < 1 / 255 ? 1 / 255 : target);
   }
 
   get point_size() {
@@ -201,21 +197,17 @@ export class Renderer {
     const { tileSet } = this;
     // Materialize using a tileset method.
     let all_tiles;
-    let natural_display = this.aes.dim('x').current.field == 'x' &&
+    const natural_display = this.aes.dim('x').current.field == 'x' &&
       this.aes.dim('y').current.field == 'y' &&
       this.aes.dim('x').last.field == 'x' &&
       this.aes.dim('y').last.field == 'y';
     
-    if (natural_display) {
-      all_tiles = tileSet.map((d : Tile) => d)      
-        .filter((tile) => {
-          const visible = tile.is_visible(max_ix, this.zoom.current_corners())
-          return visible
-        });
-    } else {
-      all_tiles = tileSet.map((d) => d)
-        .filter((tile) => tile.min_ix < this.max_ix);
-    }
+    all_tiles = natural_display ? tileSet.map((d : Tile) => d)      
+      .filter((tile) => {
+        const visible = tile.is_visible(max_ix, this.zoom.current_corners());
+        return visible;
+      }) : tileSet.map((d) => d)
+      .filter((tile) => tile.min_ix < this.max_ix);
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
     return all_tiles;
   }
@@ -228,6 +220,6 @@ export class Renderer {
   async initialize() {
     // Asynchronously wait for the basic elements to be done.
     await this._initializations;
-    this.zoom.restart_timer(500000);
+    this.zoom.restart_timer(500_000);
   }
 }

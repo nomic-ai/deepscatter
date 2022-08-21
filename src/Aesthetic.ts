@@ -84,7 +84,7 @@ for (const [k, v] of Object.entries(d3Chromatic)) {
 function okabe() {
   // Okabe-Ito color scheme.
   const okabe_palette = ['#E69F00', '#CC79A7', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#F0E442'];
-  const colors = new Array(palette_size);
+  const colors = Array.from({ length: palette_size });
   const scheme = okabe_palette.map((v) => {
     const col = rgb(v);
     return [col.r, col.g, col.b, 255];
@@ -330,7 +330,7 @@ abstract class Aesthetic {
     }
 
     if (typeof (encoding) !== 'object') {
-      let x : ConstantChannel = {
+      const x : ConstantChannel = {
         constant: encoding,
       };
       this.current_encoding = x;
@@ -407,10 +407,8 @@ abstract class Aesthetic {
   }
 
   get use_map_on_regl() : 1 | 0 {
-    if (this.is_dictionary()) {
-      if (this.domain[0] === -2047 && this.domain[1] == 2047) {
-        return 1;
-      }
+    if (this.is_dictionary() && this.domain[0] === -2047 && this.domain[1] == 2047) {
+      return 1;
     }
     return 0;
   }
@@ -418,11 +416,7 @@ abstract class Aesthetic {
   apply_function_for_textures(field: string, range : number[], raw_func: Function | string) {
     const { texture_size } = this.aesthetic_map;
     let func : Function;
-    if (typeof(raw_func) === 'string') {
-      func = lambda_to_function(parseLambdaString(raw_func));
-    } else {
-      func = raw_func;
-    }
+    func = typeof(raw_func) === 'string' ? lambda_to_function(parseLambdaString(raw_func)) : raw_func;
     //@ts-ignore TEMPORARY XXX
     this.scaleFunc = scaleLinear()
       .range(range)
@@ -444,14 +438,14 @@ abstract class Aesthetic {
     const { column } = this;
 
     if (!column) {
-      throw Error(`Column ${field} does not exist on table.`);
+      throw new Error(`Column ${field} does not exist on table.`);
     }
 
     if (column.type.dictionary) {
       // NB--Assumes string type for dictionaries.
-      input.fill(undefined);
+      input.fill();
       const dvals = column.data[0].dictionary.toArray();
-      dvals.forEach((d, i) => { input[i] = d; });
+      for (const [i, d] of dvals.entries()) { input[i] = d; }
     } else {
       input = input.map((d) => this.scale(d));
     }
@@ -466,8 +460,7 @@ abstract class OneDAesthetic extends Aesthetic {
   get default_domain() {return [0, 1];}
 }
 
-abstract class BooleanAesthetic extends Aesthetic {
-}
+abstract class BooleanAesthetic extends Aesthetic {}
 
 class Size extends OneDAesthetic {
   static get default_constant() {return 1.5;}
@@ -501,15 +494,13 @@ class X extends PositionalAesthetic {
   field = 'x';
 }
 
-class X0 extends X {
-}
+class X0 extends X {}
 
 class Y extends PositionalAesthetic {
   field = 'y';
 }
 
-class Y0 extends Y {
-}
+class Y0 extends Y {}
 
 abstract class AbstractFilter extends BooleanAesthetic {
   public current_encoding : LambdaChannel | OpChannel | ConstantChannel;
@@ -559,8 +550,7 @@ abstract class AbstractFilter extends BooleanAesthetic {
 }
 
 
-class Filter extends AbstractFilter {
-}
+class Filter extends AbstractFilter {}
 
 
 class Jitter_speed extends Aesthetic {
@@ -657,10 +647,8 @@ class Color extends Aesthetic {
   
   update(encoding : ColorChannel) {
     this.current_encoding = encoding;
-    if (isConstantChannel(encoding)) {
-      if (typeof(encoding.constant) === 'string') {
-        encoding.constant = Color.convert_color(encoding.constant);
-      }
+    if (isConstantChannel(encoding) && typeof(encoding.constant) === 'string') {
+      encoding.constant = Color.convert_color(encoding.constant);
     }
     super.update(encoding);
     if ((encoding.range && typeof(encoding.range[0]) === 'string')) {
@@ -676,7 +664,7 @@ class Color extends Aesthetic {
       this.texture_buffer.set(color_palettes[range]);
     } else if (range.length === this.aesthetic_map.texture_size * 4) {
       this.texture_buffer.set(range);
-    } else if (range.length && range[0].length && range[0].length === 3) {
+    } else if (range.length > 0 && range[0].length > 0 && range[0].length === 3) {
       // manually set colors.
       const r = arange(palette_size).map((i) => {
         const [r, g, b] = range[i % range.length];

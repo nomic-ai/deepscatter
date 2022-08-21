@@ -126,7 +126,7 @@ export class ReglRenderer extends Renderer {
     const { prefs } = this;
     const { transform } = this.zoom;
     const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
-    console.log(prefs.arrow_table)
+    console.log(prefs.arrow_table);
     const props = {
     // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
@@ -214,22 +214,22 @@ export class ReglRenderer extends Renderer {
       depth: 1,
     });
     const start = Date.now();
-    let current = () => undefined;
-    while (Date.now() - start < 10 && this.deferred_functions.length) {
+    let current = () => {};
+    while (Date.now() - start < 10 && this.deferred_functions.length > 0) {
     // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
       current = this.deferred_functions.shift();
       try {
         current();
-      } catch (err) {
-        console.warn(err, current);
+      } catch (error) {
+        console.warn(error, current);
       }
     }
     try {
       this.render_all(props);
-    } catch(err) {
+    } catch(error) {
       console.warn('ERROR NOTED');
       this.reglframe.cancel();
-      throw err;
+      throw error;
     }
   }
 
@@ -358,8 +358,8 @@ export class ReglRenderer extends Renderer {
         count: 3,
         uniforms: {
           tex: () => layer,
-          wRcp: ({ viewportWidth }) => 1.0 / viewportWidth,
-          hRcp: ({ viewportHeight }) => 1.0 / viewportHeight,
+          wRcp: ({ viewportWidth }) => 1 / viewportWidth,
+          hRcp: ({ viewportHeight }) => 1 / viewportHeight,
         },
       })();
     }
@@ -615,7 +615,7 @@ export class ReglRenderer extends Renderer {
         color_at_point = this.regl.read({
           x, y: height - y, width: 1, height: 1,
         });
-      } catch (err) {
+      } catch {
         console.warn('Read bad data from', {
           x, y, height, attempted: height - y,
         });
@@ -630,7 +630,7 @@ export class ReglRenderer extends Renderer {
     const point_as_int = Math.round(point_as_float);
     const p = this.tileSet.findPoint(point_as_int);
 
-    if (p.length === 0) { return undefined; }
+    if (p.length === 0) { return; }
 
     return p[0];
   }
@@ -883,10 +883,10 @@ export class ReglRenderer extends Renderer {
           if (this.aes.dim(aesthetic)[time].field) {
             buffers.push({ aesthetic, time, field: this.aes.dim(aesthetic)[time].field });
           }
-        } catch (e) {
+        } catch (error) {
           this.reglframe.cancel();
           this.reglframe = undefined;
-          throw e;
+          throw error;
         }
       }
     }
