@@ -143,7 +143,11 @@ export class Renderer {
   }
 
   get prefs() : APICall{
-    return this.scatterplot.prefs;
+    const p = { ...this.scatterplot.prefs };
+    p.arrow_table = undefined;
+    p.arrow_buffer = undefined;
+    return p;
+
   }
 
   //color_pick() {
