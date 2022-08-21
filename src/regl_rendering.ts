@@ -27,7 +27,6 @@ export class ReglRenderer extends Renderer {
   public tileSet : Dataset;
   public zoom : Zoom;
   public _zoom : Zoom;
-  public prefs : APICall = {};
   public _start : number;
   public most_recent_restart? : number;
   public _default_webgl_scale? : number[];
@@ -178,7 +177,6 @@ export class ReglRenderer extends Renderer {
     // Do the binding operation; returns truthy if it's already done.
       const manager = new TileBufferManager(this.regl, tile, this);
       if (!manager.ready(props.prefs, props.block_for_buffers)) {
-        console.log('Not ready');
         // The 'ready' call also pushes a creation request into
         // the deferred_functions queue.
         continue;

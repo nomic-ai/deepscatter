@@ -206,13 +206,12 @@ export default class Scatterplot {
     // Stash the previous values for interpolation.
 
     if (this.prefs.encoding && prefs.encoding) {
-      for (const k : string of Object.keys(this.prefs.encoding)) {
-        if (prefs.encoding[k]) {
+      for (const k of Object.keys(this.prefs.encoding)) {
+        if (prefs.encoding[k] !== undefined) {
           this.prefs.encoding[k] = prefs.encoding[k];
         }
       }
     }
-
     merge(this.prefs, prefs);
 
   }

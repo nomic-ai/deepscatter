@@ -114,7 +114,6 @@ export class Renderer {
   public holder : d3.Selection<any, any, any, any>;
   public canvas : d3.Selection<any, any, any, any>;
   public tileSet : Tileset;
-  public prefs : APICall;
   public width : number;
   public height : number;
   public deferred_functions : Array<() => void>;
@@ -129,9 +128,6 @@ export class Renderer {
     this.holder = select(selector);
     this.canvas = select(this.holder.node().firstElementChild);
     this.tileSet = tileSet;
-    this.prefs = {...scatterplot.prefs};
-    this.prefs.arrow_table = undefined;
-    this.prefs.arrow_buffer = undefined;
     this.width = +this.canvas.attr('width');
     this.height = +this.canvas.attr('height');
     this.deferred_functions = [];
@@ -146,7 +142,9 @@ export class Renderer {
     return 0;
   }
 
-
+  get prefs() : APICall{
+    return this.scatterplot.prefs;
+  }
 
   //color_pick() {
   //  return 1;
