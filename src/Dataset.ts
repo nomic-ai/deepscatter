@@ -117,7 +117,7 @@ export abstract class Dataset<T extends Tile> {
     }
     for (const {} of range(NUM_WORKERS)) {
       this._tileworkers.push(
-        //          Comlink.wrap(new Worker(this.url + '/../worker.js')),
+        //          Comlink.wrap(new Worker(this.url + '/../worker.ts')),
         Comlink.wrap(new TileWorker()),
       );
     }

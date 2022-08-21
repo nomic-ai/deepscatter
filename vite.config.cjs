@@ -22,7 +22,7 @@ export default {
     glslify({ compress: false }), // for debugging 
     /*    worker({
       targetPlatform: 'browser',
-      pattern: /(.+)\?worker.js/,
+      pattern: /(.+)\?worker.ts/,
       //      extensions: supportedExts,
       preserveSource: true, // somehow results in slightly smaller bundle
     }), */

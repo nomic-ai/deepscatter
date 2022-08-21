@@ -20,12 +20,12 @@ export default class GeoLines {
     const start_points = [];
     let position = 0;
 
-    for (let coordinate_set of lines.coordinates) {
+    for (const coordinate_set of lines.coordinates) {
       start_points.push({
         offset: position * 4,
         length: coordinate_set.length
       });
-      for (let [x, y] of coordinate_set) {
+      for (const [x, y] of coordinate_set) {
         buffer[position] = x;
         buffer[position + 1] = y;
         position += 2;
@@ -100,7 +100,7 @@ export default class GeoLines {
 
   render(props) {
     const prop_list = [];
-    for (let segment of this.line_meta) {
+    for (const segment of this.line_meta) {
       const el = {};
       Object.assign(el, props);
       el.length = segment.length;

@@ -74,7 +74,7 @@ export default class FeatureHandler {
 
   render(props) {
     const prop_list = [];
-    for (let feature of this.features) {
+    for (const feature of this.features) {
       feature.alpha = 1; //;feature.alpha || .7 + Math.random() * .15
       feature.color = [.2, .2, .2];
       const el = {
@@ -124,7 +124,7 @@ export default class FeatureHandler {
   }
 
   *[Symbol.iterator]() {
-    for (let feature of this.features) {
+    for (const feature of this.features) {
       yield feature;
     }
   }

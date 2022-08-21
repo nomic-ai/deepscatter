@@ -4,7 +4,7 @@ import {
 
 import { tableFromIPC, Table, RecordBatch } from 'apache-arrow';
 
-import TileWorker from './tileworker.worker.js?worker&inline';
+import TileWorker from './tileworker.worker.ts?worker&inline';
 import type { Dataset, QuadtileSet } from './Dataset';
 import Scatterplot from './deepscatter';
 type MinMax = [number, number];
