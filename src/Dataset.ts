@@ -31,7 +31,7 @@ export abstract class Dataset<T extends Tile> {
   static from_arrow_table(table: Table, prefs: APICall, plot: Scatterplot) : ArrowDataset {
     return new ArrowDataset(table, prefs, plot);
   }
-  abstract download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length : number) : void;
+  abstract download_most_needed_tiles(bbox : Rectangle | undefined, max_ix: number, queue_length : number) : void;
 
   /**
    * Map a function against all tiles.
@@ -141,7 +141,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
     return Promise.resolve();
   }
 
-  download_most_needed_tiles(bbox: Rectangle, max_ix: number, queue_length: number): void {
+  download_most_needed_tiles(bbox: Rectangle | undefined, max_ix: number, queue_length: number): void {
     // Definitionally there.
     return undefined;
   }
@@ -164,7 +164,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
     return this.root_tile.extent;
   }
 
-  download_most_needed_tiles(bbox : Rectangle, max_ix: number, queue_length = 4) {
+  download_most_needed_tiles(bbox : Rectangle | undefined, max_ix: number, queue_length = 4) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
       unneeded parts of the database. So the tile handles its own queue for dispatching
@@ -179,6 +179,10 @@ export class QuadtileSet extends Dataset<QuadTile> {
 
     const scores : [number, QuadTile, Rectangle][] = [];
     function callback (tile : QuadTile) {
+      if (bbox === undefined) {
+        // Just depth.
+        return 1 / tile.codes[0];
+      }
       if (tile.download_state === 'Unattempted') {
         const distance = check_overlap(tile, bbox);
         scores.push([distance, tile, bbox]);
@@ -199,12 +203,12 @@ export class QuadtileSet extends Dataset<QuadTile> {
       }
       queue.add(tile.key);
       tile.download()
+        .then(() => queue.delete(tile.key))
         .catch((error) => {
           console.warn('Error on', tile.key);
           queue.delete(tile.key);
           throw (error);
-        })
-        .then(() => queue.delete(tile.key));
+        });
     }
   }
 }

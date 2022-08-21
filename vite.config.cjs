@@ -1,4 +1,5 @@
-const glslify = require('rollup-plugin-glslify')
+
+const glslify = require('rollup-plugin-glslify');
 //import worker from 'rollup-plugin-web-worker-loader';
 
 //import { fileURLToPath } from 'url';
@@ -19,7 +20,7 @@ export default {
 
   plugins: [
     glslify({ compress: false }), // for debugging 
-/*    worker({
+    /*    worker({
       targetPlatform: 'browser',
       pattern: /(.+)\?worker.js/,
       //      extensions: supportedExts,

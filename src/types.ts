@@ -1,24 +1,24 @@
-import { Table } from "apache-arrow";
+import { Table } from 'apache-arrow';
 
 /**
  * Operations to be performed on the GPU taking a single argument.
  */
 type OneArgumentOp = {
-  op: "gt" | "lt" | "eq"
+  op: 'gt' | 'lt' | 'eq'
   field : string;
   a : number;
-}
+};
 
 /**
  * Operations to be performed on the GPU taking two arguments
  */
 
 type TwoArgumentOp = {
-  op: "within" | "between",
+  op: 'within' | 'between',
   field: string,
   a: number,
   b: number;
-}
+};
 
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
 
@@ -28,13 +28,13 @@ export type LambdaChannel = {
   field : string;
   domain? : [number, number];
   range? : [number, number];
-}
+};
 
 export type FunctionalChannel = LambdaChannel | OpChannel;
 
 export type ConstantChannel = {
   constant : number;
-}
+};
 
 
 /**
@@ -56,7 +56,7 @@ export interface BasicChannel {
    * 'literal' maps in the implied dataspace set by 'x', 'y', while
    * 'linear' transforms the data by the range and domain.
   */
-  transform? : "log" | "linear" | "sqrt" | "literal";
+  transform? : 'log' | 'linear' | 'sqrt' | 'literal';
   // The domain over which the data extends 
   domain? : [number, number];
   // The range into which to map the data.
@@ -72,8 +72,8 @@ export type JitterChannel = {
    * 'circle' animates a circle around the point.
    * 'time' lapses the point in and out of view.
    */
-  method : null | "spiral" | "uniform" | "normal" | "circle" | "time"
-}
+  method : null | 'spiral' | 'uniform' | 'normal' | 'circle' | 'time'
+};
 
 export interface CategoricalChannel {
   field: string;
@@ -82,16 +82,16 @@ export interface CategoricalChannel {
 export type BasicColorChannel = BasicChannel & {
   range? : [[number, number, number], [number, number, number]] | string;
   domain? : [number, number];
-}
+};
 
 export type CategoricalColorChannel = CategoricalChannel & {
   range? : [number, number, number][] | string;
   domain? : string[];
-}
+};
 
 export type ConstantColorChannel = ConstantChannel & {
   constant? : [number, number, number]
-}
+};
 
 export type ColorChannel = BasicColorChannel | CategoricalColorChannel | ConstantColorChannel;
 export type Channel = BasicChannel | string | ConstantChannel | OpChannel | LambdaChannel;
@@ -100,7 +100,7 @@ export type OpArray = [
   number,
   number, 
   number
-] // A description of a functional operation to be passsed to the shader.
+]; // A description of a functional operation to be passsed to the shader.
 
 /**
  * And encoding.
@@ -113,7 +113,7 @@ export type Encoding = {
   shape?: null | Channel;
   alpha?: null | Channel;
   filter?: null | FunctionalChannel;
-//  filter1?: null | FunctionalChannel;
+  //  filter1?: null | FunctionalChannel;
   filter2?: null | FunctionalChannel;
   jitter_radius?: Channel;
   jitter_speed?: Channel;
@@ -121,7 +121,7 @@ export type Encoding = {
   y0? : Channel;
   position?: string;
   position0? : string;
-}
+};
 
 export type Dimension = keyof Encoding;
 
@@ -130,11 +130,11 @@ export type Dimension = keyof Encoding;
 // 2. A URL to a Quadtile source.
 // 3. An array buffer that contains a serialized Table.
 
-type DataSpec = {} & (
-      | { source_url?: never; arrow_table?: never; arrow_buffer: ArrayBuffer; }
-      | { source_url: string; arrow_table?: never; arrow_buffer?: never; }
-      | { source_url?: never; arrow_table: Table; arrow_buffer?: never; }
-  )
+type DataSpec = Record<string, never> & (
+  | { source_url?: never; arrow_table?: never; arrow_buffer: ArrayBuffer; }
+  | { source_url: string; arrow_table?: never; arrow_buffer?: never; }
+  | { source_url?: never; arrow_table: Table; arrow_buffer?: never; }
+);
 
 export type APICall = { 
   /** The magnification coefficient for a zooming item */
@@ -145,6 +145,8 @@ export type APICall = {
 
   /** The base point size for aes is modified */
   point_size: number;
+
+  /** The maximum number of points to load */
   max_points : number;
   /** Overall screen saturation target at average point density */
   alpha: number;

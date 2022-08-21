@@ -6,11 +6,11 @@
   "files": [
     "dist"
   ],
-  "module": "./dist/deepscatter.es.js",
+  "module": "./dist/deepscatter.js",
   "main": "./dist/deepscatter.umd.js",
   "exports": {
     ".": {
-      "import": "./dist/deepscatter.es.js",
+      "import": "./dist/deepscatter.js",
       "require": "./dist/deepscatter.umd.js"
     }
   },

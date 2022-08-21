@@ -197,7 +197,7 @@ export abstract class Tile {
    * @param callback A function (possibly async) to execute before this cell is ready. 
    * @returns A promise that includes the callback and all previous promises.
    */
-  extend_promise(callback : () => Promise<any>) {
+  extend_promise(callback : () => Promise<void>) {
     this.promise = this.promise.then(() => callback());
     return this.promise;
   }
@@ -259,28 +259,14 @@ export abstract class Tile {
     }
   }
 
-  get theoretical_extent() : Rectangle { 
-    // QUADTREE SPECIFIC CODE.
-    const base = this.dataset.extent;
-    const [z, x, y] = this.codes;
-
-    const x_step = base.x[1] - base.x[0];
-    const each_x = x_step / (2 ** z);
-
-    const y_step = base.y[1] - base.y[0];
-    const each_y = y_step / (2 ** z);
-
-    return {
-      x: [base.x[0] + x * each_x, base.x[0] + (x + 1) * each_x],
-      y: [base.y[0] + y * each_y, base.y[0] + (y + 1) * each_y],
-    };
-  }
-
   get extent() : Rectangle {
     if (this._extent) {
       return this._extent;
     }
-    return this.theoretical_extent;
+    return {
+      x: [Number.MIN_VALUE, Number.MAX_VALUE],
+      y: [Number.MIN_VALUE, Number.MAX_VALUE]
+    };
   }
 
   [Symbol.iterator]() {
@@ -291,8 +277,8 @@ export abstract class Tile {
     if (this.parent === null) {
       // infinite extent
       return {
-        x: [-Infinity, Infinity],
-        y: [-Infinity, Infinity],
+        x: [Number.MIN_VALUE, Number.MAX_VALUE],
+        y: [Number.MIN_VALUE, Number.MAX_VALUE]
       };
     }
     return this.parent.root_extent;
@@ -311,9 +297,17 @@ export class QuadTile extends Tile {
     this.url = base_url;
     this.parent = parent;
     this.key = key;
-    const [z, x, y] = key.split('/').map((d) => parseInt(d));
+    const [z, x, y] = key.split('/').map((d) => Number.parseInt(d));
     this.codes = [z, x, y];
     this.class = new.target;
+  }
+
+
+  get extent() : Rectangle {
+    if (this._extent) {
+      return this._extent;
+    }
+    return this.theoretical_extent;
   }
 
   async download() : Promise<void> {
@@ -334,7 +328,6 @@ export class QuadTile extends Tile {
       .fetch(url, {})
       .then(([buffer, metadata, codes]): Table<any> => {
         this.download_state = 'Complete';
-
         // metadata is passed separately b/c I dont know
         // how to fix it on the table in javascript, just python.
         this._table_buffer = buffer;
@@ -378,12 +371,31 @@ export class QuadTile extends Tile {
     // }
     return this._children;
   }
+
+  get theoretical_extent() : Rectangle { 
+    // QUADTREE SPECIFIC CODE.
+    const base = this.dataset.extent;
+    const [z, x, y] = this.codes;
+
+    const x_step = base.x[1] - base.x[0];
+    const each_x = x_step / (2 ** z);
+
+    const y_step = base.y[1] - base.y[0];
+    const each_y = y_step / (2 ** z);
+
+    return {
+      x: [base.x[0] + x * each_x, base.x[0] + (x + 1) * each_x],
+      y: [base.y[0] + y * each_y, base.y[0] + (y + 1) * each_y],
+    };
+  }
+
+
 }
 
 export class ArrowTile extends Tile {
   batch_num: number;
   full_tab: Table;
-  constructor(table: Table, dataset : Dataset<ArrowTile>, batch_num : number, plot: Scatterplot, parent = null) {
+  constructor(table: Table, dataset : Dataset<this>, batch_num : number, plot: Scatterplot, parent = null) {
     super(dataset);
     this.full_tab = table;
     this._batch = table.batches[batch_num];
@@ -417,7 +429,8 @@ export class ArrowTile extends Tile {
       }
     }
   }  
-  download() : Promise<Table> {
+  download() : Promise<RecordBatch> {
+    
     return Promise.resolve(this._batch);
   }
   get ready() : boolean {
