@@ -70,7 +70,7 @@
             ]
         },
         {
-            "files": ["*.js", "*.cjs"],
+            "files": ["*.config.js", "*.config.cjs"],
             "rules": {
                 "@typescript-eslint/no-var-requires": "off"
             }
