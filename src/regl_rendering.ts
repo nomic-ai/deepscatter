@@ -992,6 +992,7 @@ class TileBufferManager {
     }
     return true;
   }
+
   get count() {
     // Returns the number of points in this table.
     const { tile, regl_elements } = this;
@@ -1113,14 +1114,22 @@ class MultipurposeBufferSet {
     );
   }
 
-  allocate_block(items, bytes_per_item : number) {
-    // Allocate a block of this buffer.
+  /**
+   * 
+   * @param items The number of datapoints in the arrow column being allocated
+   * @param bytes_per_item The number of bytes per item in the arrow column being allocated
+   * @returns 
+   */
+
+  allocate_block(items: number, bytes_per_item: number) {
+    // Call dibs on a block of this buffer.
     // NB size is in **bytes**
     if (this.pointer + items * bytes_per_item > this.buffer_size) {
     // May lead to ragged ends. Could be smarter about reallocation here,
     // too.
       this.generate_new_buffer();
     }
+
     const value = {
     // First slot stores the active buffer.
       buffer: this.buffers[0],

@@ -14,7 +14,6 @@ export type Rectangle = {
   y:  MinMax
 };
 
-
 interface schema_entry{
   name: string,
   type : string, 

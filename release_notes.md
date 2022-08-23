@@ -1,4 +1,8 @@
 
+# 2.4.1
+
+Attempted bundle fixes.
+
 # 2.4.0
 
 FEATURES:

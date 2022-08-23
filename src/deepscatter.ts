@@ -8,6 +8,7 @@ import { Dataset } from './Dataset';
 import { APICall } from './types';
 import { StructRowProxy } from 'apache-arrow';
 
+// DOM elements that deepscatter uses.
 const base_elements = [
   {
     id: 'canvas-2d-background',
