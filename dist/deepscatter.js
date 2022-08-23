@@ -5444,7 +5444,7 @@ class Zoom {
     const { width, height } = this;
     const scales2 = this.scales();
     if (scales2 === void 0) {
-      return void 0;
+      return;
     }
     const { x_, y_ } = scales2;
     return {
@@ -5530,12 +5530,8 @@ class Zoom {
   }
   tick(force = false) {
     this._start = this._start || Date.now();
-    if (force !== true) {
-      if (this._timer) {
-        if (this._timer.stop_at <= Date.now()) {
-          this._timer.stop();
-        }
-      }
+    if (force !== true && this._timer && this._timer.stop_at <= Date.now()) {
+      this._timer.stop();
     }
   }
 }
@@ -15376,7 +15372,7 @@ class PlotSetting {
       this.timer.stop();
     }
     const timer_object = timer((elapsed) => {
-      let t = elapsed / duration;
+      const t = elapsed / duration;
       if (t >= 1) {
         this.value = this.target;
         timer_object.stop();
@@ -15384,11 +15380,7 @@ class PlotSetting {
       }
       const w1 = 1 - t;
       const w2 = t;
-      if (this.transform === "geometric") {
-        this.value = this.start ** w1 * this.target ** w2;
-      } else {
-        this.value = this.start * w1 + this.target * w2;
-      }
+      this.value = this.transform === "geometric" ? this.start ** w1 * this.target ** w2 : this.start * w1 + this.target * w2;
     });
     this.timer = timer_object;
   }
@@ -15448,9 +15440,6 @@ class Renderer {
     this.holder = select(selector2);
     this.canvas = select(this.holder.node().firstElementChild);
     this.tileSet = tileSet;
-    this.prefs = { ...scatterplot.prefs };
-    this.prefs.arrow_table = void 0;
-    this.prefs.arrow_buffer = void 0;
     this.width = +this.canvas.attr("width");
     this.height = +this.canvas.attr("height");
     this.deferred_functions = [];
@@ -15460,11 +15449,17 @@ class Renderer {
   get discard_share() {
     return 0;
   }
+  get prefs() {
+    const p = { ...this.scatterplot.prefs };
+    p.arrow_table = void 0;
+    p.arrow_buffer = void 0;
+    return p;
+  }
   get alpha() {
     return this.render_props.alpha;
   }
   get optimal_alpha() {
-    let { zoom_balance } = this.prefs;
+    const { zoom_balance } = this.prefs;
     const {
       alpha,
       point_size,
@@ -15500,15 +15495,11 @@ class Renderer {
     const { max_ix } = this;
     const { tileSet } = this;
     let all_tiles;
-    let natural_display = this.aes.dim("x").current.field == "x" && this.aes.dim("y").current.field == "y" && this.aes.dim("x").last.field == "x" && this.aes.dim("y").last.field == "y";
-    if (natural_display) {
-      all_tiles = tileSet.map((d) => d).filter((tile) => {
-        const visible = tile.is_visible(max_ix, this.zoom.current_corners());
-        return visible;
-      });
-    } else {
-      all_tiles = tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
-    }
+    const natural_display = this.aes.dim("x").current.field == "x" && this.aes.dim("y").current.field == "y" && this.aes.dim("x").last.field == "x" && this.aes.dim("y").last.field == "y";
+    all_tiles = natural_display ? tileSet.map((d) => d).filter((tile) => {
+      const visible = tile.is_visible(max_ix, this.zoom.current_corners());
+      return visible;
+    }) : tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
     return all_tiles;
   }
@@ -17396,7 +17387,7 @@ for (const [k, v] of Object.entries(d3Chromatic)) {
 }
 function okabe() {
   const okabe_palette = ["#E69F00", "#CC79A7", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442"];
-  const colors2 = new Array(palette_size);
+  const colors2 = Array.from({ length: palette_size });
   const scheme2 = okabe_palette.map((v) => {
     const col = rgb(v);
     return [col.r, col.g, col.b, 255];
@@ -17568,7 +17559,7 @@ class Aesthetic {
       encoding = this.convert_string_encoding(encoding);
     }
     if (typeof encoding !== "object") {
-      let x = {
+      const x = {
         constant: encoding
       };
       this.current_encoding = x;
@@ -17636,21 +17627,15 @@ class Aesthetic {
     return this.default_constant;
   }
   get use_map_on_regl() {
-    if (this.is_dictionary()) {
-      if (this.domain[0] === -2047 && this.domain[1] == 2047) {
-        return 1;
-      }
+    if (this.is_dictionary() && this.domain[0] === -2047 && this.domain[1] == 2047) {
+      return 1;
     }
     return 0;
   }
   apply_function_for_textures(field, range$1, raw_func) {
     const { texture_size } = this.aesthetic_map;
     let func;
-    if (typeof raw_func === "string") {
-      func = lambda_to_function(parseLambdaString(raw_func));
-    } else {
-      func = raw_func;
-    }
+    func = typeof raw_func === "string" ? lambda_to_function(parseLambdaString(raw_func)) : raw_func;
     this.scaleFunc = linear().range(range$1).domain([0, texture_size - 1]);
     let input = range(texture_size);
     if (field === void 0 || this.dataset.root_tile.record_batch === void 0) {
@@ -17665,14 +17650,14 @@ class Aesthetic {
     }
     const { column } = this;
     if (!column) {
-      throw Error(`Column ${field} does not exist on table.`);
+      throw new Error(`Column ${field} does not exist on table.`);
     }
     if (column.type.dictionary) {
-      input.fill(void 0);
+      input.fill();
       const dvals = column.data[0].dictionary.toArray();
-      dvals.forEach((d, i) => {
+      for (const [i, d] of dvals.entries()) {
         input[i] = d;
-      });
+      }
     } else {
       input = input.map((d) => this.scale(d));
     }
@@ -17881,10 +17866,8 @@ class Color extends Aesthetic {
   }
   update(encoding) {
     this.current_encoding = encoding;
-    if (isConstantChannel(encoding)) {
-      if (typeof encoding.constant === "string") {
-        encoding.constant = Color.convert_color(encoding.constant);
-      }
+    if (isConstantChannel(encoding) && typeof encoding.constant === "string") {
+      encoding.constant = Color.convert_color(encoding.constant);
     }
     super.update(encoding);
     if (encoding.range && typeof encoding.range[0] === "string") {
@@ -17898,7 +17881,7 @@ class Color extends Aesthetic {
       this.texture_buffer.set(color_palettes[range$1]);
     } else if (range$1.length === this.aesthetic_map.texture_size * 4) {
       this.texture_buffer.set(range$1);
-    } else if (range$1.length && range$1[0].length && range$1[0].length === 3) {
+    } else if (range$1.length > 0 && range$1[0].length > 0 && range$1[0].length === 3) {
       const r = range(palette_size).map((i) => {
         const [r2, g, b] = range$1[i % range$1.length];
         return [r2, g, b, 255];
@@ -18073,7 +18056,7 @@ class AestheticSet {
     throw new Error(`Unknown aesthetic ${aesthetic}`);
   }
   *[Symbol.iterator]() {
-    for (let [k, v] of Object.entries(this.store)) {
+    for (const [k, v] of Object.entries(this.store)) {
       yield [k, v];
     }
   }
@@ -18203,6 +18186,8 @@ class ReglRenderer extends Renderer {
   constructor(selector2, tileSet, scatterplot) {
     super(selector2, tileSet, scatterplot);
     this.buffer_size = 1024 * 1024 * 64;
+    this._use_scale_to_download_tiles = true;
+    this.fbos = {};
     this.textures = {};
     this.regl = wrapREGL(
       {
@@ -18241,6 +18226,7 @@ class ReglRenderer extends Renderer {
     const { prefs } = this;
     const { transform } = this.zoom;
     const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
+    console.log(prefs.arrow_table);
     const props = {
       aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
@@ -18285,7 +18271,6 @@ class ReglRenderer extends Renderer {
     for (const tile of this.visible_tiles()) {
       const manager = new TileBufferManager(this.regl, tile, this);
       if (!manager.ready(props.prefs, props.block_for_buffers)) {
-        console.log("Not ready");
         continue;
       }
       const this_props = {
@@ -18307,28 +18292,29 @@ class ReglRenderer extends Renderer {
     if (this._use_scale_to_download_tiles) {
       tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix);
     } else {
-      tileSet.download_to_depth(prefs.max_points);
+      tileSet.download_most_needed_tiles(prefs.max_points);
     }
     regl2.clear({
       color: [0.9, 0.9, 0.93, 0],
       depth: 1
     });
     const start2 = Date.now();
-    let current = () => void 0;
-    while (Date.now() - start2 < 10 && this.deferred_functions.length) {
+    let current = () => {
+    };
+    while (Date.now() - start2 < 10 && this.deferred_functions.length > 0) {
       current = this.deferred_functions.shift();
       try {
         current();
-      } catch (err) {
-        console.warn(err, current);
+      } catch (error) {
+        console.warn(error, current);
       }
     }
     try {
       this.render_all(props);
-    } catch (err) {
+    } catch (error) {
       console.warn("ERROR NOTED");
       this.reglframe.cancel();
-      throw err;
+      throw error;
     }
   }
   single_blur_pass(fbo1, fbo2, direction) {
@@ -18481,16 +18467,18 @@ class ReglRenderer extends Renderer {
     }
     const image = new Image();
     image.src = url;
-    image.onload = () => {
+    image.addEventListener("load", () => {
       this.textures[url] = regl2.texture(image);
-    };
+    });
     return this.textures[url];
   }
   n_visible(only_color = -1) {
     let { width, height } = this;
     width = Math.floor(width);
     height = Math.floor(height);
-    this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height);
+    if (this.contour_vals === void 0) {
+      this.contour_vals = new Uint8Array(width * height * 4);
+    }
     const { props } = this;
     props.only_color = only_color;
     let v;
@@ -18516,7 +18504,7 @@ class ReglRenderer extends Renderer {
           width: 1,
           height: 1
         });
-      } catch (err) {
+      } catch {
         console.warn("Read bad data from", {
           x,
           y,
@@ -18529,7 +18517,7 @@ class ReglRenderer extends Renderer {
     const point_as_int = Math.round(point_as_float);
     const p = this.tileSet.findPoint(point_as_int);
     if (p.length === 0) {
-      return void 0;
+      return;
     }
     return p[0];
   }
@@ -18732,10 +18720,10 @@ class ReglRenderer extends Renderer {
           if (this.aes.dim(aesthetic)[time].field) {
             buffers.push({ aesthetic, time, field: this.aes.dim(aesthetic)[time].field });
           }
-        } catch (e) {
+        } catch (error) {
           this.reglframe.cancel();
           this.reglframe = void 0;
-          throw e;
+          throw error;
         }
       }
     }
@@ -27583,7 +27571,7 @@ class Tile {
     if (this.parent) {
       return this.parent.max_ix + 1;
     }
-    return void 0;
+    return;
   }
   async schema() {
     await this.download();
@@ -27643,23 +27631,14 @@ class Tile {
       }
     }
   }
-  get theoretical_extent() {
-    const base = this.dataset.extent;
-    const [z, x, y] = this.codes;
-    const x_step = base.x[1] - base.x[0];
-    const each_x = x_step / 2 ** z;
-    const y_step = base.y[1] - base.y[0];
-    const each_y = y_step / 2 ** z;
-    return {
-      x: [base.x[0] + x * each_x, base.x[0] + (x + 1) * each_x],
-      y: [base.y[0] + y * each_y, base.y[0] + (y + 1) * each_y]
-    };
-  }
   get extent() {
     if (this._extent) {
       return this._extent;
     }
-    return this.theoretical_extent;
+    return {
+      x: [Number.MIN_VALUE, Number.MAX_VALUE],
+      y: [Number.MIN_VALUE, Number.MAX_VALUE]
+    };
   }
   [Symbol.iterator]() {
     return this.yielder();
@@ -27667,8 +27646,8 @@ class Tile {
   get root_extent() {
     if (this.parent === null) {
       return {
-        x: [-Infinity, Infinity],
-        y: [-Infinity, Infinity]
+        x: [Number.MIN_VALUE, Number.MAX_VALUE],
+        y: [Number.MIN_VALUE, Number.MAX_VALUE]
       };
     }
     return this.parent.root_extent;
@@ -27683,9 +27662,15 @@ class QuadTile extends Tile {
     this.url = base_url;
     this.parent = parent;
     this.key = key;
-    const [z, x, y] = key.split("/").map((d) => parseInt(d));
+    const [z, x, y] = key.split("/").map((d) => Number.parseInt(d));
     this.codes = [z, x, y];
     this.class = new.target;
+  }
+  get extent() {
+    if (this._extent) {
+      return this._extent;
+    }
+    return this.theoretical_extent;
   }
   async download() {
     if (this._download) {
@@ -27712,12 +27697,12 @@ class QuadTile extends Tile {
       this.highest_known_ix = this.max_ix;
       this.local_dictionary_lookups = codes;
       return this.record_batch;
-    }).catch((e) => {
+    }).catch((error) => {
       this.download_state = "Failed";
       console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
         
         `);
-      throw e;
+      throw error;
     });
     return this._download;
   }
@@ -27731,6 +27716,18 @@ class QuadTile extends Tile {
       }
     }
     return this._children;
+  }
+  get theoretical_extent() {
+    const base = this.dataset.extent;
+    const [z, x, y] = this.codes;
+    const x_step = base.x[1] - base.x[0];
+    const each_x = x_step / 2 ** z;
+    const y_step = base.y[1] - base.y[0];
+    const each_y = y_step / 2 ** z;
+    return {
+      x: [base.x[0] + x * each_x, base.x[0] + (x + 1) * each_x],
+      y: [base.y[0] + y * each_y, base.y[0] + (y + 1) * each_y]
+    };
   }
 }
 class ArrowTile extends Tile {
@@ -28149,6 +28146,9 @@ class QuadtileSet extends Dataset {
     }
     const scores = [];
     function callback(tile) {
+      if (bbox === void 0) {
+        return 1 / tile.codes[0];
+      }
       if (tile.download_state === "Unattempted") {
         const distance = check_overlap(tile, bbox);
         scores.push([distance, tile, bbox]);
@@ -28168,11 +28168,11 @@ class QuadtileSet extends Dataset {
         continue;
       }
       queue.add(tile.key);
-      tile.download().catch((error) => {
+      tile.download().then(() => queue.delete(tile.key)).catch((error) => {
         console.warn("Error on", tile.key);
         queue.delete(tile.key);
         throw error;
-      }).then(() => queue.delete(tile.key));
+      });
     }
   }
 }
@@ -28321,7 +28321,7 @@ class Scatterplot {
   update_prefs(prefs) {
     if (this.prefs.encoding && prefs.encoding) {
       for (const k of Object.keys(this.prefs.encoding)) {
-        if (prefs.encoding[k]) {
+        if (prefs.encoding[k] !== void 0) {
           this.prefs.encoding[k] = prefs.encoding[k];
         }
       }
@@ -28473,11 +28473,11 @@ class TooltipHTML extends SettableFunction {
       null,
       "tile_key"
     ]);
-    for (const [k, v] of [...point]) {
+    for (const [k, v] of point) {
       if (nope.has(k)) {
         continue;
       }
-      if (k.match(/_float_version/)) {
+      if (/_float_version/.test(k)) {
         continue;
       }
       if (v === null) {
