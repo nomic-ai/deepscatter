@@ -19,7 +19,7 @@
     "build": "vite build",
     "test": "playwright test",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit --pretty"
+    "typecheck": "tsc --noEmit --pretty --allowJs --checkJs"
   },
   "repository": {
     "type": "git",
