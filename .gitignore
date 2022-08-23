@@ -6,3 +6,8 @@ dist/tiles
 test-results/
 playwright-report/
 dist/tiles/*
+
+# Local Quadfeather Files
+_deepscatter_tmp
+tmp.csv
+tiles
