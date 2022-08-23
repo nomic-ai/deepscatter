@@ -45,7 +45,7 @@ export abstract class Dataset<T extends Tile> {
   
   map<U>(callback : (tile: T) => U, after = false) : U[] {
     const results : U[] = [];
-    this.visit((d : T) => { results.push(callback(d)); }, after = after);
+    this.visit((d : T) => { results.push(callback(d)); }, after);
     return results;
   }
 

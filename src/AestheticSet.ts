@@ -1,6 +1,7 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
 import { 
+  StatefulAestheticSet,
   stateful_aesthetics,
 } from './Aesthetic';
 import type Scatterplot from './deepscatter';
@@ -8,13 +9,17 @@ import type QuadtreeRoot from './tile';
 import type { Encoding } from './types';
 import type { StatefulAesthetic } from './Aesthetic';
 
+type StatefulAestheticStore = {
+  [K in keyof StatefulAestheticSet]?: InstanceType<StatefulAestheticSet[K]>
+};
+
 export class AestheticSet {
   public tileSet : QuadtreeRoot;
   public scatterplot : Scatterplot;
   public regl : Regl;
   public encoding : Encoding;
   public position_interpolation : boolean;
-  private store : Record<string, StatefulAesthetic<any>>;
+  private store : StatefulAestheticStore;
   public aesthetic_map : TextureSet;
   constructor(scatterplot : Scatterplot, regl : Regl, tileSet : QuadtreeRoot) {
     this.scatterplot = scatterplot;
@@ -26,17 +31,21 @@ export class AestheticSet {
     return this;
   }
 
-  public dim(aesthetic : string) {
+  public dim<K extends keyof StatefulAestheticSet>(aesthetic : K): NonNullable<StatefulAestheticStore[K]> {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
     if (this.store[aesthetic]) {
-      return this.store[aesthetic];
+      const storedAesthetic = this.store[aesthetic]!;
+      return storedAesthetic;
     }
-    if (stateful_aesthetics[aesthetic] !== undefined) {
-      this.store[aesthetic] = new stateful_aesthetics[aesthetic](
+
+    // if (stateful_aesthetics[aesthetic] !== undefined) {
+    if (aesthetic in stateful_aesthetics) {
+      const newAesthetic = (new stateful_aesthetics[aesthetic](
         this.scatterplot, this.regl, this.tileSet, 
         this.aesthetic_map
-      );
-      return this.store[aesthetic];
+      )) as  NonNullable<StatefulAestheticStore[K]>;
+      this.store[aesthetic] = newAesthetic;
+      return newAesthetic;
     }
     throw new Error(`Unknown aesthetic ${aesthetic}`);
   }

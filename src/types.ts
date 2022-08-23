@@ -36,6 +36,7 @@ export type ConstantChannel = {
   constant : number;
 };
 
+export type Transform = 'log' | 'linear' | 'sqrt' | 'literal';
 
 /**
  * A channel represents the information necessary to map a single dimension
@@ -56,7 +57,7 @@ export interface BasicChannel {
    * 'literal' maps in the implied dataspace set by 'x', 'y', while
    * 'linear' transforms the data by the range and domain.
   */
-  transform? : 'log' | 'linear' | 'sqrt' | 'literal';
+  transform? : Transform;
   // The domain over which the data extends 
   domain? : [number, number];
   // The range into which to map the data.

@@ -7,6 +7,8 @@ import {
   scaleOrdinal,
   scaleSequential, scaleSequentialLog, 
   scaleSequentialPow,
+  ScaleContinuousNumeric,
+  ScaleIdentity,
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
@@ -16,7 +18,8 @@ import type {
   TextureSet
 } from './AestheticSet';
 import { isOpChannel, isLambdaChannel,
-  isConstantChannel } from './types';
+  isConstantChannel, 
+  Transform} from './types';
 import type {
   OpChannel, LambdaChannel,
   Channel, BasicChannel, ConstantChannel,
@@ -27,7 +30,10 @@ import { Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { QuadTile } from './tile';
 
-const scales : { [key : string] : Function } = {
+const scales: Record<
+  Transform,
+  (range?: Iterable<number>) => ScaleContinuousNumeric<number, number, never> | ScaleIdentity<never>
+> = {
   sqrt: scaleSqrt,
   log: scaleLog,
   linear: scaleLinear,
@@ -98,19 +104,17 @@ function okabe() {
 
 okabe();
 
-type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
-
 abstract class Aesthetic {
   public abstract default_range : [number, number];
   public abstract default_constant : number | [number, number, number];
-  public abstract default_transform : 'log' | 'sqrt' | 'linear' | 'literal';
+  public abstract default_transform : Transform
   public scatterplot : Scatterplot;
   public field: string | null = null;
   public regl : Regl;
   public _texture_buffer : Float32Array | Uint8Array | null = null;
   public _domain : [number, number];
   public _range : [number, number] | Uint8Array;
-  public _transform : 'log' | 'sqrt' | 'linear' | 'literal' | undefined;
+  public _transform : Transform | undefined;
   public dataset : QuadtileSet;
   public partner : Aesthetic | null = null;
   public _textures : Record<string, Texture2D> = {};
@@ -149,14 +153,11 @@ abstract class Aesthetic {
   }
 
   get transform() {    
-    if (this._transform) return this._transform;
-    return this.default_transform;
+    return this._transform || this.default_transform;
   }
 
   set transform(transform) {
-
     this._transform = transform;
-
   }
 
   get scale() {
@@ -165,9 +166,9 @@ abstract class Aesthetic {
       return r.charAt(0).toUpperCase() + r.slice(1);
     }
 
-    let scale = scales[this.transform]()
-      .domain(this.domain)
-      .range(this.range);
+    const domain = scales[this.transform]()
+      .domain(this.domain) as ScaleContinuousNumeric<number, number, never>;
+    let scale = domain.range(this.range);
 
     const range = this.range;
 
@@ -688,15 +689,16 @@ export const dimensions = {
   y : Y
 };
 
-type concrete_aesthetics = X | 
-Y |
-Size | 
-Jitter_speed |
-Jitter_radius | 
-Color | 
-Filter;
+type ConcreteAesthetic = 
+  | X
+  | Y
+  | Size
+  | Jitter_speed
+  | Jitter_radius
+  | Color
+  | Filter;
 
-export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
+export abstract class StatefulAesthetic<T extends ConcreteAesthetic> {
   // An aesthetic that tracks two states--current and last.
   // The point is to handle transitions.
   // It might make sense to handle more than two states, but there are
@@ -775,7 +777,7 @@ class StatefulColor extends StatefulAesthetic<Color> { get Factory() { return Co
 class StatefulFilter extends StatefulAesthetic<Filter> { get Factory() { return Filter; }} 
 class StatefulFilter2 extends StatefulAesthetic<Filter> { get Factory() { return Filter; }}
 
-export const stateful_aesthetics : Record<string, StatefulAesthetic<typeof Aesthetic>> = {
+export const stateful_aesthetics = {
   x : StatefulX,
   x0 : StatefulX0,
   y : StatefulY,
@@ -787,6 +789,7 @@ export const stateful_aesthetics : Record<string, StatefulAesthetic<typeof Aesth
   filter : StatefulFilter,
   filter2 : StatefulFilter2
 };
+export type StatefulAestheticSet = typeof stateful_aesthetics;
 
 function parseLambdaString(lambdastring : string) {
   // Materialize an arrow function from its string.
