@@ -18,6 +18,9 @@
         "sourceType": "module",
         "project": "tsconfig.json"
     },
+    "settings":{ 
+        "import/resolver": "typescript"
+    },
     "ignorePatterns": [
         "**/dist/**",
         "**/demo/**",
