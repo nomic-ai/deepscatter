@@ -65,6 +65,12 @@
             "extends": [
                 "plugin:@typescript-eslint/recommended-requiring-type-checking"
             ]
+        },
+        {
+            "files": ["*.js", "*.cjs"],
+            "rules": {
+                "@typescript-eslint/no-var-requires": "off"
+            }
         }
     ]
 }
