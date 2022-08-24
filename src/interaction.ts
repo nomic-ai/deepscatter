@@ -3,6 +3,7 @@ import { select } from 'd3-selection';
 import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
+import { D3DragEvent, drag } from 'd3-drag';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
 import { APICall, Encoding } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
@@ -10,7 +11,7 @@ import type { Renderer } from './rendering';
 import type QuadtreeRoot from './tile';
 import { ReglRenderer } from './regl_rendering';
 import Scatterplot from './deepscatter';
-import { StructRow } from 'apache-arrow';
+import { StructRow, StructRowProxy } from 'apache-arrow';
 
 
 export default class Zoom {
@@ -162,6 +163,7 @@ export default class Zoom {
 
       const d = data[0];
 
+      type CircleDragEvent = D3DragEvent<SVGCircleElement, StructRowProxy, any>;
       type Annotation = {
         x: number,
         y: number,
@@ -189,6 +191,32 @@ export default class Zoom {
         .join(
           (enter) => enter
             .append('circle')
+            .call(drag<SVGCircleElement, StructRowProxy>()
+              .on('start', 
+                function on_drag_start(this: SVGCircleElement, event: CircleDragEvent, datum) {
+                  select(this)
+                    .attr('cursor', 'grabbing')
+                    .raise();
+                })
+              .on('drag', function on_dragged(this: SVGCircleElement, event: CircleDragEvent, datum: StructRowProxy) {
+                let { dx, dy } = event;
+                if (dx === 0 && dy === 0) return;
+
+                // Map (dx, dy) from screen to data space.
+                dx = x_.invert(dx) - x_.invert(0);
+                dy = y_.invert(dy) - y_.invert(0);
+
+                datum.x += dx;
+                datum.y += dy;
+
+                select(this)
+                  .attr('cx', x_(datum.x))
+                  .attr('cy', y_(datum.y));
+              })
+              .on('end', function on_drag_end(this: SVGCircleElement, event: CircleDragEvent, datum) {
+                select(this).attr('cursor', 'grab');
+              }))
+            .attr('cursor', 'grab')
             .attr('class', 'label')
             .attr('stroke', '#110022')
             .attr('r', 12)
