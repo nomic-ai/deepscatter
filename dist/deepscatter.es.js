@@ -15458,12 +15458,22 @@ class Aesthetic {
               tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding["field"] + "_float_version";
             }
             tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
-              if (tile.table.getChild("_id").data[0].values[idx2] && set2.has(tile.table.getChild("_id").data[0].values[idx2].toString())) {
-                tile.table.getChild(encoding["field"]).data[0].values[idx2] = "1";
-                tile.table.getChild(encoding["field"] + "_float_version").data[0].values[idx2] = -2046;
+              if (tile.table.getChild("_id").data[0].typeId != 5) {
+                if (tile.table.getChild("_id").data[0].values[idx2] && set2.has(tile.table.getChild("_id").data[0].values[idx2].toString())) {
+                  tile.table.getChild(encoding["field"]).data[0].values[idx2] = "1";
+                  tile.table.getChild(encoding["field"] + "_float_version").data[0].values[idx2] = -2046;
+                } else {
+                  tile.table.getChild(encoding["field"]).data[0].values[idx2] = "0";
+                  tile.table.getChild(encoding["field"] + "_float_version").data[0].values[idx2] = -2047;
+                }
               } else {
-                tile.table.getChild(encoding["field"]).data[0].values[idx2] = "0";
-                tile.table.getChild(encoding["field"] + "_float_version").data[0].values[idx2] = -2047;
+                if (set2.has(String.fromCharCode(...tile.table.getChild("_id").data[0].values.slice(tile.table.getChild("_id").data[0].valueOffsets[idx2], tile.table.getChild("_id").data[0].valueOffsets[idx2 + 1])))) {
+                  tile.table.getChild(encoding["field"]).data[0].values[idx2] = "1";
+                  tile.table.getChild(encoding["field"] + "_float_version").data[0].values[idx2] = -2046;
+                } else {
+                  tile.table.getChild(encoding["field"]).data[0].values[idx2] = "0";
+                  tile.table.getChild(encoding["field"] + "_float_version").data[0].values[idx2] = -2047;
+                }
               }
             });
           });
@@ -15787,6 +15797,20 @@ class Color extends Aesthetic {
   static convert_color(color2) {
     const { r, g, b } = rgb(color2);
     return [r / 255, g / 255, b / 255];
+  }
+  get_hex_order() {
+    var hex_vals = {};
+    var ldl = this.scatterplot["_root"]["local_dictionary_lookups"];
+    var dict = ldl[this.field];
+    for (var i = 0; i < dict.size * 4; i += 4) {
+      if (i >= 16384) {
+        var color_by_index = 16380;
+      } else {
+        var color_by_index = i;
+      }
+      hex_vals[dict.get(i / 4)] = "#" + this._texture_buffer[color_by_index].toString(16) + this._texture_buffer[color_by_index + 1].toString(16) + this._texture_buffer[color_by_index + 2].toString(16);
+    }
+    return hex_vals;
   }
   post_to_regl_buffer() {
     this.aesthetic_map.set_color(this.id, this.texture_buffer);
