@@ -732,6 +732,22 @@ class Color extends Aesthetic {
     return [r / 255, g / 255, b / 255];
   }
 
+  get_hex_order() {
+    var hex_vals = {};
+    var ldl = this.scatterplot['_root']['local_dictionary_lookups'];
+    var dict = ldl[this.field];
+    var new_buffer = [];
+    for(var i = 0; i < dict.size*4; i += 4){
+      if(i >= 16384){
+        var color_by_index = 16380;
+      }else{
+        var color_by_index = i;
+      }
+      hex_vals[dict.get(i/4)] = ("#"+this._texture_buffer[color_by_index].toString(16)+this._texture_buffer[color_by_index+1].toString(16)+this._texture_buffer[color_by_index+2].toString(16));
+    }
+    return hex_vals;
+  }
+
   post_to_regl_buffer() {
     this.aesthetic_map.set_color(
       this.id,
