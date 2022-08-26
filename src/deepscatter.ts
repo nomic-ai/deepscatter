@@ -40,6 +40,7 @@ export default class Scatterplot {
   public prefs : APICall;
   ready : Promise<void>;
   public click_handler : ClickFunction;
+  public drag_handler : DragFunction; 
   public tooltip_handler : TooltipHTML;
 
   constructor(selector : string, width : number, height: number) {
@@ -52,6 +53,7 @@ export default class Scatterplot {
     // Unresolvable.
     this.ready = Promise.resolve();
     this.click_handler = new ClickFunction(this);
+    this.drag_handler = new DragFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.prefs = {
       zoom_balance: 0.35,
@@ -244,12 +246,22 @@ export default class Scatterplot {
     /* PUBLIC see set tooltip_html */
     return this.tooltip_handler.f;
   }
+
   set click_function(func) {
     this.click_handler.f = func;
   }
+
   get click_function() {
     /* PUBLIC see set click_function */
     return this.click_handler.f;
+  }
+
+  set drag_function(func) {
+    this.drag_handler.f = func;
+  }
+
+  get drag_function() {
+    return this.drag_handler.f
   }
 
   async plotAPI(prefs : APICall) {
@@ -257,6 +269,11 @@ export default class Scatterplot {
     if (prefs.click_function) {
       this.click_function = Function('datum', prefs.click_function);
     }
+
+    if (prefs.drag_function) {
+      this.drag_function = Function('datum', prefs.drag_function);
+    }
+
     if (prefs.tooltip_html) {
       this.tooltip_html = Function('datum', prefs.tooltip_html);
     }
@@ -426,6 +443,13 @@ abstract class SettableFunction<FuncType> {
 }
 
 class ClickFunction extends SettableFunction<void> {
+  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
+  default(datum : StructRowProxy) {
+    console.log({ ...datum });
+  }
+}
+
+class DragFunction extends SettableFunction<void> {
   //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(datum : StructRowProxy) {
     console.log({ ...datum });

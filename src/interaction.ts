@@ -182,6 +182,7 @@ export default class Zoom {
       ] : [];
 
       const { x_, y_ } = this.scales();
+      const { scatterplot } = this;
 
       this.html_annotation(annotations);
 
@@ -189,6 +190,8 @@ export default class Zoom {
         .selectAll('circle.label')
         .data(data, (d_) => d_.ix)
         .join(
+
+          // Enter
           (enter) => enter
             .append('circle')
             .call(drag<SVGCircleElement, StructRowProxy>()
@@ -213,8 +216,11 @@ export default class Zoom {
                   .attr('cx', x_(datum.x))
                   .attr('cy', y_(datum.y));
               })
-              .on('end', function on_drag_end(this: SVGCircleElement, event: CircleDragEvent, datum) {
+              .on('end', function on_drag_end(this: SVGCircleElement, event: CircleDragEvent, datum: StructRowProxy) {
                 select(this).attr('cursor', 'grab');
+                // renderer.render_points(renderer.props);
+                renderer.render_all(renderer.props);
+                scatterplot.drag_function(datum);
               }))
             .attr('cursor', 'grab')
             .attr('class', 'label')
@@ -223,12 +229,16 @@ export default class Zoom {
             .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd))
             .attr('cx', (datum) => x_(x_aes.value_for(datum)))
             .attr('cy', (datum) => y_(y_aes.value_for(datum))),
+
+          // Update
           (update) => update
             .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd)),
+
+          // Exit
           (exit) => exit.call((e) => e.remove())
         )
         .on('click', (ev, dd) => {
-          this.scatterplot.click_function(dd);
+          scatterplot.click_function(dd);
         });
     });
   }
