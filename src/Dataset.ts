@@ -85,6 +85,7 @@ export abstract class Dataset<T extends Tile> {
       }
     }
   }
+
   /**
    * 
    * @param ix The index of the point to get.
@@ -104,6 +105,32 @@ export abstract class Dataset<T extends Tile> {
     });
     return matches;
   }
+
+  /**
+   * 
+   * @param ix The index of the point to get.
+   * @returns 
+   */
+  updatePoint(ix : number, data: StructRowProxy) : StructRowProxy[] {
+    const matches : StructRowProxy[] = [];
+    this.visit((tile : T) => {
+      if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
+        return;
+      }
+      const mid = bisectLeft([...tile.record_batch.getChild('ix').data[0].values], ix);
+      const val = tile.record_batch.get(mid);
+      if (val?.ix === ix) {
+        console.log('setting datum', ix, 'to', data.toJSON());
+        console.log(data)
+        console.log('old datum', val.toJSON());
+        tile.record_batch.set(ix, data);
+        console.log('datum after update:', tile.record_batch.get(ix)?.toJSON());
+        matches.push(val);
+      }
+    });
+    return matches;
+  }
+
 
 
   get tileWorker() {
