@@ -1,4 +1,9 @@
 
+# Next
+
+* Allow multiple plots on the same page by assigning ids: https://github.com/CreatingData/deepscatter/pull/47.
+* Improved Typing for Aesthetics and Transforms. https://github.com/CreatingData/deepscatter/pull/46
+
 # 2.4.1
 
 Attempted bundle fixes.
