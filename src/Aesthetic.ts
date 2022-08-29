@@ -341,6 +341,39 @@ abstract class Aesthetic {
       this.current_encoding = x;
       return;
     }
+    if (encoding['domain'] && typeof(encoding['domain']) === 'string' && encoding['domain'] === 'progressive'){
+      var all_tiles = [this.tileSet];
+      var current_tiles = [this.tileSet];
+      if(this.tileSet.children.length > 0){
+        while(true)
+        {
+          if(current_tiles.length == 0){
+            break;
+          }
+          var children_tiles = [];
+          current_tiles.map(function(tile, idx){
+            if(tile.children.length > 0){
+              all_tiles.push.apply(all_tiles, tile.children);
+              children_tiles.push.apply(children_tiles, tile.children);
+            }
+          });
+          current_tiles = children_tiles;
+        }
+        var min = all_tiles[0].table.getChild(encoding['field']).data[0].values[0];
+        var max = min;
+        all_tiles.forEach(function(tile,idx){
+          tile.table.getChild(encoding['field']).data[0].values.forEach(function(val, idx2){
+              if(val < min){
+                min = val;
+              }
+              if(val > max){
+                max = val;
+              }
+            });
+          });
+        encoding['domain'] = [min,max];
+      }
+    }
     if (encoding['range'] && Array.isArray(encoding['range']) && typeof(encoding['range'][0]) === 'string'){
       if (encoding['field'] == '_isSelected'){
         var all_tiles = [this.tileSet];
