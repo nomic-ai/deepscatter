@@ -159,9 +159,9 @@ export class Tile extends Batch {
   }
   
   *points(bounding : Rectangle | undefined = undefined, sorted = false) : Iterable<StructRowProxy> {
-    if (!this.is_visible(1e100, bounding)) {
-      return;
-    }
+    //if (!this.is_visible(1e100, bounding)) {
+    //  return;
+    //}
     for (const p of this) {
       if (p_in_rect([p.x, p.y], bounding)) {
         yield p;
