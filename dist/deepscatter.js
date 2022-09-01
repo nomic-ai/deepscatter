@@ -5348,7 +5348,6 @@ class Zoom {
     this.renderers = /* @__PURE__ */ new Map();
     this.scatterplot = plot;
     this.renderers = /* @__PURE__ */ new Map();
-    this.plotId = plot.plotId
   }
   attach_tiles(tiles) {
     this.tileSet = tiles;
@@ -5432,7 +5431,7 @@ class Zoom {
       ] : [];
       const { x_, y_ } = this.scales();
       this.html_annotation(annotations);
-      select(`#deepscatter-svg-${this.plotId}`).selectAll("circle.label").data(data, (d_) => d_.ix).join(
+      select("#deepscatter-svg").selectAll("circle.label").data(data, (d_) => d_.ix).join(
         (enter) => enter.append("circle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))),
         (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)),
         (exit) => exit.call((e) => e.remove())
@@ -28226,10 +28225,10 @@ const base_elements = [
   }
 ];
 class Scatterplot {
-  constructor(selector2, width, height, plotId = '1') {
+  constructor(selector2, width, height) {
     this.bound = false;
     if (selector2 !== void 0) {
-      this.bind(selector2, width, height, plotId);
+      this.bind(selector2, width, height);
     }
     this.width = width;
     this.height = height;
@@ -28246,17 +28245,15 @@ class Scatterplot {
     };
     this.d3 = { select };
   }
-  bind(selector2, width, height, plotId) {
-    this.plotId = plotId;
-    this.base_elements = base_elements.map((element) => {return {...element, id: `${element.id}-${plotId}`}})
-    this.div = select(selector2).selectAll(`div.deepscatter_container-${plotId}`).data([1]).join("div").attr("class", `deepscatter_container-${plotId}`).style("position", "absolute");
+  bind(selector2, width, height) {
+    this.div = select(selector2).selectAll("div.deepscatter_container").data([1]).join("div").attr("class", "deepscatter_container").style("position", "absolute");
     if (this.div.empty()) {
       console.error(selector2);
       throw "Must pass a valid div selector";
     }
     this.elements = [];
-    for (const d of this.base_elements) {
-      const container = this.div.append("div").attr("id", `container-for-${d.id}`).style("position", "absolute").style("top", 0).style("left", 0).style("pointer-events", d.id === `deepscatter-svg-${plotId}` ? "auto" : "none");
+    for (const d of base_elements) {
+      const container = this.div.append("div").attr("id", `container-for-${d.id}`).style("position", "absolute").style("top", 0).style("left", 0).style("pointer-events", d.id === "deepscatter-svg" ? "auto" : "none");
       container.append(d.nodetype).attr("id", d.id).attr("width", width || window.innerWidth).attr("height", height || window.innerHeight);
       this.elements.push(container);
     }
@@ -28273,15 +28270,15 @@ class Scatterplot {
     }
     await this._root.ready;
     this._renderer = new ReglRenderer(
-      `#container-for-webgl-canvas-${this.plotId}`,
+      "#container-for-webgl-canvas",
       this._root,
       this
     );
-    this._zoom = new Zoom(`#deepscatter-svg-${this.plotId}`, this.prefs, this);
+    this._zoom = new Zoom("#deepscatter-svg", this.prefs, this);
     this._zoom.attach_tiles(this._root);
     this._zoom.attach_renderer("regl", this._renderer);
     this._zoom.initialize_zoom();
-    const bkgd = select(`#container-for-canvas-2d-background-${this.plotId}`).select("canvas");
+    const bkgd = select("#container-for-canvas-2d-background").select("canvas");
     const ctx = bkgd.node().getContext("2d");
     ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
@@ -28319,6 +28316,11 @@ class Scatterplot {
       }, i * 400);
     }
     setTimeout(() => ctx.clearRect(0, 0, 1e4, 1e4), 17 * 400);
+  }
+  destroy() {
+    var _a2, _b2, _c2;
+    (_b2 = (_a2 = this._renderer) == null ? void 0 : _a2.regl) == null ? void 0 : _b2.destroy();
+    (_c2 = this.div) == null ? void 0 : _c2.node().parentElement.replaceChildren();
   }
   update_prefs(prefs) {
     if (this.prefs.encoding && prefs.encoding) {

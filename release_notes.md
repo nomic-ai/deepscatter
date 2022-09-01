@@ -1,6 +1,7 @@
 
 # Next
 
+* Allow destruction of deepscatter objects, freeing up associated GPU memory.
 * Allow multiple plots on the same page by assigning ids: https://github.com/CreatingData/deepscatter/pull/47.
 * Improved Typing for Aesthetics and Transforms. https://github.com/CreatingData/deepscatter/pull/46
 
