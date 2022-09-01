@@ -126,7 +126,6 @@ export class ReglRenderer extends Renderer {
     const { prefs } = this;
     const { transform } = this.zoom;
     const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
-    console.log(prefs.arrow_table);
     const props = {
     // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
@@ -1049,6 +1048,7 @@ class TileBufferManager {
       key,
       buffer_desc,
     );
+
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
   }
 }
