@@ -1,51 +1,51 @@
-import { select, Selection } from 'd3-selection';
-import { geoPath, geoIdentity } from 'd3-geo';
-import { max, range } from 'd3-array';
-import merge from 'lodash.merge';
-import Zoom from './interaction';
-import { ReglRenderer } from './regl_rendering';
-import { Dataset } from './Dataset';
-import { APICall } from './types';
-import { StructRowProxy } from 'apache-arrow';
+import { select, Selection } from "d3-selection";
+import { geoPath, geoIdentity } from "d3-geo";
+import { max, range } from "d3-array";
+import merge from "lodash.merge";
+import Zoom from "./interaction";
+import { ReglRenderer } from "./regl_rendering";
+import { Dataset } from "./Dataset";
+import { APICall } from "./types";
+import { StructRowProxy } from "apache-arrow";
 
 // DOM elements that deepscatter uses.
 const base_elements = [
   {
-    id: 'canvas-2d-background',
-    nodetype: 'canvas',
+    id: "canvas-2d-background",
+    nodetype: "canvas",
   },
   {
-    id: 'webgl-canvas',
-    nodetype: 'canvas',
+    id: "webgl-canvas",
+    nodetype: "canvas",
   },
   {
-    id: 'canvas-2d',
-    nodetype: 'canvas',
+    id: "canvas-2d",
+    nodetype: "canvas",
   },
   {
-    id: 'deepscatter-svg',
-    nodetype: 'svg',
+    id: "deepscatter-svg",
+    nodetype: "svg",
   },
 ];
 
 export default class Scatterplot {
   public _renderer: ReglRenderer;
-  public width : number;
-  public height : number;
-  public _root : Dataset<any>;
-  div : Selection<any, any, any, any>;
-  bound : boolean;
-  d3 : Object;
-  private _zoom : Zoom;
-  public prefs : APICall;
-  ready : Promise<void>;
-  public click_handler : ClickFunction;
-  public tooltip_handler : TooltipHTML;
+  public width: number;
+  public height: number;
+  public _root: Dataset<any>;
+  div: Selection<any, any, any, any>;
+  bound: boolean;
+  d3: Object;
+  private _zoom: Zoom;
+  public prefs: APICall;
+  ready: Promise<void>;
+  public click_handler: ClickFunction;
+  public tooltip_handler: TooltipHTML;
 
-  constructor(selector : string, width : number, height: number) {
+  constructor(selector: string, width: number, height: number, plotId: string) {
     this.bound = false;
     if (selector !== undefined) {
-      this.bind(selector, width, height);
+      this.bind(selector, width, height, plotId);
     }
     this.width = width;
     this.height = height;
@@ -64,41 +64,47 @@ export default class Scatterplot {
     this.d3 = { select };
   }
 
-  bind(selector : string, width : number, height : number) {
+  bind(selector: string, width: number, height: number, plotId: string) {
     // Attach a plot to a particular DOM element.
     // Binding is a permanent relationship. Maybe shouldn't be, but is.
-
+    this.plotId = plotId;
+    this.base_elements = base_elements.map((element) => {
+      return { ...element, id: `${element.id}-${plotId}` };
+    });
     this.div = select(selector)
-      .selectAll('div.deepscatter_container')
+      .selectAll(`div.deepscatter_container-${plotId}`)
       .data([1])
-      .join('div')
-      .attr('class', 'deepscatter_container')
-      .style('position', 'absolute');
+      .join("div")
+      .attr("class", `deepscatter_container-${plotId}`)
+      .style("position", "absolute");
     // Styling this as position absolute with no top/left
     // forces the children to inherit the relative position
     // of the div, not the div's parent.
 
     if (this.div.empty()) {
       console.error(selector);
-      throw 'Must pass a valid div selector';
+      throw "Must pass a valid div selector";
     }
 
     this.elements = [];
 
-    for (const d of base_elements) {
+    for (const d of this.base_elements) {
       const container = this.div
-        .append('div')
-        .attr('id', `container-for-${d.id}`)
-        .style('position', 'absolute')
-        .style('top', 0)
-        .style('left', 0)
-        .style('pointer-events', d.id === 'deepscatter-svg' ? 'auto' : 'none');
+        .append("div")
+        .attr("id", `container-for-${d.id}`)
+        .style("position", "absolute")
+        .style("top", 0)
+        .style("left", 0)
+        .style(
+          "pointer-events",
+          d.id === `deepscatter-svg-${plotId}` ? "auto" : "none"
+        );
 
       container
         .append(d.nodetype)
-        .attr('id', d.id)
-        .attr('width', width || window.innerWidth)
-        .attr('height', height || window.innerHeight);
+        .attr("id", d.id)
+        .attr("width", width || window.innerWidth)
+        .attr("height", height || window.innerHeight);
 
       this.elements.push(container);
     }
@@ -106,34 +112,35 @@ export default class Scatterplot {
   }
 
   async reinitialize() {
-
     const { prefs } = this;
-    if ( prefs.source_url !== undefined ) {
+    if (prefs.source_url !== undefined) {
       this._root = Dataset.from_quadfeather(prefs.source_url, prefs, this);
     } else if (prefs.arrow_table !== undefined) {
       this._root = Dataset.from_arrow_table(prefs.arrow_table, prefs, this);
     } else {
-      throw new Error('No source_url or arrow_table specified');
+      throw new Error("No source_url or arrow_table specified");
     }
     await this._root.ready;
 
     this._renderer = new ReglRenderer(
-      '#container-for-webgl-canvas',
+      `#container-for-webgl-canvas-${this.plotId}`,
       this._root,
-      this,
+      this
     );
 
-    this._zoom = new Zoom('#deepscatter-svg', this.prefs, this);
+    this._zoom = new Zoom(`#deepscatter-svg-${this.plotId}`, this.prefs, this);
     this._zoom.attach_tiles(this._root);
-    this._zoom.attach_renderer('regl', this._renderer);
+    this._zoom.attach_renderer("regl", this._renderer);
     this._zoom.initialize_zoom();
 
     // Needs the zoom built as well.
 
-    const bkgd = select('#container-for-canvas-2d-background').select('canvas');
-    const ctx = bkgd.node().getContext('2d');
+    const bkgd = select(
+      `#container-for-canvas-2d-background-${this.plotId}`
+    ).select("canvas");
+    const ctx = bkgd.node().getContext("2d");
 
-    ctx.fillStyle = prefs.background_color || 'rgba(133, 133, 111, .8)';
+    ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
     this._renderer.initialize();
@@ -174,25 +181,28 @@ export default class Scatterplot {
   */
   visualize_tiles() {
     const map = this;
-    const ctx = map.elements[2]
-      .selectAll('canvas').node().getContext('2d');
+    const ctx = map.elements[2].selectAll("canvas").node().getContext("2d");
 
     ctx.clearRect(0, 0, 10_000, 10_000);
     const { x_, y_ } = map._zoom.scales();
-    ctx.strokeStyle = '#888888';
-    const tiles = map._root.map((t : Tile) => t);
+    ctx.strokeStyle = "#888888";
+    const tiles = map._root.map((t: Tile) => t);
     for (const i of range(13)) {
       setTimeout(() => {
         for (const tile of tiles) {
-          if (tile.codes[0] != i) { continue; }
-          if (!tile.extent) { continue; } // Still loading
-          const [x1, x2] = tile.extent.x.map((x : number) => x_(x));
-          const [y1, y2] = tile.extent.y.map((y : number) => y_(y));
+          if (tile.codes[0] != i) {
+            continue;
+          }
+          if (!tile.extent) {
+            continue;
+          } // Still loading
+          const [x1, x2] = tile.extent.x.map((x: number) => x_(x));
+          const [y1, y2] = tile.extent.y.map((y: number) => y_(y));
           const depth = tile.codes[0];
           ctx.lineWidth = 8 / Math.sqrt(depth);
           ctx.globalAlpha = 0.33;
           ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-          if (tile.download_state !== 'Unattempted') {
+          if (tile.download_state !== "Unattempted") {
             ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
           }
           ctx.globalAlpha = 1;
@@ -200,10 +210,9 @@ export default class Scatterplot {
       }, i * 400);
     }
     setTimeout(() => ctx.clearRect(0, 0, 10_000, 10_000), 17 * 400);
-
   }
 
-  update_prefs(prefs : APICall) {
+  update_prefs(prefs: APICall) {
     // Stash the previous values for interpolation.
 
     if (this.prefs.encoding && prefs.encoding) {
@@ -214,7 +223,6 @@ export default class Scatterplot {
       }
     }
     merge(this.prefs, prefs);
-
   }
 
   /*  load_lookup_table(item) {
@@ -235,7 +243,6 @@ export default class Scatterplot {
     return undefined;
   } */
 
-
   set tooltip_html(func) {
     this.tooltip_handler.f = func;
   }
@@ -252,15 +259,14 @@ export default class Scatterplot {
     return this.click_handler.f;
   }
 
-  async plotAPI(prefs : APICall) {
-
+  async plotAPI(prefs: APICall) {
     if (prefs.click_function) {
-      this.click_function = Function('datum', prefs.click_function);
+      this.click_function = Function("datum", prefs.click_function);
     }
     if (prefs.tooltip_html) {
-      this.tooltip_html = Function('datum', prefs.tooltip_html);
+      this.tooltip_html = Function("datum", prefs.tooltip_html);
     }
-    
+
     this.update_prefs(prefs);
 
     // Some things have to be done *before* we can actually run this;
@@ -271,7 +277,6 @@ export default class Scatterplot {
     if (this._root === undefined) {
       await this.reinitialize();
     }
-
 
     // Doesn't block.
     /*
@@ -325,7 +330,7 @@ export default class Scatterplot {
       this._renderer.reglframe = undefined;
     }
     this._renderer.reglframe = this._renderer.regl.frame(() => {
-      this._renderer.tick('Basic');
+      this._renderer.tick("Basic");
     });
 
     this._zoom.restart_timer(60_000);
@@ -349,22 +354,28 @@ export default class Scatterplot {
   }
 
   drawContours(contours, drawTo) {
-    const drawTwo = drawTo || select('body');
-    const canvas = drawTwo.select('#canvas-2d');
-    const context : CanvasRenderingContext2D = canvas.node().getContext('2d');
+    const drawTwo = drawTo || select("body");
+    const canvas = drawTwo.select("#canvas-2d");
+    const context: CanvasRenderingContext2D = canvas.node().getContext("2d");
 
     for (const contour of contours) {
-      context.fillStyle = 'rgba(25, 25, 29, 1)';
+      context.fillStyle = "rgba(25, 25, 29, 1)";
       context.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
-      context.strokeStyle = '#8a0303';// "rbga(255, 255, 255, 1)"
-      context.fillStyle = 'rgba(30, 30, 34, 1)';
+      context.strokeStyle = "#8a0303"; // "rbga(255, 255, 255, 1)"
+      context.fillStyle = "rgba(30, 30, 34, 1)";
 
-      context.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))]);
+      context.lineWidth = max([
+        0.45,
+        0.25 * Math.exp(Math.log(this._zoom.transform.k / 2)),
+      ]);
 
-      const path = geoPath(geoIdentity()
-        .scale(this._zoom.transform.k)
-        .translate([this._zoom.transform.x, this._zoom.transform.y]), context);
+      const path = geoPath(
+        geoIdentity()
+          .scale(this._zoom.transform.k)
+          .translate([this._zoom.transform.x, this._zoom.transform.y]),
+        context
+      );
       context.beginPath(), path(contour), context.fill();
     }
   }
@@ -372,11 +383,11 @@ export default class Scatterplot {
   contours(aes) {
     const data = this._renderer.calculate_contours(aes);
 
-    const {
-      x, y, x_, y_,
-    } = this._zoom.scales();
+    const { x, y, x_, y_ } = this._zoom.scales();
     function fix_point(p) {
-      if (!p) { return; }
+      if (!p) {
+        return;
+      }
       if (p.coordinates) {
         return fix_point(p.coordinates);
       }
@@ -397,29 +408,28 @@ export default class Scatterplot {
 abstract class SettableFunction<FuncType> {
   // A function that can be set by a string or directly with a function,
   // Used for handling interaction
-  public _f : undefined | ((arg0 : StructRowProxy) => FuncType);
-  public string_rep : string;
-  abstract default : (arg0 : StructRowProxy) => FuncType;
-  public plot : Scatterplot;
-  constructor(plot : Scatterplot) {
-    this.string_rep = '';
+  public _f: undefined | ((arg0: StructRowProxy) => FuncType);
+  public string_rep: string;
+  abstract default: (arg0: StructRowProxy) => FuncType;
+  public plot: Scatterplot;
+  constructor(plot: Scatterplot) {
+    this.string_rep = "";
     this.plot = plot;
   }
-  get f() : (arg0 : StructRowProxy) => FuncType {
+  get f(): (arg0: StructRowProxy) => FuncType {
     if (this._f === undefined) {
       return this.default;
     }
     return this._f;
   }
-  set f(f : string | ((arg0 : StructRowProxy) => FuncType)) {
-    if (typeof f === 'string') {
+  set f(f: string | ((arg0: StructRowProxy) => FuncType)) {
+    if (typeof f === "string") {
       if (this.string_rep !== f) {
         this.string_rep = f;
         //@ts-ignore
-        this._f = Function('datum', f);
+        this._f = Function("datum", f);
       }
-    }
-    else {
+    } else {
       this._f = f;
     }
   }
@@ -427,27 +437,33 @@ abstract class SettableFunction<FuncType> {
 
 class ClickFunction extends SettableFunction<void> {
   //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
-  default(datum : StructRowProxy) {
+  default(datum: StructRowProxy) {
     console.log({ ...datum });
   }
 }
 
 class TooltipHTML extends SettableFunction<string> {
   //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
-  default(point : StructRowProxy) {
-    // By default, this returns a 
-    let output = '<dl>';
-    const nope = new Set([
-      'x', 'y', 'ix', null, 'tile_key',
-    ]);
+  default(point: StructRowProxy) {
+    // By default, this returns a
+    let output = "<dl>";
+    const nope = new Set(["x", "y", "ix", null, "tile_key"]);
     for (const [k, v] of point) {
-      if (nope.has(k)) { continue; }
+      if (nope.has(k)) {
+        continue;
+      }
       // Private value.
-      if (/_float_version/.test(k)) { continue; }
+      if (/_float_version/.test(k)) {
+        continue;
+      }
       // Don't show missing data.
-      if (v === null) { continue; }
+      if (v === null) {
+        continue;
+      }
       // Don't show empty data.
-      if (v === '') { continue; }
+      if (v === "") {
+        continue;
+      }
       output += ` <dt>${k}</dt>\n`;
       output += `   <dd>${v}<dd>\n`;
     }

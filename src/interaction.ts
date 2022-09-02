@@ -1,104 +1,99 @@
 /* eslint-disable no-underscore-dangle */
-import { select } from 'd3-selection';
-import { timer } from 'd3-timer';
-import { zoom, zoomIdentity } from 'd3-zoom';
-import { mean } from 'd3-array';
-import { ScaleLinear, scaleLinear } from 'd3-scale';
-import { APICall, Encoding } from './types';
+import { select } from "d3-selection";
+import { timer } from "d3-timer";
+import { zoom, zoomIdentity } from "d3-zoom";
+import { mean } from "d3-array";
+import { ScaleLinear, scaleLinear } from "d3-scale";
+import { APICall, Encoding } from "./types";
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
-import type { Renderer } from './rendering';
-import type QuadtreeRoot from './tile';
-import { ReglRenderer } from './regl_rendering';
-import Scatterplot from './deepscatter';
-import { StructRow } from 'apache-arrow';
-
+import type { Renderer } from "./rendering";
+import type QuadtreeRoot from "./tile";
+import { ReglRenderer } from "./regl_rendering";
+import Scatterplot from "./deepscatter";
+import { StructRow } from "apache-arrow";
 
 export default class Zoom {
-  public prefs : APICall;
-  public canvas : d3.Selection<d3.ContainerElement, any, any, any>;
-  public width : number;
-  public height : number;
-  public renderers : Map<string, Renderer>;
-  public tileSet? : QuadtreeRoot;
-  public _timer : d3.Timer;
-  public _scales : Record<string, d3.ScaleLinear<number, number>>;
-  public zoomer : d3.ZoomBehavior<Element, any>;
-  public transform : d3.ZoomTransform;
-  public _start : number;
-  public scatterplot : Scatterplot;
-  constructor(selector: string, prefs: APICall, plot : Scatterplot) {
+  public prefs: APICall;
+  public canvas: d3.Selection<d3.ContainerElement, any, any, any>;
+  public width: number;
+  public height: number;
+  public renderers: Map<string, Renderer>;
+  public tileSet?: QuadtreeRoot;
+  public _timer: d3.Timer;
+  public _scales: Record<string, d3.ScaleLinear<number, number>>;
+  public zoomer: d3.ZoomBehavior<Element, any>;
+  public transform: d3.ZoomTransform;
+  public _start: number;
+  public scatterplot: Scatterplot;
+  constructor(selector: string, prefs: APICall, plot: Scatterplot) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
     // also registers events.
 
     this.prefs = prefs;
     this.canvas = select(selector);
-    this.width = +this.canvas.attr('width');
-    this.height = +this.canvas.attr('height');
+    this.width = +this.canvas.attr("width");
+    this.height = +this.canvas.attr("height");
     this.renderers = new Map();
     this.scatterplot = plot;
+    this.plotId = plot.plotId;
     // A zoom keeps track of all the renderers
     // that it's in charge of adjusting.
 
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles : QuadtreeRoot) {
+  attach_tiles(tiles: QuadtreeRoot) {
     this.tileSet = tiles;
     this.tileSet._zoom = this;
     return this;
   }
 
-  attach_renderer(key : string, renderer : Renderer) {
+  attach_renderer(key: string, renderer: Renderer) {
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
     renderer.zoom.initialize_zoom();
     return this;
   }
 
-  zoom_to(k : number, x = null, y = null, duration = 4000) {
+  zoom_to(k: number, x = null, y = null, duration = 4000) {
     const scales = this.scales();
-    const {
-      canvas, zoomer, width, height,
-    } = this;
+    const { canvas, zoomer, width, height } = this;
 
     const t = zoomIdentity
       .translate(width / 2, height / 2)
       .scale(k)
       .translate(-scales.x(x), -scales.y(y));
 
-    canvas
-      .transition()
-      .duration(duration)
-      .call(zoomer.transform, t);
+    canvas.transition().duration(duration).call(zoomer.transform, t);
   }
 
-  html_annotation(points : Array<Record<string, string | number>>) {
+  html_annotation(points: Array<Record<string, string | number>>) {
     const div = this.canvas.node().parentNode.parentNode;
 
     const els = select(div)
-      .selectAll('div.tooltip')
+      .selectAll("div.tooltip")
       .data(points)
       .join(
-        (enter) => enter
-          .append('div')
-          .attr('class', 'tooltip')
-          .style('top', 0)
-          .style('left', 0)
-          .style('position', 'absolute')
-          .style('z-index', 100)
-          .style('border-radius', '8px')
-          .style('padding', '10px')
-          .style('background', 'ivory')
-          .style('opacity', 0.75),
-        (update) => update
-          .html((d) => this.scatterplot.tooltip_html(d.data)),
+        (enter) =>
+          enter
+            .append("div")
+            .attr("class", "tooltip")
+            .style("top", 0)
+            .style("left", 0)
+            .style("position", "absolute")
+            .style("z-index", 100)
+            .style("border-radius", "8px")
+            .style("padding", "10px")
+            .style("background", "ivory")
+            .style("opacity", 0.75),
+        (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)),
         (exit) => exit.call((e) => e.remove())
       );
 
     els
       .html((d) => this.scatterplot.tooltip_html(d.data))
-      .style('transform', (d) => {
+      .style("transform", (d) => {
         const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
         return t;
       });
@@ -110,19 +105,14 @@ export default class Zoom {
     const [x0, x1] = corners.x.map(scales.x);
     const [y0, y1] = corners.y.map(scales.y);
 
-    const {
-      canvas, zoomer, width, height,
-    } = this;
+    const { canvas, zoomer, width, height } = this;
 
     const t = zoomIdentity
       .translate(width / 2, height / 2)
       .scale(0.9 / Math.max((x1 - x0) / width, (y1 - y0) / height))
       .translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
 
-    canvas
-      .transition()
-      .duration(duration)
-      .call(zoomer.transform, t);
+    canvas.transition().duration(duration).call(zoomer.transform, t);
   }
 
   initialize_zoom() {
@@ -131,8 +121,11 @@ export default class Zoom {
 
     const zoomer = zoom()
       .scaleExtent([1 / 3, 100_000])
-      .extent([[0, 0], [width, height]])
-      .on('zoom', (event) => {
+      .extent([
+        [0, 0],
+        [width, height],
+      ])
+      .on("zoom", (event) => {
         this.transform = event.transform;
         this.restart_timer(10 * 1000);
       });
@@ -147,11 +140,11 @@ export default class Zoom {
   add_mouseover() {
     let last_fired = 0;
     //@ts-ignore Not sure how to guarantee this formally.
-    const renderer : ReglRenderer = this.renderers.get('regl');
-    const x_aes = renderer.aes.dim('x').current;
-    const y_aes = renderer.aes.dim('y').current;
+    const renderer: ReglRenderer = this.renderers.get("regl");
+    const x_aes = renderer.aes.dim("x").current;
+    const y_aes = renderer.aes.dim("y").current;
 
-    this.canvas.on('mousemove', (event) => {
+    this.canvas.on("mousemove", (event) => {
       // Debouncing this is really important, it turns out.
       if (Date.now() - last_fired < 1000 / 20) {
         return;
@@ -163,43 +156,50 @@ export default class Zoom {
       const d = data[0];
 
       type Annotation = {
-        x: number,
-        y: number,
-        dx: number,
-        dy: number,
-        data: any,
+        x: number;
+        y: number;
+        dx: number;
+        dy: number;
+        data: any;
       };
-      const annotations : Annotation[] = d ? [
-        {
-          x: event.layerX,
-          y: event.layerY,
-          data: d,
-          dx: 0,
-          dy: 30,
-        },
-      ] : [];
+      const annotations: Annotation[] = d
+        ? [
+            {
+              x: event.layerX,
+              y: event.layerY,
+              data: d,
+              dx: 0,
+              dy: 30,
+            },
+          ]
+        : [];
 
       const { x_, y_ } = this.scales();
 
       this.html_annotation(annotations);
 
-      const labelSet = select('#deepscatter-svg')
-        .selectAll('circle.label')
+      const labelSet = select(`#deepscatter-svg-${this.plotId}`)
+        .selectAll("circle.label")
         .data(data, (d_) => d_.ix)
         .join(
-          (enter) => enter
-            .append('circle')
-            .attr('class', 'label')
-            .attr('stroke', '#110022')
-            .attr('r', 12)
-            .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd))
-            .attr('cx', (datum) => x_(x_aes.value_for(datum)))
-            .attr('cy', (datum) => y_(y_aes.value_for(datum))),
-          (update) => update
-            .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd)),
+          (enter) =>
+            enter
+              .append("circle")
+              .attr("class", "label")
+              .attr("stroke", "#110022")
+              .attr("r", 12)
+              .attr("fill", (dd) =>
+                this.renderers.get("regl").aes.dim("color").current.apply(dd)
+              )
+              .attr("cx", (datum) => x_(x_aes.value_for(datum)))
+              .attr("cy", (datum) => y_(y_aes.value_for(datum))),
+          (update) =>
+            update.attr("fill", (dd) =>
+              this.renderers.get("regl").aes.dim("color").current.apply(dd)
+            ),
           (exit) => exit.call((e) => e.remove())
         )
-        .on('click', (ev, dd) => {
+        .on("click", (ev, dd) => {
           this.scatterplot.click_function(dd);
         });
     });
@@ -225,10 +225,7 @@ export default class Zoom {
   current_center() {
     const { x, y } = this.current_corners();
 
-    return [
-      (x[0] + x[1]) / 2,
-      (y[0] + y[1]) / 2,
-    ];
+    return [(x[0] + x[1]) / 2, (y[0] + y[1]) / 2];
   }
 
   restart_timer(run_at_least = 10_000) {
@@ -237,7 +234,7 @@ export default class Zoom {
     // whichever is greater.
     let stop_at = Date.now() + run_at_least;
     if (this._timer) {
-      //@ts-ignore      
+      //@ts-ignore
       if (this._timer.stop_at > stop_at) {
         //@ts-ignore
         stop_at = this._timer.stop_at;
@@ -262,7 +259,7 @@ export default class Zoom {
     return this;
   }
 
-  scales(equal_units = true) : Record<string, d3.ScaleLinear> {
+  scales(equal_units = true): Record<string, d3.ScaleLinear> {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.
@@ -279,36 +276,41 @@ export default class Zoom {
 
     const { width, height } = this;
     if (this.tileSet === undefined) {
-      throw new Error('Error--scales created before tileSet present.');
+      throw new Error("Error--scales created before tileSet present.");
     }
     const { extent } = this.tileSet;
-    const scales : Record<string, any> = {};
+    const scales: Record<string, any> = {};
     if (extent === undefined) {
-      throw new Error('Error--scales created before extent present.');
+      throw new Error("Error--scales created before extent present.");
       return {};
     }
 
     interface Scale_datum {
-      limits : [number, number];
-      size_range : number;
-      pixels_per_unit : number;
+      limits: [number, number];
+      size_range: number;
+      pixels_per_unit: number;
     }
-    const scale_dat : Record<string, Scale_datum> = {};
-    for (const [name, dim] of [['x', width], ['y', height]]) {
+    const scale_dat: Record<string, Scale_datum> = {};
+    for (const [name, dim] of [
+      ["x", width],
+      ["y", height],
+    ]) {
       const limits = extent[name];
       const size_range = limits[1] - limits[0];
       scale_dat[name] = {
         limits,
         size_range,
-        pixels_per_unit : dim / size_range
+        pixels_per_unit: dim / size_range,
       };
     }
 
-    const data_aspect_ratio = scale_dat.x.pixels_per_unit / scale_dat.y.pixels_per_unit;
+    const data_aspect_ratio =
+      scale_dat.x.pixels_per_unit / scale_dat.y.pixels_per_unit;
 
-    let x_buffer_size = 0; let y_buffer_size = 0;
-    let x_target_size = width; let
-      y_target_size = height;
+    let x_buffer_size = 0;
+    let y_buffer_size = 0;
+    let x_target_size = width;
+    let y_target_size = height;
     if (data_aspect_ratio > 1) {
       // There are more pixels in the x dimension, so we need a buffer
       // around it.
@@ -340,15 +342,17 @@ export default class Zoom {
     return transform;
   }
 
-  
   tick(force = false) {
     this._start = this._start || Date.now();
 
     // Force indicates that the tick must run even the timer metadata
     // says we are not animating.
 
-    if (force !== true && this._timer && //@ts-ignore
-        this._timer.stop_at <= Date.now()) {
+    if (
+      force !== true &&
+      this._timer && //@ts-ignore
+      this._timer.stop_at <= Date.now()
+    ) {
       this._timer.stop();
     }
     /*
@@ -363,7 +367,7 @@ export default class Zoom {
   }
 }
 
-export function window_transform(x_scale : ScaleLinear, y_scale) {
+export function window_transform(x_scale: ScaleLinear, y_scale) {
   // width and height are svg parameters; x and y scales project from the data x and y into the
   // the webgl space.
 
