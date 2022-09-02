@@ -37,6 +37,8 @@ export default class Zoom {
     this.height = +this.canvas.attr('height');
     this.renderers = new Map();
     this.scatterplot = plot;
+    this.plotId = plot.plotId;
+
     // A zoom keeps track of all the renderers
     // that it's in charge of adjusting.
 
@@ -183,7 +185,7 @@ export default class Zoom {
 
       this.html_annotation(annotations);
 
-      const labelSet = select('#deepscatter-svg')
+      const labelSet = select(`#deepscatter-svg-${this.plotId}`)
         .selectAll('circle.label')
         .data(data, (d_) => d_.ix)
         .join(

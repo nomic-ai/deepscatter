@@ -43,10 +43,10 @@ export default class Scatterplot {
   public click_handler : ClickFunction;
   public tooltip_handler : TooltipHTML;
 
-  constructor(selector : string, width : number, height: number) {
+  constructor(selector: string, width: number, height: number, plotId: string) {
     this.bound = false;
     if (selector !== undefined) {
-      this.bind(selector, width, height);
+      this.bind(selector, width, height, plotId);
     }
     this.width = width;
     this.height = height;
@@ -69,12 +69,15 @@ export default class Scatterplot {
    * @param width Width of the plot, in pixels.
    * @param height Height of the plot, in pixels.
    */
-  bind(selector : string, width : number, height : number) {
+   bind(selector: string, width: number, height: number, plotId: string) {
     // Attach a plot to a particular DOM element.
     // Binding is a permanent relationship. Maybe shouldn't be, but is.
-
+    this.plotId = plotId;
+    this.base_elements = base_elements.map((element) => {
+      return { ...element, id: `${element.id}-${plotId}` };
+    });
     this.div = select(selector)
-      .selectAll('div.deepscatter_container')
+      .selectAll(`div.deepscatter_container-${plotId}`)
       .data([1])
       .join('div')
       .attr('class', 'deepscatter_container')
@@ -91,15 +94,17 @@ export default class Scatterplot {
 
     this.elements = [];
 
-    for (const d of base_elements) {
+    for (const d of this.base_elements) {
       const container = this.div
         .append('div')
         .attr('id', `container-for-${d.id}`)
         .style('position', 'absolute')
         .style('top', 0)
         .style('left', 0)
-        .style('pointer-events', d.id === 'deepscatter-svg' ? 'auto' : 'none');
-
+        .style(
+          "pointer-events",
+          d.id === `deepscatter-svg-${plotId}` ? "auto" : "none"
+        );
       container
         .append(d.nodetype)
         .attr('id', d.id)
@@ -124,19 +129,19 @@ export default class Scatterplot {
     await this._root.ready;
 
     this._renderer = new ReglRenderer(
-      '#container-for-webgl-canvas',
+      `#container-for-webgl-canvas-${this.plotId}`,
       this._root,
       this,
     );
 
-    this._zoom = new Zoom('#deepscatter-svg', this.prefs, this);
+    this._zoom = new Zoom(`#deepscatter-svg-${this.plotId}`, this.prefs, this);
     this._zoom.attach_tiles(this._root);
     this._zoom.attach_renderer('regl', this._renderer);
     this._zoom.initialize_zoom();
 
     // Needs the zoom built as well.
 
-    const bkgd = select('#container-for-canvas-2d-background').select('canvas');
+    const bkgd = select(`#container-for-canvas-2d-background-${this.plotId}`).select('canvas');
     const ctx = bkgd.node().getContext('2d');
 
     ctx.fillStyle = prefs.background_color || 'rgba(133, 133, 111, .8)';
