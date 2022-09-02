@@ -11,7 +11,8 @@ import TileWorker from './tileworker.worker.js?worker&inline';
 
 import { APICall } from './types';
 import Scatterplot from './deepscatter';
-import { StructRowProxy, Table } from 'apache-arrow';
+import { Float32, makeVector, StructRowProxy, Table, Vector } from 'apache-arrow';
+import { assert } from './util';
 type Key = string;
 
 export abstract class Dataset<T extends Tile> {
@@ -111,7 +112,7 @@ export abstract class Dataset<T extends Tile> {
    * @param ix The index of the point to get.
    * @returns 
    */
-  updatePoint(ix : number, data: StructRowProxy) : StructRowProxy[] {
+  updatePointCoordinates(ix : number, coords: { x: number, y: number }) : StructRowProxy[] {
     const matches : StructRowProxy[] = [];
     this.visit((tile : T) => {
       if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
@@ -119,19 +120,40 @@ export abstract class Dataset<T extends Tile> {
       }
       const mid = bisectLeft([...tile.record_batch.getChild('ix').data[0].values], ix);
       const val = tile.record_batch.get(mid);
-      if (val?.ix === ix) {
-        console.log('setting datum', ix, 'to', data.toJSON());
-        console.log(data)
-        console.log('old datum', val.toJSON());
-        tile.record_batch.set(ix, data);
-        console.log('datum after update:', tile.record_batch.get(ix)?.toJSON());
+      assert(val);
+      if (val.ix === ix) {
+        console.log(`before set: (${val.x}, ${val.y})`, val);
+        // const [x, y] = ['x', 'y'].map(name => {
+        //   const child: Vector<Float32> | null = tile.record_batch.getChild(name);
+        //   assert(child, `record batch has no ${name} child`);
+        //   child.
+        //   tile.record_batch.setChild()
+        //   return child;
+        // });
+        for (const name of ['x', 'y'] as const) {
+          const child: Vector<Float32> | null = tile.record_batch.getChild(name);
+          assert(child, `record batch has no ${name} child`);
+          
+          // child.toArray()
+          // const array = new Float32Array(child.data[0].values);
+          const array = child.toArray();
+          console.log(`before set: ${array[mid]}`);
+          array[mid] = coords[name];
+          console.log(`after set: ${array[mid]}`);
+          tile.record_batch.setChild(name, makeVector(array));
+        }
+
+        // x.data[0].values.set([coords.x], mid);
+        // y.data[0].values.set([coords.y], mid);
+        const post = tile.record_batch.get(mid);
+        console.log(`after set: (${post.x}, ${post.y})`, post);
+        // x.set
+
         matches.push(val);
       }
     });
     return matches;
   }
-
-
 
   get tileWorker() {
     const NUM_WORKERS = 4;

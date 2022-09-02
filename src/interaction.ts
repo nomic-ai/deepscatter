@@ -11,7 +11,7 @@ import type { Renderer } from './rendering';
 import type QuadtreeRoot from './tile';
 import { ReglRenderer } from './regl_rendering';
 import Scatterplot from './deepscatter';
-import { StructRow, StructRowProxy } from 'apache-arrow';
+import { Float32, makeData, StructRow, StructRowProxy } from 'apache-arrow';
 import type { Dataset } from './Dataset'
 import type { Tile } from './tile'
 
@@ -232,7 +232,9 @@ export default class Zoom {
 
                 console.log(`datum[ix: ${datum.ix}] (${datum.x}, ${datum.y})`);
                 console.log(datum);
-                self.tileSet.updatePoint(datum.ix, datum);
+                // datum.x = makeData<Float32>({ type: new Float32(), data: [datum.x]});
+                // self.tileSet.updatePoint(datum.ix, datum);
+                self.tileSet?.updatePointCoordinates(datum.ix, { x: datum.x, y: datum.y });
                 renderer.render_all(renderer.props);
                 scatterplot.drag_function(datum);
               }))
