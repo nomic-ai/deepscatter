@@ -6,3 +6,7 @@ dist/tiles
 test-results/
 playwright-report/
 dist/tiles/*
+
+tiles
+tmp.csv
+*.feather
