@@ -1048,6 +1048,7 @@ class TileBufferManager {
       key,
       buffer_desc,
     );
+
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
   }
 }

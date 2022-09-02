@@ -33,6 +33,7 @@ export default class Scatterplot {
   public width : number;
   public height : number;
   public _root : Dataset<any>;
+  public elements? : Selection<SVGElement, any, any, any>[];
   div : Selection<any, any, any, any>;
   bound : boolean;
   d3 : Object;
@@ -65,7 +66,11 @@ export default class Scatterplot {
     };
     this.d3 = { select };
   }
-
+  /**
+   * @param selector A selector for the root element of the deepscatter; must already exist.
+   * @param width Width of the plot, in pixels.
+   * @param height Height of the plot, in pixels.
+   */
   bind(selector : string, width : number, height : number) {
     // Attach a plot to a particular DOM element.
     // Binding is a permanent relationship. Maybe shouldn't be, but is.
@@ -76,6 +81,7 @@ export default class Scatterplot {
       .join('div')
       .attr('class', 'deepscatter_container')
       .style('position', 'absolute');
+
     // Styling this as position absolute with no top/left
     // forces the children to inherit the relative position
     // of the div, not the div's parent.
@@ -203,6 +209,16 @@ export default class Scatterplot {
     }
     setTimeout(() => ctx.clearRect(0, 0, 10_000, 10_000), 17 * 400);
 
+  }
+
+  /**
+   * Destroy the scatterplot and release all associated resources.
+   * This is necessary because removing a deepscatter instance
+   * will not de-allocate tables from GPU memory.
+   */
+  public destroy() {
+    this._renderer?.regl?.destroy();
+    this.div?.node().parentElement.replaceChildren();
   }
 
   update_prefs(prefs : APICall) {

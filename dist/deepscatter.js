@@ -18226,7 +18226,6 @@ class ReglRenderer extends Renderer {
     const { prefs } = this;
     const { transform } = this.zoom;
     const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
-    console.log(prefs.arrow_table);
     const props = {
       aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
@@ -28317,6 +28316,11 @@ class Scatterplot {
       }, i * 400);
     }
     setTimeout(() => ctx.clearRect(0, 0, 1e4, 1e4), 17 * 400);
+  }
+  destroy() {
+    var _a2, _b2, _c2;
+    (_b2 = (_a2 = this._renderer) == null ? void 0 : _a2.regl) == null ? void 0 : _b2.destroy();
+    (_c2 = this.div) == null ? void 0 : _c2.node().parentElement.replaceChildren();
   }
   update_prefs(prefs) {
     if (this.prefs.encoding && prefs.encoding) {
