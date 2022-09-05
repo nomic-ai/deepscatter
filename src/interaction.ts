@@ -223,22 +223,14 @@ export default class Zoom {
                 select(this)
                   .attr('cx', x_(datum.x))
                   .attr('cy', y_(datum.y));
+
+                const tile = self.scatterplot._root.root_tile as QuadTile;
+                tile.visit_at_point(datum.ix, tile => tile.needs_rerendering('x', 'y'));
               })
 
               // Drag end
               .on('end', function on_drag_end(this: SVGCircleElement, event: CircleDragEvent, datum: StructRowProxy) {
                 select(this).attr('cursor', 'grab');
-                // renderer.render_points(renderer.props);
-
-                console.log(`datum[ix: ${datum.ix}] (${datum.x}, ${datum.y})`);
-                console.log(datum);
-
-                const tile = self.scatterplot._root.root_tile as QuadTile;
-
-                // console.log(`findPoint before: ${tile.findPoint(datum.ix) || 'not found'}`);
-                tile.updatePoint(datum.ix, datum);
-                // console.log(`findPoint after: ${tile.findPoint(datum.ix) || 'not found'}`);
-                renderer.remake_renderer();
                 renderer.render_all(renderer.props);
                 scatterplot.drag_function(datum);
               }))
