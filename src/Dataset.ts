@@ -107,54 +107,6 @@ export abstract class Dataset<T extends Tile> {
     return matches;
   }
 
-  /**
-   * 
-   * @param ix The index of the point to get.
-   * @returns 
-   */
-  updatePointCoordinates(ix : number, coords: { x: number, y: number }) : StructRowProxy[] {
-    const matches : StructRowProxy[] = [];
-    this.visit((tile : T) => {
-      if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
-        return;
-      }
-      const mid = bisectLeft([...tile.record_batch.getChild('ix').data[0].values], ix);
-      const val = tile.record_batch.get(mid);
-      assert(val);
-      if (val.ix === ix) {
-        console.log(`before set: (${val.x}, ${val.y})`, val);
-        // const [x, y] = ['x', 'y'].map(name => {
-        //   const child: Vector<Float32> | null = tile.record_batch.getChild(name);
-        //   assert(child, `record batch has no ${name} child`);
-        //   child.
-        //   tile.record_batch.setChild()
-        //   return child;
-        // });
-        for (const name of ['x', 'y'] as const) {
-          const child: Vector<Float32> | null = tile.record_batch.getChild(name);
-          assert(child, `record batch has no ${name} child`);
-          
-          // child.toArray()
-          // const array = new Float32Array(child.data[0].values);
-          const array = child.toArray();
-          console.log(`before set: ${array[mid]}`);
-          array[mid] = coords[name];
-          console.log(`after set: ${array[mid]}`);
-          tile.record_batch.setChild(name, makeVector(array));
-        }
-
-        // x.data[0].values.set([coords.x], mid);
-        // y.data[0].values.set([coords.y], mid);
-        const post = tile.record_batch.get(mid);
-        console.log(`after set: (${post.x}, ${post.y})`, post);
-        // x.set
-
-        matches.push(val);
-      }
-    });
-    return matches;
-  }
-
   get tileWorker() {
     const NUM_WORKERS = 4;
     if (this._tileworkers.length > 0) {
