@@ -12,8 +12,8 @@ import type QuadtreeRoot from './tile';
 import { ReglRenderer } from './regl_rendering';
 import Scatterplot from './deepscatter';
 import { Float32, makeData, StructRow, StructRowProxy } from 'apache-arrow';
-import type { Dataset } from './Dataset'
-import type { Tile } from './tile'
+import type { Dataset } from './Dataset';
+import type { QuadTile, Tile } from './tile';
 
 
 export default class Zoom {
@@ -232,9 +232,13 @@ export default class Zoom {
 
                 console.log(`datum[ix: ${datum.ix}] (${datum.x}, ${datum.y})`);
                 console.log(datum);
-                // datum.x = makeData<Float32>({ type: new Float32(), data: [datum.x]});
-                // self.tileSet.updatePoint(datum.ix, datum);
-                self.tileSet?.updatePointCoordinates(datum.ix, { x: datum.x, y: datum.y });
+
+                const tile = self.scatterplot._root.root_tile as QuadTile;
+
+                // console.log(`findPoint before: ${tile.findPoint(datum.ix) || 'not found'}`);
+                tile.updatePoint(datum.ix, datum);
+                // console.log(`findPoint after: ${tile.findPoint(datum.ix) || 'not found'}`);
+                renderer.remake_renderer();
                 renderer.render_all(renderer.props);
                 scatterplot.drag_function(datum);
               }))

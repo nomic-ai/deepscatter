@@ -277,7 +277,7 @@ export default class Scatterplot {
   }
 
   get drag_function() {
-    return this.drag_handler.f
+    return this.drag_handler.f;
   }
 
   async plotAPI(prefs : APICall) {

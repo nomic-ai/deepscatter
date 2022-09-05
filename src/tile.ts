@@ -2,7 +2,7 @@ import {
   extent
 } from 'd3-array';
 
-import { tableFromIPC, Table, RecordBatch } from 'apache-arrow';
+import { tableFromIPC, Table, RecordBatch, StructRowProxy } from 'apache-arrow';
 
 import TileWorker from './tileworker.worker.js?worker&inline';
 import type { Dataset, QuadtileSet } from './Dataset';
@@ -291,6 +291,8 @@ export class QuadTile extends Tile {
   codes : [number, number, number];
   _already_called = false;
   public child_locations : string[] = [];
+  _table: Table<any> | undefined;
+
   constructor(base_url : string, key : string, parent : null | this, dataset : QuadtileSet) {
     super(dataset);
     this.url = base_url;
@@ -330,7 +332,8 @@ export class QuadTile extends Tile {
         // metadata is passed separately b/c I dont know
         // how to fix it on the table in javascript, just python.
         this._table_buffer = buffer;
-        this._batch = tableFromIPC(buffer).batches[0];
+        this._table = tableFromIPC(buffer);
+        this._batch = this._table.batches[0];
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
         const ixes = this.record_batch.getChild('ix');
@@ -388,7 +391,45 @@ export class QuadTile extends Tile {
     };
   }
 
+  public findPoint(ix: number): StructRowProxy<any> | null {
+    // Tile hasn't been downloaded yet.
+    if (this.download_state !== 'Complete') return null;
 
+    // Point is in this tile's table
+    if (ix >= this.min_ix && ix <= this.max_ix) {
+      return this._table?.get(ix) ?? null;
+    }
+
+    // Check children, if there are any.
+    if (!this._children?.length) return null;
+
+    for (const child of this._children) {
+      const point = child.findPoint(ix);
+      if (point) return point;
+    }
+
+    return null;
+  }
+
+  public updatePoint(ix: number, point: StructRowProxy<any>): boolean {
+    // Tile hasn't been downloaded yet.
+    if (this.download_state !== 'Complete') return false;
+
+    // Update point if it's in this tile's table
+    if (ix >= this.min_ix && ix <= this.max_ix) {
+      this._table?.set(ix, point);
+      return true;
+    }
+
+    // Check children, if there are any.
+    if (!this._children?.length) return false;
+
+    for (const child of this._children) {
+      if (child.updatePoint(ix, point)) return true;
+    }
+
+    return false;
+  }
 }
 
 export class ArrowTile extends Tile {
