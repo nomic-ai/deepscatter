@@ -2,11 +2,12 @@
 import { select } from 'd3-selection';
 import { min } from 'd3-array';
 import type Scatterplot from './deepscatter';
-import type { Tileset } from './tile';
+import type { Tile, Tileset } from './tile';
 import type { APICall } from './types';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 import { timer, Timer } from 'd3-timer';
+import type { Dataset } from './Dataset';
 
 abstract class PlotSetting {
   abstract start: number;
@@ -119,7 +120,7 @@ export class Renderer {
   public _zoom : Zoom;
   public _initializations : Promise<any>[];
   public render_props : RenderProps;
-  constructor(selector, tileSet, scatterplot) {
+  constructor(selector: string, tileSet: Dataset<Tile>, scatterplot: Scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
     this.canvas = select(this.holder.node().firstElementChild);
@@ -190,13 +191,13 @@ export class Renderer {
     return max_points * k * k / point_size_adjust / point_size_adjust;
   }
 
-  visible_tiles() {
+  visible_tiles(): Tile[] {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
     const { tileSet } = this;
     // Materialize using a tileset method.
-    let all_tiles;
+    let all_tiles: Tile[];
     const natural_display = this.aes.dim('x').current.field == 'x' &&
       this.aes.dim('y').current.field == 'y' &&
       this.aes.dim('x').last.field == 'x' &&
