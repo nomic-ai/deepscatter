@@ -5346,7 +5346,11 @@ class Zoom {
   }
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
-    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", 0.75), (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)), (exit) => exit.call((e) => e.remove()));
+    var opacity = 0.75;
+    if (this.scatterplot.prefs.tooltip_opacity !== void 0) {
+      opacity = this.scatterplot.prefs.tooltip_opacity;
+    }
+    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", opacity), (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)), (exit) => exit.call((e) => e.remove()));
     els.html((d) => this.scatterplot.tooltip_html(d.data)).style("transform", (d) => {
       const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
       return t;
@@ -26958,9 +26962,6 @@ class Tile extends Batch {
     });
   }
   *points(bounding = void 0, sorted = false) {
-    if (!this.is_visible(1e100, bounding)) {
-      return;
-    }
     for (const p of this) {
       if (p_in_rect([p.x, p.y], bounding)) {
         yield p;

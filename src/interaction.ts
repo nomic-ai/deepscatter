@@ -75,7 +75,10 @@ export default class Zoom {
 
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
-
+    var opacity = 0.75;
+    if(this.scatterplot.prefs.tooltip_opacity !== undefined){
+      opacity = this.scatterplot.prefs.tooltip_opacity;
+    }
     const els = select(div)
       .selectAll('div.tooltip')
       .data(points)
@@ -90,7 +93,7 @@ export default class Zoom {
           .style('border-radius', '8px')
           .style('padding', '10px')
           .style('background', 'ivory')
-          .style('opacity', 0.75),
+          .style('opacity', opacity),
         (update) => update
           .html((d) => this.scatterplot.tooltip_html(d.data)),
         (exit) => exit.call((e) => e.remove())
