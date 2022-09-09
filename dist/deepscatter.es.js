@@ -5373,6 +5373,10 @@ class Zoom {
     const { width, height, canvas } = this;
     this.transform = identity$3;
     const zoomer = zoom().scaleExtent([1 / 3, 1e5]).extent([[0, 0], [width, height]]).on("zoom", (event) => {
+      try {
+        document.getElementById("tooltipcircle").remove();
+      } catch (error) {
+      }
       this.transform = event.transform;
       this.restart_timer(10 * 1e3);
     });
@@ -5404,7 +5408,10 @@ class Zoom {
       ] : [];
       const { x_, y_ } = this.scales();
       this.html_annotation(annotations);
-      select("#deepscatter-svg").selectAll("circle.label").data(data, (d_) => d_.ix).join((enter) => enter.append("circle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))), (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)), (exit) => exit.call((e) => e.remove())).on("click", (ev, dd) => {
+      select("#deepscatter-svg").selectAll("circle.label").data(data, (d_) => d_.ix).join((enter) => enter.append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))), (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)), (exit) => exit.call((e) => {
+        e.remove();
+        this.prefs.exit_function();
+      })).on("click", (ev, dd) => {
         this.scatterplot.click_function(dd);
       });
     });

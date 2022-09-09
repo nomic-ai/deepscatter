@@ -136,6 +136,10 @@ export default class Zoom {
       .scaleExtent([1 / 3, 100000])
       .extent([[0, 0], [width, height]])
       .on('zoom', (event) => {
+        try{
+          document.getElementById('tooltipcircle').remove();
+        }
+        catch (error){}
         this.transform = event.transform;
         this.restart_timer(10 * 1000);
       });
@@ -192,6 +196,7 @@ export default class Zoom {
         .join(
           (enter) => enter
             .append('circle')
+            .attr('id', 'tooltipcircle')
             .attr('class', 'label')
             .attr('stroke', '#110022')
             .attr('r', 12)
@@ -200,7 +205,10 @@ export default class Zoom {
             .attr('cy', (datum) => y_(y_aes.value_for(datum))),
           (update) => update
             .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd)),
-          (exit) => exit.call((e) => e.remove())
+          (exit) => exit.call((e) => {
+            e.remove();
+            this.prefs.exit_function();
+          })
         )
         .on('click', (ev, dd) => {
           this.scatterplot.click_function(dd);
