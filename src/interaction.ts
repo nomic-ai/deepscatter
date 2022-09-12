@@ -151,6 +151,29 @@ export default class Zoom {
     this.zoomer = zoomer;
   }
 
+  synthetic_mouseover(feather_datum) {
+
+    const datum = feather_datum;
+    const renderer : ReglRenderer = this.renderers.get('regl');
+    const x_aes = renderer.aes.dim('x').current;
+    const y_aes = renderer.aes.dim('y').current;
+    const { x_, y_ } = this.scales();
+
+    try {
+      select('#tooltipcircle').remove();
+    } catch (e) {console.log('no circle');}
+
+    select('#deepscatter-svg')
+      .append('circle')
+      .attr('id', 'tooltipcircle')
+      .attr('class', 'label')
+      .attr('stroke', '#110022')
+      .attr('r', 12)
+      .attr('cx', x_(x_aes.value_for(datum)))
+      .attr('cy', y_(y_aes.value_for(datum)))
+
+  }
+
   add_mouseover() {
     let last_fired = 0;
     //@ts-ignore Not sure how to guarantee this formally.

@@ -5384,6 +5384,19 @@ class Zoom {
     this.add_mouseover();
     this.zoomer = zoomer;
   }
+  synthetic_mouseover(feather_datum) {
+    const datum2 = feather_datum;
+    const renderer = this.renderers.get("regl");
+    const x_aes = renderer.aes.dim("x").current;
+    const y_aes = renderer.aes.dim("y").current;
+    const { x_, y_ } = this.scales();
+    try {
+      select("#tooltipcircle").remove();
+    } catch (e) {
+      console.log("no circle");
+    }
+    select("#deepscatter-svg").append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("cx", x_(x_aes.value_for(datum2))).attr("cy", y_(y_aes.value_for(datum2)));
+  }
   add_mouseover() {
     let last_fired = 0;
     const renderer = this.renderers.get("regl");
