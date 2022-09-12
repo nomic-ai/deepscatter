@@ -75,7 +75,10 @@ export default class Zoom {
 
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
-
+    var opacity = 0.75;
+    if(this.scatterplot.prefs.tooltip_opacity !== undefined){
+      opacity = this.scatterplot.prefs.tooltip_opacity;
+    }
     const els = select(div)
       .selectAll('div.tooltip')
       .data(points)
@@ -90,7 +93,7 @@ export default class Zoom {
           .style('border-radius', '8px')
           .style('padding', '10px')
           .style('background', 'ivory')
-          .style('opacity', 0.75),
+          .style('opacity', opacity),
         (update) => update
           .html((d) => this.scatterplot.tooltip_html(d.data)),
         (exit) => exit.call((e) => e.remove())
@@ -133,6 +136,10 @@ export default class Zoom {
       .scaleExtent([1 / 3, 100000])
       .extent([[0, 0], [width, height]])
       .on('zoom', (event) => {
+        try{
+          document.getElementById('tooltipcircle').remove();
+        }
+        catch (error){}
         this.transform = event.transform;
         this.restart_timer(10 * 1000);
       });
@@ -142,6 +149,29 @@ export default class Zoom {
     this.add_mouseover();
 
     this.zoomer = zoomer;
+  }
+
+  synthetic_mouseover(feather_datum) {
+
+    const datum = feather_datum;
+    const renderer : ReglRenderer = this.renderers.get('regl');
+    const x_aes = renderer.aes.dim('x').current;
+    const y_aes = renderer.aes.dim('y').current;
+    const { x_, y_ } = this.scales();
+
+    try {
+      select('#tooltipcircle').remove();
+    } catch (e) {console.log('no circle');}
+
+    select('#deepscatter-svg')
+      .append('circle')
+      .attr('id', 'tooltipcircle')
+      .attr('class', 'label')
+      .attr('stroke', '#110022')
+      .attr('r', 12)
+      .attr('cx', x_(x_aes.value_for(datum)))
+      .attr('cy', y_(y_aes.value_for(datum)))
+
   }
 
   add_mouseover() {
@@ -189,6 +219,7 @@ export default class Zoom {
         .join(
           (enter) => enter
             .append('circle')
+            .attr('id', 'tooltipcircle')
             .attr('class', 'label')
             .attr('stroke', '#110022')
             .attr('r', 12)
@@ -197,7 +228,10 @@ export default class Zoom {
             .attr('cy', (datum) => y_(y_aes.value_for(datum))),
           (update) => update
             .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd)),
-          (exit) => exit.call((e) => e.remove())
+          (exit) => exit.call((e) => {
+            e.remove();
+            this.prefs.exit_function();
+          })
         )
         .on('click', (ev, dd) => {
           this.scatterplot.click_function(dd);

@@ -5346,7 +5346,11 @@ class Zoom {
   }
   html_annotation(points) {
     const div = this.canvas.node().parentNode.parentNode;
-    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", 0.75), (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)), (exit) => exit.call((e) => e.remove()));
+    var opacity = 0.75;
+    if (this.scatterplot.prefs.tooltip_opacity !== void 0) {
+      opacity = this.scatterplot.prefs.tooltip_opacity;
+    }
+    const els = select(div).selectAll("div.tooltip").data(points).join((enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", opacity), (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)), (exit) => exit.call((e) => e.remove()));
     els.html((d) => this.scatterplot.tooltip_html(d.data)).style("transform", (d) => {
       const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
       return t;
@@ -5369,12 +5373,29 @@ class Zoom {
     const { width, height, canvas } = this;
     this.transform = identity$3;
     const zoomer = zoom().scaleExtent([1 / 3, 1e5]).extent([[0, 0], [width, height]]).on("zoom", (event) => {
+      try {
+        document.getElementById("tooltipcircle").remove();
+      } catch (error) {
+      }
       this.transform = event.transform;
       this.restart_timer(10 * 1e3);
     });
     canvas.call(zoomer);
     this.add_mouseover();
     this.zoomer = zoomer;
+  }
+  synthetic_mouseover(feather_datum) {
+    const datum2 = feather_datum;
+    const renderer = this.renderers.get("regl");
+    const x_aes = renderer.aes.dim("x").current;
+    const y_aes = renderer.aes.dim("y").current;
+    const { x_, y_ } = this.scales();
+    try {
+      select("#tooltipcircle").remove();
+    } catch (e) {
+      console.log("no circle");
+    }
+    select("#deepscatter-svg").append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("cx", x_(x_aes.value_for(datum2))).attr("cy", y_(y_aes.value_for(datum2)));
   }
   add_mouseover() {
     let last_fired = 0;
@@ -5400,7 +5421,10 @@ class Zoom {
       ] : [];
       const { x_, y_ } = this.scales();
       this.html_annotation(annotations);
-      select("#deepscatter-svg").selectAll("circle.label").data(data, (d_) => d_.ix).join((enter) => enter.append("circle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))), (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)), (exit) => exit.call((e) => e.remove())).on("click", (ev, dd) => {
+      select("#deepscatter-svg").selectAll("circle.label").data(data, (d_) => d_.ix).join((enter) => enter.append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))), (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)), (exit) => exit.call((e) => {
+        e.remove();
+        this.prefs.exit_function();
+      })).on("click", (ev, dd) => {
         this.scatterplot.click_function(dd);
       });
     });
@@ -26958,9 +26982,6 @@ class Tile extends Batch {
     });
   }
   *points(bounding = void 0, sorted = false) {
-    if (!this.is_visible(1e100, bounding)) {
-      return;
-    }
     for (const p of this) {
       if (p_in_rect([p.x, p.y], bounding)) {
         yield p;
