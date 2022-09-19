@@ -765,6 +765,47 @@ class Color extends Aesthetic {
     return [r / 255, g / 255, b / 255];
   }
 
+  get_hex_values(field) {
+    var all_tiles = [this.tileSet];
+    var current_tiles = [this.tileSet];
+    if (this.tileSet.children.length > 0) {
+      while (true) {
+        if (current_tiles.length == 0) {
+          break;
+        }
+        var children_tiles = [];
+        current_tiles.map(function(tile, idx) {
+          if (tile.children.length > 0) {
+            all_tiles.push.apply(all_tiles, tile.children);
+            children_tiles.push.apply(children_tiles, tile.children);
+          }
+        });
+        current_tiles = children_tiles;
+      }
+      var min2 = all_tiles[0].table.getChild(field).data[0].values[0];
+      var max2 = min2;
+      all_tiles.forEach(function(tile, idx) {
+        tile.table.getChild(field).data[0].values.forEach(function(val, idx2) {
+          if (val < min2) {
+            min2 = val;
+          }
+          if (val > max2) {
+            max2 = val;
+          }
+        });
+      });
+      if(typeof min2 == "bigint" || typeof max2 == "bigint"){
+        min2 = Number(min2);
+        max2 = Number(max2);
+      }
+      var hex_vals = {};
+      for (var i = 0; i < this._texture_buffer.length; i += 4*512){
+        hex_vals[((Math.abs(max2-min2)/7)*(i/(4*512))+min2).toString()] = ("#" + this._texture_buffer[i].toString(16) + this._texture_buffer[i + 1].toString(16) + this._texture_buffer[i + 2].toString(16));
+      }
+      return hex_vals;
+    }
+  }
+
   get_hex_order() {
     var hex_vals = {};
     var ldl = this.scatterplot['_root']['local_dictionary_lookups'];
