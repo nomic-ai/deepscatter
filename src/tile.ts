@@ -482,9 +482,8 @@ export class QuadTile extends Tile {
     super();
     this.url = base_url;
     this.bearer_token = ""
-    if("bearer_token" in prefs){
+    if(prefs != undefined && "bearer_token" in prefs){
       this.bearer_token = prefs["bearer_token"]
-      this.url = this.url.replace('/public', '')
     }
 
     this.parent = parent;
@@ -546,10 +545,13 @@ export class QuadTile extends Tile {
     this._already_called = true;
 
     // new: must include protocol and hostname.
-    const url = `${this.url}/${this.key}.feather`
+    var url = `${this.url}/${this.key}.feather`
     this.download_state = 'In progress';
+    if(this.bearer_token){
+      url = url.replace('/public', '')
+    }
     this._download = this.tileWorker
-      .fetch(url, this.needed_mutations, {method: 'GET', headers: {'Authorization': 'Bearer ' + this.bearer_token}})
+      .fetch(url, this.needed_mutations, {method: 'GET', headers: {'Authorization': 'Bearer ' + this.bearer_token} })
       .then(([buffer, metadata, codes]): Table<any> => {
         this.download_state = 'Complete';
 
@@ -623,7 +625,7 @@ export class QuadTile extends Tile {
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
         //this._children.push(key)
-        this._children.push(new this.class(this.url, key, this));
+        this._children.push(new this.class(this.url, key, this, {'bearer_token': this.bearer_token}));
       }
     }
     // }

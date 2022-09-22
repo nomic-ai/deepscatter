@@ -439,7 +439,7 @@ abstract class Aesthetic {
       if(color_by_values == undefined){
         var lowercase_values = ['1','0']
       }else{
-      var lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
+        var lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase()).sort();
       }
       var new_range = Array(lowercase_values.length).fill("#000000");
       if(encoding['domain'] && Array.isArray(encoding['domain']) && typeof(encoding['domain'][0] === 'string')){
