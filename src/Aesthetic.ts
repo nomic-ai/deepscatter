@@ -436,10 +436,11 @@ abstract class Aesthetic {
         encoding['domain'] = ['0','1']
       }
       var color_by_values = this.tileSet.local_dictionary_lookups[encoding['field']];
+      console.log(color_by_values);
       if(color_by_values == undefined){
         var lowercase_values = ['1','0']
       }else{
-      var lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
+        var lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
       }
       var new_range = Array(lowercase_values.length).fill("#000000");
       if(encoding['domain'] && Array.isArray(encoding['domain']) && typeof(encoding['domain'][0] === 'string')){
