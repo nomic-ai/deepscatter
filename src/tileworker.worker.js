@@ -25,11 +25,11 @@ function dictVector(input, id) {
 
 const WorkerTile = {
 
-  fetch(url, mutations) {
+  fetch(url, mutations, requestOptions) {
     if (url.match('https://github')) {
       url += '?raw=true';
     }
-    return fetch(url)
+    return fetch(url, requestOptions)
       .then((resp) => resp.arrayBuffer())
       .then((response) => {
         const table = tableFromIPC(response);

@@ -470,6 +470,7 @@ export class Tile extends Batch {
 
 export class QuadTile extends Tile {
   url : string;
+  bearer_token: string;
   _mutations : Map<string, any> = new Map();
   key : string;
   public _children : Array<QuadTile> = [];
@@ -480,6 +481,12 @@ export class QuadTile extends Tile {
   constructor(base_url : string, key : string, parent : QuadTile, prefs) {
     super();
     this.url = base_url;
+    this.bearer_token = ""
+    if("bearer_token" in prefs){
+      this.bearer_token = prefs["bearer_token"]
+      this.url = this.url.replace('/public', '')
+    }
+
     this.parent = parent;
     if (parent === undefined) {
       this._mutations = prefs.mutate;
@@ -542,7 +549,7 @@ export class QuadTile extends Tile {
     const url = `${this.url}/${this.key}.feather`
     this.download_state = 'In progress';
     this._download = this.tileWorker
-      .fetch(url, this.needed_mutations)
+      .fetch(url, this.needed_mutations, {method: 'GET', headers: {'Authorization': 'Bearer ' + this.bearer_token}})
       .then(([buffer, metadata, codes]): Table<any> => {
         this.download_state = 'Complete';
 
