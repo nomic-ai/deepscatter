@@ -761,7 +761,7 @@ export default class RootTile extends QuadTile {
     }
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
-        this._children.push(new QuadTile(this.url, key, this, {}));
+        this._children.push(new QuadTile(this.url, key, this, {'bearer_token': this.bearer_token}));
       }
     }
     // }
