@@ -534,86 +534,93 @@ export class QuadTile extends Tile {
     return this;
   }
 
-  download() : Promise<Table> {
-    // This should only be called once per tile.
-    if (this._download) { return this._download }
-
+  download(): Promise<Table> {
+    if (this._download) {
+      return this._download;
+    }
     if (this._already_called) {
-      throw ('Illegally attempting to download twice');
+      throw "Illegally attempting to download twice";
     }
-
     this._already_called = true;
-
-    // new: must include protocol and hostname.
-    var url = `${this.url}/${this.key}.feather`
-    this.download_state = 'In progress';
-    if(this.bearer_token){
-      url = url.replace('/public', '')
+    var url = `${this.url}/${this.key}.feather`;
+    this.download_state = "In progress";
+    if (this.bearer_token) {
+      url = url.replace("/public", "");
     }
-    this._download = this.tileWorker
-      .fetch(url, this.needed_mutations, {method: 'GET', headers: {'Authorization': 'Bearer ' + this.bearer_token} })
-      .then(([buffer, metadata, codes]): Table<any> => {
-        this.download_state = 'Complete';
-
-        // metadata is passed separately b/c I dont know
-        // how to fix it on the table in javascript, just python.
-        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
-        this._table_buffer = buffer;
-        this._table = tableFromIPC(buffer);
-        if(!this._table.getChild('_isSelected')){
-        const isSelectedArray = Array(this._table.numRows).fill('0');
-        isSelectedArray[0] = '1';
-        const isSelectedVector = vectorFromArray(isSelectedArray, new Utf8);
+    this._download = this.tileWorker.fetch(url, this.needed_mutations, {
+      method: "GET",
+      headers: {"Authorization": "Bearer " + this.bearer_token}
+    }).then(([buffer, metadata, codes]) => {
+      this.download_state = "Complete";
+      this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
+      this._table_buffer = buffer;
+      this._table = tableFromIPC(buffer);
+      if (true || !this._table.getChild("_isSelected")) {
+        const isSelectedArray = Array(this._table.numRows).fill("0");
+        const isSelectedVector = vectorFromArray(isSelectedArray, new Utf8());
         const isSelectedDictionary = makeVector({
           data: isSelectedArray.map((v) => parseInt(v)),
           dictionary: isSelectedVector,
-          type: new Dictionary(new Utf8, new Uint32)
+          type: new Dictionary(new Utf8(), new Uint32())
         });
-        var buffers = [undefined,isSelectedDictionary.data[0].values,this._table.batches[0].data.children[0].nullBitmap,undefined];
-        const isSelectedData = new Data(new Dictionary(new Utf8, new Uint32), 0, this._table.numRows, 0, buffers, isSelectedDictionary);
+        var buffers = [void 0, isSelectedDictionary.data[0].values, this._table.batches[0].data.children[0].nullBitmap, void 0];
+        const isSelectedData = new Data(new Dictionary(new Utf8(), new Uint32()), 0, this._table.numRows, 0, buffers, isSelectedDictionary);
         isSelectedData.dictionary = isSelectedDictionary.memoize();
         isSelectedData.children = [];
-        var isSelectedSchemaField = new Field('_isSelected', new Dictionary(new Utf8, new Uint32), false);
-        this._table.schema.fields.push(isSelectedSchemaField);
-        this._table.batches[0].data.children.push(isSelectedData);
-        const float_version = new Float32Array(this._table.numRows);
-        for (let i = 0; i < this._table.numRows; i++) {
-          float_version[i] = this._table.getChild('_isSelected').data[0].values[i] - 2047;
+        //const selfield = this.tileSet.currentSelected;
+        var sorted_fields = [{'name': '_isSelected'}];
+        if (this.parent !== undefined && this.parent._table !== undefined) {
+          sorted_fields = this.parent._table.schema.fields
+              .filter(f => f.name.includes('Selected'))
+              .filter(f => !f.name.includes('float_version'))
+              .sort()
+              .reverse();
         }
-        const float_vector = makeVector(float_version);
-        var float_buffers = [undefined,float_vector.data[0].values,this._table.batches[0].data.children[0].nullBitmap,undefined];
-        const float_data = new Data(new Float(), 0, this._table.numRows, 0, float_buffers);
-        var float_field = new Field('_isSelected_float_version', new Float(), false);
-        this._table.batches[0].data.children.push(float_data);
-        this._table.schema.fields.push(float_field);
-        var selected_codes = new Map();
-        selected_codes.set(0, '1');
-        selected_codes.set(1, '0');
-        codes['_isSelected'] = selected_codes;
-        }
-        this._extent = JSON.parse(metadata.get('extent'));
-        this.child_locations = JSON.parse(metadata.get('children'));
-        const ixes = this.table.getChild('ix')
-        if (ixes === null) {
-          throw ('No ix column in table');
-        }
-        this._min_ix = Number(ixes.get(0));
-        this.max_ix = Number(ixes.get(ixes.length - 1));
-        this.highest_known_ix = this.max_ix;
-        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
-        //    this.setDataTypes()
+        var child_field_names = this._table.schema.fields.map(f => f.name);
+        sorted_fields.forEach(field => {
+          if (child_field_names.includes(field.name)) {
+            return
+          }
+          var isSelectedSchemaField = new Field(field.name, new Dictionary(new Utf8(), new Uint32()), false);
+          this._table.schema.fields.push(isSelectedSchemaField);
+          this._table.batches[0].data.children.push(isSelectedData);
+          const float_version = new Float32Array(this._table.numRows);
+          for (let i = 0; i < this._table.numRows; i++) {
+            float_version[i] = this._table.getChild(field.name).data[0].values[i] - 2047;
+          }
+          const float_vector = makeVector(float_version);
+          var float_buffers = [void 0, float_vector.data[0].values, this._table.batches[0].data.children[0].nullBitmap, void 0];
+          const float_data = new Data(new Float(), 0, this._table.numRows, 0, float_buffers);
+          var float_field = new Field(field.name + "_float_version", new Float(), false);
+          this._table.batches[0].data.children.push(float_data);
+          this._table.schema.fields.push(float_field);
+        });
 
-        this.local_dictionary_lookups = codes;
-        this.update_master_dictionary_lookups();
-        return this.table;
-      })
-      .catch((e) => {        
-        this.download_state = 'Failed';
-        console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
+        var selected_codes = /* @__PURE__ */ new Map();
+        selected_codes.set(0, "1");
+        selected_codes.set(1, "0");
+        codes["_isSelected"] = selected_codes;
+      }
+      this._extent = JSON.parse(metadata.get("extent"));
+      this.child_locations = JSON.parse(metadata.get("children"));
+      const ixes = this.table.getChild("ix");
+      if (ixes === null) {
+        throw "No ix column in table";
+      }
+      this._min_ix = Number(ixes.get(0));
+      this.max_ix = Number(ixes.get(ixes.length - 1));
+      this.highest_known_ix = this.max_ix;
+      this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations));
+      this.local_dictionary_lookups = codes;
+      this.update_master_dictionary_lookups();
+      return this.table;
+    }).catch((e) => {
+      this.download_state = "Failed";
+      console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
         
         `);
-        throw e;
-      });
+      throw e;
+    });
     return this._download;
   }
 

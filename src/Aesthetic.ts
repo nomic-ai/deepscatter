@@ -25,7 +25,7 @@ import type {
   ConstantColorChannel, ColorChannel, OpArray
 
 } from './types';
-import { Vector, tableToIPC } from 'apache-arrow';
+import { Vector, tableToIPC, makeVector } from 'apache-arrow';
 
 const scales : {[key : string] : Function} = {
   sqrt: scaleSqrt,
@@ -344,96 +344,97 @@ abstract class Aesthetic {
     if (encoding['domain'] && typeof(encoding['domain']) === 'string' && encoding['domain'] === 'progressive'){
       var all_tiles = [this.tileSet];
       var current_tiles = [this.tileSet];
-      if(this.tileSet.children.length > 0){
-        while(true)
-        {
-          if(current_tiles.length == 0){
+      if (this.tileSet.children.length > 0) {
+        while (true) {
+          if (current_tiles.length == 0) {
             break;
           }
           var children_tiles = [];
-          current_tiles.map(function(tile, idx){
-            if(tile.children.length > 0){
+          current_tiles.map(function(tile, idx) {
+            if (tile.children.length > 0) {
               all_tiles.push.apply(all_tiles, tile.children);
               children_tiles.push.apply(children_tiles, tile.children);
             }
           });
           current_tiles = children_tiles;
         }
-        var min = all_tiles[0].table.getChild(encoding['field']).data[0].values[0];
-        var max = min;
-        all_tiles.forEach(function(tile,idx){
-          tile.table.getChild(encoding['field']).data[0].values.forEach(function(val, idx2){
-              if(val < min){
-                min = val;
-              }
-              if(val > max){
-                max = val;
-              }
-            });
+        var min2 = all_tiles[0].table.getChild(encoding["field"]).data[0].values[0];
+        var max2 = min2;
+        all_tiles.forEach(function(tile, idx) {
+          tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
+            if (val < min2) {
+              min2 = val;
+            }
+            if (val > max2) {
+              max2 = val;
+            }
           });
-        encoding['domain'] = [min,max];
+        });
+        encoding["domain"] = [min2, max2];
       }
     }
+
     if (encoding['range'] && Array.isArray(encoding['range']) && typeof(encoding['range'][0]) === 'string'){
-      if (encoding['field'] == '_isSelected'){
-        var all_tiles = [this.tileSet];
+      if (encoding["field"] == "_isSelected") {
+        var all_tiles = [];
         var current_tiles = [this.tileSet];
-        if(this.tileSet.children.length > 0){
-          while(true)
-          {
-            if(current_tiles.length == 0){
-                break;
-            }
-            var children_tiles = [];
-            current_tiles.map(function(tile, idx){
-              if(tile.children.length > 0){
-                all_tiles.push.apply(all_tiles, tile.children);
-                children_tiles.push.apply(children_tiles, tile.children);
-              }
-            });
-            current_tiles = children_tiles;
+        while (current_tiles.length > 0) {
+          var current_tile = current_tiles.shift();
+          if (current_tile.download_state === 'Complete') {
+            all_tiles.push(current_tile);
+            current_tile.children.forEach((child) => current_tiles.push(child));
           }
-          var set2 = new Set(encoding['domain']);
-          if(this.tileSet.currentSelected == undefined){
+        }
+        if (this.tileSet.children.length > 0) {
+
+          var set2 = new Set(encoding["domain"]);
+          if (this.tileSet.currentSelected == void 0) {
             this.tileSet.currentSelected = 0;
             this.tileSet.isSelectedIndex = this.tileSet.table.batches[0].data.children.length - 2;
-          }else{
+          } else {
             this.tileSet.currentSelected += 1;
-            encoding['field'] = encoding['field'] + this.tileSet.currentSelected.toString();
+            encoding["field"] = encoding["field"] + this.tileSet.currentSelected.toString();
           }
-          var selected = this.tileSet.currentSelected;
+          var selected = this.tileSet.currentSelected; //This is the key of the field corresponding to the selection
           var selectedIndex = this.tileSet.isSelectedIndex;
-          all_tiles.forEach(function(tile,idx){
-            if(selected > 0){
+          all_tiles.forEach(function (tile, idx) {
+            if (selected > 0) {
               tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex].clone());
-              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex+1].clone());
+              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex + 1].clone());
               tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex].clone());
-              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding['field'];
-              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex+1].clone());
-              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding['field']+"_float_version";
+              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding["field"];
+              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex + 1].clone());
+              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding["field"] + "_float_version";
             }
-            tile.table.getChild(encoding['field']).data[0].values.forEach(function(val, idx2){
-              if (tile.table.getChild("_id").data[0].typeId != 5){
-                if (tile.table.getChild("_id").data[0].values[idx2] && set2.has(tile.table.getChild("_id").data[0].values[idx2].toString())) {
-                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "1";
-                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2046;
+
+            var updatedArray = new Uint8Array(tile.table.numRows);
+            var updatedFloatArray = new Float32Array(tile.table.numRows);
+            var didSelect = false;
+            tile.table.getChild(encoding["field"]).data[0].values.forEach(function (val, idx2) {
+              if (tile.table.getChild("_id").data[0].typeId != 5) {
+                if (set2.has(tile.table.getChild("_id").data[0].values[idx2].toString())) {
+                  updatedArray[idx2] = "1";
+                  updatedFloatArray[idx2] = -2046;
                 } else {
-                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "0";
-                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2047;
+                  updatedArray[idx2] = "0";
+                  updatedFloatArray[idx2] = -2047;
                 }
               } else {
-                if (set2.has(String.fromCharCode(...tile.table.getChild("_id").data[0].values.slice(tile.table.getChild("_id").data[0].valueOffsets[idx2],tile.table.getChild("_id").data[0].valueOffsets[idx2+1])))){
-                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "1";
-                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2046;
+                if (set2.has(String.fromCharCode(...tile.table.getChild("_id").data[0].values.slice(tile.table.getChild("_id").data[0].valueOffsets[idx2], tile.table.getChild("_id").data[0].valueOffsets[idx2 + 1])))) {
+                  updatedArray[idx2] = "1";
+                  updatedFloatArray[idx2] = -2046;
                 } else {
-                  tile.table.getChild(encoding['field']).data[0].values[idx2] = "0";
-                  tile.table.getChild(encoding['field']+"_float_version").data[0].values[idx2] = -2047;
+                  updatedArray[idx2] = "0";
+                  updatedFloatArray[idx2] = -2047;
                 }
               }
             });
+            tile._table = tile.table.setChild(encoding["field"], makeVector(updatedArray));
+            tile._table = tile.table.setChild(encoding["field"] + "_float_version", makeVector(updatedFloatArray));
           });
         }
-        encoding['domain'] = ['0','1']
+        encoding["domain"] = ["0", "1"];
+
       }
       var color_by_values = this.tileSet.local_dictionary_lookups[encoding['field']];
       console.log(color_by_values);
