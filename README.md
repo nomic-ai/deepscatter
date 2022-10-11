@@ -28,7 +28,7 @@ It also runs in completely static settings, so you can host a million-point scat
 
 # Get help
 
-Github issues, even low quality ones, are welcom here. There is also a dedicated [Deepscatter Slack](https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw) which you are welcome to join.
+Github issues, even low quality ones, are welcome here. There is also a dedicated [Deepscatter Slack](https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw) which you are welcome to join.
 I came into doing this stuff from a very non-technical background and welcome people to join with naive questions.
 
 # Quick start
