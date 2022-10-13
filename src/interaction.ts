@@ -15,7 +15,7 @@ import { StructRow } from 'apache-arrow';
 
 export default class Zoom {
   public prefs : APICall;
-  public canvas : d3.Selection<d3.ContainerElement, any, any, any>;
+  public svg_element_selection : d3.Selection<d3.ContainerElement, any, any, any>;
   public width : number;
   public height : number;
   public renderers : Map<string, Renderer>;
@@ -32,9 +32,10 @@ export default class Zoom {
     // also registers events.
 
     this.prefs = prefs;
-    this.canvas = select(selector);
-    this.width = +this.canvas.attr('width');
-    this.height = +this.canvas.attr('height');
+
+    this.svg_element_selection = select(selector);
+    this.width = +this.svg_element_selection.attr('width');
+    this.height = +this.svg_element_selection.attr('height');
     this.renderers = new Map();
     this.scatterplot = plot;
     // A zoom keeps track of all the renderers
@@ -59,7 +60,7 @@ export default class Zoom {
   zoom_to(k : number, x = null, y = null, duration = 4000) {
     const scales = this.scales();
     const {
-      canvas, zoomer, width, height,
+      svg_element_selection: canvas, zoomer, width, height,
     } = this;
 
     const t = zoomIdentity
@@ -74,7 +75,7 @@ export default class Zoom {
   }
 
   html_annotation(points : Array<Record<string, string | number>>) {
-    const div = this.canvas.node().parentNode.parentNode;
+    const div = this.svg_element_selection.node().parentNode.parentNode;
 
     const els = select(div)
       .selectAll('div.tooltip')
@@ -111,7 +112,7 @@ export default class Zoom {
     const [y0, y1] = corners.y.map(scales.y);
 
     const {
-      canvas, zoomer, width, height,
+      svg_element_selection: canvas, zoomer, width, height,
     } = this;
 
     const t = zoomIdentity
@@ -126,7 +127,7 @@ export default class Zoom {
   }
 
   initialize_zoom() {
-    const { width, height, canvas } = this;
+    const { width, height, svg_element_selection: canvas } = this;
     this.transform = zoomIdentity;
 
     const zoomer = zoom()
@@ -151,7 +152,7 @@ export default class Zoom {
     const x_aes = renderer.aes.dim('x').current;
     const y_aes = renderer.aes.dim('y').current;
 
-    this.canvas.on('mousemove', (event) => {
+    this.svg_element_selection.on('mousemove', (event) => {
       // Debouncing this is really important, it turns out.
       if (Date.now() - last_fired < 1000 / 20) {
         return;
