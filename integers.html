@@ -1,0 +1,90 @@
+<body>
+  <div id="deepscatter"></div>
+</body>
+<script type="module">
+  import Scatterplot from './src/deepscatter';
+  import { tableFromArrays, Table } from 'apache-arrow';
+
+  let batch_no = 0;
+  /* Clifford attractor frame.*/
+  function batch(n_batches) {
+    // this is a function to create an apache arrow table based on a 
+    // set of constants and a Clifford attractor. See https://observablehq.com/@mbostock/clifford-attractor.
+    function make_batch(start = 0, length = 65536) {
+      const batch_number_here = batch_no++;
+      // make a batch of clifford generator data starting at start and of length length
+
+      let x = new Float32Array(length);
+      let y = new Float32Array(length);
+      let integers = new Float32Array(length);
+      let ix = new Float32Array(length);
+      let batch_id = new Float32Array(length).fill(batch_number_here);
+      for (let i = start; i < start + length; i++) {
+        ix[i - start] = i;        
+        let x_ = 0;
+        let y_ = 0;
+        const binary = i.toString(2).split('').reverse()
+        for (let j = 0; j < binary.length; j++) {
+          const bit = binary[j]
+          if (bit == 1) {
+            if (j % 2 == 0) {
+              x_ += 2**(j / 2);
+            } else {
+              y_ += 2**((j - 1) / 2);
+            }
+          }
+        }
+        x[i - start] = x_  / 1024 / 1024;
+        y[i - start] = y_ / 1024 / 1024;
+        integers[i - start] = i;
+      }
+
+      return tableFromArrays({
+        x: x,
+        y: y,
+        ix: ix,
+        integers: integers,
+        batch_id
+      });
+
+    }
+    const batches = []
+    for (let i = 0; i < n_batches; i++) {
+      const batch = make_batch(i * 65536, 65536);
+      batches.push(batch);
+      window.b = batch;
+      console.log(i)
+    }
+    const table = new Table(...batches);
+    return table;
+  }
+
+  const table = batch(256)
+  const plot = new Scatterplot("#deepscatter");
+
+  plot.plotAPI({
+    arrow_table: table,
+    point_size: 12,
+    max_points: 2.5e7,
+    alpha: 1150,
+    background_color: "#EEEDDE",
+    zoom_balance: .75,
+    duration: 1200,
+    encoding: {
+      'x': {
+        field: 'x',
+        transform: 'literal'
+      },
+      'y': {
+        field: 'y',
+        transform: 'literal'
+      },
+      color: {
+        field: 'batch_id',
+        range: 'viridis',
+        domain: [0, 256]
+      }
+    }
+  })
+  window.plot = plot;
+</script>
