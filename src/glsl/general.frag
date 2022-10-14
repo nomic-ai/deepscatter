@@ -66,7 +66,7 @@ void main() {
     if (alpha <= 0.03) discard;
   }*/
   // Pre-blend the alpha channel.
-  if (u_color_picker_mode == 1.) {
+  if (u_color_picker_mode >= 1.) {
     // no alpha when color picking; we use all four channels for that.
     gl_FragColor = fill;
   } else {

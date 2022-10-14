@@ -1,7 +1,7 @@
 precision mediump float;
 
 uniform float u_zoom_balance;
-
+uniform float u_tile_id;
 uniform float u_update_time;
 uniform float u_transition_duration;
 
@@ -834,6 +834,7 @@ vec2 calc_and_interpolate_positions(
 void main() {
   float debug_mode = 0.;
   float ix = buffer_0;
+  float ix_in_tile = buffer_1;
   if (ix > u_maxix) {
     // throw away points that are too low.
     gl_Position = discard_me;
@@ -1220,9 +1221,14 @@ void main() {
   } else {
     gl_Position = vec4(position + jitter, 0., 1.);
   }  
-  if (u_color_picker_mode > 0.) {
+  if (u_color_picker_mode == 1.) {
     // Add one so the first element is distinguishable.
     fill = packFloat(ix + 1.);
+  } else if (u_color_picker_mode == 2.) {
+    // 
+    fill = packFloat(u_tile_id + 1.);
+  } else if (u_color_picker_mode == 3.) {
+    fill = packFloat(ix_in_tile + 1.);
   } else {
     run_color_fill(ease);
   }

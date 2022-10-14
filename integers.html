@@ -59,10 +59,10 @@
     return table;
   }
 
-  const table = batch(256)
+  const table = batch(128)
   const plot = new Scatterplot("#deepscatter");
 
-  plot.plotAPI({
+  const draw1 = plot.plotAPI({
     arrow_table: table,
     point_size: 12,
     max_points: 2.5e7,
@@ -85,6 +85,17 @@
         domain: [0, 256]
       }
     }
+  })
+  draw1.then( () => {
+    plot.plotAPI({
+      duration: 10000,
+      zoom: {
+        bbox: {
+          "x":[0.0019172125023188906,0.0019916103567022615],
+          "y":[0.0003230314941825195,0.0003629471969556204]
+        }
+      }
+    })
   })
   window.plot = plot;
 </script>

@@ -190,7 +190,7 @@ export class Renderer {
     return max_points * k * k / point_size_adjust / point_size_adjust;
   }
 
-  visible_tiles() {
+  visible_tiles() : Array<Tile> {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
@@ -202,7 +202,7 @@ export class Renderer {
       this.aes.dim('x').last.field == 'x' &&
       this.aes.dim('y').last.field == 'y';
     
-    all_tiles = natural_display ? tileSet.map((d : Tile) => d)      
+    all_tiles = natural_display ? tileSet.map((d : Tile) => d)
       .filter((tile) => {
         const visible = tile.is_visible(max_ix, this.zoom.current_corners());
         return visible;

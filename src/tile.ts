@@ -21,6 +21,8 @@ interface schema_entry{
   keys ? : Array<any>,
 }
 
+// Keep a global index of tile numbers. These are used to identify points.
+let tile_identifier = 0;
 
 export abstract class Tile {
   public max_ix  = -1;
@@ -39,7 +41,7 @@ export abstract class Tile {
   __schema?: schema_entry[];
   local_dictionary_lookups? : Map<string, any>;
   public _extent? : { 'x' : MinMax, 'y': MinMax };
-
+  public numeric_id: number;
   constructor(dataset : QuadtileSet) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
@@ -50,6 +52,9 @@ export abstract class Tile {
     if (dataset === undefined) {
       throw new Error('No dataset provided');
     }
+    // Grab the next identifier off the queue. This should be async safe with the current setup, but
+    // the logic might fall apart in truly parallel situations.
+    this.numeric_id = tile_identifier++;
   }
 
   get children() {

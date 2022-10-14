@@ -183,6 +183,7 @@ export class ReglRenderer extends Renderer {
       }
       const this_props = {
         manager,
+        tile_id: tile.numeric_id,
         //        image_locations: manager.image_locations,
         sprites: this.sprites,
       };
@@ -599,14 +600,40 @@ export class ReglRenderer extends Renderer {
     return v;
   }
 
-  color_pick(x: number, y: number) {
-    const { props, height } = this;
-    props.color_picker_mode = 1;
-    let color_at_point : [number, number, number, number] = [0, 0, 0, 0];
+  get integer_buffer() : wrapREGL.Buffer {
+    if (this._integer_buffer === undefined) {
+      const array = new Float32Array(2**16);
+      for (let i = 0; i < 2**16; i++) {
+        array[i] = i;
+      }
+      this._integer_buffer = this.regl.buffer(array);
+    }
+    return this._integer_buffer;
+  }
 
+  color_pick(x: number, y: number) {
+    const tile_number = this.color_pick_single(x, y, 'tile_id');
+    const row_number = this.color_pick_single(x, y, 'ix_in_tile');
+    for (const tile of this.visible_tiles()) {
+      if (tile.numeric_id === tile_number) {
+        return tile.record_batch.get(row_number)
+      }
+    }
+//    const p = this.tileSet.findPoint(point_as_int);
+
+//    if (p.length === 0) { return; }
+
+//    return p[0];
+
+    
+  }
+  color_pick_single(x: number, y: number, field : 'ix_in_tile' | 'ix' | 'tile_id' = 'tile_id') {
+    const { props, height } = this;
+    props.color_picker_mode = [ 'ix', 'tile_id', 'ix_in_tile'].indexOf(field) + 1;
+
+    let color_at_point : [number, number, number, number] = [0, 0, 0, 0];
     this.fbos.colorpicker.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
-
       // read onto the contour vals.
       this.render_points(props);
       // Must be flipped
@@ -620,18 +647,14 @@ export class ReglRenderer extends Renderer {
         });
       }
     });
-
     // Subtract one. This inverts the operation `fill = packFloat(ix + 1.);`
     // in glsl/general.vert, to avoid off-by-one errors with the point selected.
     const point_as_float = unpackFloat(...color_at_point) - 1;
-
     // Coerce to int. unpackFloat returns float but findPoint expects int.
     const point_as_int = Math.round(point_as_float);
-    const p = this.tileSet.findPoint(point_as_int);
 
-    if (p.length === 0) { return; }
-
-    return p[0];
+//    console.log(point_as_int, `${field} (${props.color_picker_mode})`);
+    return point_as_int;
   }
 
   /* blur(fbo) {
@@ -730,7 +753,8 @@ export class ReglRenderer extends Renderer {
         return props.manager.count;
       },
       attributes: {
-        buffer_0: (_, props) => props.manager.regl_elements.get('ix'),
+//        buffer_0: (_, props) => props.manager.regl_elements.get('ix'),
+//        buffer_1: this.integer_buffer
       }, // Filled below.
       uniforms: {
         //@ts-ignore
@@ -772,6 +796,7 @@ export class ReglRenderer extends Renderer {
         u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
           ? this.aes.dim("color").last.constant
           : [-1, -1, -1]),*/
+        u_tile_id: (_, props) => props.tile_id,
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
@@ -815,7 +840,7 @@ export class ReglRenderer extends Renderer {
     // store needed buffers
     for (const i of range(0, 16)) {
       parameters.attributes[`buffer_${i}`] = (_, { manager, buffer_num_to_variable }) => {
-        const c = manager.regl_elements.get(buffer_num_to_variable[i]);        
+        const c = manager.regl_elements.get(buffer_num_to_variable[i]);
         return c || { constant: 0 };
       };
     }
@@ -862,8 +887,8 @@ export class ReglRenderer extends Renderer {
   }
 
   private allocate_aesthetic_buffers() {
-    // There are only 15 attribute buffers available to use,
-    // once we pass in the index. The order here determines
+    // There are only 14 attribute buffers available to use,
+    // once we pass in the index and position in the tile. The order here determines
     // how important it is to capture transitions for them; if
     // we run out of buffers, the previous state of the requested aesthetic will just be thrown 
     // away.
@@ -901,8 +926,11 @@ export class ReglRenderer extends Renderer {
     const aes_to_buffer_num : Record<encodingkey, number> = {}; // eg 'x' => 3
 
     // Pre-allocate the 'ix' buffer.
-    const variable_to_buffer_num : Record<string, number>= { ix: 0 }; // eg 'year' =>  3
-    let num = 0;
+    const variable_to_buffer_num : Record<string, number>= {
+      ix: 0,
+      ix_in_tile: 1
+    }; // eg 'year' =>  3
+    let num = 1;
     for (const { aesthetic, time, field } of buffers) {
       const k = `${aesthetic}--${time}`;
       if (variable_to_buffer_num[field] !== undefined) {
@@ -948,7 +976,12 @@ class TileBufferManager {
     this.tile = tile;
     this.regl = regl;
     this.renderer = renderer;
-    tile._regl_elements = tile._regl_elements || new Map();
+    tile._regl_elements = tile._regl_elements || new Map([
+      ['ix_in_tile', {
+        offset: 0,
+        stride: 4,
+        buffer: renderer.integer_buffer
+    }]]);
     this.regl_elements = tile._regl_elements;
   }
 
@@ -965,11 +998,14 @@ class TileBufferManager {
         }
       }
     }
-    for (const key of ['ix', ...needed_dimensions]) {
-      const current = this.regl_elements.get(key);
+    for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
+      const current = key === 'ix_in_tile' ? 
+        this.renderer.integer_buffer : 
+        this.regl_elements.get(key);
+
       if (current === null) {
         // It's in the process of being built.
-        console.log('Building', key);
+//        console.log('Building', key);
         return false;
       } if (current === undefined) {
         if (!this.tile.ready) {
