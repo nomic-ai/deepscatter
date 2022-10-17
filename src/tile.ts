@@ -2,7 +2,20 @@ import {
   extent
 } from 'd3-array';
 
-import { tableFromIPC, Table, RecordBatch } from 'apache-arrow';
+import {
+  Table, Vector, Utf8, Float32, Float, Int,
+  Uint32, Int32, Int64, Dictionary,
+  tableFromIPC,
+  tableToIPC,
+  vectorFromArray,
+  table, RecordBatchFromArrays,
+  makeBuilder,
+  makeVector,
+  RecordBatch,
+  Schema,
+  Data,
+  Field
+} from 'apache-arrow';
 
 import TileWorker from './tileworker.worker.js?worker&inline';
 import type { Dataset, QuadtileSet } from './Dataset';
@@ -97,12 +110,10 @@ export abstract class Tile {
   }
 
 
-  /*
   *points(bounding : Rectangle | undefined = undefined, sorted = false) : Iterable<StructRowProxy> {
-    // Iterate over the rows one at a time.
-    if (bounding && !this.is_visible(1e100, bounding)) {
-      return;
-    }
+    //if (!this.is_visible(1e100, bounding)) {
+    //  return;
+    //}
     for (const p of this) {
       if (p_in_rect([p.x, p.y], bounding)) {
         yield p;
@@ -156,7 +167,7 @@ export abstract class Tile {
       callback(p);
     }
   }
-  */
+
   set highest_known_ix(val) {
     // Do nothing if it isn't actually higher.
     if (this._highest_known_ix == undefined || this._highest_known_ix < val) {
@@ -291,14 +302,19 @@ export abstract class Tile {
 
 export class QuadTile extends Tile {
   url : string;
+  bearer_token = '';
   key : string;
   public _children : Array<this> = [];
   codes : [number, number, number];
   _already_called = false;
   public child_locations : string[] = [];
-  constructor(base_url : string, key : string, parent : null | this, dataset : QuadtileSet) {
+  constructor(base_url : string, key : string, parent : null | this, dataset : QuadtileSet, prefs) {
     super(dataset);
     this.url = base_url;
+    if (prefs != undefined && 'bearer_token' in prefs) {
+      this.bearer_token = prefs['bearer_token'];
+    }
+
     this.parent = parent;
     this.key = key;
     const [z, x, y] = key.split('/').map((d) => Number.parseInt(d));
@@ -319,36 +335,90 @@ export class QuadTile extends Tile {
     if (this._download) { return this._download; }
 
     if (this._already_called) {
-      throw ('Illegally attempting to download twice');
+      throw 'Illegally attempting to download twice';
     }
-
     this._already_called = true;
-
-    // new: must include protocol and hostname.
-    const url = `${this.url}/${this.key}.feather`;
+    var url = `${this.url}/${this.key}.feather`;
     this.download_state = 'In progress';
+    if (this.bearer_token) {
+      url = url.replace('/public', '');
+    }
+    const request : RequestInit | undefined = 
+    this.bearer_token ? 
+      {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + this.bearer_token }
+      } :
+      undefined;
 
     this._download = this.tileWorker
-      .fetch(url, {})
+      .fetch(url, {}, request)
       .then(([buffer, metadata, codes]): Table<any> => {
         this.download_state = 'Complete';
-        // metadata is passed separately b/c I dont know
-        // how to fix it on the table in javascript, just python.
         this._table_buffer = buffer;
         this._batch = tableFromIPC(buffer).batches[0];
+        if (this._batch === undefined) {
+          throw 'Batch was empty'
+        }
+        if (!this._batch.getChild('_isSelected')) {
+          const isSelectedArray = Array(this._batch.numRows).fill('0');
+          const isSelectedVector = vectorFromArray(isSelectedArray, new Utf8());
+          const isSelectedDictionary = makeVector({
+            data: isSelectedArray.map((v) => parseInt(v)),
+            dictionary: isSelectedVector,
+            type: new Dictionary(new Utf8(), new Uint32())
+          });
+          var buffers = [void 0, isSelectedDictionary.data[0].values, this._batch.data.children[0].nullBitmap, void 0];
+          const isSelectedData = new Data(new Dictionary(new Utf8(), new Uint32()), 0, this._batch.numRows, 0, buffers, isSelectedDictionary);
+          isSelectedData.dictionary = isSelectedDictionary.memoize();
+          isSelectedData.children = [];
+          //const selfield = this.tileSet.currentSelected;
+          var sorted_fields = [{'name': '_isSelected'}];
+          if (this.parent !== undefined && this.parent !== null && this.parent._batch !== undefined) {
+            sorted_fields = this.parent._batch.schema.fields
+                .filter(f => f.name.includes('Selected'))
+                .filter(f => !f.name.includes('float_version'))
+                .sort()
+                .reverse();
+          }
+          var child_field_names = this._batch.schema.fields.map(f => f.name);
+          sorted_fields.forEach(field => {
+            if (child_field_names.includes(field.name)) {
+              return
+            }
+            var isSelectedSchemaField = new Field(field.name, new Dictionary(new Utf8(), new Uint32()), false);
+            this._batch.schema.fields.push(isSelectedSchemaField);
+            this._batch.data.children.push(isSelectedData);
+            const float_version = new Float32Array(this._batch.numRows);
+            for (let i = 0; i < this._batch.numRows; i++) {
+              float_version[i] = this._batch.getChild(field.name).data[0].values[i] - 2047;
+            }
+            const float_vector = makeVector(float_version);
+            var float_buffers = [void 0, float_vector.data[0].values, this._batch.data.children[0].nullBitmap, void 0];
+            const float_data = new Data(new Float(), 0, this._batch.numRows, 0, float_buffers);
+            var float_field = new Field(field.name + '_float_version', new Float(), false);
+            this._batch.data.children.push(float_data);
+            this._batch.schema.fields.push(float_field);
+          });
+
+          var selected_codes = /* @__PURE__ */ new Map();
+          selected_codes.set(0, '1');
+          selected_codes.set(1, '0');
+          codes['_isSelected'] = selected_codes;
+        }
+
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
-        const ixes = this.record_batch.getChild('ix');
+        const ixes = this._batch.getChild('ix');
         if (ixes === null) {
-          throw ('No ix column in table');
+          throw 'No ix column in table';
         }
         this._min_ix = Number(ixes.get(0));
         this.max_ix = Number(ixes.get(ixes.length - 1));
         this.highest_known_ix = this.max_ix;
-        //    this.setDataTypes()
-
+        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations || {}));
         this.local_dictionary_lookups = codes;
-        return this.record_batch;
+//        this.update_master_dictionary_lookups();
       })
       .catch((error) => {        
         this.download_state = 'Failed';
@@ -362,13 +432,14 @@ export class QuadTile extends Tile {
 
   get children() : Array<this> {
     // create or return children.
+
     if (this.download_state !== 'Complete') {
       return [];
     }
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
         //this._children.push(key)
-        this._children.push(new this.class(this.url, key, this, this.dataset));
+        this._children.push(new this.class(this.url, key, this, this.dataset, {'bearer_token': this.bearer_token}));
       }
     }
     // }

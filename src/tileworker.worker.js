@@ -25,22 +25,18 @@ function dictVector(input, id) {
 
 const WorkerTile = {
 
-  fetch(url, mutations) {
+  fetch(url, mutations, requestOptions) {
     if (url.match('https://github')) {
       url += '?raw=true';
     }
-    return fetch(url)
+    return fetch(url, requestOptions)
       .then((resp) => resp.arrayBuffer())
       .then((response) => {
         const table = tableFromIPC(response);
         const { metadata } = table.schema;
         let buffer;
         // For now, always mutate to ensure dict indexes are cast.
-        if (Object.keys(mutations).length || true) {
-          buffer = mutate(mutations, response, metadata);
-        } else {
-          buffer = response;
-        }
+        buffer = Object.keys(mutations).length || true ? mutate(mutations, response, metadata) : response;
         const codes = get_dictionary_codes(buffer);
         return [transfer(buffer, [buffer]), metadata, codes];
       });

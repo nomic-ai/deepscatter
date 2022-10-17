@@ -23,7 +23,7 @@ import type {
   ColorChannel, OpArray
 } from './types';
 import type { Dataset, QuadtileSet } from './Dataset';
-import { Vector } from 'apache-arrow';
+import { Vector, tableToIPC, makeVector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { QuadTile } from './tile';
 
@@ -148,7 +148,7 @@ abstract class Aesthetic {
     return this.scale(this.value_for(point));
   }
 
-  get transform() {    
+  get transform() {
     if (this._transform) return this._transform;
     return this.default_transform;
   }
@@ -177,8 +177,8 @@ abstract class Aesthetic {
       const interpolator = d3Chromatic['interpolate' + capitalize(range)];
       if (interpolator !== undefined) {
         // linear maps to nothing, but.
-        // scaleLinear, and scaleLog but 
-        // scaleSequential and scaleSequentialLog. 
+        // scaleLinear, and scaleLog but
+        // scaleSequential and scaleSequentialLog.
         if (this.transform === 'sqrt') {
           return scaleSequentialPow(interpolator)
             //@ts-ignore
@@ -265,7 +265,7 @@ abstract class Aesthetic {
     }
     return point[this.field];
   }
-  
+
   get map_position() {
     // Returns the location on the color map to use
     // for this field. Gives a column on the texture
@@ -275,7 +275,7 @@ abstract class Aesthetic {
     }
     return this.aesthetic_map.get_position(this.id);
   }
-  
+
   get texture_buffer() {
     if (this._texture_buffer) {
       return this._texture_buffer;
@@ -293,7 +293,7 @@ abstract class Aesthetic {
   
   post_to_regl_buffer() {
     this.aesthetic_map.set_one_d(
-      this.id, 
+      this.id,
       this.texture_buffer
     );
   }
@@ -310,6 +310,21 @@ abstract class Aesthetic {
   complete_domain(encoding : BasicChannel) {
     encoding.domain = encoding.domain || this.default_domain;
     return encoding;
+  }
+
+  custom(values) {
+    // Custom color values
+    const custom_palette = values;
+    const colors = new Array(palette_size);
+    const scheme = custom_palette.map((v) => {
+      const col = rgb(v);
+      return [col.r, col.g, col.b, 255];
+    });
+    for (const i of arange(palette_size)) {
+      colors[i] = scheme[i % custom_palette.length];
+    }
+    color_palettes.custom = to_buffer(colors);
+    schemes['custom'] = custom_palette;
   }
 
   update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
@@ -336,6 +351,124 @@ abstract class Aesthetic {
       this.current_encoding = x;
       return;
     }
+    if (encoding['domain'] && typeof(encoding['domain']) === 'string' && encoding['domain'] === 'progressive'){
+      var all_tiles = [this.tileSet];
+      var current_tiles = [this.tileSet];
+      if (this.tileSet.children.length > 0) {
+        while (true) {
+          if (current_tiles.length == 0) {
+            break;
+          }
+          var children_tiles = [];
+          current_tiles.map(function(tile, idx) {
+            if (tile.children.length > 0) {
+              all_tiles.push.apply(all_tiles, tile.children);
+              children_tiles.push.apply(children_tiles, tile.children);
+            }
+          });
+          current_tiles = children_tiles;
+        }
+        var min2 = all_tiles[0].table.getChild(encoding["field"]).data[0].values[0];
+        var max2 = min2;
+        all_tiles.forEach(function(tile, idx) {
+          tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
+            if (val < min2) {
+              min2 = val;
+            }
+            if (val > max2) {
+              max2 = val;
+            }
+          });
+        });
+        encoding["domain"] = [min2, max2];
+      }
+    }
+
+    if (encoding['range'] && Array.isArray(encoding['range']) && typeof(encoding['range'][0]) === 'string'){
+      if (encoding["field"] == "_isSelected") {
+        var all_tiles = [];
+        var current_tiles = [this.tileSet];
+        while (current_tiles.length > 0) {
+          var current_tile = current_tiles.shift();
+          if (current_tile.download_state === 'Complete') {
+            all_tiles.push(current_tile);
+            current_tile.children.forEach((child) => current_tiles.push(child));
+          }
+        }
+        if (this.tileSet.children.length > 0) {
+
+          var set2 = new Set(encoding["domain"]);
+          if (this.tileSet.currentSelected == void 0) {
+            this.tileSet.currentSelected = 0;
+            this.tileSet.isSelectedIndex = this.tileSet.table.batches[0].data.children.length - 2;
+          } else {
+            this.tileSet.currentSelected += 1;
+            encoding["field"] = encoding["field"] + this.tileSet.currentSelected.toString();
+          }
+          var selected = this.tileSet.currentSelected; //This is the key of the field corresponding to the selection
+          var selectedIndex = this.tileSet.isSelectedIndex;
+          all_tiles.forEach(function (tile, idx) {
+            if (selected > 0) {
+              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex].clone());
+              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex + 1].clone());
+              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex].clone());
+              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding["field"];
+              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex + 1].clone());
+              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding["field"] + "_float_version";
+            }
+
+            var updatedArray = new Uint8Array(tile.table.numRows);
+            var updatedFloatArray = new Float32Array(tile.table.numRows);
+            var didSelect = false;
+            tile.table.getChild(encoding["field"]).data[0].values.forEach(function (val, idx2) {
+              if (tile.table.getChild("_id").data[0].typeId != 5) {
+                if (set2.has(tile.table.getChild("_id").data[0].values[idx2].toString())) {
+                  updatedArray[idx2] = "1";
+                  updatedFloatArray[idx2] = -2046;
+                } else {
+                  updatedArray[idx2] = "0";
+                  updatedFloatArray[idx2] = -2047;
+                }
+              } else {
+                if (set2.has(String.fromCharCode(...tile.table.getChild("_id").data[0].values.slice(tile.table.getChild("_id").data[0].valueOffsets[idx2], tile.table.getChild("_id").data[0].valueOffsets[idx2 + 1])))) {
+                  updatedArray[idx2] = "1";
+                  updatedFloatArray[idx2] = -2046;
+                } else {
+                  updatedArray[idx2] = "0";
+                  updatedFloatArray[idx2] = -2047;
+                }
+              }
+            });
+            tile._table = tile.table.setChild(encoding["field"], makeVector(updatedArray));
+            tile._table = tile.table.setChild(encoding["field"] + "_float_version", makeVector(updatedFloatArray));
+          });
+        }
+        encoding["domain"] = ["0", "1"];
+
+      }
+      var color_by_values = this.tileSet.local_dictionary_lookups[encoding['field']];
+      console.log(color_by_values);
+      if(color_by_values == undefined){
+        var lowercase_values = ['1','0']
+      }else{
+        var lowercase_values = Array.from(color_by_values.values()).map(val => val.toLowerCase());
+      }
+      var new_range = Array(lowercase_values.length).fill("#000000");
+      if(encoding['domain'] && Array.isArray(encoding['domain']) && typeof(encoding['domain'][0] === 'string')){
+        if(encoding['domain'].length === encoding['range'].length){
+          encoding['domain'].map(function(val, idx){
+            if(lowercase_values.includes(val.toLowerCase())){
+              new_range[lowercase_values.indexOf(val.toLowerCase())] = encoding['range'][idx];
+            }
+          });
+          encoding['range'] = 'custom';
+          encoding['domain'] = [-2047, 2047];
+          this.custom(new_range);
+        }else{
+          encoding['domain'] = [-2047, 2047];
+        }
+      }
+    }
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
       return;
@@ -349,13 +482,13 @@ abstract class Aesthetic {
       const {
         lambda,
         field,
-      } = encoding;  
+      } = encoding;
       if (lambda) {
         this.apply_function_for_textures(field, this.domain, lambda);
         this.post_to_regl_buffer();
       } else if (encoding.range) {
         this.encode_for_textures(this.range);
-        this.post_to_regl_buffer();
+       this.post_to_regl_buffer();
       }
       return;
     }
@@ -600,7 +733,7 @@ class Jitter_radius extends Aesthetic {
   get jitter_int_format() {
     return encode_jitter_to_int(this.method);
   }
- 
+
 }
 
 const default_color : [number, number, number] = [0.7, 0, 0.5];
@@ -628,7 +761,6 @@ class Color extends Aesthetic {
 
     this._texture_buffer = new Uint8Array(this.aesthetic_map.texture_size * 4);
     this._texture_buffer.set(this.default_data());
-
     return this._texture_buffer;
   }
 
@@ -638,13 +770,70 @@ class Color extends Aesthetic {
     return [r / 255, g / 255, b / 255];
   }
 
+  get_hex_values(field) {
+    var all_tiles = [this.tileSet];
+    var current_tiles = [this.tileSet];
+    if (this.tileSet.children.length > 0) {
+      while (true) {
+        if (current_tiles.length == 0) {
+          break;
+        }
+        var children_tiles = [];
+        current_tiles.map(function(tile, idx) {
+          if (tile.children.length > 0) {
+            all_tiles.push.apply(all_tiles, tile.children);
+            children_tiles.push.apply(children_tiles, tile.children);
+          }
+        });
+        current_tiles = children_tiles;
+      }
+      var min2 = all_tiles[0].table.getChild(field).data[0].values[0];
+      var max2 = min2;
+      all_tiles.forEach(function(tile, idx) {
+        tile.table.getChild(field).data[0].values.forEach(function(val, idx2) {
+          if (val < min2) {
+            min2 = val;
+          }
+          if (val > max2) {
+            max2 = val;
+          }
+        });
+      });
+      if(typeof min2 == "bigint" || typeof max2 == "bigint"){
+        min2 = Number(min2);
+        max2 = Number(max2);
+      }
+      var hex_vals = {};
+      for (var i = 0; i < this._texture_buffer.length; i += 4*512){
+        hex_vals[((Math.abs(max2-min2)/7)*(i/(4*512))+min2).toString()] = ("#" + this._texture_buffer[i].toString(16) + this._texture_buffer[i + 1].toString(16) + this._texture_buffer[i + 2].toString(16));
+      }
+      return hex_vals;
+    }
+  }
+
+  get_hex_order() {
+    var hex_vals = {};
+    var ldl = this.scatterplot['_root']['local_dictionary_lookups'];
+    var dict = ldl[this.field];
+    var new_buffer = [];
+    for(var i = 0; i < dict.size*4; i += 4){
+      if(i >= 16384){
+        var color_by_index = 16380;
+      }else{
+        var color_by_index = i;
+      }
+      hex_vals[dict.get(i/4)] = ("#"+this._texture_buffer[color_by_index].toString(16)+this._texture_buffer[color_by_index+1].toString(16)+this._texture_buffer[color_by_index+2].toString(16));
+    }
+    return hex_vals;
+  }
+
   post_to_regl_buffer() {
     this.aesthetic_map.set_color(
       this.id,
       this.texture_buffer
     );
   }
-  
+
   update(encoding : ColorChannel) {
     this.current_encoding = encoding;
     if (isConstantChannel(encoding) && typeof(encoding.constant) === 'string') {
@@ -659,7 +848,6 @@ class Color extends Aesthetic {
 
   encode_for_textures(range) {
     this._scale = scales[this.transform]().range(range).domain(this.domain);
-  
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range]);
     } else if (range.length === this.aesthetic_map.texture_size * 4) {

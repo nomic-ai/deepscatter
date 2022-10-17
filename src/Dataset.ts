@@ -154,7 +154,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
 
   constructor(base_url : string, prefs: APICall, plot: Scatterplot) {
     super(plot);
-    this.root_tile = new QuadTile(base_url, '0/0/0', null, this);
+    this.root_tile = new QuadTile(base_url, '0/0/0', null, this, {});
   }
 
   get ready() {
@@ -220,6 +220,8 @@ function area(rect : Rectangle) {
 function check_overlap(tile : Tile, bbox : Rectangle) : number {
   /* the area of Intersect(tile, bbox) expressed
      as a percentage of the area of bbox */
+  console.log({tile})
+  console.log(tile.extent)
   const c : Rectangle = tile.extent;
 
   if (c.x[0] > bbox.x[1]
