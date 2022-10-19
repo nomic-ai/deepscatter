@@ -111,6 +111,20 @@ export default class Scatterplot {
     this.bound = true;
   }
 
+  /**
+   * 
+   * @param name The name of the new column to be created. If it already exists, this will throw an error in invocation
+   * @param codes The codes to be assigned labels. This can be either a list of ids (in which case all ids will have the value 1.0 assigned)
+   *   **or** a keyed of values like {'Rome': 3, 'Vienna': 13} in which case the numeric values will be used.
+   * @param key_field The field in which to look for the identifiers.
+   */
+  add_identifier_column(name : string, codes: string[] | Record<string, number>, key_field : string) {
+    const true_codes : Record<string, number> = Array.isArray(codes) ?
+      codes.reduce((acc, next) => Object.assign(acc, { [next] : 1 }), {}) :
+      codes;
+    this._root.add_label_identifiers(true_codes, name, key_field);
+  }
+
   async reinitialize() {
 
     const { prefs } = this;
@@ -456,6 +470,7 @@ class TooltipHTML extends SettableFunction<string> {
     const nope = new Set([
       'x', 'y', 'ix', null, 'tile_key',
     ]);
+    console.log({...point});
     for (const [k, v] of point) {
       if (nope.has(k)) { continue; }
       // Private value.

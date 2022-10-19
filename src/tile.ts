@@ -360,52 +360,6 @@ export class QuadTile extends Tile {
         if (this._batch === undefined) {
           throw 'Batch was empty'
         }
-        if (!this._batch.getChild('_isSelected')) {
-          const isSelectedArray = Array(this._batch.numRows).fill('0');
-          const isSelectedVector = vectorFromArray(isSelectedArray, new Utf8());
-          const isSelectedDictionary = makeVector({
-            data: isSelectedArray.map((v) => parseInt(v)),
-            dictionary: isSelectedVector,
-            type: new Dictionary(new Utf8(), new Uint32())
-          });
-          var buffers = [void 0, isSelectedDictionary.data[0].values, this._batch.data.children[0].nullBitmap, void 0];
-          const isSelectedData = new Data(new Dictionary(new Utf8(), new Uint32()), 0, this._batch.numRows, 0, buffers, isSelectedDictionary);
-          isSelectedData.dictionary = isSelectedDictionary.memoize();
-          isSelectedData.children = [];
-          //const selfield = this.tileSet.currentSelected;
-          var sorted_fields = [{'name': '_isSelected'}];
-          if (this.parent !== undefined && this.parent !== null && this.parent._batch !== undefined) {
-            sorted_fields = this.parent._batch.schema.fields
-                .filter(f => f.name.includes('Selected'))
-                .filter(f => !f.name.includes('float_version'))
-                .sort()
-                .reverse();
-          }
-          var child_field_names = this._batch.schema.fields.map(f => f.name);
-          sorted_fields.forEach(field => {
-            if (child_field_names.includes(field.name)) {
-              return
-            }
-            var isSelectedSchemaField = new Field(field.name, new Dictionary(new Utf8(), new Uint32()), false);
-            this._batch.schema.fields.push(isSelectedSchemaField);
-            this._batch.data.children.push(isSelectedData);
-            const float_version = new Float32Array(this._batch.numRows);
-            for (let i = 0; i < this._batch.numRows; i++) {
-              float_version[i] = this._batch.getChild(field.name).data[0].values[i] - 2047;
-            }
-            const float_vector = makeVector(float_version);
-            var float_buffers = [void 0, float_vector.data[0].values, this._batch.data.children[0].nullBitmap, void 0];
-            const float_data = new Data(new Float(), 0, this._batch.numRows, 0, float_buffers);
-            var float_field = new Field(field.name + '_float_version', new Float(), false);
-            this._batch.data.children.push(float_data);
-            this._batch.schema.fields.push(float_field);
-          });
-
-          var selected_codes = /* @__PURE__ */ new Map();
-          selected_codes.set(0, '1');
-          selected_codes.set(1, '0');
-          codes['_isSelected'] = selected_codes;
-        }
 
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));

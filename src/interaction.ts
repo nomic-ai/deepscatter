@@ -231,7 +231,9 @@ export default class Zoom {
             .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd)),
           (exit) => exit.call((e) => {
             e.remove();
-            this.prefs.exit_function();
+            if (this.prefs.exit_function) {
+              this.prefs.exit_function();
+            }
           })
         )
         .on('click', (ev, dd) => {

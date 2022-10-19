@@ -5457,7 +5457,9 @@ class Zoom {
         (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)),
         (exit) => exit.call((e) => {
           e.remove();
-          this.prefs.exit_function();
+          if (this.prefs.exit_function) {
+            this.prefs.exit_function();
+          }
         })
       ).on("click", (ev, dd) => {
         this.scatterplot.click_function(dd);
@@ -17369,6 +17371,1685 @@ function isLambdaChannel(input) {
 function isConstantChannel(input) {
   return input.constant !== void 0;
 }
+const scales = {
+  sqrt,
+  log,
+  linear,
+  literal: identity
+};
+const palette_size = 4096;
+function to_buffer(data) {
+  const output = new Uint8Array(4 * palette_size);
+  output.set(data.flat());
+  return output;
+}
+function materialize_color_interplator(interpolator) {
+  const rawValues = range(palette_size).map((i) => {
+    const p = rgb(interpolator(i / palette_size));
+    return [p.r, p.g, p.b, 255];
+  });
+  return to_buffer(rawValues);
+}
+const color_palettes = {
+  white: to_buffer(range(palette_size).map(() => [0.5, 0.5, 0.5, 0.5]))
+};
+const schemes = {};
+for (const [k, v] of Object.entries(d3Chromatic)) {
+  if (k.startsWith("scheme") && typeof v[0] === "string") {
+    const colors2 = Array(palette_size);
+    const scheme2 = v.map((v2) => {
+      const col = rgb(v2);
+      return [col.r, col.g, col.b, 255];
+    });
+    for (const i of range(palette_size)) {
+      colors2[i] = scheme2[i % v.length];
+    }
+    const name = k.replace("scheme", "").toLowerCase();
+    color_palettes[name] = to_buffer(colors2);
+    schemes[name] = v;
+  }
+  if (k.startsWith("interpolate")) {
+    const name = k.replace("interpolate", "").toLowerCase();
+    color_palettes[name] = materialize_color_interplator(v);
+    if (name === "rainbow") {
+      const shuffle = shuffler(lcg(1));
+      color_palettes.shufbow = shuffle(color_palettes[name]);
+    }
+  }
+}
+function okabe() {
+  const okabe_palette = ["#E69F00", "#CC79A7", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442"];
+  const colors2 = Array.from({ length: palette_size });
+  const scheme2 = okabe_palette.map((v) => {
+    const col = rgb(v);
+    return [col.r, col.g, col.b, 255];
+  });
+  for (const i of range(palette_size)) {
+    colors2[i] = scheme2[i % okabe_palette.length];
+  }
+  color_palettes.okabe = to_buffer(colors2);
+  schemes["okabe"] = okabe_palette;
+}
+okabe();
+class Aesthetic {
+  constructor(scatterplot, regl2, dataset, aesthetic_map) {
+    this.field = null;
+    this._texture_buffer = null;
+    this.partner = null;
+    this._textures = {};
+    this._scale = (p) => 1;
+    this.aesthetic_map = aesthetic_map;
+    if (this.aesthetic_map === void 0) {
+      throw new Error("Aesthetic map is undefined");
+    }
+    this.scatterplot = scatterplot;
+    this.regl = regl2;
+    this._domain = this.default_domain;
+    this._range = [0, 1];
+    this.dataset = dataset;
+    this._domains = {};
+    this.id = "" + Math.random();
+    this.current_encoding = { constant: 1 };
+  }
+  apply(point) {
+    return this.scale(this.value_for(point));
+  }
+  get transform() {
+    if (this._transform)
+      return this._transform;
+    return this.default_transform;
+  }
+  set transform(transform) {
+    this._transform = transform;
+  }
+  get scale() {
+    function capitalize(r) {
+      return r.charAt(0).toUpperCase() + r.slice(1);
+    }
+    let scale = scales[this.transform]().domain(this.domain).range(this.range);
+    const range2 = this.range;
+    if (typeof range2 == "string") {
+      const interpolator = d3Chromatic["interpolate" + capitalize(range2)];
+      if (interpolator !== void 0) {
+        if (this.transform === "sqrt") {
+          return sequentialPow(interpolator).exponent(0.5).domain(this.domain);
+        } else if (this.transform === "log") {
+          return sequentialLog(interpolator).domain(this.domain);
+        } else {
+          return sequential(interpolator).domain(this.domain);
+        }
+      }
+    }
+    if (this.is_dictionary()) {
+      scale = ordinal().domain(this.domain);
+      if (typeof range2 === "string" && schemes[range2]) {
+        if (this.column.data[0].dictionary === null) {
+          throw new Error("Dictionary is null");
+        }
+        scale.range(schemes[range2]).domain(this.column.data[0].dictionary.toArray());
+      } else {
+        scale.range(this.range);
+      }
+    }
+    return scale;
+  }
+  get column() {
+    if (this.field === null) {
+      throw new Error("Can't retrieve column for aesthetic without a field");
+    }
+    if (this.dataset.root_tile.record_batch) {
+      const col = this.dataset.root_tile.record_batch.getChild(this.field);
+      if (col === void 0 || col === null) {
+        throw new Error("Can't find column " + this.field);
+      }
+      return col;
+    }
+    throw new Error("Table is null");
+  }
+  get default_domain() {
+    if (this.field == void 0) {
+      return [1, 1];
+    }
+    if (this._domains[this.field]) {
+      return this._domains[this.field];
+    }
+    if (!this.dataset.ready) {
+      return [1, 1];
+    }
+    const { column } = this;
+    if (!column) {
+      return [1, 1];
+    }
+    if (column.type.dictionary) {
+      this._domains[this.field] = [0, this.aesthetic_map.texture_size - 1];
+    } else {
+      this._domains[this.field] = extent(column.toArray());
+    }
+    return this._domains[this.field];
+  }
+  default_data() {
+    return Array(this.aesthetic_map.texture_size).fill(this.default_constant);
+  }
+  get domain() {
+    return this._domain || this.default_domain;
+  }
+  get range() {
+    return this._range || this.default_range;
+  }
+  value_for(point) {
+    if (this.field === null) {
+      return this.default_constant;
+    }
+    return point[this.field];
+  }
+  get map_position() {
+    if (this.use_map_on_regl === 0) {
+      return 0;
+    }
+    return this.aesthetic_map.get_position(this.id);
+  }
+  get texture_buffer() {
+    if (this._texture_buffer) {
+      return this._texture_buffer;
+    }
+    this._texture_buffer = new Float32Array(this.aesthetic_map.texture_size);
+    this._texture_buffer.set(this.default_data());
+    return this._texture_buffer;
+  }
+  post_to_regl_buffer() {
+    this.aesthetic_map.set_one_d(
+      this.id,
+      this.texture_buffer
+    );
+  }
+  convert_string_encoding(channel) {
+    const v = {
+      field: channel,
+      domain: this.default_domain,
+      range: this.default_range
+    };
+    return v;
+  }
+  complete_domain(encoding) {
+    encoding.domain = encoding.domain || this.default_domain;
+    return encoding;
+  }
+  custom(values) {
+    const custom_palette = values;
+    const colors2 = new Array(palette_size);
+    const scheme2 = custom_palette.map((v) => {
+      const col = rgb(v);
+      return [col.r, col.g, col.b, 255];
+    });
+    for (const i of range(palette_size)) {
+      colors2[i] = scheme2[i % custom_palette.length];
+    }
+    color_palettes.custom = to_buffer(colors2);
+    schemes["custom"] = custom_palette;
+  }
+  update(encoding) {
+    if (encoding === "null") {
+      encoding = null;
+    }
+    if (encoding === null) {
+      this.current_encoding = {
+        constant: this.default_constant
+      };
+      return;
+    }
+    if (encoding === void 0) {
+      return;
+    }
+    if (typeof encoding === "string") {
+      encoding = this.convert_string_encoding(encoding);
+    }
+    if (typeof encoding !== "object") {
+      const x = {
+        constant: encoding
+      };
+      this.current_encoding = x;
+      return;
+    }
+    if (encoding["domain"] && typeof encoding["domain"] === "string" && encoding["domain"] === "progressive") {
+      var all_tiles = [this.tileSet];
+      var current_tiles = [this.tileSet];
+      if (this.tileSet.children.length > 0) {
+        while (true) {
+          if (current_tiles.length == 0) {
+            break;
+          }
+          var children_tiles = [];
+          current_tiles.map(function(tile, idx) {
+            if (tile.children.length > 0) {
+              all_tiles.push.apply(all_tiles, tile.children);
+              children_tiles.push.apply(children_tiles, tile.children);
+            }
+          });
+          current_tiles = children_tiles;
+        }
+        var min2 = all_tiles[0].table.getChild(encoding["field"]).data[0].values[0];
+        var max2 = min2;
+        all_tiles.forEach(function(tile, idx) {
+          tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
+            if (val < min2) {
+              min2 = val;
+            }
+            if (val > max2) {
+              max2 = val;
+            }
+          });
+        });
+        encoding["domain"] = [min2, max2];
+      }
+    }
+    this.current_encoding = encoding;
+    if (isConstantChannel(encoding)) {
+      return;
+    }
+    this.field = encoding.field;
+    if (isOpChannel(encoding)) {
+      return;
+    }
+    if (isLambdaChannel(encoding)) {
+      const {
+        lambda,
+        field
+      } = encoding;
+      if (lambda) {
+        this.apply_function_for_textures(field, this.domain, lambda);
+        this.post_to_regl_buffer();
+      } else if (encoding.range) {
+        this.encode_for_textures(this.range);
+        this.post_to_regl_buffer();
+      }
+      return;
+    }
+    if (encoding["domain"] === void 0) {
+      encoding["domain"] = this.default_domain;
+    }
+    if (encoding["range"]) {
+      this._domain = encoding.domain;
+      this._range = encoding.range;
+    }
+    this._transform = encoding.transform || void 0;
+  }
+  encode_for_textures(range2) {
+    const { texture_size } = this.aesthetic_map;
+    const values = Array(texture_size);
+    this.scaleFunc = scales[this.transform]().range(range2).domain([0, texture_size - 1]);
+    for (let i = 0; i < texture_size; i += 1) {
+      values[i] = this.scaleFunc(i);
+    }
+  }
+  arrow_column() {
+    if (this.field === null) {
+      throw new Error("Can't retrieve column for aesthetic without a field");
+    }
+    const c2 = this.dataset.root_tile.record_batch.getChild(this.field);
+    if (c2 === null) {
+      throw `No column ${this.field} on arrow table for aesthetic`;
+    }
+    return c2;
+  }
+  is_dictionary() {
+    if (this.field === null || this.field === void 0) {
+      return false;
+    }
+    return this.arrow_column().type.dictionary !== void 0;
+  }
+  get constant() {
+    if (isConstantChannel(this.current_encoding)) {
+      return this.current_encoding.constant;
+    }
+    return this.default_constant;
+  }
+  get use_map_on_regl() {
+    if (this.is_dictionary() && this.domain[0] === -2047 && this.domain[1] == 2047) {
+      return 1;
+    }
+    return 0;
+  }
+  apply_function_for_textures(field, range$1, raw_func) {
+    const { texture_size } = this.aesthetic_map;
+    let func;
+    func = typeof raw_func === "string" ? lambda_to_function(parseLambdaString(raw_func)) : raw_func;
+    this.scaleFunc = linear().range(range$1).domain([0, texture_size - 1]);
+    let input = range(texture_size);
+    if (field === void 0 || this.dataset.root_tile.record_batch === void 0) {
+      if (field === void 0) {
+        console.warn("SETTING EMPTY FIELD");
+      }
+      if (this.dataset.root_tile.record_batch === void 0) {
+        console.warn("SETTING EMPTY TABLE");
+      }
+      this.texture_buffer.set(range(texture_size).map((i) => 1));
+      return;
+    }
+    const { column } = this;
+    if (!column) {
+      throw new Error(`Column ${field} does not exist on table.`);
+    }
+    if (column.type.dictionary) {
+      input.fill();
+      const dvals = column.data[0].dictionary.toArray();
+      for (const [i, d] of dvals.entries()) {
+        input[i] = d;
+      }
+    } else {
+      input = input.map((d) => this.scale(d));
+    }
+    const values = input.map((i) => func(i));
+    this.texture_buffer.set(values);
+  }
+}
+class OneDAesthetic extends Aesthetic {
+  static get default_constant() {
+    return 1.5;
+  }
+  static get_default_domain() {
+    return [0, 1];
+  }
+  get default_domain() {
+    return [0, 1];
+  }
+}
+class BooleanAesthetic extends Aesthetic {
+}
+class Size extends OneDAesthetic {
+  constructor() {
+    super(...arguments);
+    this.default_constant = 1;
+    this.default_transform = "sqrt";
+  }
+  static get default_constant() {
+    return 1.5;
+  }
+  static get_default_domain() {
+    return [0, 10];
+  }
+  get default_domain() {
+    return [0, 10];
+  }
+}
+Size.default_range = [0, 1];
+class PositionalAesthetic extends OneDAesthetic {
+  constructor(scatterplot, regl2, tile, map2) {
+    super(scatterplot, regl2, tile, map2);
+    this.default_range = [-1, 1];
+    this.default_constant = 0;
+    this.default_transform = "literal";
+    this._transform = "literal";
+  }
+  get range() {
+    if (this.dataset.extent && this.dataset.extent[this.field])
+      return this.dataset.extent[this.field];
+    return [-20, 20];
+  }
+  static get default_constant() {
+    return 0;
+  }
+}
+class X extends PositionalAesthetic {
+  constructor() {
+    super(...arguments);
+    this.field = "x";
+  }
+}
+class X0 extends X {
+}
+class Y extends PositionalAesthetic {
+  constructor() {
+    super(...arguments);
+    this.field = "y";
+  }
+}
+class Y0 extends Y {
+}
+class AbstractFilter extends BooleanAesthetic {
+  constructor(scatterplot, regl2, tile, map2) {
+    super(scatterplot, regl2, tile, map2);
+    this.default_transform = "literal";
+    this.default_constant = 1;
+    this.default_range = [0, 1];
+    this.current_encoding = { constant: 1 };
+  }
+  get default_domain() {
+    return [0, 1];
+  }
+  get domain() {
+    const domain = this.is_dictionary() ? [-2047, 2047] : [0, 1];
+    return domain;
+  }
+  update(encoding) {
+    super.update(encoding);
+  }
+  post_to_regl_buffer() {
+    super.post_to_regl_buffer();
+  }
+  ops_to_array() {
+    const input = this.current_encoding;
+    if (input === null)
+      return [0, 0, 0];
+    if (input === void 0)
+      return [0, 0, 0];
+    if (!isOpChannel(input)) {
+      return [0, 0, 0];
+    }
+    if (input.op === "within") {
+      return [4, input.a, input.b];
+    }
+    const val = [
+      [null, "lt", "gt", "eq"].indexOf(input.op),
+      input.a,
+      0
+    ];
+    return val;
+  }
+}
+class Filter extends AbstractFilter {
+}
+class Jitter_speed extends Aesthetic {
+  constructor() {
+    super(...arguments);
+    this.default_transform = "linear";
+    this.default_range = [0, 1];
+    this.default_constant = 0.5;
+  }
+  get default_domain() {
+    return [0, 1];
+  }
+}
+function encode_jitter_to_int(jitter) {
+  if (jitter === "spiral") {
+    return 1;
+  }
+  if (jitter === "uniform") {
+    return 2;
+  }
+  if (jitter === "normal") {
+    return 3;
+  }
+  if (jitter === "circle") {
+    return 4;
+  }
+  if (jitter === "time") {
+    return 5;
+  }
+  return 0;
+}
+class Jitter_radius extends Aesthetic {
+  constructor() {
+    super(...arguments);
+    this.jitter_int_formatted = 0;
+    this.default_transform = "linear";
+    this._method = "None";
+  }
+  get default_constant() {
+    return 0;
+  }
+  get default_domain() {
+    return [0, 1];
+  }
+  get default_range() {
+    return [0, 1];
+  }
+  get method() {
+    return this.current_encoding && this.current_encoding.method ? this.current_encoding.method : "None";
+  }
+  set method(value) {
+    this._method = value;
+  }
+  get jitter_int_format() {
+    return encode_jitter_to_int(this.method);
+  }
+}
+const default_color = [0.7, 0, 0.5];
+class Color extends Aesthetic {
+  constructor() {
+    super(...arguments);
+    this.texture_type = "uint8";
+    this.default_constant = [0.7, 0, 0.5];
+    this.default_transform = "linear";
+    this.current_encoding = {
+      constant: default_color
+    };
+  }
+  get default_range() {
+    return [0, 1];
+  }
+  default_data() {
+    return color_palettes.viridis;
+  }
+  get use_map_on_regl() {
+    return 1;
+  }
+  get texture_buffer() {
+    if (this._texture_buffer) {
+      return this._texture_buffer;
+    }
+    this._texture_buffer = new Uint8Array(this.aesthetic_map.texture_size * 4);
+    this._texture_buffer.set(this.default_data());
+    return this._texture_buffer;
+  }
+  static convert_color(color2) {
+    const { r, g, b } = rgb(color2);
+    return [r / 255, g / 255, b / 255];
+  }
+  get_hex_values(field) {
+    var all_tiles = [this.tileSet];
+    var current_tiles = [this.tileSet];
+    if (this.tileSet.children.length > 0) {
+      while (true) {
+        if (current_tiles.length == 0) {
+          break;
+        }
+        var children_tiles = [];
+        current_tiles.map(function(tile, idx) {
+          if (tile.children.length > 0) {
+            all_tiles.push.apply(all_tiles, tile.children);
+            children_tiles.push.apply(children_tiles, tile.children);
+          }
+        });
+        current_tiles = children_tiles;
+      }
+      var min2 = all_tiles[0].table.getChild(field).data[0].values[0];
+      var max2 = min2;
+      all_tiles.forEach(function(tile, idx) {
+        tile.table.getChild(field).data[0].values.forEach(function(val, idx2) {
+          if (val < min2) {
+            min2 = val;
+          }
+          if (val > max2) {
+            max2 = val;
+          }
+        });
+      });
+      if (typeof min2 == "bigint" || typeof max2 == "bigint") {
+        min2 = Number(min2);
+        max2 = Number(max2);
+      }
+      var hex_vals = {};
+      for (var i = 0; i < this._texture_buffer.length; i += 4 * 512) {
+        hex_vals[(Math.abs(max2 - min2) / 7 * (i / (4 * 512)) + min2).toString()] = "#" + this._texture_buffer[i].toString(16) + this._texture_buffer[i + 1].toString(16) + this._texture_buffer[i + 2].toString(16);
+      }
+      return hex_vals;
+    }
+  }
+  get_hex_order() {
+    var hex_vals = {};
+    var ldl = this.scatterplot["_root"]["local_dictionary_lookups"];
+    var dict = ldl[this.field];
+    for (var i = 0; i < dict.size * 4; i += 4) {
+      if (i >= 16384) {
+        var color_by_index = 16380;
+      } else {
+        var color_by_index = i;
+      }
+      hex_vals[dict.get(i / 4)] = "#" + this._texture_buffer[color_by_index].toString(16) + this._texture_buffer[color_by_index + 1].toString(16) + this._texture_buffer[color_by_index + 2].toString(16);
+    }
+    return hex_vals;
+  }
+  post_to_regl_buffer() {
+    this.aesthetic_map.set_color(
+      this.id,
+      this.texture_buffer
+    );
+  }
+  update(encoding) {
+    this.current_encoding = encoding;
+    if (isConstantChannel(encoding) && typeof encoding.constant === "string") {
+      encoding.constant = Color.convert_color(encoding.constant);
+    }
+    super.update(encoding);
+    if (encoding.range && typeof encoding.range[0] === "string") {
+      this.encode_for_textures(encoding.range);
+      this.post_to_regl_buffer();
+    }
+  }
+  encode_for_textures(range$1) {
+    this._scale = scales[this.transform]().range(range$1).domain(this.domain);
+    if (color_palettes[range$1]) {
+      this.texture_buffer.set(color_palettes[range$1]);
+    } else if (range$1.length === this.aesthetic_map.texture_size * 4) {
+      this.texture_buffer.set(range$1);
+    } else if (range$1.length > 0 && range$1[0].length > 0 && range$1[0].length === 3) {
+      const r = range(palette_size).map((i) => {
+        const [r2, g, b] = range$1[i % range$1.length];
+        return [r2, g, b, 255];
+      });
+      this.texture_buffer.set(r.flat());
+    } else {
+      console.warn(`request range of ${range$1} for color ${this.field} unknown`);
+    }
+  }
+}
+class StatefulAesthetic {
+  constructor(scatterplot, regl2, tile, aesthetic_map) {
+    this.needs_transitions = false;
+    if (aesthetic_map === void 0) {
+      throw new Error("Aesthetic map is undefined.");
+    }
+    this.scatterplot = scatterplot;
+    this.regl = regl2;
+    this.tile = tile;
+    this.aesthetic_map = aesthetic_map;
+    this.aesthetic_map = aesthetic_map;
+    this.current_encoding = {
+      constant: 1
+    };
+  }
+  get current() {
+    return this.states[0];
+  }
+  get last() {
+    return this.states[1];
+  }
+  get states() {
+    if (this._states !== void 0) {
+      return this._states;
+    }
+    this._states = [
+      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map),
+      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map)
+    ];
+    return this._states;
+  }
+  update(encoding) {
+    const stringy = JSON.stringify(encoding);
+    if (stringy == JSON.stringify(this.current_encoding) || encoding === void 0) {
+      if (this.needs_transitions) {
+        this.states[1].update(this.current_encoding);
+      }
+      this.needs_transitions = false;
+    } else {
+      this.states.reverse();
+      this.states[0].update(encoding);
+      this.needs_transitions = true;
+      this.current_encoding = encoding;
+    }
+  }
+}
+class StatefulX extends StatefulAesthetic {
+  get Factory() {
+    return X;
+  }
+}
+class StatefulX0 extends StatefulAesthetic {
+  get Factory() {
+    return X0;
+  }
+}
+class StatefulY extends StatefulAesthetic {
+  get Factory() {
+    return Y;
+  }
+}
+class StatefulY0 extends StatefulAesthetic {
+  get Factory() {
+    return Y0;
+  }
+}
+class StatefulSize extends StatefulAesthetic {
+  get Factory() {
+    return Size;
+  }
+}
+class StatefulJitter_speed extends StatefulAesthetic {
+  get Factory() {
+    return Jitter_speed;
+  }
+}
+class StatefulJitter_radius extends StatefulAesthetic {
+  get Factory() {
+    return Jitter_radius;
+  }
+}
+class StatefulColor extends StatefulAesthetic {
+  get Factory() {
+    return Color;
+  }
+}
+class StatefulFilter extends StatefulAesthetic {
+  get Factory() {
+    return Filter;
+  }
+}
+class StatefulFilter2 extends StatefulAesthetic {
+  get Factory() {
+    return Filter;
+  }
+}
+const stateful_aesthetics = {
+  x: StatefulX,
+  x0: StatefulX0,
+  y: StatefulY,
+  y0: StatefulY0,
+  size: StatefulSize,
+  jitter_speed: StatefulJitter_speed,
+  jitter_radius: StatefulJitter_radius,
+  color: StatefulColor,
+  filter: StatefulFilter,
+  filter2: StatefulFilter2
+};
+function parseLambdaString(lambdastring) {
+  let [field, lambda] = lambdastring.split("=>").map((d) => d.trim());
+  if (lambda === void 0) {
+    throw `Couldn't parse ${lambdastring} into a function`;
+  }
+  if (lambda.slice(0, 1) !== "{" && lambda.slice(0, 6) !== "return") {
+    lambda = `return ${lambda}`;
+  }
+  const func = `${field} => ${lambda}`;
+  return {
+    field,
+    lambda: func
+  };
+}
+function lambda_to_function(input) {
+  if (typeof input.lambda === "function") {
+    throw "Must pass a string to lambda, not a function.";
+  }
+  const {
+    lambda,
+    field
+  } = input;
+  if (field === void 0) {
+    throw "Must pass a field to lambda.";
+  }
+  const cleaned = parseLambdaString(lambda).lambda;
+  const [arg, code] = cleaned.split("=>", 2).map((d) => d.trim());
+  const func = new Function(arg, code);
+  return func;
+}
+class AestheticSet {
+  constructor(scatterplot, regl2, tileSet) {
+    this.scatterplot = scatterplot;
+    this.store = {};
+    this.regl = regl2;
+    this.tileSet = tileSet;
+    this.position_interpolation = false;
+    this.aesthetic_map = new TextureSet(this.regl);
+    return this;
+  }
+  dim(aesthetic) {
+    if (this.store[aesthetic]) {
+      return this.store[aesthetic];
+    }
+    if (stateful_aesthetics[aesthetic] !== void 0) {
+      this.store[aesthetic] = new stateful_aesthetics[aesthetic](
+        this.scatterplot,
+        this.regl,
+        this.tileSet,
+        this.aesthetic_map
+      );
+      return this.store[aesthetic];
+    }
+    throw new Error(`Unknown aesthetic ${aesthetic}`);
+  }
+  *[Symbol.iterator]() {
+    for (const [k, v] of Object.entries(this.store)) {
+      yield [k, v];
+    }
+  }
+  interpret_position(encoding) {
+    if (encoding) {
+      if (encoding.x0 || encoding.position0) {
+        this.position_interpolation = true;
+      } else if (encoding.x || encoding.position) {
+        this.position_interpolation = false;
+      }
+      for (const p of ["position", "position0"]) {
+        const suffix = p.replace("position", "");
+        if (encoding[p]) {
+          if (encoding[p] === "literal") {
+            encoding[`x${suffix}`] = {
+              field: "x",
+              transform: "literal"
+            };
+            encoding[`y${suffix}`] = {
+              field: "y",
+              transform: "literal"
+            };
+          } else {
+            const field = encoding[p];
+            encoding[`x${suffix}`] = {
+              field: `${field}.x`,
+              transform: "literal"
+            };
+            encoding[`y${suffix}`] = {
+              field: `${field}.y`,
+              transform: "literal"
+            };
+          }
+          delete encoding[p];
+        }
+      }
+    }
+    delete encoding.position;
+    delete encoding.position0;
+  }
+  apply_encoding(encoding) {
+    if (encoding === void 0) {
+      encoding = {};
+    }
+    if (encoding.filter1) {
+      encoding.filter = encoding.filter1;
+      delete encoding.filter1;
+    }
+    this.interpret_position(encoding);
+    for (const k of Object.keys(stateful_aesthetics)) {
+      this.dim(k).update(encoding[k]);
+    }
+  }
+}
+class TextureSet {
+  constructor(regl2, texture_size = 4096, texture_widths = 32) {
+    this.id_locs = {};
+    this.offsets = {};
+    this.texture_size = texture_size;
+    this.texture_widths = texture_widths;
+    this.regl = regl2;
+    this._one_d_position = 1;
+    this._color_position = -1;
+  }
+  get_position(id2) {
+    return this.offsets[id2] || 0;
+  }
+  set_one_d(id2, value) {
+    let offset;
+    const { offsets } = this;
+    if (offsets[id2]) {
+      offset = offsets[id2];
+    } else {
+      offset = this._one_d_position++;
+      offsets[id2] = offset;
+    }
+    this.one_d_texture.subimage({
+      data: value,
+      width: 1,
+      height: this.texture_size
+    }, offset - 1, 0);
+  }
+  set_color(id2, value) {
+    let offset;
+    const { offsets } = this;
+    if (offsets[id2]) {
+      offset = offsets[id2];
+    } else {
+      offset = this._color_position--;
+      offsets[id2] = offset;
+    }
+    this.color_texture.subimage({
+      data: value,
+      width: 1,
+      height: this.texture_size
+    }, -offset - 1, 0);
+  }
+  get one_d_texture() {
+    if (this._one_d_texture) {
+      return this._one_d_texture;
+    }
+    const texture_type = this.regl.hasExtension("OES_texture_float") ? "float" : this.regl.hasExtension("OES_texture_half_float") ? "half float" : "uint8";
+    const format2 = texture_type === "uint8" ? "rgba" : "alpha";
+    const params = {
+      width: this.texture_widths,
+      height: this.texture_size,
+      type: texture_type,
+      format: format2
+    };
+    this._one_d_texture = this.regl.texture(params);
+    return this._one_d_texture;
+  }
+  get color_texture() {
+    if (this._color_texture) {
+      return this._color_texture;
+    }
+    this._color_texture = this.regl.texture({
+      width: this.texture_widths,
+      height: this.texture_size,
+      type: "uint8",
+      format: "rgba"
+    });
+    return this._color_texture;
+  }
+}
+class ReglRenderer extends Renderer {
+  constructor(selector2, tileSet, scatterplot) {
+    super(selector2, tileSet, scatterplot);
+    this.buffer_size = 1024 * 1024 * 64;
+    this._use_scale_to_download_tiles = true;
+    this.fbos = {};
+    this.textures = {};
+    this.regl = wrapREGL(
+      {
+        optionalExtensions: [
+          "OES_standard_derivatives",
+          "OES_element_index_uint",
+          "OES_texture_float",
+          "OES_texture_half_float"
+        ],
+        canvas: this.canvas.node()
+      }
+    );
+    this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
+    this.initialize_textures();
+    this._initializations = [
+      this.tileSet.ready.then(() => {
+        this.remake_renderer();
+        this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
+      })
+    ];
+    this.initialize();
+    this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
+  }
+  get buffers() {
+    this._buffers = this._buffers || new MultipurposeBufferSet(this.regl, this.buffer_size);
+    return this._buffers;
+  }
+  data(dataset) {
+    if (dataset === void 0) {
+      return this.tileSet;
+    }
+    this.tileSet = dataset;
+    return this;
+  }
+  get props() {
+    const { prefs } = this;
+    const { transform } = this.zoom;
+    const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
+    const props = {
+      aes: { encoding: this.aes.encoding },
+      colors_as_grid: 0,
+      corners: this.zoom.current_corners(),
+      zoom_balance: prefs.zoom_balance,
+      transform,
+      max_ix: this.max_ix,
+      point_size: this.point_size,
+      alpha: this.optimal_alpha,
+      time: Date.now() - this.zoom._start,
+      update_time: Date.now() - this.most_recent_restart,
+      relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
+      string_index: 0,
+      prefs: JSON.parse(JSON.stringify(prefs)),
+      color_type: void 0,
+      start_time: this.most_recent_restart,
+      webgl_scale: this._webgl_scale_history[0],
+      last_webgl_scale: this._webgl_scale_history[1],
+      use_scale_for_tiles: this._use_scale_to_download_tiles,
+      grid_mode: 0,
+      buffer_num_to_variable,
+      aes_to_buffer_num,
+      variable_to_buffer_num,
+      color_picker_mode: 0,
+      zoom_matrix: [
+        [transform.k, 0, transform.x],
+        [0, transform.k, transform.y],
+        [0, 0, 1]
+      ].flat()
+    };
+    return JSON.parse(JSON.stringify(props));
+  }
+  get default_webgl_scale() {
+    if (this._default_webgl_scale) {
+      return this._default_webgl_scale;
+    }
+    this._default_webgl_scale = this.zoom.webgl_scale();
+    return this._default_webgl_scale;
+  }
+  render_points(props) {
+    const prop_list = [];
+    for (const tile of this.visible_tiles()) {
+      const manager = new TileBufferManager(this.regl, tile, this);
+      if (!manager.ready(props.prefs, props.block_for_buffers)) {
+        continue;
+      }
+      const this_props = {
+        manager,
+        tile_id: tile.numeric_id,
+        sprites: this.sprites
+      };
+      Object.assign(this_props, props);
+      prop_list.push(this_props);
+    }
+    prop_list.reverse();
+    this._renderer(prop_list);
+  }
+  tick() {
+    const { prefs } = this;
+    const { regl: regl2, tileSet } = this;
+    const { props } = this;
+    this.tick_num = this.tick_num || 0;
+    this.tick_num++;
+    if (this._use_scale_to_download_tiles) {
+      tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix);
+    } else {
+      tileSet.download_most_needed_tiles(prefs.max_points);
+    }
+    regl2.clear({
+      color: [0.9, 0.9, 0.93, 0],
+      depth: 1
+    });
+    const start2 = Date.now();
+    let current = () => {
+    };
+    while (Date.now() - start2 < 10 && this.deferred_functions.length > 0) {
+      current = this.deferred_functions.shift();
+      try {
+        current();
+      } catch (error) {
+        console.warn(error, current);
+      }
+    }
+    try {
+      this.render_all(props);
+    } catch (error) {
+      console.warn("ERROR NOTED");
+      this.reglframe.cancel();
+      throw error;
+    }
+  }
+  single_blur_pass(fbo1, fbo2, direction) {
+    const { regl: regl2 } = this;
+    fbo2.use(() => {
+      regl2.clear({ color: [0, 0, 0, 0] });
+      regl2(
+        {
+          frag: gaussian_blur,
+          uniforms: {
+            iResolution: ({ viewportWidth, viewportHeight }) => [viewportWidth, viewportHeight],
+            iChannel0: fbo1,
+            direction
+          },
+          vert: `
+        precision mediump float;
+        attribute vec2 position;
+        varying vec2 uv;
+        void main() {
+          uv = 0.5 * (position + 1.0);
+          gl_Position = vec4(position, 0, 1);
+        }`,
+          attributes: {
+            position: [-4, -4, 4, -4, 0, 4]
+          },
+          depth: { enable: false },
+          count: 3
+        }
+      )();
+    });
+  }
+  blur(fbo1, fbo2, passes = 3) {
+    let remaining = passes - 1;
+    while (remaining > -1) {
+      this.single_blur_pass(fbo1, fbo2, [2 ** remaining, 0]);
+      this.single_blur_pass(fbo2, fbo1, [0, 2 ** remaining]);
+      remaining -= 1;
+    }
+  }
+  render_all(props) {
+    const { regl: regl2 } = this;
+    this.fbos.points.use(() => {
+      regl2.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+    });
+    regl2.clear({ color: [0, 0, 0, 0] });
+    this.fbos.lines.use(() => regl2.clear({ color: [0, 0, 0, 0] }));
+    if (this.scatterplot.trimap) {
+      this.fbos.lines.use(() => {
+        this.scatterplot.trimap.zoom = this.zoom;
+        this.scatterplot.trimap.tick("polygon");
+      });
+    }
+    for (const layer of [this.fbos.lines, this.fbos.points]) {
+      regl2({
+        profile: true,
+        blend: {
+          enable: true,
+          func: {
+            srcRGB: "one",
+            srcAlpha: "one",
+            dstRGB: "one minus src alpha",
+            dstAlpha: "one minus src alpha"
+          }
+        },
+        frag: `
+        precision mediump float;
+        varying vec2 uv;
+        uniform sampler2D tex;
+        uniform float wRcp, hRcp;
+        void main() {
+          gl_FragColor = texture2D(tex, uv);
+        }
+      `,
+        vert: `
+        precision mediump float;
+        attribute vec2 position;
+        varying vec2 uv;
+        void main() {
+          uv = 0.5 * (position + 1.0);
+          gl_Position = vec4(position, 0., 1.);
+        }
+      `,
+        attributes: {
+          position: this.fill_buffer
+        },
+        depth: { enable: false },
+        count: 3,
+        uniforms: {
+          tex: () => layer,
+          wRcp: ({ viewportWidth }) => 1 / viewportWidth,
+          hRcp: ({ viewportHeight }) => 1 / viewportHeight
+        }
+      })();
+    }
+  }
+  initialize_textures() {
+    const { regl: regl2 } = this;
+    this.fbos = this.fbos || {};
+    this.textures = this.textures || {};
+    this.textures.empty_texture = regl2.texture(
+      range(128).map((d) => range(128).map((d2) => [0, 0, 0]))
+    );
+    this.fbos.minicounter = regl2.framebuffer({
+      width: 512,
+      height: 512,
+      depth: false
+    });
+    this.fbos.lines = regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.points = regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.ping = regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.pong = regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.contour = this.fbos.contour || regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.colorpicker = this.fbos.colorpicker || regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.dummy = this.fbos.dummy || regl2.framebuffer({
+      width: 1,
+      height: 1,
+      depth: false
+    });
+  }
+  get_image_texture(url) {
+    const { regl: regl2 } = this;
+    this.textures = this.textures || {};
+    if (this.textures[url]) {
+      return this.textures[url];
+    }
+    const image = new Image();
+    image.src = url;
+    image.addEventListener("load", () => {
+      this.textures[url] = regl2.texture(image);
+    });
+    return this.textures[url];
+  }
+  n_visible(only_color = -1) {
+    let { width, height } = this;
+    width = Math.floor(width);
+    height = Math.floor(height);
+    if (this.contour_vals === void 0) {
+      this.contour_vals = new Uint8Array(width * height * 4);
+    }
+    const { props } = this;
+    props.only_color = only_color;
+    let v;
+    this.fbos.contour.use(() => {
+      this.regl.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+      this.regl.read(this.contour_vals);
+      v = sum$1(this.contour_vals);
+    });
+    return v;
+  }
+  get integer_buffer() {
+    if (this._integer_buffer === void 0) {
+      const array2 = new Float32Array(2 ** 16);
+      for (let i = 0; i < 2 ** 16; i++) {
+        array2[i] = i;
+      }
+      this._integer_buffer = this.regl.buffer(array2);
+    }
+    return this._integer_buffer;
+  }
+  color_pick(x, y) {
+    const tile_number = this.color_pick_single(x, y, "tile_id");
+    const row_number = this.color_pick_single(x, y, "ix_in_tile");
+    for (const tile of this.visible_tiles()) {
+      if (tile.numeric_id === tile_number) {
+        return tile.record_batch.get(row_number);
+      }
+    }
+  }
+  color_pick_single(x, y, field = "tile_id") {
+    const { props, height } = this;
+    props.color_picker_mode = ["ix", "tile_id", "ix_in_tile"].indexOf(field) + 1;
+    let color_at_point = [0, 0, 0, 0];
+    this.fbos.colorpicker.use(() => {
+      this.regl.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+      try {
+        color_at_point = this.regl.read({
+          x,
+          y: height - y,
+          width: 1,
+          height: 1
+        });
+      } catch {
+        console.warn("Read bad data from", {
+          x,
+          y,
+          height,
+          attempted: height - y
+        });
+      }
+    });
+    const point_as_float = glslReadFloat(...color_at_point) - 1;
+    const point_as_int = Math.round(point_as_float);
+    return point_as_int;
+  }
+  get fill_buffer() {
+    if (!this._fill_buffer) {
+      const { regl: regl2 } = this;
+      this._fill_buffer = regl2.buffer(
+        { data: [-4, -4, 4, -4, 0, 4] }
+      );
+    }
+    return this._fill_buffer;
+  }
+  draw_contour_buffer(field, ix) {
+    let { width, height } = this;
+    width = Math.floor(width);
+    height = Math.floor(height);
+    this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height);
+    this.contour_alpha_vals = this.contour_alpha_vals || new Uint16Array(width * height);
+    const { props } = this;
+    props.aes.encoding.color = {
+      field
+    };
+    props.only_color = ix;
+    this.fbos.contour.use(() => {
+      this.regl.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+      this.regl.read(this.contour_vals);
+    });
+    this.blur(this.fbos.contour, this.fbos.ping, 3);
+    this.fbos.contour.use(() => {
+      this.regl.read(this.contour_vals);
+    });
+    let i = 0;
+    while (i < width * height * 4) {
+      this.contour_alpha_vals[i / 4] = this.contour_vals[i + 3] * 255;
+      i += 4;
+    }
+    return this.contour_alpha_vals;
+  }
+  remake_renderer() {
+    const { regl: regl2 } = this;
+    const parameters = {
+      depth: { enable: false },
+      stencil: { enable: false },
+      blend: {
+        enable(_, { color_picker_mode }) {
+          return color_picker_mode < 0.5;
+        },
+        func: {
+          srcRGB: "one",
+          srcAlpha: "one",
+          dstRGB: "one minus src alpha",
+          dstAlpha: "one minus src alpha"
+        }
+      },
+      primitive: "points",
+      frag: frag_shader,
+      vert: vertex_shader,
+      count(_, props) {
+        return props.manager.count;
+      },
+      attributes: {},
+      uniforms: {
+        u_update_time: regl2.prop("update_time"),
+        u_transition_duration(_, props) {
+          return props.prefs.duration;
+        },
+        u_only_color(_, props) {
+          if (props.only_color !== void 0) {
+            return props.only_color;
+          }
+          return -2;
+        },
+        u_use_glyphset: (_, { prefs }) => prefs.glyph_set ? 1 : 0,
+        u_glyphset: (_, { prefs }) => {
+          if (prefs.glyph_set) {
+            return this.get_image_texture(prefs.glyph_set);
+          }
+          return this.textures.empty_texture;
+        },
+        u_color_picker_mode: regl2.prop("color_picker_mode"),
+        u_position_interpolation_mode() {
+          if (this.aes.position_interpolation) {
+            return 1;
+          }
+          return 0;
+        },
+        u_grid_mode: (_, { grid_mode }) => grid_mode,
+        u_colors_as_grid: regl2.prop("colors_as_grid"),
+        u_tile_id: (_, props) => props.tile_id,
+        u_width: ({ viewportWidth }) => viewportWidth,
+        u_height: ({ viewportHeight }) => viewportHeight,
+        u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
+        u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
+        u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
+        u_zoom_balance: regl2.prop("zoom_balance"),
+        u_base_size: (_, { point_size }) => point_size,
+        u_maxix: (_, { max_ix }) => max_ix,
+        u_alpha: (_, { alpha }) => alpha,
+        u_k: (_, props) => {
+          return props.transform.k;
+        },
+        u_window_scale: regl2.prop("webgl_scale"),
+        u_last_window_scale: regl2.prop("last_webgl_scale"),
+        u_time: ({ time }) => time,
+        u_filter_numeric() {
+          return this.aes.dim("filter").current.ops_to_array();
+        },
+        u_last_filter_numeric() {
+          return this.aes.dim("filter").last.ops_to_array();
+        },
+        u_filter2_numeric() {
+          return this.aes.dim("filter2").current.ops_to_array();
+        },
+        u_last_filter2_numeric() {
+          return this.aes.dim("filter2").last.ops_to_array();
+        },
+        u_jitter: () => this.aes.dim("jitter_radius").current.jitter_int_format,
+        u_last_jitter: () => this.aes.dim("jitter_radius").last.jitter_int_format,
+        u_zoom(_, props) {
+          return props.zoom_matrix;
+        }
+      }
+    };
+    for (const i of range(0, 16)) {
+      parameters.attributes[`buffer_${i}`] = (_, { manager, buffer_num_to_variable }) => {
+        const c2 = manager.regl_elements.get(buffer_num_to_variable[i]);
+        return c2 || { constant: 0 };
+      };
+    }
+    for (const k of [
+      "x",
+      "y",
+      "color",
+      "jitter_radius",
+      "x0",
+      "y0",
+      "jitter_speed",
+      "size",
+      "filter",
+      "filter2",
+      "character"
+    ]) {
+      for (const time of ["current", "last"]) {
+        const temporal = time === "current" ? "" : "last_";
+        parameters.uniforms[`u_${temporal}${k}_map`] = () => {
+          const aes_holder = this.aes.dim(k)[time];
+          return aes_holder.textures.one_d;
+        };
+        parameters.uniforms[`u_${temporal}${k}_map_position`] = () => this.aes.dim(k)[time].map_position;
+        parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
+          const val = aes_to_buffer_num[`${k}--${time}`];
+          if (val === void 0) {
+            return -1;
+          }
+          return val;
+        };
+        if (k !== "filter" && k !== "filter2") {
+          parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
+          parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
+          parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
+            const t = this.aes.dim(k)[time].transform;
+            if (t === "linear")
+              return 1;
+            if (t === "sqrt")
+              return 2;
+            if (t === "log")
+              return 3;
+            if (t === "literal")
+              return 4;
+            throw "Invalid transform";
+          };
+          parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
+            return this.aes.dim(k)[time].constant;
+          };
+        }
+      }
+    }
+    this._renderer = regl2(parameters);
+    return this._renderer;
+  }
+  allocate_aesthetic_buffers() {
+    const buffers = [];
+    const priorities = [
+      "x",
+      "y",
+      "color",
+      "x0",
+      "y0",
+      "size",
+      "jitter_radius",
+      "jitter_speed",
+      "filter",
+      "filter2"
+    ];
+    for (const aesthetic of priorities) {
+      for (const time of ["current", "last"]) {
+        try {
+          if (this.aes.dim(aesthetic)[time].field) {
+            buffers.push({ aesthetic, time, field: this.aes.dim(aesthetic)[time].field });
+          }
+        } catch (error) {
+          this.reglframe.cancel();
+          this.reglframe = void 0;
+          throw error;
+        }
+      }
+    }
+    buffers.sort((a, b) => {
+      if (a.time < b.time) {
+        return -1;
+      }
+      if (b.time < a.time) {
+        return 1;
+      }
+      return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
+    });
+    const aes_to_buffer_num = {};
+    const variable_to_buffer_num = {
+      ix: 0,
+      ix_in_tile: 1
+    };
+    let num = 1;
+    for (const { aesthetic, time, field } of buffers) {
+      const k = `${aesthetic}--${time}`;
+      if (variable_to_buffer_num[field] !== void 0) {
+        aes_to_buffer_num[k] = variable_to_buffer_num[field];
+        continue;
+      }
+      if (num++ < 16) {
+        aes_to_buffer_num[k] = num;
+        variable_to_buffer_num[field] = num;
+        continue;
+      } else {
+        aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
+      }
+    }
+    const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
+    return { aes_to_buffer_num, variable_to_buffer_num, buffer_num_to_variable };
+  }
+  get discard_share() {
+    return 0;
+  }
+}
+class TileBufferManager {
+  constructor(regl2, tile, renderer) {
+    this.tile = tile;
+    this.regl = regl2;
+    this.renderer = renderer;
+    tile._regl_elements = tile._regl_elements || /* @__PURE__ */ new Map([
+      ["ix_in_tile", {
+        offset: 0,
+        stride: 4,
+        buffer: renderer.integer_buffer
+      }]
+    ]);
+    this.regl_elements = tile._regl_elements;
+  }
+  ready(_, block_for_buffers = true) {
+    const { renderer, regl_elements } = this;
+    const needed_dimensions = /* @__PURE__ */ new Set();
+    for (const [k, v] of renderer.aes) {
+      for (const aesthetic of [v.current, v.last]) {
+        if (aesthetic.field) {
+          needed_dimensions.add(aesthetic.field);
+        }
+      }
+    }
+    for (const key of ["ix", "ix_in_tile", ...needed_dimensions]) {
+      const current = key === "ix_in_tile" ? this.renderer.integer_buffer : this.regl_elements.get(key);
+      if (current === null) {
+        return false;
+      }
+      if (current === void 0) {
+        if (!this.tile.ready) {
+          return false;
+        }
+        regl_elements.set(key, null);
+        if (block_for_buffers) {
+          if (key === void 0) {
+            continue;
+          }
+          this.create_regl_buffer(key);
+        } else {
+          renderer.deferred_functions.push(() => this.create_regl_buffer(key));
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  get count() {
+    const { regl_elements, tile } = this;
+    if (regl_elements.has("_count")) {
+      return regl_elements.get("_count");
+    }
+    if (tile.ready && tile._batch) {
+      regl_elements.set("_count", tile.record_batch.getChild("ix").length);
+      return regl_elements.get("_count");
+    }
+  }
+  create_buffer_data(key) {
+    const { tile } = this;
+    if (!tile.ready) {
+      throw "Tile table not present.";
+    }
+    let column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
+    if (!column) {
+      if (tile.dataset.transformations[key]) {
+        tile._batch = tile.dataset.transformations[key](tile.record_batch);
+        column = tile.record_batch.getChild(key);
+        if (!column) {
+          throw new Error(`${key} was not created.`);
+        }
+      } else {
+        const col_names = tile.record_batch.schema.fields.map((d) => d.name);
+        throw new Error(`Requested ${key} but table lacks that; the present columns are "${col_names.join('", "')}"`);
+      }
+    }
+    if (column.type.typeId !== 3) {
+      const buffer = new Float32Array(tile.record_batch.length);
+      for (let i = 0; i < tile.record_batch.numRows; i++) {
+        buffer[i] = column.data[0].values[i];
+      }
+      return buffer;
+    }
+    if (column.data[0].values.constructor === Float64Array) {
+      return new Float32Array(column.data[0].values);
+    }
+    return column.data[0].values;
+  }
+  create_regl_buffer(key) {
+    const { regl_elements } = this;
+    const data = this.create_buffer_data(key);
+    if (data.constructor !== Float32Array) {
+      console.warn(typeof data, data);
+      throw new Error("Buffer data must be a Float32Array");
+    }
+    const item_size = 4;
+    const data_length = data.length;
+    const buffer_desc = this.renderer.buffers.allocate_block(
+      data_length,
+      item_size
+    );
+    regl_elements.set(
+      key,
+      buffer_desc
+    );
+    buffer_desc.buffer.subdata(data, buffer_desc.offset);
+  }
+}
+class MultipurposeBufferSet {
+  constructor(regl2, buffer_size) {
+    this.regl = regl2;
+    this.buffer_size = buffer_size;
+    this.buffers = [];
+    this.buffer_offsets = [];
+    this.pointer = 0;
+    this.generate_new_buffer();
+  }
+  generate_new_buffer() {
+    if (this.pointer) {
+      this.buffer_offsets.unshift(this.pointer);
+    }
+    this.pointer = 0;
+    this.buffers.unshift(
+      this.regl.buffer({
+        type: "float",
+        length: this.buffer_size,
+        usage: "dynamic"
+      })
+    );
+  }
+  allocate_block(items, bytes_per_item) {
+    if (this.pointer + items * bytes_per_item > this.buffer_size) {
+      this.generate_new_buffer();
+    }
+    const value = {
+      buffer: this.buffers[0],
+      offset: this.pointer,
+      stride: bytes_per_item
+    };
+    this.pointer += items * bytes_per_item;
+    return value;
+  }
+}
 function __awaiter(thisArg, _arguments, P, generator) {
   function adopt(value) {
     return value instanceof P ? value : new P(function(resolve) {
@@ -27105,1758 +28786,6 @@ function tableFromIPC(input) {
   }
   return new Table(reader.readAll());
 }
-const scales = {
-  sqrt,
-  log,
-  linear,
-  literal: identity
-};
-const palette_size = 4096;
-function to_buffer(data) {
-  const output = new Uint8Array(4 * palette_size);
-  output.set(data.flat());
-  return output;
-}
-function materialize_color_interplator(interpolator) {
-  const rawValues = range(palette_size).map((i) => {
-    const p = rgb(interpolator(i / palette_size));
-    return [p.r, p.g, p.b, 255];
-  });
-  return to_buffer(rawValues);
-}
-const color_palettes = {
-  white: to_buffer(range(palette_size).map(() => [0.5, 0.5, 0.5, 0.5]))
-};
-const schemes = {};
-for (const [k, v] of Object.entries(d3Chromatic)) {
-  if (k.startsWith("scheme") && typeof v[0] === "string") {
-    const colors2 = Array(palette_size);
-    const scheme2 = v.map((v2) => {
-      const col = rgb(v2);
-      return [col.r, col.g, col.b, 255];
-    });
-    for (const i of range(palette_size)) {
-      colors2[i] = scheme2[i % v.length];
-    }
-    const name = k.replace("scheme", "").toLowerCase();
-    color_palettes[name] = to_buffer(colors2);
-    schemes[name] = v;
-  }
-  if (k.startsWith("interpolate")) {
-    const name = k.replace("interpolate", "").toLowerCase();
-    color_palettes[name] = materialize_color_interplator(v);
-    if (name === "rainbow") {
-      const shuffle = shuffler(lcg(1));
-      color_palettes.shufbow = shuffle(color_palettes[name]);
-    }
-  }
-}
-function okabe() {
-  const okabe_palette = ["#E69F00", "#CC79A7", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442"];
-  const colors2 = Array.from({ length: palette_size });
-  const scheme2 = okabe_palette.map((v) => {
-    const col = rgb(v);
-    return [col.r, col.g, col.b, 255];
-  });
-  for (const i of range(palette_size)) {
-    colors2[i] = scheme2[i % okabe_palette.length];
-  }
-  color_palettes.okabe = to_buffer(colors2);
-  schemes["okabe"] = okabe_palette;
-}
-okabe();
-class Aesthetic {
-  constructor(scatterplot, regl2, dataset, aesthetic_map) {
-    this.field = null;
-    this._texture_buffer = null;
-    this.partner = null;
-    this._textures = {};
-    this._scale = (p) => 1;
-    this.aesthetic_map = aesthetic_map;
-    if (this.aesthetic_map === void 0) {
-      throw new Error("Aesthetic map is undefined");
-    }
-    this.scatterplot = scatterplot;
-    this.regl = regl2;
-    this._domain = this.default_domain;
-    this._range = [0, 1];
-    this.dataset = dataset;
-    this._domains = {};
-    this.id = "" + Math.random();
-    this.current_encoding = { constant: 1 };
-  }
-  apply(point) {
-    return this.scale(this.value_for(point));
-  }
-  get transform() {
-    if (this._transform)
-      return this._transform;
-    return this.default_transform;
-  }
-  set transform(transform) {
-    this._transform = transform;
-  }
-  get scale() {
-    function capitalize(r) {
-      return r.charAt(0).toUpperCase() + r.slice(1);
-    }
-    let scale = scales[this.transform]().domain(this.domain).range(this.range);
-    const range2 = this.range;
-    if (typeof range2 == "string") {
-      const interpolator = d3Chromatic["interpolate" + capitalize(range2)];
-      if (interpolator !== void 0) {
-        if (this.transform === "sqrt") {
-          return sequentialPow(interpolator).exponent(0.5).domain(this.domain);
-        } else if (this.transform === "log") {
-          return sequentialLog(interpolator).domain(this.domain);
-        } else {
-          return sequential(interpolator).domain(this.domain);
-        }
-      }
-    }
-    if (this.is_dictionary()) {
-      scale = ordinal().domain(this.domain);
-      if (typeof range2 === "string" && schemes[range2]) {
-        if (this.column.data[0].dictionary === null) {
-          throw new Error("Dictionary is null");
-        }
-        scale.range(schemes[range2]).domain(this.column.data[0].dictionary.toArray());
-      } else {
-        scale.range(this.range);
-      }
-    }
-    return scale;
-  }
-  get column() {
-    if (this.field === null) {
-      throw new Error("Can't retrieve column for aesthetic without a field");
-    }
-    if (this.dataset.root_tile.record_batch) {
-      const col = this.dataset.root_tile.record_batch.getChild(this.field);
-      if (col === void 0 || col === null) {
-        throw new Error("Can't find column " + this.field);
-      }
-      return col;
-    }
-    throw new Error("Table is null");
-  }
-  get default_domain() {
-    if (this.field == void 0) {
-      return [1, 1];
-    }
-    if (this._domains[this.field]) {
-      return this._domains[this.field];
-    }
-    if (!this.dataset.ready) {
-      return [1, 1];
-    }
-    const { column } = this;
-    if (!column) {
-      return [1, 1];
-    }
-    if (column.type.dictionary) {
-      this._domains[this.field] = [0, this.aesthetic_map.texture_size - 1];
-    } else {
-      this._domains[this.field] = extent(column.toArray());
-    }
-    return this._domains[this.field];
-  }
-  default_data() {
-    return Array(this.aesthetic_map.texture_size).fill(this.default_constant);
-  }
-  get domain() {
-    return this._domain || this.default_domain;
-  }
-  get range() {
-    return this._range || this.default_range;
-  }
-  value_for(point) {
-    if (this.field === null) {
-      return this.default_constant;
-    }
-    return point[this.field];
-  }
-  get map_position() {
-    if (this.use_map_on_regl === 0) {
-      return 0;
-    }
-    return this.aesthetic_map.get_position(this.id);
-  }
-  get texture_buffer() {
-    if (this._texture_buffer) {
-      return this._texture_buffer;
-    }
-    this._texture_buffer = new Float32Array(this.aesthetic_map.texture_size);
-    this._texture_buffer.set(this.default_data());
-    return this._texture_buffer;
-  }
-  post_to_regl_buffer() {
-    this.aesthetic_map.set_one_d(
-      this.id,
-      this.texture_buffer
-    );
-  }
-  convert_string_encoding(channel) {
-    const v = {
-      field: channel,
-      domain: this.default_domain,
-      range: this.default_range
-    };
-    return v;
-  }
-  complete_domain(encoding) {
-    encoding.domain = encoding.domain || this.default_domain;
-    return encoding;
-  }
-  custom(values) {
-    const custom_palette = values;
-    const colors2 = new Array(palette_size);
-    const scheme2 = custom_palette.map((v) => {
-      const col = rgb(v);
-      return [col.r, col.g, col.b, 255];
-    });
-    for (const i of range(palette_size)) {
-      colors2[i] = scheme2[i % custom_palette.length];
-    }
-    color_palettes.custom = to_buffer(colors2);
-    schemes["custom"] = custom_palette;
-  }
-  update(encoding) {
-    if (encoding === "null") {
-      encoding = null;
-    }
-    if (encoding === null) {
-      this.current_encoding = {
-        constant: this.default_constant
-      };
-      return;
-    }
-    if (encoding === void 0) {
-      return;
-    }
-    if (typeof encoding === "string") {
-      encoding = this.convert_string_encoding(encoding);
-    }
-    if (typeof encoding !== "object") {
-      const x = {
-        constant: encoding
-      };
-      this.current_encoding = x;
-      return;
-    }
-    if (encoding["domain"] && typeof encoding["domain"] === "string" && encoding["domain"] === "progressive") {
-      var all_tiles = [this.tileSet];
-      var current_tiles = [this.tileSet];
-      if (this.tileSet.children.length > 0) {
-        while (true) {
-          if (current_tiles.length == 0) {
-            break;
-          }
-          var children_tiles = [];
-          current_tiles.map(function(tile, idx) {
-            if (tile.children.length > 0) {
-              all_tiles.push.apply(all_tiles, tile.children);
-              children_tiles.push.apply(children_tiles, tile.children);
-            }
-          });
-          current_tiles = children_tiles;
-        }
-        var min2 = all_tiles[0].table.getChild(encoding["field"]).data[0].values[0];
-        var max2 = min2;
-        all_tiles.forEach(function(tile, idx) {
-          tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
-            if (val < min2) {
-              min2 = val;
-            }
-            if (val > max2) {
-              max2 = val;
-            }
-          });
-        });
-        encoding["domain"] = [min2, max2];
-      }
-    }
-    if (encoding["range"] && Array.isArray(encoding["range"]) && typeof encoding["range"][0] === "string") {
-      if (encoding["field"] == "_isSelected") {
-        var all_tiles = [];
-        var current_tiles = [this.tileSet];
-        while (current_tiles.length > 0) {
-          var current_tile = current_tiles.shift();
-          if (current_tile.download_state === "Complete") {
-            all_tiles.push(current_tile);
-            current_tile.children.forEach((child) => current_tiles.push(child));
-          }
-        }
-        if (this.tileSet.children.length > 0) {
-          var set2 = new Set(encoding["domain"]);
-          if (this.tileSet.currentSelected == void 0) {
-            this.tileSet.currentSelected = 0;
-            this.tileSet.isSelectedIndex = this.tileSet.table.batches[0].data.children.length - 2;
-          } else {
-            this.tileSet.currentSelected += 1;
-            encoding["field"] = encoding["field"] + this.tileSet.currentSelected.toString();
-          }
-          var selected = this.tileSet.currentSelected;
-          var selectedIndex = this.tileSet.isSelectedIndex;
-          all_tiles.forEach(function(tile, idx) {
-            if (selected > 0) {
-              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex].clone());
-              tile.table.batches[0].data.children.push(tile.table.batches[0].data.children[selectedIndex + 1].clone());
-              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex].clone());
-              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding["field"];
-              tile.table.schema.fields.push(tile.table.schema.fields[selectedIndex + 1].clone());
-              tile.table.schema.fields[tile.table.schema.fields.length - 1].name = encoding["field"] + "_float_version";
-            }
-            var updatedArray = new Uint8Array(tile.table.numRows);
-            var updatedFloatArray = new Float32Array(tile.table.numRows);
-            tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
-              if (tile.table.getChild("_id").data[0].typeId != 5) {
-                if (set2.has(tile.table.getChild("_id").data[0].values[idx2].toString())) {
-                  updatedArray[idx2] = "1";
-                  updatedFloatArray[idx2] = -2046;
-                } else {
-                  updatedArray[idx2] = "0";
-                  updatedFloatArray[idx2] = -2047;
-                }
-              } else {
-                if (set2.has(String.fromCharCode(...tile.table.getChild("_id").data[0].values.slice(tile.table.getChild("_id").data[0].valueOffsets[idx2], tile.table.getChild("_id").data[0].valueOffsets[idx2 + 1])))) {
-                  updatedArray[idx2] = "1";
-                  updatedFloatArray[idx2] = -2046;
-                } else {
-                  updatedArray[idx2] = "0";
-                  updatedFloatArray[idx2] = -2047;
-                }
-              }
-            });
-            tile._table = tile.table.setChild(encoding["field"], makeVector(updatedArray));
-            tile._table = tile.table.setChild(encoding["field"] + "_float_version", makeVector(updatedFloatArray));
-          });
-        }
-        encoding["domain"] = ["0", "1"];
-      }
-      var color_by_values = this.tileSet.local_dictionary_lookups[encoding["field"]];
-      console.log(color_by_values);
-      if (color_by_values == void 0) {
-        var lowercase_values = ["1", "0"];
-      } else {
-        var lowercase_values = Array.from(color_by_values.values()).map((val) => val.toLowerCase());
-      }
-      var new_range = Array(lowercase_values.length).fill("#000000");
-      if (encoding["domain"] && Array.isArray(encoding["domain"]) && typeof (encoding["domain"][0] === "string")) {
-        if (encoding["domain"].length === encoding["range"].length) {
-          encoding["domain"].map(function(val, idx) {
-            if (lowercase_values.includes(val.toLowerCase())) {
-              new_range[lowercase_values.indexOf(val.toLowerCase())] = encoding["range"][idx];
-            }
-          });
-          encoding["range"] = "custom";
-          encoding["domain"] = [-2047, 2047];
-          this.custom(new_range);
-        } else {
-          encoding["domain"] = [-2047, 2047];
-        }
-      }
-    }
-    this.current_encoding = encoding;
-    if (isConstantChannel(encoding)) {
-      return;
-    }
-    this.field = encoding.field;
-    if (isOpChannel(encoding)) {
-      return;
-    }
-    if (isLambdaChannel(encoding)) {
-      const {
-        lambda,
-        field
-      } = encoding;
-      if (lambda) {
-        this.apply_function_for_textures(field, this.domain, lambda);
-        this.post_to_regl_buffer();
-      } else if (encoding.range) {
-        this.encode_for_textures(this.range);
-        this.post_to_regl_buffer();
-      }
-      return;
-    }
-    if (encoding["domain"] === void 0) {
-      encoding["domain"] = this.default_domain;
-    }
-    if (encoding["range"]) {
-      this._domain = encoding.domain;
-      this._range = encoding.range;
-    }
-    this._transform = encoding.transform || void 0;
-  }
-  encode_for_textures(range2) {
-    const { texture_size } = this.aesthetic_map;
-    const values = Array(texture_size);
-    this.scaleFunc = scales[this.transform]().range(range2).domain([0, texture_size - 1]);
-    for (let i = 0; i < texture_size; i += 1) {
-      values[i] = this.scaleFunc(i);
-    }
-  }
-  arrow_column() {
-    if (this.field === null) {
-      throw new Error("Can't retrieve column for aesthetic without a field");
-    }
-    const c2 = this.dataset.root_tile.record_batch.getChild(this.field);
-    if (c2 === null) {
-      throw `No column ${this.field} on arrow table for aesthetic`;
-    }
-    return c2;
-  }
-  is_dictionary() {
-    if (this.field === null || this.field === void 0) {
-      return false;
-    }
-    return this.arrow_column().type.dictionary !== void 0;
-  }
-  get constant() {
-    if (isConstantChannel(this.current_encoding)) {
-      return this.current_encoding.constant;
-    }
-    return this.default_constant;
-  }
-  get use_map_on_regl() {
-    if (this.is_dictionary() && this.domain[0] === -2047 && this.domain[1] == 2047) {
-      return 1;
-    }
-    return 0;
-  }
-  apply_function_for_textures(field, range$1, raw_func) {
-    const { texture_size } = this.aesthetic_map;
-    let func;
-    func = typeof raw_func === "string" ? lambda_to_function(parseLambdaString(raw_func)) : raw_func;
-    this.scaleFunc = linear().range(range$1).domain([0, texture_size - 1]);
-    let input = range(texture_size);
-    if (field === void 0 || this.dataset.root_tile.record_batch === void 0) {
-      if (field === void 0) {
-        console.warn("SETTING EMPTY FIELD");
-      }
-      if (this.dataset.root_tile.record_batch === void 0) {
-        console.warn("SETTING EMPTY TABLE");
-      }
-      this.texture_buffer.set(range(texture_size).map((i) => 1));
-      return;
-    }
-    const { column } = this;
-    if (!column) {
-      throw new Error(`Column ${field} does not exist on table.`);
-    }
-    if (column.type.dictionary) {
-      input.fill();
-      const dvals = column.data[0].dictionary.toArray();
-      for (const [i, d] of dvals.entries()) {
-        input[i] = d;
-      }
-    } else {
-      input = input.map((d) => this.scale(d));
-    }
-    const values = input.map((i) => func(i));
-    this.texture_buffer.set(values);
-  }
-}
-class OneDAesthetic extends Aesthetic {
-  static get default_constant() {
-    return 1.5;
-  }
-  static get_default_domain() {
-    return [0, 1];
-  }
-  get default_domain() {
-    return [0, 1];
-  }
-}
-class BooleanAesthetic extends Aesthetic {
-}
-class Size extends OneDAesthetic {
-  constructor() {
-    super(...arguments);
-    this.default_constant = 1;
-    this.default_transform = "sqrt";
-  }
-  static get default_constant() {
-    return 1.5;
-  }
-  static get_default_domain() {
-    return [0, 10];
-  }
-  get default_domain() {
-    return [0, 10];
-  }
-}
-Size.default_range = [0, 1];
-class PositionalAesthetic extends OneDAesthetic {
-  constructor(scatterplot, regl2, tile, map2) {
-    super(scatterplot, regl2, tile, map2);
-    this.default_range = [-1, 1];
-    this.default_constant = 0;
-    this.default_transform = "literal";
-    this._transform = "literal";
-  }
-  get range() {
-    if (this.dataset.extent && this.dataset.extent[this.field])
-      return this.dataset.extent[this.field];
-    return [-20, 20];
-  }
-  static get default_constant() {
-    return 0;
-  }
-}
-class X extends PositionalAesthetic {
-  constructor() {
-    super(...arguments);
-    this.field = "x";
-  }
-}
-class X0 extends X {
-}
-class Y extends PositionalAesthetic {
-  constructor() {
-    super(...arguments);
-    this.field = "y";
-  }
-}
-class Y0 extends Y {
-}
-class AbstractFilter extends BooleanAesthetic {
-  constructor(scatterplot, regl2, tile, map2) {
-    super(scatterplot, regl2, tile, map2);
-    this.default_transform = "literal";
-    this.default_constant = 1;
-    this.default_range = [0, 1];
-    this.current_encoding = { constant: 1 };
-  }
-  get default_domain() {
-    return [0, 1];
-  }
-  get domain() {
-    const domain = this.is_dictionary() ? [-2047, 2047] : [0, 1];
-    return domain;
-  }
-  update(encoding) {
-    super.update(encoding);
-  }
-  post_to_regl_buffer() {
-    super.post_to_regl_buffer();
-  }
-  ops_to_array() {
-    const input = this.current_encoding;
-    if (input === null)
-      return [0, 0, 0];
-    if (input === void 0)
-      return [0, 0, 0];
-    if (!isOpChannel(input)) {
-      return [0, 0, 0];
-    }
-    if (input.op === "within") {
-      return [4, input.a, input.b];
-    }
-    const val = [
-      [null, "lt", "gt", "eq"].indexOf(input.op),
-      input.a,
-      0
-    ];
-    return val;
-  }
-}
-class Filter extends AbstractFilter {
-}
-class Jitter_speed extends Aesthetic {
-  constructor() {
-    super(...arguments);
-    this.default_transform = "linear";
-    this.default_range = [0, 1];
-    this.default_constant = 0.5;
-  }
-  get default_domain() {
-    return [0, 1];
-  }
-}
-function encode_jitter_to_int(jitter) {
-  if (jitter === "spiral") {
-    return 1;
-  }
-  if (jitter === "uniform") {
-    return 2;
-  }
-  if (jitter === "normal") {
-    return 3;
-  }
-  if (jitter === "circle") {
-    return 4;
-  }
-  if (jitter === "time") {
-    return 5;
-  }
-  return 0;
-}
-class Jitter_radius extends Aesthetic {
-  constructor() {
-    super(...arguments);
-    this.jitter_int_formatted = 0;
-    this.default_transform = "linear";
-    this._method = "None";
-  }
-  get default_constant() {
-    return 0;
-  }
-  get default_domain() {
-    return [0, 1];
-  }
-  get default_range() {
-    return [0, 1];
-  }
-  get method() {
-    return this.current_encoding && this.current_encoding.method ? this.current_encoding.method : "None";
-  }
-  set method(value) {
-    this._method = value;
-  }
-  get jitter_int_format() {
-    return encode_jitter_to_int(this.method);
-  }
-}
-const default_color = [0.7, 0, 0.5];
-class Color extends Aesthetic {
-  constructor() {
-    super(...arguments);
-    this.texture_type = "uint8";
-    this.default_constant = [0.7, 0, 0.5];
-    this.default_transform = "linear";
-    this.current_encoding = {
-      constant: default_color
-    };
-  }
-  get default_range() {
-    return [0, 1];
-  }
-  default_data() {
-    return color_palettes.viridis;
-  }
-  get use_map_on_regl() {
-    return 1;
-  }
-  get texture_buffer() {
-    if (this._texture_buffer) {
-      return this._texture_buffer;
-    }
-    this._texture_buffer = new Uint8Array(this.aesthetic_map.texture_size * 4);
-    this._texture_buffer.set(this.default_data());
-    return this._texture_buffer;
-  }
-  static convert_color(color2) {
-    const { r, g, b } = rgb(color2);
-    return [r / 255, g / 255, b / 255];
-  }
-  get_hex_values(field) {
-    var all_tiles = [this.tileSet];
-    var current_tiles = [this.tileSet];
-    if (this.tileSet.children.length > 0) {
-      while (true) {
-        if (current_tiles.length == 0) {
-          break;
-        }
-        var children_tiles = [];
-        current_tiles.map(function(tile, idx) {
-          if (tile.children.length > 0) {
-            all_tiles.push.apply(all_tiles, tile.children);
-            children_tiles.push.apply(children_tiles, tile.children);
-          }
-        });
-        current_tiles = children_tiles;
-      }
-      var min2 = all_tiles[0].table.getChild(field).data[0].values[0];
-      var max2 = min2;
-      all_tiles.forEach(function(tile, idx) {
-        tile.table.getChild(field).data[0].values.forEach(function(val, idx2) {
-          if (val < min2) {
-            min2 = val;
-          }
-          if (val > max2) {
-            max2 = val;
-          }
-        });
-      });
-      if (typeof min2 == "bigint" || typeof max2 == "bigint") {
-        min2 = Number(min2);
-        max2 = Number(max2);
-      }
-      var hex_vals = {};
-      for (var i = 0; i < this._texture_buffer.length; i += 4 * 512) {
-        hex_vals[(Math.abs(max2 - min2) / 7 * (i / (4 * 512)) + min2).toString()] = "#" + this._texture_buffer[i].toString(16) + this._texture_buffer[i + 1].toString(16) + this._texture_buffer[i + 2].toString(16);
-      }
-      return hex_vals;
-    }
-  }
-  get_hex_order() {
-    var hex_vals = {};
-    var ldl = this.scatterplot["_root"]["local_dictionary_lookups"];
-    var dict = ldl[this.field];
-    for (var i = 0; i < dict.size * 4; i += 4) {
-      if (i >= 16384) {
-        var color_by_index = 16380;
-      } else {
-        var color_by_index = i;
-      }
-      hex_vals[dict.get(i / 4)] = "#" + this._texture_buffer[color_by_index].toString(16) + this._texture_buffer[color_by_index + 1].toString(16) + this._texture_buffer[color_by_index + 2].toString(16);
-    }
-    return hex_vals;
-  }
-  post_to_regl_buffer() {
-    this.aesthetic_map.set_color(
-      this.id,
-      this.texture_buffer
-    );
-  }
-  update(encoding) {
-    this.current_encoding = encoding;
-    if (isConstantChannel(encoding) && typeof encoding.constant === "string") {
-      encoding.constant = Color.convert_color(encoding.constant);
-    }
-    super.update(encoding);
-    if (encoding.range && typeof encoding.range[0] === "string") {
-      this.encode_for_textures(encoding.range);
-      this.post_to_regl_buffer();
-    }
-  }
-  encode_for_textures(range$1) {
-    this._scale = scales[this.transform]().range(range$1).domain(this.domain);
-    if (color_palettes[range$1]) {
-      this.texture_buffer.set(color_palettes[range$1]);
-    } else if (range$1.length === this.aesthetic_map.texture_size * 4) {
-      this.texture_buffer.set(range$1);
-    } else if (range$1.length > 0 && range$1[0].length > 0 && range$1[0].length === 3) {
-      const r = range(palette_size).map((i) => {
-        const [r2, g, b] = range$1[i % range$1.length];
-        return [r2, g, b, 255];
-      });
-      this.texture_buffer.set(r.flat());
-    } else {
-      console.warn(`request range of ${range$1} for color ${this.field} unknown`);
-    }
-  }
-}
-class StatefulAesthetic {
-  constructor(scatterplot, regl2, tile, aesthetic_map) {
-    this.needs_transitions = false;
-    if (aesthetic_map === void 0) {
-      throw new Error("Aesthetic map is undefined.");
-    }
-    this.scatterplot = scatterplot;
-    this.regl = regl2;
-    this.tile = tile;
-    this.aesthetic_map = aesthetic_map;
-    this.aesthetic_map = aesthetic_map;
-    this.current_encoding = {
-      constant: 1
-    };
-  }
-  get current() {
-    return this.states[0];
-  }
-  get last() {
-    return this.states[1];
-  }
-  get states() {
-    if (this._states !== void 0) {
-      return this._states;
-    }
-    this._states = [
-      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map),
-      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map)
-    ];
-    return this._states;
-  }
-  update(encoding) {
-    const stringy = JSON.stringify(encoding);
-    if (stringy == JSON.stringify(this.current_encoding) || encoding === void 0) {
-      if (this.needs_transitions) {
-        this.states[1].update(this.current_encoding);
-      }
-      this.needs_transitions = false;
-    } else {
-      this.states.reverse();
-      this.states[0].update(encoding);
-      this.needs_transitions = true;
-      this.current_encoding = encoding;
-    }
-  }
-}
-class StatefulX extends StatefulAesthetic {
-  get Factory() {
-    return X;
-  }
-}
-class StatefulX0 extends StatefulAesthetic {
-  get Factory() {
-    return X0;
-  }
-}
-class StatefulY extends StatefulAesthetic {
-  get Factory() {
-    return Y;
-  }
-}
-class StatefulY0 extends StatefulAesthetic {
-  get Factory() {
-    return Y0;
-  }
-}
-class StatefulSize extends StatefulAesthetic {
-  get Factory() {
-    return Size;
-  }
-}
-class StatefulJitter_speed extends StatefulAesthetic {
-  get Factory() {
-    return Jitter_speed;
-  }
-}
-class StatefulJitter_radius extends StatefulAesthetic {
-  get Factory() {
-    return Jitter_radius;
-  }
-}
-class StatefulColor extends StatefulAesthetic {
-  get Factory() {
-    return Color;
-  }
-}
-class StatefulFilter extends StatefulAesthetic {
-  get Factory() {
-    return Filter;
-  }
-}
-class StatefulFilter2 extends StatefulAesthetic {
-  get Factory() {
-    return Filter;
-  }
-}
-const stateful_aesthetics = {
-  x: StatefulX,
-  x0: StatefulX0,
-  y: StatefulY,
-  y0: StatefulY0,
-  size: StatefulSize,
-  jitter_speed: StatefulJitter_speed,
-  jitter_radius: StatefulJitter_radius,
-  color: StatefulColor,
-  filter: StatefulFilter,
-  filter2: StatefulFilter2
-};
-function parseLambdaString(lambdastring) {
-  let [field, lambda] = lambdastring.split("=>").map((d) => d.trim());
-  if (lambda === void 0) {
-    throw `Couldn't parse ${lambdastring} into a function`;
-  }
-  if (lambda.slice(0, 1) !== "{" && lambda.slice(0, 6) !== "return") {
-    lambda = `return ${lambda}`;
-  }
-  const func = `${field} => ${lambda}`;
-  return {
-    field,
-    lambda: func
-  };
-}
-function lambda_to_function(input) {
-  if (typeof input.lambda === "function") {
-    throw "Must pass a string to lambda, not a function.";
-  }
-  const {
-    lambda,
-    field
-  } = input;
-  if (field === void 0) {
-    throw "Must pass a field to lambda.";
-  }
-  const cleaned = parseLambdaString(lambda).lambda;
-  const [arg, code] = cleaned.split("=>", 2).map((d) => d.trim());
-  const func = new Function(arg, code);
-  return func;
-}
-class AestheticSet {
-  constructor(scatterplot, regl2, tileSet) {
-    this.scatterplot = scatterplot;
-    this.store = {};
-    this.regl = regl2;
-    this.tileSet = tileSet;
-    this.position_interpolation = false;
-    this.aesthetic_map = new TextureSet(this.regl);
-    return this;
-  }
-  dim(aesthetic) {
-    if (this.store[aesthetic]) {
-      return this.store[aesthetic];
-    }
-    if (stateful_aesthetics[aesthetic] !== void 0) {
-      this.store[aesthetic] = new stateful_aesthetics[aesthetic](
-        this.scatterplot,
-        this.regl,
-        this.tileSet,
-        this.aesthetic_map
-      );
-      return this.store[aesthetic];
-    }
-    throw new Error(`Unknown aesthetic ${aesthetic}`);
-  }
-  *[Symbol.iterator]() {
-    for (const [k, v] of Object.entries(this.store)) {
-      yield [k, v];
-    }
-  }
-  interpret_position(encoding) {
-    if (encoding) {
-      if (encoding.x0 || encoding.position0) {
-        this.position_interpolation = true;
-      } else if (encoding.x || encoding.position) {
-        this.position_interpolation = false;
-      }
-      for (const p of ["position", "position0"]) {
-        const suffix = p.replace("position", "");
-        if (encoding[p]) {
-          if (encoding[p] === "literal") {
-            encoding[`x${suffix}`] = {
-              field: "x",
-              transform: "literal"
-            };
-            encoding[`y${suffix}`] = {
-              field: "y",
-              transform: "literal"
-            };
-          } else {
-            const field = encoding[p];
-            encoding[`x${suffix}`] = {
-              field: `${field}.x`,
-              transform: "literal"
-            };
-            encoding[`y${suffix}`] = {
-              field: `${field}.y`,
-              transform: "literal"
-            };
-          }
-          delete encoding[p];
-        }
-      }
-    }
-    delete encoding.position;
-    delete encoding.position0;
-  }
-  apply_encoding(encoding) {
-    if (encoding === void 0) {
-      encoding = {};
-    }
-    if (encoding.filter1) {
-      encoding.filter = encoding.filter1;
-      delete encoding.filter1;
-    }
-    this.interpret_position(encoding);
-    for (const k of Object.keys(stateful_aesthetics)) {
-      this.dim(k).update(encoding[k]);
-    }
-  }
-}
-class TextureSet {
-  constructor(regl2, texture_size = 4096, texture_widths = 32) {
-    this.id_locs = {};
-    this.offsets = {};
-    this.texture_size = texture_size;
-    this.texture_widths = texture_widths;
-    this.regl = regl2;
-    this._one_d_position = 1;
-    this._color_position = -1;
-  }
-  get_position(id2) {
-    return this.offsets[id2] || 0;
-  }
-  set_one_d(id2, value) {
-    let offset;
-    const { offsets } = this;
-    if (offsets[id2]) {
-      offset = offsets[id2];
-    } else {
-      offset = this._one_d_position++;
-      offsets[id2] = offset;
-    }
-    this.one_d_texture.subimage({
-      data: value,
-      width: 1,
-      height: this.texture_size
-    }, offset - 1, 0);
-  }
-  set_color(id2, value) {
-    let offset;
-    const { offsets } = this;
-    if (offsets[id2]) {
-      offset = offsets[id2];
-    } else {
-      offset = this._color_position--;
-      offsets[id2] = offset;
-    }
-    this.color_texture.subimage({
-      data: value,
-      width: 1,
-      height: this.texture_size
-    }, -offset - 1, 0);
-  }
-  get one_d_texture() {
-    if (this._one_d_texture) {
-      return this._one_d_texture;
-    }
-    const texture_type = this.regl.hasExtension("OES_texture_float") ? "float" : this.regl.hasExtension("OES_texture_half_float") ? "half float" : "uint8";
-    const format2 = texture_type === "uint8" ? "rgba" : "alpha";
-    const params = {
-      width: this.texture_widths,
-      height: this.texture_size,
-      type: texture_type,
-      format: format2
-    };
-    this._one_d_texture = this.regl.texture(params);
-    return this._one_d_texture;
-  }
-  get color_texture() {
-    if (this._color_texture) {
-      return this._color_texture;
-    }
-    this._color_texture = this.regl.texture({
-      width: this.texture_widths,
-      height: this.texture_size,
-      type: "uint8",
-      format: "rgba"
-    });
-    return this._color_texture;
-  }
-}
-class ReglRenderer extends Renderer {
-  constructor(selector2, tileSet, scatterplot) {
-    super(selector2, tileSet, scatterplot);
-    this.buffer_size = 1024 * 1024 * 64;
-    this._use_scale_to_download_tiles = true;
-    this.fbos = {};
-    this.textures = {};
-    this.regl = wrapREGL(
-      {
-        optionalExtensions: [
-          "OES_standard_derivatives",
-          "OES_element_index_uint",
-          "OES_texture_float",
-          "OES_texture_half_float"
-        ],
-        canvas: this.canvas.node()
-      }
-    );
-    this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
-    this.initialize_textures();
-    this._initializations = [
-      this.tileSet.ready.then(() => {
-        this.remake_renderer();
-        this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
-      })
-    ];
-    this.initialize();
-    this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
-  }
-  get buffers() {
-    this._buffers = this._buffers || new MultipurposeBufferSet(this.regl, this.buffer_size);
-    return this._buffers;
-  }
-  data(dataset) {
-    if (dataset === void 0) {
-      return this.tileSet;
-    }
-    this.tileSet = dataset;
-    return this;
-  }
-  get props() {
-    const { prefs } = this;
-    const { transform } = this.zoom;
-    const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
-    const props = {
-      aes: { encoding: this.aes.encoding },
-      colors_as_grid: 0,
-      corners: this.zoom.current_corners(),
-      zoom_balance: prefs.zoom_balance,
-      transform,
-      max_ix: this.max_ix,
-      point_size: this.point_size,
-      alpha: this.optimal_alpha,
-      time: Date.now() - this.zoom._start,
-      update_time: Date.now() - this.most_recent_restart,
-      relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
-      string_index: 0,
-      prefs: JSON.parse(JSON.stringify(prefs)),
-      color_type: void 0,
-      start_time: this.most_recent_restart,
-      webgl_scale: this._webgl_scale_history[0],
-      last_webgl_scale: this._webgl_scale_history[1],
-      use_scale_for_tiles: this._use_scale_to_download_tiles,
-      grid_mode: 0,
-      buffer_num_to_variable,
-      aes_to_buffer_num,
-      variable_to_buffer_num,
-      color_picker_mode: 0,
-      zoom_matrix: [
-        [transform.k, 0, transform.x],
-        [0, transform.k, transform.y],
-        [0, 0, 1]
-      ].flat()
-    };
-    return JSON.parse(JSON.stringify(props));
-  }
-  get default_webgl_scale() {
-    if (this._default_webgl_scale) {
-      return this._default_webgl_scale;
-    }
-    this._default_webgl_scale = this.zoom.webgl_scale();
-    return this._default_webgl_scale;
-  }
-  render_points(props) {
-    const prop_list = [];
-    for (const tile of this.visible_tiles()) {
-      const manager = new TileBufferManager(this.regl, tile, this);
-      if (!manager.ready(props.prefs, props.block_for_buffers)) {
-        continue;
-      }
-      const this_props = {
-        manager,
-        tile_id: tile.numeric_id,
-        sprites: this.sprites
-      };
-      Object.assign(this_props, props);
-      prop_list.push(this_props);
-    }
-    prop_list.reverse();
-    this._renderer(prop_list);
-  }
-  tick() {
-    const { prefs } = this;
-    const { regl: regl2, tileSet } = this;
-    const { props } = this;
-    this.tick_num = this.tick_num || 0;
-    this.tick_num++;
-    if (this._use_scale_to_download_tiles) {
-      tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix);
-    } else {
-      tileSet.download_most_needed_tiles(prefs.max_points);
-    }
-    regl2.clear({
-      color: [0.9, 0.9, 0.93, 0],
-      depth: 1
-    });
-    const start2 = Date.now();
-    let current = () => {
-    };
-    while (Date.now() - start2 < 10 && this.deferred_functions.length > 0) {
-      current = this.deferred_functions.shift();
-      try {
-        current();
-      } catch (error) {
-        console.warn(error, current);
-      }
-    }
-    try {
-      this.render_all(props);
-    } catch (error) {
-      console.warn("ERROR NOTED");
-      this.reglframe.cancel();
-      throw error;
-    }
-  }
-  single_blur_pass(fbo1, fbo2, direction) {
-    const { regl: regl2 } = this;
-    fbo2.use(() => {
-      regl2.clear({ color: [0, 0, 0, 0] });
-      regl2(
-        {
-          frag: gaussian_blur,
-          uniforms: {
-            iResolution: ({ viewportWidth, viewportHeight }) => [viewportWidth, viewportHeight],
-            iChannel0: fbo1,
-            direction
-          },
-          vert: `
-        precision mediump float;
-        attribute vec2 position;
-        varying vec2 uv;
-        void main() {
-          uv = 0.5 * (position + 1.0);
-          gl_Position = vec4(position, 0, 1);
-        }`,
-          attributes: {
-            position: [-4, -4, 4, -4, 0, 4]
-          },
-          depth: { enable: false },
-          count: 3
-        }
-      )();
-    });
-  }
-  blur(fbo1, fbo2, passes = 3) {
-    let remaining = passes - 1;
-    while (remaining > -1) {
-      this.single_blur_pass(fbo1, fbo2, [2 ** remaining, 0]);
-      this.single_blur_pass(fbo2, fbo1, [0, 2 ** remaining]);
-      remaining -= 1;
-    }
-  }
-  render_all(props) {
-    const { regl: regl2 } = this;
-    this.fbos.points.use(() => {
-      regl2.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-    });
-    regl2.clear({ color: [0, 0, 0, 0] });
-    this.fbos.lines.use(() => regl2.clear({ color: [0, 0, 0, 0] }));
-    if (this.scatterplot.trimap) {
-      this.fbos.lines.use(() => {
-        this.scatterplot.trimap.zoom = this.zoom;
-        this.scatterplot.trimap.tick("polygon");
-      });
-    }
-    for (const layer of [this.fbos.lines, this.fbos.points]) {
-      regl2({
-        profile: true,
-        blend: {
-          enable: true,
-          func: {
-            srcRGB: "one",
-            srcAlpha: "one",
-            dstRGB: "one minus src alpha",
-            dstAlpha: "one minus src alpha"
-          }
-        },
-        frag: `
-        precision mediump float;
-        varying vec2 uv;
-        uniform sampler2D tex;
-        uniform float wRcp, hRcp;
-        void main() {
-          gl_FragColor = texture2D(tex, uv);
-        }
-      `,
-        vert: `
-        precision mediump float;
-        attribute vec2 position;
-        varying vec2 uv;
-        void main() {
-          uv = 0.5 * (position + 1.0);
-          gl_Position = vec4(position, 0., 1.);
-        }
-      `,
-        attributes: {
-          position: this.fill_buffer
-        },
-        depth: { enable: false },
-        count: 3,
-        uniforms: {
-          tex: () => layer,
-          wRcp: ({ viewportWidth }) => 1 / viewportWidth,
-          hRcp: ({ viewportHeight }) => 1 / viewportHeight
-        }
-      })();
-    }
-  }
-  initialize_textures() {
-    const { regl: regl2 } = this;
-    this.fbos = this.fbos || {};
-    this.textures = this.textures || {};
-    this.textures.empty_texture = regl2.texture(
-      range(128).map((d) => range(128).map((d2) => [0, 0, 0]))
-    );
-    this.fbos.minicounter = regl2.framebuffer({
-      width: 512,
-      height: 512,
-      depth: false
-    });
-    this.fbos.lines = regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.points = regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.ping = regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.pong = regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.contour = this.fbos.contour || regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.colorpicker = this.fbos.colorpicker || regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.dummy = this.fbos.dummy || regl2.framebuffer({
-      width: 1,
-      height: 1,
-      depth: false
-    });
-  }
-  get_image_texture(url) {
-    const { regl: regl2 } = this;
-    this.textures = this.textures || {};
-    if (this.textures[url]) {
-      return this.textures[url];
-    }
-    const image = new Image();
-    image.src = url;
-    image.addEventListener("load", () => {
-      this.textures[url] = regl2.texture(image);
-    });
-    return this.textures[url];
-  }
-  n_visible(only_color = -1) {
-    let { width, height } = this;
-    width = Math.floor(width);
-    height = Math.floor(height);
-    if (this.contour_vals === void 0) {
-      this.contour_vals = new Uint8Array(width * height * 4);
-    }
-    const { props } = this;
-    props.only_color = only_color;
-    let v;
-    this.fbos.contour.use(() => {
-      this.regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      this.regl.read(this.contour_vals);
-      v = sum$1(this.contour_vals);
-    });
-    return v;
-  }
-  get integer_buffer() {
-    if (this._integer_buffer === void 0) {
-      const array2 = new Float32Array(2 ** 16);
-      for (let i = 0; i < 2 ** 16; i++) {
-        array2[i] = i;
-      }
-      this._integer_buffer = this.regl.buffer(array2);
-    }
-    return this._integer_buffer;
-  }
-  color_pick(x, y) {
-    const tile_number = this.color_pick_single(x, y, "tile_id");
-    const row_number = this.color_pick_single(x, y, "ix_in_tile");
-    for (const tile of this.visible_tiles()) {
-      if (tile.numeric_id === tile_number) {
-        return tile.record_batch.get(row_number);
-      }
-    }
-  }
-  color_pick_single(x, y, field = "tile_id") {
-    const { props, height } = this;
-    props.color_picker_mode = ["ix", "tile_id", "ix_in_tile"].indexOf(field) + 1;
-    let color_at_point = [0, 0, 0, 0];
-    this.fbos.colorpicker.use(() => {
-      this.regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      try {
-        color_at_point = this.regl.read({
-          x,
-          y: height - y,
-          width: 1,
-          height: 1
-        });
-      } catch {
-        console.warn("Read bad data from", {
-          x,
-          y,
-          height,
-          attempted: height - y
-        });
-      }
-    });
-    const point_as_float = glslReadFloat(...color_at_point) - 1;
-    const point_as_int = Math.round(point_as_float);
-    return point_as_int;
-  }
-  get fill_buffer() {
-    if (!this._fill_buffer) {
-      const { regl: regl2 } = this;
-      this._fill_buffer = regl2.buffer(
-        { data: [-4, -4, 4, -4, 0, 4] }
-      );
-    }
-    return this._fill_buffer;
-  }
-  draw_contour_buffer(field, ix) {
-    let { width, height } = this;
-    width = Math.floor(width);
-    height = Math.floor(height);
-    this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height);
-    this.contour_alpha_vals = this.contour_alpha_vals || new Uint16Array(width * height);
-    const { props } = this;
-    props.aes.encoding.color = {
-      field
-    };
-    props.only_color = ix;
-    this.fbos.contour.use(() => {
-      this.regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      this.regl.read(this.contour_vals);
-    });
-    this.blur(this.fbos.contour, this.fbos.ping, 3);
-    this.fbos.contour.use(() => {
-      this.regl.read(this.contour_vals);
-    });
-    let i = 0;
-    while (i < width * height * 4) {
-      this.contour_alpha_vals[i / 4] = this.contour_vals[i + 3] * 255;
-      i += 4;
-    }
-    return this.contour_alpha_vals;
-  }
-  remake_renderer() {
-    const { regl: regl2 } = this;
-    const parameters = {
-      depth: { enable: false },
-      stencil: { enable: false },
-      blend: {
-        enable(_, { color_picker_mode }) {
-          return color_picker_mode < 0.5;
-        },
-        func: {
-          srcRGB: "one",
-          srcAlpha: "one",
-          dstRGB: "one minus src alpha",
-          dstAlpha: "one minus src alpha"
-        }
-      },
-      primitive: "points",
-      frag: frag_shader,
-      vert: vertex_shader,
-      count(_, props) {
-        return props.manager.count;
-      },
-      attributes: {},
-      uniforms: {
-        u_update_time: regl2.prop("update_time"),
-        u_transition_duration(_, props) {
-          return props.prefs.duration;
-        },
-        u_only_color(_, props) {
-          if (props.only_color !== void 0) {
-            return props.only_color;
-          }
-          return -2;
-        },
-        u_use_glyphset: (_, { prefs }) => prefs.glyph_set ? 1 : 0,
-        u_glyphset: (_, { prefs }) => {
-          if (prefs.glyph_set) {
-            return this.get_image_texture(prefs.glyph_set);
-          }
-          return this.textures.empty_texture;
-        },
-        u_color_picker_mode: regl2.prop("color_picker_mode"),
-        u_position_interpolation_mode() {
-          if (this.aes.position_interpolation) {
-            return 1;
-          }
-          return 0;
-        },
-        u_grid_mode: (_, { grid_mode }) => grid_mode,
-        u_colors_as_grid: regl2.prop("colors_as_grid"),
-        u_tile_id: (_, props) => props.tile_id,
-        u_width: ({ viewportWidth }) => viewportWidth,
-        u_height: ({ viewportHeight }) => viewportHeight,
-        u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
-        u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
-        u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
-        u_zoom_balance: regl2.prop("zoom_balance"),
-        u_base_size: (_, { point_size }) => point_size,
-        u_maxix: (_, { max_ix }) => max_ix,
-        u_alpha: (_, { alpha }) => alpha,
-        u_k: (_, props) => {
-          return props.transform.k;
-        },
-        u_window_scale: regl2.prop("webgl_scale"),
-        u_last_window_scale: regl2.prop("last_webgl_scale"),
-        u_time: ({ time }) => time,
-        u_filter_numeric() {
-          return this.aes.dim("filter").current.ops_to_array();
-        },
-        u_last_filter_numeric() {
-          return this.aes.dim("filter").last.ops_to_array();
-        },
-        u_filter2_numeric() {
-          return this.aes.dim("filter2").current.ops_to_array();
-        },
-        u_last_filter2_numeric() {
-          return this.aes.dim("filter2").last.ops_to_array();
-        },
-        u_jitter: () => this.aes.dim("jitter_radius").current.jitter_int_format,
-        u_last_jitter: () => this.aes.dim("jitter_radius").last.jitter_int_format,
-        u_zoom(_, props) {
-          return props.zoom_matrix;
-        }
-      }
-    };
-    for (const i of range(0, 16)) {
-      parameters.attributes[`buffer_${i}`] = (_, { manager, buffer_num_to_variable }) => {
-        const c2 = manager.regl_elements.get(buffer_num_to_variable[i]);
-        return c2 || { constant: 0 };
-      };
-    }
-    for (const k of [
-      "x",
-      "y",
-      "color",
-      "jitter_radius",
-      "x0",
-      "y0",
-      "jitter_speed",
-      "size",
-      "filter",
-      "filter2",
-      "character"
-    ]) {
-      for (const time of ["current", "last"]) {
-        const temporal = time === "current" ? "" : "last_";
-        parameters.uniforms[`u_${temporal}${k}_map`] = () => {
-          const aes_holder = this.aes.dim(k)[time];
-          return aes_holder.textures.one_d;
-        };
-        parameters.uniforms[`u_${temporal}${k}_map_position`] = () => this.aes.dim(k)[time].map_position;
-        parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
-          const val = aes_to_buffer_num[`${k}--${time}`];
-          if (val === void 0) {
-            return -1;
-          }
-          return val;
-        };
-        if (k !== "filter" && k !== "filter2") {
-          parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
-          parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
-          parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
-            const t = this.aes.dim(k)[time].transform;
-            if (t === "linear")
-              return 1;
-            if (t === "sqrt")
-              return 2;
-            if (t === "log")
-              return 3;
-            if (t === "literal")
-              return 4;
-            throw "Invalid transform";
-          };
-          parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
-            return this.aes.dim(k)[time].constant;
-          };
-        }
-      }
-    }
-    this._renderer = regl2(parameters);
-    return this._renderer;
-  }
-  allocate_aesthetic_buffers() {
-    const buffers = [];
-    const priorities = [
-      "x",
-      "y",
-      "color",
-      "x0",
-      "y0",
-      "size",
-      "jitter_radius",
-      "jitter_speed",
-      "filter",
-      "filter2"
-    ];
-    for (const aesthetic of priorities) {
-      for (const time of ["current", "last"]) {
-        try {
-          if (this.aes.dim(aesthetic)[time].field) {
-            buffers.push({ aesthetic, time, field: this.aes.dim(aesthetic)[time].field });
-          }
-        } catch (error) {
-          this.reglframe.cancel();
-          this.reglframe = void 0;
-          throw error;
-        }
-      }
-    }
-    buffers.sort((a, b) => {
-      if (a.time < b.time) {
-        return -1;
-      }
-      if (b.time < a.time) {
-        return 1;
-      }
-      return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
-    });
-    const aes_to_buffer_num = {};
-    const variable_to_buffer_num = {
-      ix: 0,
-      ix_in_tile: 1
-    };
-    let num = 1;
-    for (const { aesthetic, time, field } of buffers) {
-      const k = `${aesthetic}--${time}`;
-      if (variable_to_buffer_num[field] !== void 0) {
-        aes_to_buffer_num[k] = variable_to_buffer_num[field];
-        continue;
-      }
-      if (num++ < 16) {
-        aes_to_buffer_num[k] = num;
-        variable_to_buffer_num[field] = num;
-        continue;
-      } else {
-        aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
-      }
-    }
-    const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
-    return { aes_to_buffer_num, variable_to_buffer_num, buffer_num_to_variable };
-  }
-  get discard_share() {
-    return 0;
-  }
-}
-class TileBufferManager {
-  constructor(regl2, tile, renderer) {
-    this.tile = tile;
-    this.regl = regl2;
-    this.renderer = renderer;
-    tile._regl_elements = tile._regl_elements || /* @__PURE__ */ new Map([
-      ["ix_in_tile", {
-        offset: 0,
-        stride: 4,
-        buffer: renderer.integer_buffer
-      }]
-    ]);
-    this.regl_elements = tile._regl_elements;
-  }
-  ready(_, block_for_buffers = true) {
-    const { renderer, regl_elements } = this;
-    const needed_dimensions = /* @__PURE__ */ new Set();
-    for (const [k, v] of renderer.aes) {
-      for (const aesthetic of [v.current, v.last]) {
-        if (aesthetic.field) {
-          needed_dimensions.add(aesthetic.field);
-        }
-      }
-    }
-    for (const key of ["ix", "ix_in_tile", ...needed_dimensions]) {
-      const current = key === "ix_in_tile" ? this.renderer.integer_buffer : this.regl_elements.get(key);
-      if (current === null) {
-        return false;
-      }
-      if (current === void 0) {
-        if (!this.tile.ready) {
-          return false;
-        }
-        regl_elements.set(key, null);
-        if (block_for_buffers) {
-          if (key === void 0) {
-            continue;
-          }
-          this.create_regl_buffer(key);
-        } else {
-          renderer.deferred_functions.push(() => this.create_regl_buffer(key));
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-  get count() {
-    const { tile, regl_elements } = this;
-    if (regl_elements.has("_count")) {
-      return regl_elements.get("_count");
-    }
-    if (tile.ready && tile._batch) {
-      regl_elements.set("_count", tile.record_batch.getChild("ix").length);
-      return regl_elements.get("_count");
-    }
-  }
-  create_buffer_data(key) {
-    const { tile } = this;
-    if (!tile.ready) {
-      throw "Tile table not present.";
-    }
-    const column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
-    if (!column) {
-      const col_names = tile.record_batch.schema.fields.map((d) => d.name);
-      throw `Requested ${key} but table has columns ${col_names.join(", ")}`;
-    }
-    if (column.type.typeId !== 3) {
-      const buffer = new Float32Array(tile.record_batch.length);
-      for (let i = 0; i < tile.record_batch.numRows; i++) {
-        buffer[i] = column.data[0].values[i];
-      }
-      return buffer;
-    }
-    if (column.data[0].values.constructor === Float64Array) {
-      return new Float32Array(column.data[0].values);
-    }
-    return column.data[0].values;
-  }
-  create_regl_buffer(key) {
-    const { regl_elements } = this;
-    const data = this.create_buffer_data(key);
-    if (data.constructor !== Float32Array) {
-      console.log(typeof data, data);
-      throw new Error("Buffer data must be a Float32Array");
-    }
-    const item_size = 4;
-    const data_length = data.length;
-    const buffer_desc = this.renderer.buffers.allocate_block(
-      data_length,
-      item_size
-    );
-    regl_elements.set(
-      key,
-      buffer_desc
-    );
-    buffer_desc.buffer.subdata(data, buffer_desc.offset);
-  }
-}
-class MultipurposeBufferSet {
-  constructor(regl2, buffer_size) {
-    this.regl = regl2;
-    this.buffer_size = buffer_size;
-    this.buffers = [];
-    this.buffer_offsets = [];
-    this.pointer = 0;
-    this.generate_new_buffer();
-  }
-  generate_new_buffer() {
-    if (this.pointer) {
-      this.buffer_offsets.unshift(this.pointer);
-    }
-    this.pointer = 0;
-    this.buffers.unshift(
-      this.regl.buffer({
-        type: "float",
-        length: this.buffer_size,
-        usage: "dynamic"
-      })
-    );
-  }
-  allocate_block(items, bytes_per_item) {
-    if (this.pointer + items * bytes_per_item > this.buffer_size) {
-      this.generate_new_buffer();
-    }
-    const value = {
-      buffer: this.buffers[0],
-      offset: this.pointer,
-      stride: bytes_per_item
-    };
-    this.pointer += items * bytes_per_item;
-    return value;
-  }
-}
 let tile_identifier = 0;
 class Tile {
   constructor(dataset) {
@@ -29104,46 +29033,6 @@ class QuadTile extends Tile {
       this._batch = tableFromIPC(buffer).batches[0];
       if (this._batch === void 0) {
         throw "Batch was empty";
-      }
-      if (!this._batch.getChild("_isSelected")) {
-        const isSelectedArray = Array(this._batch.numRows).fill("0");
-        const isSelectedVector = vectorFromArray(isSelectedArray, new Utf8$1());
-        const isSelectedDictionary = makeVector({
-          data: isSelectedArray.map((v) => parseInt(v)),
-          dictionary: isSelectedVector,
-          type: new Dictionary(new Utf8$1(), new Uint32())
-        });
-        var buffers = [void 0, isSelectedDictionary.data[0].values, this._batch.data.children[0].nullBitmap, void 0];
-        const isSelectedData = new Data(new Dictionary(new Utf8$1(), new Uint32()), 0, this._batch.numRows, 0, buffers, isSelectedDictionary);
-        isSelectedData.dictionary = isSelectedDictionary.memoize();
-        isSelectedData.children = [];
-        var sorted_fields = [{ "name": "_isSelected" }];
-        if (this.parent !== void 0 && this.parent !== null && this.parent._batch !== void 0) {
-          sorted_fields = this.parent._batch.schema.fields.filter((f) => f.name.includes("Selected")).filter((f) => !f.name.includes("float_version")).sort().reverse();
-        }
-        var child_field_names = this._batch.schema.fields.map((f) => f.name);
-        sorted_fields.forEach((field) => {
-          if (child_field_names.includes(field.name)) {
-            return;
-          }
-          var isSelectedSchemaField = new Field(field.name, new Dictionary(new Utf8$1(), new Uint32()), false);
-          this._batch.schema.fields.push(isSelectedSchemaField);
-          this._batch.data.children.push(isSelectedData);
-          const float_version = new Float32Array(this._batch.numRows);
-          for (let i = 0; i < this._batch.numRows; i++) {
-            float_version[i] = this._batch.getChild(field.name).data[0].values[i] - 2047;
-          }
-          const float_vector = makeVector(float_version);
-          var float_buffers = [void 0, float_vector.data[0].values, this._batch.data.children[0].nullBitmap, void 0];
-          const float_data = new Data(new Float(), 0, this._batch.numRows, 0, float_buffers);
-          var float_field = new Field(field.name + "_float_version", new Float(), false);
-          this._batch.data.children.push(float_data);
-          this._batch.schema.fields.push(float_field);
-        });
-        var selected_codes = /* @__PURE__ */ new Map();
-        selected_codes.set(0, "1");
-        selected_codes.set(1, "0");
-        codes["_isSelected"] = selected_codes;
       }
       this._extent = JSON.parse(metadata.get("extent"));
       this.child_locations = JSON.parse(metadata.get("children"));
@@ -29502,6 +29391,7 @@ function WorkerWrapper() {
 }
 class Dataset {
   constructor(plot) {
+    this.transformations = {};
     this.max_ix = -1;
     this._tileworkers = [];
     this.plot = plot;
@@ -29541,6 +29431,14 @@ class Dataset {
         callback(current);
       }
     }
+  }
+  add_label_identifiers(ids, field_name, key_field = "_id") {
+    if (this.transformations[field_name]) {
+      throw new Error(`Can't overwrite existing transformation for ${field_name}`);
+    }
+    this.transformations[field_name] = function(batch) {
+      return supplement_identifiers(batch, ids, field_name, key_field);
+    };
   }
   findPoint(ix) {
     const matches = [];
@@ -29639,8 +29537,6 @@ function area(rect) {
   return (rect.x[1] - rect.x[0]) * (rect.y[1] - rect.y[0]);
 }
 function check_overlap(tile, bbox) {
-  console.log({ tile });
-  console.log(tile.extent);
   const c2 = tile.extent;
   if (c2.x[0] > bbox.x[1] || c2.x[1] < bbox.x[0] || c2.y[0] > bbox.y[1] || c2.y[1] < bbox.y[0]) {
     return 0;
@@ -29667,6 +29563,40 @@ function check_overlap(tile, bbox) {
     return disqualify;
   }
   return area(intersection) / area(bbox);
+}
+function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
+  const current_keys = new Set([...batch.schema.fields].map((d) => d.name));
+  if (current_keys.has(field_name)) {
+    throw new Error(`Field ${field_name} already exists in batch`);
+  }
+  if (!current_keys.has(key_field)) {
+    throw new Error(`Key field ${key_field} not found in batch, can't merge`);
+  }
+  const hashtab = /* @__PURE__ */ new Set();
+  for (const item of Object.keys(ids)) {
+    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i)).join("");
+    hashtab.add(code);
+  }
+  const updatedFloatArray = new Float32Array(batch.numRows);
+  const offsets = batch.getChild(key_field).data[0].valueOffsets;
+  const values = batch.getChild(key_field).data[0].values;
+  for (let i = 0; i < batch.numRows; i++) {
+    const code = values.slice(offsets[i], offsets[i + 1]);
+    const shortversion = code.slice(0, 4).join("");
+    if (hashtab.has(shortversion)) {
+      const stringtime = String.fromCharCode(...code);
+      if (ids[stringtime] !== void 0) {
+        updatedFloatArray[i] = ids[stringtime];
+      }
+    }
+  }
+  const tb = {};
+  for (const key of current_keys) {
+    tb[key] = batch.getChild(key).data[0];
+  }
+  tb[field_name] = vectorFromArray(updatedFloatArray).data[0];
+  const new_batch = new RecordBatch$2(tb);
+  return new_batch;
 }
 const base_elements = [
   {
@@ -29720,6 +29650,10 @@ class Scatterplot {
       this.elements.push(container);
     }
     this.bound = true;
+  }
+  add_identifier_column(name, codes, key_field) {
+    const true_codes = Array.isArray(codes) ? codes.reduce((acc, next) => Object.assign(acc, { [next]: 1 }), {}) : codes;
+    this._root.add_label_identifiers(true_codes, name, key_field);
   }
   async reinitialize() {
     const { prefs } = this;
@@ -29939,6 +29873,7 @@ class TooltipHTML extends SettableFunction {
       null,
       "tile_key"
     ]);
+    console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) {
         continue;

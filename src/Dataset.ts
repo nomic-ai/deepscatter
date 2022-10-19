@@ -11,10 +11,12 @@ import TileWorker from './tileworker.worker.js?worker&inline';
 
 import { APICall } from './types';
 import Scatterplot from './deepscatter';
-import { StructRowProxy, Table } from 'apache-arrow';
+import { RecordBatch, StructRowProxy, Table, Vector, vectorFromArray, makeVector, Data, makeData } from 'apache-arrow';
 type Key = string;
 
 export abstract class Dataset<T extends Tile> {
+
+  public transformations: Record<string, (arg0 : RecordBatch) => RecordBatch> = {};
   abstract root_tile : T;
   public max_ix = -1;
   protected plot : Scatterplot;
@@ -59,6 +61,7 @@ export abstract class Dataset<T extends Tile> {
    * @param after Whether to execute the visit in bottom-up order. Default false.
    * @param filter 
    */
+
   visit(callback: (tile: T) => void, after = false, filter : (t : T) => boolean = (x) => true) {
     // Visit all children with a callback function.
 
@@ -85,6 +88,21 @@ export abstract class Dataset<T extends Tile> {
       }
     }
   }
+
+
+  
+
+  /** */
+
+  add_label_identifiers(ids : Record<string, number>, field_name: string, key_field = '_id') {
+    if (this.transformations[field_name]) {
+      throw new Error(`Can't overwrite existing transformation for ${field_name}`);
+    }
+    this.transformations[field_name] = function(batch: RecordBatch) {
+      return supplement_identifiers(batch, ids, field_name, key_field);
+    };
+  }
+
   /**
    * 
    * @param ix The index of the point to get.
@@ -178,6 +196,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
     }
 
     const scores : [number, QuadTile, Rectangle][] = [];
+    
     function callback (tile : QuadTile) {
       if (bbox === undefined) {
         // Just depth.
@@ -220,8 +239,6 @@ function area(rect : Rectangle) {
 function check_overlap(tile : Tile, bbox : Rectangle) : number {
   /* the area of Intersect(tile, bbox) expressed
      as a percentage of the area of bbox */
-  console.log({tile})
-  console.log(tile.extent)
   const c : Rectangle = tile.extent;
 
   if (c.x[0] > bbox.x[1]
@@ -250,4 +267,52 @@ function check_overlap(tile : Tile, bbox : Rectangle) : number {
     return disqualify;
   }
   return area(intersection) / area(bbox);
+}
+
+/**
+ * 
+ * @param batch 
+ * @param ids 
+ * @param field_name 
+ * @param key_field 
+ * @returns 
+ */
+function supplement_identifiers(batch: RecordBatch, ids : Record<string, number>, field_name: string, key_field = '_id') : RecordBatch {
+  /* Add the identifiers from the batch to the ids array */
+  const current_keys : Set<string> = new Set([...batch.schema.fields].map(d => d.name));
+  if (current_keys.has(field_name)) {
+    throw new Error(`Field ${field_name} already exists in batch`);
+  }
+  if (!current_keys.has(key_field)) {
+    throw new Error(`Key field ${key_field} not found in batch, can't merge`);
+  }
+
+  // A quick lookup before performing a costly string decode.
+  const hashtab = new Set();
+  for (const item of Object.keys(ids)) {
+    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i)).join('');
+    hashtab.add(code);
+  }
+  const updatedFloatArray = new Float32Array(batch.numRows);
+  const offsets = batch.getChild(key_field).data[0].valueOffsets;
+  const values = batch.getChild(key_field).data[0].values;
+
+  // For every identifier, look if it's in the id array.
+  for (let i = 0; i < batch.numRows; i++) {
+    const code = values.slice(offsets[i], offsets[i + 1])
+    const shortversion : string = code.slice(0, 4).join('');
+    if (hashtab.has(shortversion)) {
+      const stringtime = String.fromCharCode(...code)
+      if (ids[stringtime] !== undefined) {
+        updatedFloatArray[i] = ids[stringtime];
+      }
+    }
+  }
+  const tb : Record<string, Data> = {};
+  for (const key of current_keys) {
+    tb[key] = batch.getChild(key).data[0];
+  }
+  tb[field_name] = vectorFromArray(updatedFloatArray).data[0];
+  const new_batch = new RecordBatch(tb);
+  return new_batch;
 }

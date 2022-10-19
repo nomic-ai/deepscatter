@@ -1030,7 +1030,9 @@ class TileBufferManager {
 
   get count() {
     // Returns the number of points in this table.
-    const { tile, regl_elements } = this;
+    const { regl_elements, tile } = this;
+    // return this.tile.record_batch.numRows; // Would probably be fine, but no need to lose the optimized version below.
+
     if (regl_elements.has('_count')) {
       return regl_elements.get('_count');
     }
@@ -1046,11 +1048,21 @@ class TileBufferManager {
       throw 'Tile table not present.';
     }
 
-    const column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
+    let column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
 
     if (!column) {
-      const col_names = tile.record_batch.schema.fields.map((d) => d.name);
-      throw `Requested ${key} but table has columns ${col_names.join(', ')}`;
+      if (tile.dataset.transformations[key]) {
+        // Sometimes the transformation for creating the column may be defined but not yet applied.
+        // If so, apply it right away.
+        tile._batch = tile.dataset.transformations[key](tile.record_batch);
+        column = tile.record_batch.getChild(key);
+        if (!column) {
+          throw new Error(`${key} was not created.`)
+        }
+      } else {
+        const col_names = tile.record_batch.schema.fields.map((d) => d.name);
+        throw new Error(`Requested ${key} but table lacks that; the present columns are "${col_names.join('", "')}"`);
+      }
     }
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.length);
@@ -1070,7 +1082,7 @@ class TileBufferManager {
     const { regl_elements } = this;
     const data = this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {
-      console.log(typeof(data), data);
+      console.warn(typeof(data), data);
       throw new Error('Buffer data must be a Float32Array');
     }
     const item_size = 4;

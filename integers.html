@@ -1,15 +1,22 @@
 <body>
+  <div class="buttons">
+    <button id="primes">Highlight Primes</button>
+  </div>
   <div id="deepscatter"></div>
-</body>
+
+  </body>
 <script type="module">
   import Scatterplot from './src/deepscatter';
-  import { tableFromArrays, Table } from 'apache-arrow';
-
+  import { tableFromArrays, Table, RecordBatch, vectorFromArray, Utf8 } from 'apache-arrow';
+  const num_batches = 25;
+  window.RecordBatch = RecordBatch;
+  window.vectorFromArray = vectorFromArray;
+  function num_to_string(d) {
+    return (Number(d).toString(36).padEnd(16, 0))
+  }
   let batch_no = 0;
   /* Clifford attractor frame.*/
   function batch(n_batches) {
-    // this is a function to create an apache arrow table based on a 
-    // set of constants and a Clifford attractor. See https://observablehq.com/@mbostock/clifford-attractor.
     function make_batch(start = 0, length = 65536) {
       const batch_number_here = batch_no++;
       // make a batch of clifford generator data starting at start and of length length
@@ -39,14 +46,17 @@
         integers[i - start] = i;
       }
 
-      return tableFromArrays({
-        x: x,
-        y: y,
-        ix: ix,
-        integers: integers,
-        batch_id
+      const vs = [...ix].map(num_to_string);
+      const _id =  vectorFromArray(vs, new Utf8());
+      console.log({_id})
+      return new Table({
+        x: vectorFromArray(x),
+        y: vectorFromArray(y),
+        ix: vectorFromArray(ix),
+        _id,
+        integers: vectorFromArray(integers),
+        batch_id: vectorFromArray(batch_id)
       });
-
     }
     const batches = []
     for (let i = 0; i < n_batches; i++) {
@@ -55,18 +65,45 @@
       window.b = batch;
       console.log(i)
     }
-    const table = new Table(...batches);
+    const table = new Table([batches]);
     return table;
   }
 
-  const table = batch(128)
+  const table = batch(num_batches)
   const plot = new Scatterplot("#deepscatter");
+
+
+  function eratosthenes(n) {
+      // improved from https://stackoverflow.com/questions/15471291/sieve-of-eratosthenes-algorithm-in-javascript-running-endless-for-large-number
+      // Eratosthenes algorithm to find all primes under n
+      var upperLimit = Math.sqrt(n), output = [2];
+
+      // Make an array from 2 to (n - 1)
+      const array = new Uint32Array(n)
+
+      // Remove multiples of primes starting from 2, 3, 5,...
+      for (var i = 3; i <= upperLimit; i += 2) {
+          if (array[i] == 0) {
+              for (var j = i * i; j < n; j += i*2)
+                  array[j] = 1;
+          }
+      }
+
+      // All array[i] set to 1 (true) are primes
+      for (var i = 3; i < n; i += 2) {
+          if(array[i] == 0) {
+              output.push(i);
+          }
+      }
+
+      return output;
+  };
 
   const draw1 = plot.plotAPI({
     arrow_table: table,
-    point_size: 12,
+    point_size: 3,
     max_points: 2.5e7,
-    alpha: 1150,
+    alpha: 111150,
     background_color: "#EEEDDE",
     zoom_balance: .75,
     duration: 1200,
@@ -89,13 +126,42 @@
   draw1.then( () => {
     plot.plotAPI({
       duration: 10000,
-      zoom: {
+/*      zoom: {
         bbox: {
           "x":[0.0019172125023188906,0.0019916103567022615],
           "y":[0.0003230314941825195,0.0003629471969556204]
         }
-      }
-    })
+      }*/
+    });
+//    highlightPrimes()
   })
   window.plot = plot;
+  function highlightPrimes() {
+    const primes = eratosthenes(num_batches * (2**16));
+    console.log(primes);
+    const prime_ids = primes.map(num_to_string);
+    plot.add_identifier_column("prime", prime_ids, "_id");
+    plot.plotAPI({
+      duration: 1000,
+      encoding:    {
+        size: {
+          field: 'prime',
+          range: [.5, 2],
+          domain: [0, 1]
+        }
+      }
+    })
+  }
+  document.getElementById("primes").addEventListener("click", highlightPrimes);
 </script>
+
+
+<style>
+  .buttons {
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 20px;
+    z-index: 199;
+  }
+</style>
