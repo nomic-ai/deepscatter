@@ -110,7 +110,7 @@ export abstract class Tile {
   }
 
 
-  *points(bounding : Rectangle | undefined = undefined, sorted = false) : Iterable<StructRowProxy> {
+  *points(bounding : Rectangle | undefined, sorted = false) : Iterable<StructRowProxy> {
     //if (!this.is_visible(1e100, bounding)) {
     //  return;
     //}
@@ -120,9 +120,12 @@ export abstract class Tile {
       }
     }
     //    console.log("Exhausted points on ", this.key)
-    if (sorted == false) {
+    if (sorted === false) {
       for (const child of this.children) {
         if (!child.ready) {
+          continue;
+        }
+        if (bounding && !child.is_visible(1e100, bounding)) {
           continue;
         }
         for (const p of child.points(bounding, sorted)) {
@@ -467,3 +470,16 @@ export class ArrowTile extends Tile {
     return true;
   }
 }
+
+type Point = [number, number];
+
+
+function p_in_rect(p : Point, rect : Rectangle | undefined) {
+  if (rect === undefined) { return true; }
+  const c = rect;
+  return (p[0] < rect.x[1]
+             && p[0] > rect.x[0]
+             && p[1] < rect.y[1]
+             && p[1] > rect.y[0]);
+}
+

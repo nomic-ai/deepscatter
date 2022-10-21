@@ -17,14 +17,14 @@ import { Dataset } from './Dataset';
 import { Frame } from '@playwright/test';
 
 // eslint-disable-next-line import/prefer-default-export
-export class ReglRenderer extends Renderer {
+export class ReglRenderer<T extends Tile> extends Renderer {
   public regl : Regl;
   public aes : AestheticSet;
   public buffer_size = 1024 * 1024 * 64;
   public canvas? : d3.Selection<HTMLCanvasElement, any, any, any>;
   public _buffers : MultipurposeBufferSet;
   public _initializations : Promise<void>[];
-  public tileSet : Dataset;
+  public tileSet : Dataset<T>;
   public zoom : Zoom;
   public _zoom : Zoom;
   public _start : number;
@@ -45,7 +45,7 @@ export class ReglRenderer extends Renderer {
   //  public _renderer :  Renderer;
 
 
-  constructor(selector, tileSet, scatterplot) {
+  constructor(selector, tileSet : Dataset<T>, scatterplot) {
     super(selector, tileSet, scatterplot);
     this.regl = wrapREGL(
       {
@@ -60,18 +60,19 @@ export class ReglRenderer extends Renderer {
       },
     );
 
-
+    this.tileSet = tileSet;
 
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
 
     // allocate buffers in 64 MB blocks.
-
     this.initialize_textures();
+
     // Not the right way, for sure.
+    console.log({tileSet})
     this._initializations = [
     // some things that need to be initialized before the renderer is loaded.
       this.tileSet
-        .ready
+        .promise
         .then(() => {
           this.remake_renderer();
           this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
@@ -1054,7 +1055,7 @@ class TileBufferManager {
       if (tile.dataset.transformations[key]) {
         // Sometimes the transformation for creating the column may be defined but not yet applied.
         // If so, apply it right away.
-        tile._batch = tile.dataset.transformations[key](tile.record_batch);
+        tile._batch = tile.dataset.transformations[key](tile);
         column = tile.record_batch.getChild(key);
         if (!column) {
           throw new Error(`${key} was not created.`)

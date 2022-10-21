@@ -9,24 +9,31 @@ import * as Comlink from 'comlink';
 //@ts-ignore
 import TileWorker from './tileworker.worker.js?worker&inline';
 
-import { APICall } from './types';
+import { APICall, PointUpdate } from './types';
 import Scatterplot from './deepscatter';
-import { RecordBatch, StructRowProxy, Table, Vector, vectorFromArray, makeVector, Data, makeData } from 'apache-arrow';
+import { RecordBatch, StructRowProxy, Table, Vector, vectorFromArray, makeVector, Data, makeData, Float } from 'apache-arrow';
 type Key = string;
+
+function nothing() {/* do nothing */};
 
 export abstract class Dataset<T extends Tile> {
 
-  public transformations: Record<string, (arg0 : RecordBatch) => RecordBatch> = {};
+  public transformations: Record<string, (arg0 : T) => RecordBatch> = {};
   abstract root_tile : T;
-  public max_ix = -1;
   protected plot : Scatterplot;
   protected _tileworkers: TileWorker[] = [];
   abstract ready : Promise<void>;
   abstract get extent() : Rectangle;
+  abstract promise : Promise<void>;
 
   constructor(plot : Scatterplot) {
     this.plot = plot;
   }
+
+  get highest_known_ix() : number {
+    return this.root_tile.highest_known_ix;
+  }
+
   static from_quadfeather(url : string, prefs: APICall, plot: Scatterplot) : QuadtileSet {
     return new QuadtileSet(url, prefs, plot);
   }
@@ -35,6 +42,11 @@ export abstract class Dataset<T extends Tile> {
   }
   abstract download_most_needed_tiles(bbox : Rectangle | undefined, max_ix: number, queue_length : number) : void;
 
+  *points(bbox: Rectangle | undefined) {
+    for (const point of this.root_tile.points(bbox)) {
+      yield point;
+    }
+  }
   /**
    * Map a function against all tiles.
    * It is often useful simply to invoke Dataset.map(d => d) to 
@@ -89,17 +101,36 @@ export abstract class Dataset<T extends Tile> {
     }
   }
 
+  async schema() {
+    await this.ready;
+    return this.root_tile.record_batch.schema;
+  }
 
-  
+  add_sparse_identifiers(field_name: string, ids : PointUpdate) {
+    this.transformations[field_name] = function(tile) {
+      const { key } = tile;
+      const length = tile.record_batch.numRows;
+      const array = new Float32Array(length);
+      const sparse_values = ids.values[key] ?? [];
+      for (const [ix, value] of Object.entries(sparse_values)) {
+        array[Number.parseInt(ix)] = value;
+      }
+      return bind_column(tile.record_batch, field_name, array);
+    };
+  }
 
-  /** */
-
+  /**
+   * 
+   * @param ids A list of ids to get, keyed to the value to set them to.
+   * @param field_name The name of the new field to create
+   * @param key_field 
+   */
   add_label_identifiers(ids : Record<string, number>, field_name: string, key_field = '_id') {
     if (this.transformations[field_name]) {
       throw new Error(`Can't overwrite existing transformation for ${field_name}`);
     }
-    this.transformations[field_name] = function(batch: RecordBatch) {
-      return supplement_identifiers(batch, ids, field_name, key_field);
+    this.transformations[field_name] = function(tile) {
+      return supplement_identifiers(tile.record_batch, ids, field_name, key_field);
     };
   }
 
@@ -146,6 +177,9 @@ export abstract class Dataset<T extends Tile> {
 
 export class ArrowDataset extends Dataset<ArrowTile> {
 
+  public promise : Promise<void> = Promise.resolve();
+  public root_tile: ArrowTile;
+
   constructor(table: Table, prefs: APICall, plot: Scatterplot) {
     super(plot);
     this.root_tile = new ArrowTile(table, this, 0, plot);
@@ -160,7 +194,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   }
 
   download_most_needed_tiles(bbox: Rectangle | undefined, max_ix: number, queue_length: number): void {
-    // Definitionally there.
+    // Definitionally, they're already there if using an Arrow table.
     return undefined;
   }
 }
@@ -168,11 +202,13 @@ export class ArrowDataset extends Dataset<ArrowTile> {
 export class QuadtileSet extends Dataset<QuadTile> {
   protected _tileWorkers : TileWorker[] = [];
   protected _download_queue : Set<Key> = new Set();
+  public promise : Promise<void> = new Promise(nothing);
   root_tile : QuadTile;
 
   constructor(base_url : string, prefs: APICall, plot: Scatterplot) {
     super(plot);
     this.root_tile = new QuadTile(base_url, '0/0/0', null, this, {});
+    this.promise = this.root_tile.promise;
   }
 
   get ready() {
@@ -269,6 +305,21 @@ function check_overlap(tile : Tile, bbox : Rectangle) : number {
   return area(intersection) / area(bbox);
 }
 
+
+function bind_column(batch: RecordBatch, field_name: string, data: Float32Array) : RecordBatch {
+  const current_keys : Set<string> = new Set([...batch.schema.fields].map(d => d.name));
+  if (current_keys.has(field_name)) {
+    throw new Error(`Field ${field_name} already exists in batch`);
+  }
+  const tb : Record<string, Data> = {};
+  for (const key of current_keys) {
+    tb[key] = batch.getChild(key).data[0];
+  }
+  tb[field_name] = vectorFromArray(data).data[0];
+  const new_batch = new RecordBatch(tb);
+  return new_batch;
+}
+
 /**
  * 
  * @param batch 
@@ -279,13 +330,7 @@ function check_overlap(tile : Tile, bbox : Rectangle) : number {
  */
 function supplement_identifiers(batch: RecordBatch, ids : Record<string, number>, field_name: string, key_field = '_id') : RecordBatch {
   /* Add the identifiers from the batch to the ids array */
-  const current_keys : Set<string> = new Set([...batch.schema.fields].map(d => d.name));
-  if (current_keys.has(field_name)) {
-    throw new Error(`Field ${field_name} already exists in batch`);
-  }
-  if (!current_keys.has(key_field)) {
-    throw new Error(`Key field ${key_field} not found in batch, can't merge`);
-  }
+
 
   // A quick lookup before performing a costly string decode.
   const hashtab = new Set();
@@ -294,8 +339,12 @@ function supplement_identifiers(batch: RecordBatch, ids : Record<string, number>
     hashtab.add(code);
   }
   const updatedFloatArray = new Float32Array(batch.numRows);
-  const offsets = batch.getChild(key_field).data[0].valueOffsets;
-  const values = batch.getChild(key_field).data[0].values;
+  const kfield = batch.getChild(key_field);
+  if (kfield === null) {
+    throw new Error(`Field ${key_field} not found in batch`);
+  }
+  const offsets = kfield.data[0].valueOffsets;
+  const values = kfield.data[0].values;
 
   // For every identifier, look if it's in the id array.
   for (let i = 0; i < batch.numRows; i++) {
@@ -308,11 +357,6 @@ function supplement_identifiers(batch: RecordBatch, ids : Record<string, number>
       }
     }
   }
-  const tb : Record<string, Data> = {};
-  for (const key of current_keys) {
-    tb[key] = batch.getChild(key).data[0];
-  }
-  tb[field_name] = vectorFromArray(updatedFloatArray).data[0];
-  const new_batch = new RecordBatch(tb);
-  return new_batch;
+  return bind_column(batch, field_name, updatedFloatArray);
 }
+

@@ -17587,6 +17587,15 @@ class Aesthetic {
     color_palettes.custom = to_buffer(colors2);
     schemes["custom"] = custom_palette;
   }
+  reset_to_defaults() {
+    this._domain = this.default_domain;
+    this._range = [0, 1];
+    this._transform = void 0;
+    this._constant = this.default_constant;
+    this.current_encoding = {
+      constant: this.default_constant
+    };
+  }
   update(encoding) {
     if (encoding === "null") {
       encoding = null;
@@ -17611,14 +17620,14 @@ class Aesthetic {
       return;
     }
     if (encoding["domain"] && typeof encoding["domain"] === "string" && encoding["domain"] === "progressive") {
-      var all_tiles = [this.tileSet];
-      var current_tiles = [this.tileSet];
-      if (this.tileSet.children.length > 0) {
+      const all_tiles = [this.dataset.root_tile];
+      let current_tiles = [...all_tiles];
+      if (this.dataset.root_tile.children.length > 0) {
         while (true) {
-          if (current_tiles.length == 0) {
+          if (current_tiles.length === 0) {
             break;
           }
-          var children_tiles = [];
+          const children_tiles = [];
           current_tiles.map(function(tile, idx) {
             if (tile.children.length > 0) {
               all_tiles.push.apply(all_tiles, tile.children);
@@ -17627,10 +17636,10 @@ class Aesthetic {
           });
           current_tiles = children_tiles;
         }
-        var min2 = all_tiles[0].table.getChild(encoding["field"]).data[0].values[0];
+        var min2 = all_tiles[0].record_batch.getChild(encoding["field"]).data[0].values[0];
         var max2 = min2;
         all_tiles.forEach(function(tile, idx) {
-          tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
+          tile.record_batch.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
             if (val < min2) {
               min2 = val;
             }
@@ -18007,7 +18016,6 @@ class Color extends Aesthetic {
     }
   }
   encode_for_textures(range$1) {
-    this._scale = scales[this.transform]().range(range$1).domain(this.domain);
     if (color_palettes[range$1]) {
       this.texture_buffer.set(color_palettes[range$1]);
     } else if (range$1.length === this.aesthetic_map.texture_size * 4) {
@@ -18024,14 +18032,14 @@ class Color extends Aesthetic {
   }
 }
 class StatefulAesthetic {
-  constructor(scatterplot, regl2, tile, aesthetic_map) {
+  constructor(scatterplot, regl2, dataset, aesthetic_map) {
     this.needs_transitions = false;
     if (aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined.");
     }
     this.scatterplot = scatterplot;
     this.regl = regl2;
-    this.tile = tile;
+    this.dataset = dataset;
     this.aesthetic_map = aesthetic_map;
     this.aesthetic_map = aesthetic_map;
     this.current_encoding = {
@@ -18049,8 +18057,8 @@ class StatefulAesthetic {
       return this._states;
     }
     this._states = [
-      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map),
-      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map)
+      new this.Factory(this.scatterplot, this.regl, this.dataset, this.aesthetic_map),
+      new this.Factory(this.scatterplot, this.regl, this.dataset, this.aesthetic_map)
     ];
     return this._states;
   }
@@ -18331,10 +18339,12 @@ class ReglRenderer extends Renderer {
         canvas: this.canvas.node()
       }
     );
+    this.tileSet = tileSet;
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
     this.initialize_textures();
+    console.log({ tileSet });
     this._initializations = [
-      this.tileSet.ready.then(() => {
+      this.tileSet.promise.then(() => {
         this.remake_renderer();
         this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
       })
@@ -18973,7 +18983,7 @@ class TileBufferManager {
     let column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
     if (!column) {
       if (tile.dataset.transformations[key]) {
-        tile._batch = tile.dataset.transformations[key](tile.record_batch);
+        tile._batch = tile.dataset.transformations[key](tile);
         column = tile.record_batch.getChild(key);
         if (!column) {
           throw new Error(`${key} was not created.`);
@@ -28824,15 +28834,18 @@ class Tile {
     const worker = this.dataset.tileWorker;
     return worker;
   }
-  *points(bounding = void 0, sorted = false) {
+  *points(bounding, sorted = false) {
     for (const p of this) {
       if (p_in_rect([p.x, p.y], bounding)) {
         yield p;
       }
     }
-    if (sorted == false) {
+    if (sorted === false) {
       for (const child of this.children) {
         if (!child.ready) {
+          continue;
+        }
+        if (bounding && !child.is_visible(1e100, bounding)) {
           continue;
         }
         for (const p of child.points(bounding, sorted)) {
@@ -29119,6 +29132,12 @@ class ArrowTile extends Tile {
     return true;
   }
 }
+function p_in_rect(p, rect) {
+  if (rect === void 0) {
+    return true;
+  }
+  return p[0] < rect.x[1] && p[0] > rect.x[0] && p[1] < rect.y[1] && p[1] > rect.y[0];
+}
 const proxyMarker = Symbol("Comlink.proxy");
 const createEndpoint = Symbol("Comlink.endpoint");
 const releaseProxy = Symbol("Comlink.releaseProxy");
@@ -29389,18 +29408,27 @@ function WorkerWrapper() {
     objURL && (window.URL || window.webkitURL).revokeObjectURL(objURL);
   }
 }
+function nothing() {
+}
 class Dataset {
   constructor(plot) {
     this.transformations = {};
-    this.max_ix = -1;
     this._tileworkers = [];
     this.plot = plot;
+  }
+  get highest_known_ix() {
+    return this.root_tile.highest_known_ix;
   }
   static from_quadfeather(url, prefs, plot) {
     return new QuadtileSet(url, prefs, plot);
   }
   static from_arrow_table(table, prefs, plot) {
     return new ArrowDataset(table, prefs, plot);
+  }
+  *points(bbox) {
+    for (const point of this.root_tile.points(bbox)) {
+      yield point;
+    }
   }
   map(callback, after = false) {
     const results = [];
@@ -29432,12 +29460,29 @@ class Dataset {
       }
     }
   }
+  async schema() {
+    await this.ready;
+    return this.root_tile.record_batch.schema;
+  }
+  add_sparse_identifiers(field_name, ids) {
+    this.transformations[field_name] = function(tile) {
+      var _a2;
+      const { key } = tile;
+      const length = tile.record_batch.numRows;
+      const array2 = new Float32Array(length);
+      const sparse_values = (_a2 = ids.values[key]) != null ? _a2 : [];
+      for (const [ix, value] of Object.entries(sparse_values)) {
+        array2[Number.parseInt(ix)] = value;
+      }
+      return bind_column(tile.record_batch, field_name, array2);
+    };
+  }
   add_label_identifiers(ids, field_name, key_field = "_id") {
     if (this.transformations[field_name]) {
       throw new Error(`Can't overwrite existing transformation for ${field_name}`);
     }
-    this.transformations[field_name] = function(batch) {
-      return supplement_identifiers(batch, ids, field_name, key_field);
+    this.transformations[field_name] = function(tile) {
+      return supplement_identifiers(tile.record_batch, ids, field_name, key_field);
     };
   }
   findPoint(ix) {
@@ -29471,6 +29516,7 @@ class Dataset {
 class ArrowDataset extends Dataset {
   constructor(table, prefs, plot) {
     super(plot);
+    this.promise = Promise.resolve();
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
   get extent() {
@@ -29488,7 +29534,9 @@ class QuadtileSet extends Dataset {
     super(plot);
     this._tileWorkers = [];
     this._download_queue = /* @__PURE__ */ new Set();
+    this.promise = new Promise(nothing);
     this.root_tile = new QuadTile(base_url, "0/0/0", null, this, {});
+    this.promise = this.root_tile.promise;
   }
   get ready() {
     return this.root_tile.download();
@@ -29564,22 +29612,32 @@ function check_overlap(tile, bbox) {
   }
   return area(intersection) / area(bbox);
 }
-function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
+function bind_column(batch, field_name, data) {
   const current_keys = new Set([...batch.schema.fields].map((d) => d.name));
   if (current_keys.has(field_name)) {
     throw new Error(`Field ${field_name} already exists in batch`);
   }
-  if (!current_keys.has(key_field)) {
-    throw new Error(`Key field ${key_field} not found in batch, can't merge`);
+  const tb = {};
+  for (const key of current_keys) {
+    tb[key] = batch.getChild(key).data[0];
   }
+  tb[field_name] = vectorFromArray(data).data[0];
+  const new_batch = new RecordBatch$2(tb);
+  return new_batch;
+}
+function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
   const hashtab = /* @__PURE__ */ new Set();
   for (const item of Object.keys(ids)) {
     const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i)).join("");
     hashtab.add(code);
   }
   const updatedFloatArray = new Float32Array(batch.numRows);
-  const offsets = batch.getChild(key_field).data[0].valueOffsets;
-  const values = batch.getChild(key_field).data[0].values;
+  const kfield = batch.getChild(key_field);
+  if (kfield === null) {
+    throw new Error(`Field ${key_field} not found in batch`);
+  }
+  const offsets = kfield.data[0].valueOffsets;
+  const values = kfield.data[0].values;
   for (let i = 0; i < batch.numRows; i++) {
     const code = values.slice(offsets[i], offsets[i + 1]);
     const shortversion = code.slice(0, 4).join("");
@@ -29590,13 +29648,7 @@ function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
       }
     }
   }
-  const tb = {};
-  for (const key of current_keys) {
-    tb[key] = batch.getChild(key).data[0];
-  }
-  tb[field_name] = vectorFromArray(updatedFloatArray).data[0];
-  const new_batch = new RecordBatch$2(tb);
-  return new_batch;
+  return bind_column(batch, field_name, updatedFloatArray);
 }
 const base_elements = [
   {
@@ -29624,7 +29676,8 @@ class Scatterplot {
     }
     this.width = width;
     this.height = height;
-    this.ready = Promise.resolve();
+    this.ready = new Promise(() => {
+    });
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.prefs = {

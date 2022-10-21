@@ -51,7 +51,7 @@ export default class Scatterplot {
     this.width = width;
     this.height = height;
     // Unresolvable.
-    this.ready = Promise.resolve();
+    this.ready = new Promise(() => {/*pass*/});
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.prefs = {
@@ -192,6 +192,7 @@ export default class Scatterplot {
     }
   }
   */
+
   visualize_tiles() {
     const map = this;
     const ctx = map.elements[2]
@@ -246,25 +247,6 @@ export default class Scatterplot {
     merge(this.prefs, prefs);
 
   }
-
-  /*  load_lookup_table(item) {
-    this.lookup_tables = this.lookup_tables || new Map();
-    if (this.lookup_promises.get(item)) {
-      return this.lookup_promises.get(item);
-    } if (this.lookup_promises.get(item) === null) {
-      return undefined;
-    }
-    // Temporarily set as null to avoid multiple writes.
-    this.lookup_promises.set(item, null);
-    const metaTable = new ArrowMetaTable(this.prefs, item);
-    metaTable.load().then(
-      () => this.lookup_tables.set(item, metaTable),
-    );
-    this.lookup_promises.set(item, metaTable.load());
-
-    return undefined;
-  } */
-
 
   set tooltip_html(func) {
     this.tooltip_handler.f = func;

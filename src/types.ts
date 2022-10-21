@@ -123,6 +123,13 @@ export type Encoding = {
   position0? : string;
 };
 
+type TileKey = `${number}/${number}/${number}`;
+
+export type PointUpdate = {
+  column_name: string,
+  values: Record<string, Record<number, number>>
+};
+
 export type Dimension = keyof Encoding;
 
 // Data can be passed in three ways:

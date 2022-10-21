@@ -7,6 +7,7 @@ import {
   scaleOrdinal,
   scaleSequential, scaleSequentialLog, 
   scaleSequentialPow,
+  scaleImplicit,
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
@@ -25,9 +26,9 @@ import type {
 import type { Dataset, QuadtileSet } from './Dataset';
 import { Vector, tableToIPC, makeVector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
-import { QuadTile } from './tile';
+import { Tile } from './tile';
 
-const scales : { [key : string] : Function } = {
+const scales : Record<string, typeof scaleSqrt | typeof scaleLog | typeof scaleLinear | typeof scaleIdentity>= {
   sqrt: scaleSqrt,
   log: scaleLog,
   linear: scaleLinear,
@@ -112,7 +113,7 @@ abstract class Aesthetic {
   public _range : [number, number] | Uint8Array;
   public _transform : 'log' | 'sqrt' | 'linear' | 'literal' | undefined;
   public dataset : QuadtileSet;
-  public partner : Aesthetic | null = null;
+  public partner : typeof this | null = null;
   public _textures : Record<string, Texture2D> = {};
   public _constant : any;
   public _scale : (p: number | string) => number | [number, number, number] = (p) => 1;
@@ -171,6 +172,7 @@ abstract class Aesthetic {
 
     const range = this.range;
 
+    // color_specific stuff doesn't belong here.
     if (typeof(range) == 'string') {
       // Convert range from 'viridis' to InterpolateViridis.
 
@@ -327,16 +329,28 @@ abstract class Aesthetic {
     schemes['custom'] = custom_palette;
   }
 
+  reset_to_defaults() {
+    this._domain = this.default_domain;
+    this._range = [0, 1];
+    this._transform = undefined;
+    this._constant = this.default_constant;
+    this.current_encoding = {
+      constant : this.default_constant
+    };
+  }
   update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
+    
     if (encoding === 'null') {
       encoding = null;
     }
+
     if (encoding === null) {
       this.current_encoding = {
         constant : this.default_constant
       };
       return;
     }
+
     if (encoding === undefined) {
       return;
     }
@@ -352,14 +366,14 @@ abstract class Aesthetic {
       return;
     }
     if (encoding['domain'] && typeof(encoding['domain']) === 'string' && encoding['domain'] === 'progressive'){
-      var all_tiles = [this.tileSet];
-      var current_tiles = [this.tileSet];
-      if (this.tileSet.children.length > 0) {
+      const all_tiles = [this.dataset.root_tile];
+      let current_tiles = [...all_tiles];
+      if (this.dataset.root_tile.children.length > 0) {
         while (true) {
-          if (current_tiles.length == 0) {
+          if (current_tiles.length === 0) {
             break;
           }
-          var children_tiles = [];
+          const children_tiles = [];
           current_tiles.map(function(tile, idx) {
             if (tile.children.length > 0) {
               all_tiles.push.apply(all_tiles, tile.children);
@@ -368,10 +382,10 @@ abstract class Aesthetic {
           });
           current_tiles = children_tiles;
         }
-        var min2 = all_tiles[0].table.getChild(encoding["field"]).data[0].values[0];
+        var min2 = all_tiles[0].record_batch.getChild(encoding["field"]).data[0].values[0];
         var max2 = min2;
         all_tiles.forEach(function(tile, idx) {
-          tile.table.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
+          tile.record_batch.getChild(encoding["field"]).data[0].values.forEach(function(val, idx2) {
             if (val < min2) {
               min2 = val;
             }
@@ -688,6 +702,8 @@ class Color extends Aesthetic {
   get_hex_values(field) {
     var all_tiles = [this.tileSet];
     var current_tiles = [this.tileSet];
+
+    //  TBD this seems to be calculating an input domain???
     if (this.tileSet.children.length > 0) {
       while (true) {
         if (current_tiles.length == 0) {
@@ -761,8 +777,7 @@ class Color extends Aesthetic {
     }
   }
 
-  encode_for_textures(range) {
-    this._scale = scales[this.transform]().range(range).domain(this.domain);
+  encode_for_textures(range : string | number[] | Array<Array<number>>) {
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range]);
     } else if (range.length === this.aesthetic_map.texture_size * 4) {
@@ -806,20 +821,20 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   // diminishing returns.
   abstract Factory : new (a, b, c, d) => T;
   public _states : [T, T] | undefined;
-  public dataset : Dataset;
+  public dataset : QuadtileSet;
   public regl : Regl;
   public scatterplot : Scatterplot;
   public current_encoding : Channel;
   public needs_transitions = false;
   public aesthetic_map : TextureSet;
   constructor(
-    scatterplot: Scatterplot, regl : Regl, tile : QuadtreeRoot, aesthetic_map : TextureSet) {
+    scatterplot: Scatterplot, regl : Regl, dataset : QuadtileSet, aesthetic_map : TextureSet) {
     if (aesthetic_map === undefined) {
       throw new Error('Aesthetic map is undefined.');
     }
     this.scatterplot = scatterplot;
     this.regl = regl;
-    this.tile = tile;
+    this.dataset = dataset;
     this.aesthetic_map = aesthetic_map;
     this.aesthetic_map = aesthetic_map;
     this.current_encoding = {
@@ -840,8 +855,8 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
       return this._states;
     }
     this._states = [
-      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map),
-      new this.Factory(this.scatterplot, this.regl, this.tile, this.aesthetic_map)
+      new this.Factory(this.scatterplot, this.regl, this.dataset, this.aesthetic_map),
+      new this.Factory(this.scatterplot, this.regl, this.dataset, this.aesthetic_map)
     ];
     return this._states;  
   }
