@@ -2,7 +2,7 @@
   "name": "deepscatter",
   "type": "module",
   "version": "2.4.1",
-  "description": "Fast animated zoomable scatterplots with billions of points",
+  "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
     "dist"
   ],
@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "dev": "vite --port 3000",
+    "dev": "vite --port 3344",
     "build": "vite build",
     "test": "playwright test",
     "lint": "eslint src"

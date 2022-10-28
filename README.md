@@ -56,7 +56,7 @@ npm i
 npm run dev
 ```
 
-If you go to localhost:3000, it should have an interactive scatterplot waiting.
+If you go to localhost:3344, it should have an interactive scatterplot waiting.
 (In 2021, this development site works in Chrome, not Safari or Firefox, because it uses ES6 module syntax inside the webworker. The distributed version of 
 the module should work in all browsers.)
 
