@@ -51,9 +51,11 @@
     "click_function": "select('#ident').html(JSON.stringify(datum, undefined, 2))",
     "encoding": {
       "color": {
-        "field": "class",
+        field: "x",
+        range: "ylorrd"    
+/*        "field": "class",
         "range": "category10",
-        "domain": [-2047, 2047] 
+        "domain": [-2047, 2047] */
       },
       "x": {
         field: "x",
@@ -91,14 +93,9 @@
   const colors = [
 //    JSON.parse(JSON.stringify(prefs.encoding.color)),
     {
-      "field": "_isSelected",
-      "range": ['#000000','#ffffff'],
-      "domain": ids_1,
-    },
-    {
       "field": 'quantity',
-      "range": 'viridis',
-      "domain": 'progressive',
+      "range": 'ylorrd',
+//      "domain": 'progressive',
     },
   ]
 
