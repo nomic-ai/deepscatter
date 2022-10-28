@@ -11,7 +11,8 @@ import TileWorker from './tileworker.worker.js?worker&inline';
 
 import { APICall } from './types';
 import Scatterplot from './deepscatter';
-import { StructRowProxy, Table } from 'apache-arrow';
+import { Float32, makeVector, StructRowProxy, Table, Vector } from 'apache-arrow';
+import { assert } from './util';
 type Key = string;
 
 export abstract class Dataset<T extends Tile> {
@@ -85,6 +86,7 @@ export abstract class Dataset<T extends Tile> {
       }
     }
   }
+
   /**
    * 
    * @param ix The index of the point to get.
@@ -104,7 +106,6 @@ export abstract class Dataset<T extends Tile> {
     });
     return matches;
   }
-
 
   get tileWorker() {
     const NUM_WORKERS = 4;

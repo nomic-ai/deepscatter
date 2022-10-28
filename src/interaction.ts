@@ -3,6 +3,7 @@ import { select } from 'd3-selection';
 import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
+import { D3DragEvent, drag } from 'd3-drag';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
 import { APICall, Encoding } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
@@ -10,7 +11,9 @@ import type { Renderer } from './rendering';
 import type QuadtreeRoot from './tile';
 import { ReglRenderer } from './regl_rendering';
 import Scatterplot from './deepscatter';
-import { StructRow } from 'apache-arrow';
+import { Float32, makeData, StructRow, StructRowProxy } from 'apache-arrow';
+import type { Dataset } from './Dataset';
+import type { QuadTile, Tile } from './tile';
 
 
 export default class Zoom {
@@ -19,7 +22,7 @@ export default class Zoom {
   public width : number;
   public height : number;
   public renderers : Map<string, Renderer>;
-  public tileSet? : QuadtreeRoot;
+  public tileSet? : Dataset<Tile>;
   public _timer : d3.Timer;
   public _scales : Record<string, d3.ScaleLinear<number, number>>;
   public zoomer : d3.ZoomBehavior<Element, any>;
@@ -43,7 +46,7 @@ export default class Zoom {
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles : QuadtreeRoot) {
+  attach_tiles(tiles : Dataset) {
     this.tileSet = tiles;
     this.tileSet._zoom = this;
     return this;
@@ -146,6 +149,9 @@ export default class Zoom {
 
   add_mouseover() {
     let last_fired = 0;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+
     //@ts-ignore Not sure how to guarantee this formally.
     const renderer : ReglRenderer = this.renderers.get('regl');
     const x_aes = renderer.aes.dim('x').current;
@@ -162,6 +168,7 @@ export default class Zoom {
 
       const d = data[0];
 
+      type CircleDragEvent = D3DragEvent<SVGCircleElement, StructRowProxy, any>;
       type Annotation = {
         x: number,
         y: number,
@@ -180,6 +187,7 @@ export default class Zoom {
       ] : [];
 
       const { x_, y_ } = this.scales();
+      const { scatterplot } = this;
 
       this.html_annotation(annotations);
 
@@ -187,20 +195,62 @@ export default class Zoom {
         .selectAll('circle.label')
         .data(data, (d_) => d_.ix)
         .join(
+
+          // Enter
           (enter) => enter
             .append('circle')
+            .call(drag<SVGCircleElement, StructRowProxy>()
+              // Drag Start
+              .on('start', 
+                function on_drag_start(this: SVGCircleElement, event: CircleDragEvent, datum) {
+                  select(this)
+                    .attr('cursor', 'grabbing')
+                    .raise();
+                })
+
+              // Dragging
+              .on('drag', function on_dragged(this: SVGCircleElement, event: CircleDragEvent, datum: StructRowProxy) {
+                let { dx, dy } = event;
+                if (dx === 0 && dy === 0) return;
+
+                // Map (dx, dy) from screen to data space.
+                dx = x_.invert(dx) - x_.invert(0);
+                dy = y_.invert(dy) - y_.invert(0);
+
+                datum.x += dx;
+                datum.y += dy;
+
+                select(this)
+                  .attr('cx', x_(datum.x))
+                  .attr('cy', y_(datum.y));
+
+                const tile = self.scatterplot._root.root_tile as QuadTile;
+                tile.visit_at_point(datum.ix, tile => tile.needs_rerendering('x', 'y'));
+              })
+
+              // Drag end
+              .on('end', function on_drag_end(this: SVGCircleElement, event: CircleDragEvent, datum: StructRowProxy) {
+                select(this).attr('cursor', 'grab');
+                renderer.render_all(renderer.props);
+                scatterplot.drag_function(datum);
+              }))
+            .attr('cursor', 'grab')
             .attr('class', 'label')
             .attr('stroke', '#110022')
             .attr('r', 12)
-            .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd))
+            .attr('fill', (dd) => renderer.aes.dim('color').current.apply(dd))
             .attr('cx', (datum) => x_(x_aes.value_for(datum)))
             .attr('cy', (datum) => y_(y_aes.value_for(datum))),
+
+          // Update
           (update) => update
-            .attr('fill', (dd) => this.renderers.get('regl').aes.dim('color').current.apply(dd)),
+            .attr('fill', (dd) => renderer.aes.dim('color').current.apply(dd)),
+
+          // Exit
           (exit) => exit.call((e) => e.remove())
         )
         .on('click', (ev, dd) => {
-          this.scatterplot.click_function(dd);
+          scatterplot.click_function(dd);
         });
     });
   }
@@ -254,7 +304,7 @@ export default class Zoom {
     return this._timer;
   }
 
-  data(dataset) {
+  data(dataset: Dataset<Tile>) {
     if (dataset === undefined) {
       return this.tileSet;
     }

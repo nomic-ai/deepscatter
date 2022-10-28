@@ -2,11 +2,13 @@ import {
   extent
 } from 'd3-array';
 
-import { tableFromIPC, Table, RecordBatch } from 'apache-arrow';
+import { tableFromIPC, Table, RecordBatch, StructRowProxy } from 'apache-arrow';
 
 import TileWorker from './tileworker.worker.js?worker&inline';
 import type { Dataset, QuadtileSet } from './Dataset';
 import Scatterplot from './deepscatter';
+import { assert } from './util';
+import type { Buffer } from 'regl';
 type MinMax = [number, number];
 
 export type Rectangle = {
@@ -39,6 +41,12 @@ export abstract class Tile {
   __schema?: schema_entry[];
   local_dictionary_lookups? : Map<string, any>;
   public _extent? : { 'x' : MinMax, 'y': MinMax };
+
+  _regl_elements: Map<string, {
+    buffer: Buffer;
+    offset: number;
+    stride: number;
+  }> | undefined;
 
   constructor(dataset : QuadtileSet) {
     // Accepts prefs only for the case of the root tile.
@@ -282,6 +290,27 @@ export abstract class Tile {
     }
     return this.parent.root_extent;
   }
+
+  /**
+   * Flush cached render buffers. Buffers will be re-built on next render,
+   * allowing changes to this tile to be displayed on-screen. 
+   *
+   * @param keys The name of the buffer to flush. If not specified, all buffers
+   * will be flushed.
+   *
+   * @returns 
+   */
+  public needs_rerendering(...keys: string[]) {
+    if (!this._regl_elements) return;
+
+    if (keys.length === 0) {
+      this._regl_elements = undefined;
+    } else {
+      for (const key of keys) {
+        this._regl_elements.delete(key);
+      }
+    }
+  }
 }
 
 export class QuadTile extends Tile {
@@ -291,6 +320,8 @@ export class QuadTile extends Tile {
   codes : [number, number, number];
   _already_called = false;
   public child_locations : string[] = [];
+  _table: Table<any> | undefined;
+
   constructor(base_url : string, key : string, parent : null | this, dataset : QuadtileSet) {
     super(dataset);
     this.url = base_url;
@@ -330,7 +361,8 @@ export class QuadTile extends Tile {
         // metadata is passed separately b/c I dont know
         // how to fix it on the table in javascript, just python.
         this._table_buffer = buffer;
-        this._batch = tableFromIPC(buffer).batches[0];
+        this._table = tableFromIPC(buffer);
+        this._batch = this._table.batches[0];
         this._extent = JSON.parse(metadata.get('extent'));
         this.child_locations = JSON.parse(metadata.get('children'));
         const ixes = this.record_batch.getChild('ix');
@@ -366,8 +398,6 @@ export class QuadTile extends Tile {
         this._children.push(new this.class(this.url, key, this, this.dataset));
       }
     }
-    // }
-    // }
     return this._children;
   }
 
@@ -388,6 +418,74 @@ export class QuadTile extends Tile {
     };
   }
 
+  /**
+   * Find the tile that contains a desired point.
+   *
+   * @param ix The index of the point to find
+   * @param callback A function to call when the tile is found.
+   *
+   * @returns `true` if the tile was found and {@link callback} was invoked,
+   * `false` otherwise.
+   */
+  public visit_at_point(
+    ix: number,
+    callback: (tile: this, point: StructRowProxy<any>) => void
+  ): boolean {
+
+    // Tile hasn't been downloaded yet.
+    if (this.download_state !== 'Complete' || !this._table) return false;
+
+    const toVisit: this[] = [this];
+    // Breadth first search.
+    while(toVisit.length > 0) {
+      const current = toVisit.pop();
+      assert(current);
+
+      // Check if the current tile contains the point
+      if (ix >= current.min_ix && ix <= current.max_ix) {
+        const ixes = current._table?.getChild('ix');
+        assert(ixes);
+        const rowIndex = ixes.indexOf(ix);
+        if (rowIndex !== -1) {
+          const point = current._table?.get(rowIndex);
+          assert(point);
+          callback(current, point);
+          return true;
+        }
+      }
+
+      // If we didn't find the point in this tile, we need to visit its children.
+      if(current._children && current._children.length > 0) {
+        console.log('toVisit:', toVisit.length);
+        console.log('children:', current._children.length);
+        // toVisit.push(...this._children);
+        toVisit.push(...current._children);
+      }
+    }
+
+    return false;
+  }
+
+  public find_point(ix: number): StructRowProxy | null {
+    let point: StructRowProxy | null = null;
+    this.visit_at_point(ix, (_, p) => {
+      point = p;
+    });
+
+    return point;
+  }
+
+  public update_point(ix: number, point: StructRowProxy): boolean {
+    let did_update = false;
+
+    this.visit_at_point(ix, tile => {
+      const rowIndex: number = point[Symbol.for('rowIndex')]
+      tile._table?.set(rowIndex, point);
+      did_update = true;
+    });
+
+    return did_update;
+  }
 
 }
 
