@@ -36,8 +36,10 @@ export default class Scatterplot {
   public elements? : Selection<SVGElement, any, any, any>[];
   div : Selection<any, any, any, any>;
   bound : boolean;
-  d3 : Object;
+  //  d3 : Object;
   private _zoom : Zoom;
+  // The queue of draw calls are a chain of promises.
+  private plot_queue : Promise<void> = Promise.resolve(0);
   public prefs : APICall;
   ready : Promise<void>;
   public click_handler : ClickFunction;
@@ -60,9 +62,9 @@ export default class Scatterplot {
       max_points: 100,
       encoding: {},
       point_size: 1, // base size before aes modifications.
-      alpha: 0.4, // Overall screen saturation target.
+      alpha: 40, // Overall screen saturation target.
     };
-    this.d3 = { select };
+//    this.d3 = { select };
   }
   /**
    * @param selector A selector for the root element of the deepscatter; must already exist.
@@ -264,8 +266,22 @@ export default class Scatterplot {
     return this.click_handler.f;
   }
 
-  async plotAPI(prefs : APICall) {
+  async plotAPI(prefs : APICall) : Promise<void> {
+    if (prefs.encoding && prefs.encoding.filter && prefs.encoding.filter.domain) {
+      throw new Error('Filtering is not supported in the API');
+    }
+    await this.plot_queue;
+    this.plot_queue = this.unsafe_plotAPI(prefs);
+    return await this.plot_queue;
+  }
 
+  /**
+   * This is the main plot entry point: it's unsafe to fire multiple
+   * times in parallel because the transition state can get all borked up.
+   * 
+   * @param prefs The preferences
+   */
+  private async unsafe_plotAPI(prefs : APICall) : Promise<void>{
     if (prefs.click_function) {
       this.click_function = Function('datum', prefs.click_function);
     }
@@ -336,20 +352,21 @@ export default class Scatterplot {
       this._renderer.reglframe.cancel();
       this._renderer.reglframe = undefined;
     }
+
     this._renderer.reglframe = this._renderer.regl.frame(() => {
       this._renderer.tick('Basic');
     });
 
-    this._zoom.restart_timer(60_000);
+    this._zoom.restart_timer(60000);
   }
 
   async root_table() {
     if (!this._root) {
       return false;
     }
-    return this._root.table;
+    return this._root.record_batch;
   }
-
+  
   /**
    * Return the current state of the query. Can be used to save an API
    * call for use programatically.

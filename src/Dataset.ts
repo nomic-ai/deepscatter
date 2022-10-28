@@ -1,8 +1,8 @@
 // A Dataset manages the production and manipulation of *tiles*.
 
-import { Tile, Rectangle, QuadTile, ArrowTile } from './tile';
+import { Tile, Rectangle, QuadTile, ArrowTile, p_in_rect } from './tile';
 import {
-  range, min, max, bisectLeft,
+  range, min, max, bisectLeft, extent
 } from 'd3-array';
 import * as Comlink from 'comlink';
 
@@ -25,6 +25,7 @@ export abstract class Dataset<T extends Tile> {
   abstract ready : Promise<void>;
   abstract get extent() : Rectangle;
   abstract promise : Promise<void>;
+  private extents : Record<string, [number, number]> = {};
 
   constructor(plot : Scatterplot) {
     this.plot = plot;
@@ -42,9 +43,32 @@ export abstract class Dataset<T extends Tile> {
   }
   abstract download_most_needed_tiles(bbox : Rectangle | undefined, max_ix: number, queue_length : number) : void;
 
-  *points(bbox: Rectangle | undefined) {
-    for (const point of this.root_tile.points(bbox)) {
-      yield point;
+  domain(dimension : string, max_ix = 1e6): [number, number] {
+    if (this.extents[dimension]) {
+      return this.extents[dimension];
+    }
+    this.extents[dimension] = extent(this.points(undefined, max_ix), d => d[dimension]);
+    return this.extents[dimension];
+  }
+
+  *points(bbox: Rectangle | undefined, max_ix = 1e99) {
+    const stack : T[] = [this.root_tile];
+    let current;
+    while (current = stack.shift()) {
+      if (        
+        current.download_state == 'Complete' &&
+        (
+          bbox === undefined ||
+          current.is_visible(max_ix, bbox)
+        )
+      ) {
+        for (const point of current) {
+          if (p_in_rect([point.x, point.y], bbox) && point.ix <= max_ix) {
+            yield point;
+          }
+        }
+        stack.push(...current.children);
+      }
     }
   }
   /**

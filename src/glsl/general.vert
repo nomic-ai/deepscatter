@@ -443,7 +443,7 @@ vec2 box_muller(in float ix, in float seed) {
 
 float domainify(in vec2 domain, in float transform, in float attr, in bool clamped) {
 
-  // Clamp an attribute into a domain, with an option log or sqrt transform.
+  // Clamp an attribute into a domain, with an optional log or sqrt transform.
   if (transform == 2.) {
     domain = sqrt(domain);
     attr = sqrt(attr);
@@ -507,6 +507,7 @@ float choose_and_run_filter(
 
 vec2 bezier_interpolate(vec2 p1, vec2 p2, float frac, float ix) {
   // Interpolates between two points on a Bezier curve around a jittered middle.
+  // Makes animations look cooler.
     vec2 midpoint = box_muller(ix, 3.) * .05 *
          dot(p2 - p1, p2 - p1)
          + p2 / 2. + p1 / 2.;
@@ -524,7 +525,6 @@ float sineInOut(float t) {
 const vec4 decoder = vec4(1./256./256./256., 1. / 256. / 256., 1. / 256., 1.);
 
 float RGBAtoFloat(in vec4 floater) {
-  //return 0.05;
   // Scale values up by 256.
   return dot(floater, decoder);
 }
@@ -560,9 +560,10 @@ vec2 calculate_position(in vec2 position, in float x_scale_type,
     float y;
 
     if (x_scale_type < 4.0) {
+      float x_ = linscale(u_color_domain, a_color);
       x = texture_float_lookup(x_domain, x_range,
         x_scale_type,
-        position.x, x_map_position
+        position.x, 0. // ymap position 0 means never use a texture lookup.
         );
     } else {
       x = position.x;
@@ -570,12 +571,11 @@ vec2 calculate_position(in vec2 position, in float x_scale_type,
 
     if (y_scale_type < 4.0) {
       y = texture_float_lookup(y_domain, y_range, y_scale_type,
-        position.y, y_map_position
+        position.y, 0. // ymap position 0 means never use a texture lookup.
         );
     } else {
       y = position.y;
     }
-
     vec3 pos2d = vec3(x, y, 1.0) * window_scale * zoom * pixelspace_to_glspace;
     return pos2d.xy;
 }
@@ -782,6 +782,7 @@ vec2 calc_and_interpolate_positions(
   in float interpolation,
   in float u_grid_mode, 
   in float ix) {
+
   old_position = calculate_position(old_position, u_last_x_transform,
     u_last_x_domain, u_last_x_range,
     u_last_y_transform, u_last_y_domain, u_last_y_range,
@@ -798,7 +799,6 @@ vec2 calc_and_interpolate_positions(
       u_y_transform, u_y_domain, 
       u_y_range, u_window_scale, u_zoom, 
       u_x_map_position, u_y_map_position);
-
     float xpos = clamp((1. + position.x) / 2., 0., 1.);
     float randy = ix_to_random(ix, 13.76);
     float delay = xpos + randy * .1;
@@ -1012,7 +1012,6 @@ void main() {
     a_last_color = ix;
     a_last_color_is_constant = true;
   }
-
 
   pixelspace_to_glspace = mat3(
       2. / u_width, 0., -1.,

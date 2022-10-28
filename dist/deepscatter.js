@@ -15975,7 +15975,7 @@ vec2 box_muller(in float ix, in float seed) {
 
 float domainify(in vec2 domain, in float transform, in float attr, in bool clamped) {
 
-  // Clamp an attribute into a domain, with an option log or sqrt transform.
+  // Clamp an attribute into a domain, with an optional log or sqrt transform.
   if (transform == 2.) {
     domain = sqrt(domain);
     attr = sqrt(attr);
@@ -16199,6 +16199,7 @@ float sineInOut_0(float t) {
 
 vec2 bezier_interpolate(vec2 p1, vec2 p2, float frac, float ix) {
   // Interpolates between two points on a Bezier curve around a jittered middle.
+  // Makes animations look cooler.
     vec2 midpoint = box_muller(ix, 3.) * .05 *
          dot(p2 - p1, p2 - p1)
          + p2 / 2. + p1 / 2.;
@@ -16216,7 +16217,6 @@ float sineInOut(float t) {
 const vec4 decoder = vec4(1./256./256./256., 1. / 256. / 256., 1. / 256., 1.);
 
 float RGBAtoFloat(in vec4 floater) {
-  //return 0.05;
   // Scale values up by 256.
   return dot(floater, decoder);
 }
@@ -16251,9 +16251,10 @@ vec2 calculate_position(in vec2 position, in float x_scale_type,
     float y;
 
     if (x_scale_type < 4.0) {
+      float x_ = linscale(u_color_domain, a_color);
       x = texture_float_lookup(x_domain, x_range,
         x_scale_type,
-        position.x, x_map_position
+        position.x, 0. // ymap position 0 means never use a texture lookup.
         );
     } else {
       x = position.x;
@@ -16261,12 +16262,11 @@ vec2 calculate_position(in vec2 position, in float x_scale_type,
 
     if (y_scale_type < 4.0) {
       y = texture_float_lookup(y_domain, y_range, y_scale_type,
-        position.y, y_map_position
+        position.y, 0. // ymap position 0 means never use a texture lookup.
         );
     } else {
       y = position.y;
     }
-
     vec3 pos2d = vec3(x, y, 1.0) * window_scale * zoom * pixelspace_to_glspace;
     return pos2d.xy;
 }
@@ -16471,6 +16471,7 @@ vec2 calc_and_interpolate_positions(
   in float interpolation,
   in float u_grid_mode, 
   in float ix) {
+
   old_position = calculate_position(old_position, u_last_x_transform,
     u_last_x_domain, u_last_x_range,
     u_last_y_transform, u_last_y_domain, u_last_y_range,
@@ -16487,7 +16488,6 @@ vec2 calc_and_interpolate_positions(
       u_y_transform, u_y_domain, 
       u_y_range, u_window_scale, u_zoom, 
       u_x_map_position, u_y_map_position);
-
     float xpos = clamp((1. + position.x) / 2., 0., 1.);
     float randy = ix_to_random(ix, 13.76);
     float delay = xpos + randy * .1;
@@ -17464,6 +17464,9 @@ class Aesthetic {
   }
   get scale() {
     function capitalize(r) {
+      if (r === "ylorrd") {
+        return "YlOrRd";
+      }
       return r.charAt(0).toUpperCase() + r.slice(1);
     }
     let scale = scales[this.transform]().domain(this.domain).range(this.range);
@@ -17525,6 +17528,7 @@ class Aesthetic {
     } else {
       this._domains[this.field] = extent(column.toArray());
     }
+    console.log("Inferring range of " + this.field + " to be " + this._domains[this.field]);
     return this._domains[this.field];
   }
   default_data() {
@@ -17592,6 +17596,7 @@ class Aesthetic {
     this._range = [0, 1];
     this._transform = void 0;
     this._constant = this.default_constant;
+    this.field = null;
     this.current_encoding = {
       constant: this.default_constant
     };
@@ -17604,6 +17609,7 @@ class Aesthetic {
       this.current_encoding = {
         constant: this.default_constant
       };
+      this.reset_to_defaults();
       return;
     }
     if (encoding === void 0) {
@@ -17617,6 +17623,10 @@ class Aesthetic {
         constant: encoding
       };
       this.current_encoding = x;
+      return;
+    }
+    if (Object.keys(encoding).length === 0) {
+      this.reset_to_defaults();
       return;
     }
     if (encoding["domain"] && typeof encoding["domain"] === "string" && encoding["domain"] === "progressive") {
@@ -17648,6 +17658,7 @@ class Aesthetic {
             }
           });
         });
+        console.warn("deprecated code");
         encoding["domain"] = [min2, max2];
       }
     }
@@ -17779,8 +17790,10 @@ class Size extends OneDAesthetic {
   get default_domain() {
     return [0, 10];
   }
+  get default_range() {
+    return [0, 1];
+  }
 }
-Size.default_range = [0, 1];
 class PositionalAesthetic extends OneDAesthetic {
   constructor(scatterplot, regl2, tile, map2) {
     super(scatterplot, regl2, tile, map2);
@@ -17790,9 +17803,12 @@ class PositionalAesthetic extends OneDAesthetic {
     this._transform = "literal";
   }
   get range() {
+    if (this._range) {
+      return this._range;
+    }
     if (this.dataset.extent && this.dataset.extent[this.field])
       return this.dataset.extent[this.field];
-    return [-20, 20];
+    this.default_range;
   }
   static get default_constant() {
     return 0;
@@ -17825,15 +17841,11 @@ class AbstractFilter extends BooleanAesthetic {
   get default_domain() {
     return [0, 1];
   }
-  get domain() {
-    const domain = this.is_dictionary() ? [-2047, 2047] : [0, 1];
-    return domain;
-  }
   update(encoding) {
     super.update(encoding);
-  }
-  post_to_regl_buffer() {
-    super.post_to_regl_buffer();
+    if (Object.keys(this.current_encoding).length === 0) {
+      this.current_encoding = { constant: 1 };
+    }
   }
   ops_to_array() {
     const input = this.current_encoding;
@@ -17944,60 +17956,6 @@ class Color extends Aesthetic {
     const { r, g, b } = rgb(color2);
     return [r / 255, g / 255, b / 255];
   }
-  get_hex_values(field) {
-    var all_tiles = [this.tileSet];
-    var current_tiles = [this.tileSet];
-    if (this.tileSet.children.length > 0) {
-      while (true) {
-        if (current_tiles.length == 0) {
-          break;
-        }
-        var children_tiles = [];
-        current_tiles.map(function(tile, idx) {
-          if (tile.children.length > 0) {
-            all_tiles.push.apply(all_tiles, tile.children);
-            children_tiles.push.apply(children_tiles, tile.children);
-          }
-        });
-        current_tiles = children_tiles;
-      }
-      var min2 = all_tiles[0].table.getChild(field).data[0].values[0];
-      var max2 = min2;
-      all_tiles.forEach(function(tile, idx) {
-        tile.table.getChild(field).data[0].values.forEach(function(val, idx2) {
-          if (val < min2) {
-            min2 = val;
-          }
-          if (val > max2) {
-            max2 = val;
-          }
-        });
-      });
-      if (typeof min2 == "bigint" || typeof max2 == "bigint") {
-        min2 = Number(min2);
-        max2 = Number(max2);
-      }
-      var hex_vals = {};
-      for (var i = 0; i < this._texture_buffer.length; i += 4 * 512) {
-        hex_vals[(Math.abs(max2 - min2) / 7 * (i / (4 * 512)) + min2).toString()] = "#" + this._texture_buffer[i].toString(16) + this._texture_buffer[i + 1].toString(16) + this._texture_buffer[i + 2].toString(16);
-      }
-      return hex_vals;
-    }
-  }
-  get_hex_order() {
-    var hex_vals = {};
-    var ldl = this.scatterplot["_root"]["local_dictionary_lookups"];
-    var dict = ldl[this.field];
-    for (var i = 0; i < dict.size * 4; i += 4) {
-      if (i >= 16384) {
-        var color_by_index = 16380;
-      } else {
-        var color_by_index = i;
-      }
-      hex_vals[dict.get(i / 4)] = "#" + this._texture_buffer[color_by_index].toString(16) + this._texture_buffer[color_by_index + 1].toString(16) + this._texture_buffer[color_by_index + 2].toString(16);
-    }
-    return hex_vals;
-  }
   post_to_regl_buffer() {
     this.aesthetic_map.set_color(
       this.id,
@@ -18005,13 +17963,17 @@ class Color extends Aesthetic {
     );
   }
   update(encoding) {
-    this.current_encoding = encoding;
+    console.log("UPDATING COLOR");
     if (isConstantChannel(encoding) && typeof encoding.constant === "string") {
       encoding.constant = Color.convert_color(encoding.constant);
     }
     super.update(encoding);
+    this.current_encoding = encoding;
     if (encoding.range && typeof encoding.range[0] === "string") {
+      console.log("encoding to buffer");
       this.encode_for_textures(encoding.range);
+      this.post_to_regl_buffer();
+    } else if (encoding.range) {
       this.post_to_regl_buffer();
     }
   }
@@ -18042,9 +18004,6 @@ class StatefulAesthetic {
     this.dataset = dataset;
     this.aesthetic_map = aesthetic_map;
     this.aesthetic_map = aesthetic_map;
-    this.current_encoding = {
-      constant: 1
-    };
   }
   get current() {
     return this.states[0];
@@ -18064,16 +18023,15 @@ class StatefulAesthetic {
   }
   update(encoding) {
     const stringy = JSON.stringify(encoding);
-    if (stringy == JSON.stringify(this.current_encoding) || encoding === void 0) {
+    if (stringy == JSON.stringify(this.states[0].current_encoding) || encoding === void 0) {
       if (this.needs_transitions) {
-        this.states[1].update(this.current_encoding);
+        this.states[1].update(this.states[0].current_encoding);
       }
       this.needs_transitions = false;
     } else {
       this.states.reverse();
       this.states[0].update(encoding);
       this.needs_transitions = true;
-      this.current_encoding = encoding;
     }
   }
 }
@@ -18241,8 +18199,7 @@ class AestheticSet {
       encoding = {};
     }
     if (encoding.filter1) {
-      encoding.filter = encoding.filter1;
-      delete encoding.filter1;
+      throw new Error('filter1 is not supported; just say "filter"');
     }
     this.interpret_position(encoding);
     for (const k of Object.keys(stateful_aesthetics)) {
@@ -18342,7 +18299,6 @@ class ReglRenderer extends Renderer {
     this.tileSet = tileSet;
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
     this.initialize_textures();
-    console.log({ tileSet });
     this._initializations = [
       this.tileSet.promise.then(() => {
         this.remake_renderer();
@@ -18364,9 +18320,9 @@ class ReglRenderer extends Renderer {
     return this;
   }
   get props() {
-    const { prefs } = this;
+    this.allocate_aesthetic_buffers();
+    const { prefs, aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this;
     const { transform } = this.zoom;
-    const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
     const props = {
       aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
@@ -18831,25 +18787,23 @@ class ReglRenderer extends Renderer {
           }
           return val;
         };
-        if (k !== "filter" && k !== "filter2") {
-          parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
-          parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
-          parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
-            const t = this.aes.dim(k)[time].transform;
-            if (t === "linear")
-              return 1;
-            if (t === "sqrt")
-              return 2;
-            if (t === "log")
-              return 3;
-            if (t === "literal")
-              return 4;
-            throw "Invalid transform";
-          };
-          parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
-            return this.aes.dim(k)[time].constant;
-          };
-        }
+        parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
+        parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
+        parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
+          const t = this.aes.dim(k)[time].transform;
+          if (t === "linear")
+            return 1;
+          if (t === "sqrt")
+            return 2;
+          if (t === "log")
+            return 3;
+          if (t === "literal")
+            return 4;
+          throw "Invalid transform";
+        };
+        parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
+          return this.aes.dim(k)[time].constant;
+        };
       }
     }
     this._renderer = regl2(parameters);
@@ -18870,7 +18824,8 @@ class ReglRenderer extends Renderer {
       "filter2"
     ];
     for (const aesthetic of priorities) {
-      for (const time of ["current", "last"]) {
+      const times = ["current", "last"];
+      for (const time of times) {
         try {
           if (this.aes.dim(aesthetic)[time].field) {
             buffers.push({ aesthetic, time, field: this.aes.dim(aesthetic)[time].field });
@@ -18912,7 +18867,9 @@ class ReglRenderer extends Renderer {
       }
     }
     const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
-    return { aes_to_buffer_num, variable_to_buffer_num, buffer_num_to_variable };
+    this.aes_to_buffer_num = aes_to_buffer_num;
+    this.variable_to_buffer_num = variable_to_buffer_num;
+    this.buffer_num_to_variable = buffer_num_to_variable;
   }
   get discard_share() {
     return 0;
@@ -18994,6 +18951,7 @@ class TileBufferManager {
       }
     }
     if (column.type.typeId !== 3) {
+      console.warn(`Coercing ${key} to float32--it shouldn't be passed here as something else, though.`);
       const buffer = new Float32Array(tile.record_batch.length);
       for (let i = 0; i < tile.record_batch.numRows; i++) {
         buffer[i] = column.data[0].values[i];
@@ -28827,6 +28785,9 @@ class Tile {
     if (this.min_ix > max_ix) {
       return false;
     }
+    if (viewport_limits === void 0) {
+      return true;
+    }
     const c2 = this.extent;
     return !(c2.x[0] > viewport_limits.x[1] || c2.x[1] < viewport_limits.x[0] || c2.y[0] > viewport_limits.y[1] || c2.y[1] < viewport_limits.y[0]);
   }
@@ -29414,6 +29375,7 @@ class Dataset {
   constructor(plot) {
     this.transformations = {};
     this._tileworkers = [];
+    this.extents = {};
     this.plot = plot;
   }
   get highest_known_ix() {
@@ -29425,9 +29387,25 @@ class Dataset {
   static from_arrow_table(table, prefs, plot) {
     return new ArrowDataset(table, prefs, plot);
   }
-  *points(bbox) {
-    for (const point of this.root_tile.points(bbox)) {
-      yield point;
+  domain(dimension, max_ix = 1e6) {
+    if (this.extents[dimension]) {
+      return this.extents[dimension];
+    }
+    this.extents[dimension] = extent(this.points(void 0, max_ix), (d) => d[dimension]);
+    return this.extents[dimension];
+  }
+  *points(bbox, max_ix = 1e99) {
+    const stack = [this.root_tile];
+    let current;
+    while (current = stack.shift()) {
+      if (current.download_state == "Complete" && (bbox === void 0 || current.is_visible(max_ix, bbox))) {
+        for (const point of current) {
+          if (p_in_rect([point.x, point.y], bbox) && point.ix <= max_ix) {
+            yield point;
+          }
+        }
+        stack.push(...current.children);
+      }
     }
   }
   map(callback, after = false) {
@@ -29670,6 +29648,7 @@ const base_elements = [
 ];
 class Scatterplot {
   constructor(selector2, width, height) {
+    this.plot_queue = Promise.resolve(0);
     this.bound = false;
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
@@ -29686,9 +29665,8 @@ class Scatterplot {
       max_points: 100,
       encoding: {},
       point_size: 1,
-      alpha: 0.4
+      alpha: 40
     };
-    this.d3 = { select };
   }
   bind(selector2, width, height) {
     this.div = select(selector2).selectAll("div.deepscatter_container").data([1]).join("div").attr("class", "deepscatter_container").style("position", "absolute");
@@ -29794,6 +29772,14 @@ class Scatterplot {
     return this.click_handler.f;
   }
   async plotAPI(prefs) {
+    if (prefs.encoding && prefs.encoding.filter && prefs.encoding.filter.domain) {
+      throw new Error("Filtering is not supported in the API");
+    }
+    await this.plot_queue;
+    this.plot_queue = this.unsafe_plotAPI(prefs);
+    return await this.plot_queue;
+  }
+  async unsafe_plotAPI(prefs) {
     if (prefs.click_function) {
       this.click_function = Function("datum", prefs.click_function);
     }
@@ -29840,7 +29826,7 @@ class Scatterplot {
     if (!this._root) {
       return false;
     }
-    return this._root.table;
+    return this._root.record_batch;
   }
   get query() {
     const p = JSON.parse(JSON.stringify(this.prefs));

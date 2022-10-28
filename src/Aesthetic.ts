@@ -161,11 +161,12 @@ abstract class Aesthetic {
   }
 
   get scale() {
-
     function capitalize(r : string) {
+      if (r === "ylorrd") {
+        return "YlOrRd";
+      }
       return r.charAt(0).toUpperCase() + r.slice(1);
     }
-
     let scale = scales[this.transform]()
       .domain(this.domain)
       .range(this.range);
@@ -224,7 +225,7 @@ abstract class Aesthetic {
   }
 
   _domains: {
-    [key: string]: any;
+    [key: string]: [number, number];
   };
 
 
@@ -246,6 +247,7 @@ abstract class Aesthetic {
     } else {
       this._domains[this.field] = extent(column.toArray());
     }
+    console.log("Inferring range of " + this.field + " to be " + this._domains[this.field]);
     return this._domains[this.field];
   }
 
@@ -334,12 +336,13 @@ abstract class Aesthetic {
     this._range = [0, 1];
     this._transform = undefined;
     this._constant = this.default_constant;
+    this.field = null;
     this.current_encoding = {
       constant : this.default_constant
     };
   }
   update(encoding : string | BasicChannel | null | ConstantChannel | LambdaChannel | OpChannel) {
-    
+
     if (encoding === 'null') {
       encoding = null;
     }
@@ -348,6 +351,7 @@ abstract class Aesthetic {
       this.current_encoding = {
         constant : this.default_constant
       };
+      this.reset_to_defaults();
       return;
     }
 
@@ -365,6 +369,12 @@ abstract class Aesthetic {
       this.current_encoding = x;
       return;
     }
+
+    if (Object.keys(encoding).length === 0) {
+      this.reset_to_defaults();
+      return;
+    }
+
     if (encoding['domain'] && typeof(encoding['domain']) === 'string' && encoding['domain'] === 'progressive'){
       const all_tiles = [this.dataset.root_tile];
       let current_tiles = [...all_tiles];
@@ -394,10 +404,10 @@ abstract class Aesthetic {
             }
           });
         });
+        console.warn("deprecated code")
         encoding["domain"] = [min2, max2];
       }
     }
-    
     this.current_encoding = encoding;
     if (isConstantChannel(encoding)) {
       return;
@@ -528,8 +538,10 @@ class Size extends OneDAesthetic {
   static get default_constant() {return 1.5;}
   static get_default_domain() {return [0, 10];}
   get default_domain() {return [0, 10];}
-  static default_range = [0, 1];
   default_constant = 1;
+  get default_range() : [number, number] {
+    return [0, 1];
+  }
   default_transform : Transform = 'sqrt';
 }
 
@@ -544,8 +556,11 @@ abstract class PositionalAesthetic extends OneDAesthetic {
 
 
   get range() : [number, number] {
+    if (this._range) {
+      return this._range;
+    }
     if (this.dataset.extent && this.dataset.extent[this.field]) return this.dataset.extent[this.field]; 
-    return [-20, 20];
+    this.default_range;
   }
 
   static get default_constant() { return 0; }
@@ -574,21 +589,14 @@ abstract class AbstractFilter extends BooleanAesthetic {
 
   default_transform : Transform = 'literal';
   default_constant = 1;
-  get default_domain() {return [0, 1];}
+  get default_domain() : [number, number] {return [0, 1];}
   default_range : [number, number] = [0, 1];
 
-  get domain() {
-    //    return [-2047, 2047];
-    const domain : [number, number] = this.is_dictionary()
-      ? [-2047, 2047] : [0, 1];
-    return domain;
-  }
-
-  update(encoding) {
+  update(encoding : LambdaChannel | OpChannel | ConstantChannel) {
     super.update(encoding);
-  }
-  post_to_regl_buffer(): void {
-    super.post_to_regl_buffer();
+    if (Object.keys(this.current_encoding).length === 0) {
+      this.current_encoding = { constant : 1 };
+    }
   }
   ops_to_array() : OpArray {
     const input = this.current_encoding;
@@ -699,7 +707,7 @@ class Color extends Aesthetic {
     return [r / 255, g / 255, b / 255];
   }
 
-  get_hex_values(field) {
+  /*get_hex_values(field) {
     var all_tiles = [this.tileSet];
     var current_tiles = [this.tileSet];
 
@@ -756,7 +764,7 @@ class Color extends Aesthetic {
       hex_vals[dict.get(i/4)] = ("#"+this._texture_buffer[color_by_index].toString(16)+this._texture_buffer[color_by_index+1].toString(16)+this._texture_buffer[color_by_index+2].toString(16));
     }
     return hex_vals;
-  }
+  }*/
 
   post_to_regl_buffer() {
     this.aesthetic_map.set_color(
@@ -766,13 +774,17 @@ class Color extends Aesthetic {
   }
 
   update(encoding : ColorChannel) {
-    this.current_encoding = encoding;
+    console.log("UPDATING COLOR");
     if (isConstantChannel(encoding) && typeof(encoding.constant) === 'string') {
       encoding.constant = Color.convert_color(encoding.constant);
     }
     super.update(encoding);
+    this.current_encoding = encoding;
     if ((encoding.range && typeof(encoding.range[0]) === 'string')) {
+      console.log("encoding to buffer")
       this.encode_for_textures(encoding.range);
+      this.post_to_regl_buffer();
+    } else if (encoding.range) {
       this.post_to_regl_buffer();
     }
   }
@@ -824,7 +836,7 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   public dataset : QuadtileSet;
   public regl : Regl;
   public scatterplot : Scatterplot;
-  public current_encoding : Channel;
+//  public current_encoding : Channel;
   public needs_transitions = false;
   public aesthetic_map : TextureSet;
   constructor(
@@ -837,9 +849,6 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
     this.dataset = dataset;
     this.aesthetic_map = aesthetic_map;
     this.aesthetic_map = aesthetic_map;
-    this.current_encoding = {
-      constant : 1
-    };
   }
 
   get current() {
@@ -864,12 +873,12 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
   update(encoding : BasicChannel | ConstantChannel) {
     const stringy = JSON.stringify(encoding);
     // Overwrite the last version.
-    if (stringy == JSON.stringify(this.current_encoding) || encoding === undefined) {
+    if (stringy == JSON.stringify(this.states[0].current_encoding) || encoding === undefined) {
       // If an undefined encoding is passed, that means
       // we've seen an update without any change.
       if (this.needs_transitions) {
         // The first one is fine, but we gotta update the *last* one.
-        this.states[1].update(this.current_encoding);
+        this.states[1].update(this.states[0].current_encoding);
       }
       this.needs_transitions = false;
     } else {
@@ -877,7 +886,7 @@ export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
       this.states.reverse();
       this.states[0].update(encoding);
       this.needs_transitions = true;
-      this.current_encoding = encoding;
+//      this.current_encoding = encoding;
     }
   }
 }

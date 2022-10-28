@@ -22,7 +22,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
   public aes : AestheticSet;
   public buffer_size = 1024 * 1024 * 64;
   public canvas? : d3.Selection<HTMLCanvasElement, any, any, any>;
-  public _buffers : MultipurposeBufferSet;
+  private _buffers : MultipurposeBufferSet;
   public _initializations : Promise<void>[];
   public tileSet : Dataset<T>;
   public zoom : Zoom;
@@ -68,7 +68,6 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     this.initialize_textures();
 
     // Not the right way, for sure.
-    console.log({tileSet})
     this._initializations = [
     // some things that need to be initialized before the renderer is loaded.
       this.tileSet
@@ -124,9 +123,13 @@ export class ReglRenderer<T extends Tile> extends Renderer {
   */
 
   get props() {
-    const { prefs } = this;
+    // Stuff needed for regl.
+
+
+    // Would be better cached per draw call.
+    this.allocate_aesthetic_buffers();
+    const { prefs, aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this;
     const { transform } = this.zoom;
-    const { aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this.allocate_aesthetic_buffers();
     const props = {
     // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
@@ -192,7 +195,6 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       prop_list.push(this_props);
     }
     prop_list.reverse();
-    //    console.log(prop_list)
     this._renderer(prop_list);
   }
 
@@ -863,22 +865,19 @@ export class ReglRenderer<T extends Tile> extends Renderer {
           return val;
         };
         
-        if (k !== 'filter' && k !== 'filter2') {
-          // These are not meaningful on filters.
-          parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
-          parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
-          parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
-            const t = this.aes.dim(k)[time].transform;
-            if (t === 'linear') return 1;
-            if (t === 'sqrt') return 2;
-            if (t === 'log') return 3;
-            if (t === 'literal') return 4;
-            throw 'Invalid transform';
-          };
-          parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
-            return this.aes.dim(k)[time].constant;
-          };
-        }
+        parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].domain;
+        parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
+        parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
+          const t = this.aes.dim(k)[time].transform;
+          if (t === 'linear') return 1;
+          if (t === 'sqrt') return 2;
+          if (t === 'log') return 3;
+          if (t === 'literal') return 4;
+          throw 'Invalid transform';
+        };
+        parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
+          return this.aes.dim(k)[time].constant;
+        };
       }
     // Copy the parameters from the data name.
     }
@@ -887,23 +886,25 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     return this._renderer;
   }
 
-  private allocate_aesthetic_buffers() {
+  public allocate_aesthetic_buffers() {
     // There are only 14 attribute buffers available to use,
     // once we pass in the index and position in the tile. The order here determines
     // how important it is to capture transitions for them; if
     // we run out of buffers, the previous state of the requested aesthetic will just be thrown 
     // away.
 
+    type time = 'current' | 'last';
     type BufferSummary = {
       aesthetic : keyof Encoding;
-      time : 'current' | 'last';
+      time : time;
       field: string;
     };
     const buffers : BufferSummary[] = [];
     const priorities = ['x', 'y', 'color', 'x0', 'y0', 'size', 'jitter_radius',
       'jitter_speed', 'filter', 'filter2'];
     for (const aesthetic of priorities) {
-      for (const time of ['current', 'last']) {
+      const times : time[] = ['current', 'last'];
+      for (const time of times) {
         try {
           if (this.aes.dim(aesthetic)[time].field) {
             buffers.push({ aesthetic, time, field: this.aes.dim(aesthetic)[time].field });
@@ -951,8 +952,14 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     }
 
     const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
-    return { aes_to_buffer_num, variable_to_buffer_num, buffer_num_to_variable };
+    this.aes_to_buffer_num = aes_to_buffer_num;
+    this.variable_to_buffer_num = variable_to_buffer_num;
+    this.buffer_num_to_variable = buffer_num_to_variable;
   }
+
+  aes_to_buffer_num? : Record<string, number>;
+  variable_to_buffer_num? : Record<string, number>;
+  buffer_num_to_variable? : string[];
 
   get discard_share() {
     // If jitter is temporal, e.g., or filters are in place,
@@ -1065,7 +1072,9 @@ class TileBufferManager {
         throw new Error(`Requested ${key} but table lacks that; the present columns are "${col_names.join('", "')}"`);
       }
     }
+    // Anything that isn't a single-precision float must be coerced.
     if (column.type.typeId !== 3) {
+      console.warn(`Coercing ${key} to float32--it shouldn't be passed here as something else, though.`);
       const buffer = new Float32Array(tile.record_batch.length);
       for (let i = 0; i < tile.record_batch.numRows; i++) {
         buffer[i] = column.data[0].values[i];

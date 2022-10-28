@@ -82,7 +82,7 @@ export abstract class Tile {
     throw new Error('Not implemented');
   }
 
-  is_visible(max_ix : number, viewport_limits : Rectangle ) : boolean {
+  is_visible(max_ix : number, viewport_limits : Rectangle | undefined ) : boolean {
     // viewport_limits is in coordinate points.
     // Will typically be got by calling current_corners.
 
@@ -94,6 +94,9 @@ export abstract class Tile {
 
     if (this.min_ix > max_ix) {
       return false;
+    }
+    if (viewport_limits === undefined) {
+      return true;
     }
 
     const c = this.extent;
@@ -474,7 +477,7 @@ export class ArrowTile extends Tile {
 type Point = [number, number];
 
 
-function p_in_rect(p : Point, rect : Rectangle | undefined) {
+export function p_in_rect(p : Point, rect : Rectangle | undefined) {
   if (rect === undefined) { return true; }
   const c = rect;
   return (p[0] < rect.x[1]

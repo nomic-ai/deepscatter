@@ -1,13 +1,13 @@
-
-
-
-# Next
+# 2.5.0
 
 * Allow destruction of deepscatter objects, freeing up associated GPU memory.
 * Allow multiple plots on the same page by assigning ids: https://github.com/CreatingData/deepscatter/pull/47.
 * Improved Typing for Aesthetics and Transforms. https://github.com/CreatingData/deepscatter/pull/46
 * Fixed bug on M1 macs for mouseover past the 4 millionth (actually, 2^22) point in a set. Now mouseover events draw to the hidden canvas **twice**: first identifying which tile the moused-over point is in, and then identifying the row number inside that tile. This new field consumes an additional buffer, leaving 14 rather than 15 channels free for aesthetics.
 * Added new test case plotting several million integers in Z-curve order for debugging purposes.
+* Safety fixes for concurrent plotting of points.
+* Supports handling ranges on [x, y] dimensions
+* Change of license associated with Nomic move
 
 # 2.4.1
 

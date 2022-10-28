@@ -101,8 +101,7 @@ export class AestheticSet {
       encoding = {};
     }
     if (encoding.filter1) {
-      encoding.filter = encoding.filter1;
-      delete encoding.filter1;
+      throw new Error('filter1 is not supported; just say "filter"');
     }
     // Overwrite position fields.
     this.interpret_position(encoding);
