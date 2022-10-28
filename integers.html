@@ -1,6 +1,8 @@
 <body>
   <div class="buttons">
-    <button id="primes">Highlight Primes</button>
+    <button id="prime">Highlight Primes</button>
+    <button id="even">Highlight Even</button>
+    <button id="b">Clear</button>
   </div>
   <div id="deepscatter"></div>
 
@@ -8,7 +10,7 @@
 <script type="module">
   import Scatterplot from './src/deepscatter';
   import { tableFromArrays, Table, RecordBatch, vectorFromArray, Utf8 } from 'apache-arrow';
-  const num_batches = 25;
+  const num_batches = 2;
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
@@ -136,23 +138,29 @@
 //    highlightPrimes()
   })
   window.plot = plot;
-  function highlightPrimes() {
-    const primes = eratosthenes(num_batches * (2**16));
-    console.log(primes);
-    const prime_ids = primes.map(num_to_string);
-    plot.add_identifier_column("prime", prime_ids, "_id");
+  const functions = {
+    "prime" : (n) => eratosthenes(n),
+    "even": (n) => [...Array(n).keys()].filter(x => x % 2 == 0),
+  }
+  function highlight(key) {
+    const vals = functions[key](num_batches * (2**16))
+    const prime_ids = vals.map(num_to_string);
+    const k2 = '' + Math.random()
+    plot.add_identifier_column(k2, prime_ids, "_id");
     plot.plotAPI({
       duration: 1000,
       encoding:    {
-        size: {
-          field: 'prime',
-          range: [.5, 2],
-          domain: [0, 1]
+        filter2: {
+          field: k2,
+          op: 'eq',
+          a: 1
         }
       }
     })
   }
-  document.getElementById("primes").addEventListener("click", highlightPrimes);
+  document.getElementById("prime").addEventListener("click", () => highlight("prime"));
+  document.getElementById("even").addEventListener("click", () => highlight("even"));
+  document.getElementById("b").addEventListener("click", () => plot.plotAPI({encoding: {filter2: {}}}));
 </script>
 
 
