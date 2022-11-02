@@ -16,6 +16,7 @@
   },
   "scripts": {
     "dev": "vite --port 3344",
+    "dev-simple": "vite --port 3344 --mode simple",
     "build": "vite build",
     "test": "playwright test",
     "lint": "eslint src"
