@@ -33,10 +33,10 @@
         field: "y",
         transform: "literal",
       },
+      // This is just to demo an encoding a color field, likely you wouldn't need to doubly encode x!
       color: {
         field: "x",
-        domain: [0, 1],
-        range: "PuRd", // Purple to red
+        range: "PuRd", // "Purple to red", anything from d3-scale-chromatic works
       },
     },
   };
