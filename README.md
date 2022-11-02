@@ -44,6 +44,7 @@ and generate a million points of test data in tiles of 50000 apiece.
 
 
 ```sh
+python3 -V # requires Python 3.9.x or 3.10.x
 python3 -m pip install git+https://github.com/bmschmidt/quadfeather
 quadfeather-test-data 1_000_000
 quadfeather --files tmp.csv --tile_size 50_000 --destination tiles
