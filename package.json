@@ -1,7 +1,7 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
     "dist"
@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "dev": "vite --port 3344",
+    "dev": "vite --port 3344 --host",
     "build": "vite build",
     "test": "playwright test",
     "lint": "eslint src"
@@ -59,6 +59,7 @@
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",
     "lodash.merge": "^4.6.2",
+    "rbush-3d": "^0.0.4",
     "regl": "^2.1.0"
   },
   "devDependencies": {
@@ -66,6 +67,7 @@
     "@types/d3": "^7.4.0",
     "@types/d3-geo": "^3.0.2",
     "@types/d3-selection": "^3.0.3",
+    "@types/geojson": "^7946.0.10",
     "@types/lodash.merge": "^4.6.7",
     "@typescript-eslint/eslint-plugin": "^5.33.0",
     "@typescript-eslint/parser": "^5.33.0",

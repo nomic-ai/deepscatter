@@ -15534,8 +15534,6 @@ class Renderer {
     return this;
   }
   async initialize() {
-    await this._initializations;
-    this.zoom.restart_timer(5e5);
   }
 }
 const gaussian_blur = "precision mediump float;\n#define GLSLIFY 1\n\nvec4 blur13(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {\n  vec4 color = vec4(0.0);\n  vec2 off1 = vec2(1.411764705882353) * direction;\n  vec2 off2 = vec2(3.2941176470588234) * direction;\n  vec2 off3 = vec2(5.176470588235294) * direction;\n  color += texture2D(image, uv) * 0.1964825501511404;\n  color += texture2D(image, uv + (off1 / resolution)) * 0.2969069646728344;\n  color += texture2D(image, uv - (off1 / resolution)) * 0.2969069646728344;\n  color += texture2D(image, uv + (off2 / resolution)) * 0.09447039785044732;\n  color += texture2D(image, uv - (off2 / resolution)) * 0.09447039785044732;\n  color += texture2D(image, uv + (off3 / resolution)) * 0.010381362401148057;\n  color += texture2D(image, uv - (off3 / resolution)) * 0.010381362401148057;\n  return color;\n}\n\nuniform vec2 iResolution;\nuniform sampler2D iChannel0;\nuniform vec2 direction;\n\nvoid main() {\n  vec2 uv = vec2(gl_FragCoord.xy / iResolution.xy);\n  gl_FragColor = blur13(iChannel0, uv, iResolution.xy, direction);\n}\n";
@@ -29628,6 +29626,844 @@ function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
   }
   return bind_column(batch, field_name, updatedFloatArray);
 }
+var dist = {};
+var quickselect = { exports: {} };
+(function(module, exports) {
+  (function(global2, factory) {
+    module.exports = factory();
+  })(commonjsGlobal, function() {
+    function quickselect2(arr, k, left, right, compare) {
+      quickselectStep(arr, k, left || 0, right || arr.length - 1, compare || defaultCompare);
+    }
+    function quickselectStep(arr, k, left, right, compare) {
+      while (right > left) {
+        if (right - left > 600) {
+          var n = right - left + 1;
+          var m = k - left + 1;
+          var z = Math.log(n);
+          var s = 0.5 * Math.exp(2 * z / 3);
+          var sd = 0.5 * Math.sqrt(z * s * (n - s) / n) * (m - n / 2 < 0 ? -1 : 1);
+          var newLeft = Math.max(left, Math.floor(k - m * s / n + sd));
+          var newRight = Math.min(right, Math.floor(k + (n - m) * s / n + sd));
+          quickselectStep(arr, k, newLeft, newRight, compare);
+        }
+        var t = arr[k];
+        var i = left;
+        var j = right;
+        swap(arr, left, k);
+        if (compare(arr[right], t) > 0)
+          swap(arr, left, right);
+        while (i < j) {
+          swap(arr, i, j);
+          i++;
+          j--;
+          while (compare(arr[i], t) < 0)
+            i++;
+          while (compare(arr[j], t) > 0)
+            j--;
+        }
+        if (compare(arr[left], t) === 0)
+          swap(arr, left, j);
+        else {
+          j++;
+          swap(arr, j, right);
+        }
+        if (j <= k)
+          left = j + 1;
+        if (k <= j)
+          right = j - 1;
+      }
+    }
+    function swap(arr, i, j) {
+      var tmp2 = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp2;
+    }
+    function defaultCompare(a, b) {
+      return a < b ? -1 : a > b ? 1 : 0;
+    }
+    return quickselect2;
+  });
+})(quickselect);
+(function(exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  var quickselect$1 = quickselect.exports;
+  var nodePool = [];
+  var freeNode = function(node) {
+    return nodePool.push(node);
+  };
+  var freeAllNode = function(node) {
+    if (node) {
+      freeNode(node);
+      if (!isLeaf(node)) {
+        node.children.forEach(freeAllNode);
+      }
+    }
+  };
+  var allowNode = function(children2) {
+    var node = nodePool.pop();
+    if (node) {
+      node.children = children2;
+      node.height = 1;
+      node.leaf = true;
+      node.minX = Infinity;
+      node.minY = Infinity;
+      node.minZ = Infinity;
+      node.maxX = -Infinity;
+      node.maxY = -Infinity;
+      node.maxZ = -Infinity;
+    } else {
+      node = {
+        children: children2,
+        height: 1,
+        leaf: true,
+        minX: Infinity,
+        minY: Infinity,
+        minZ: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+        maxZ: -Infinity
+      };
+    }
+    return node;
+  };
+  var distNodePool = [];
+  var freeDistNode = function(node) {
+    return distNodePool.push(node);
+  };
+  var allowDistNode = function(dist2, node) {
+    var heapNode = distNodePool.pop();
+    if (heapNode) {
+      heapNode.dist = dist2;
+      heapNode.node = node;
+    } else {
+      heapNode = { dist: dist2, node };
+    }
+    return heapNode;
+  };
+  var isLeaf = function(node) {
+    return node.leaf;
+  };
+  var isLeafChild = function(node, child) {
+    return node.leaf;
+  };
+  var findItem = function(item, items, equalsFn) {
+    if (!equalsFn)
+      return items.indexOf(item);
+    for (var i = 0; i < items.length; i++) {
+      if (equalsFn(item, items[i]))
+        return i;
+    }
+    return -1;
+  };
+  var calcBBox = function(node) {
+    distBBox(node, 0, node.children.length, node);
+  };
+  var distBBox = function(node, k, p, destNode) {
+    var dNode = destNode;
+    if (dNode) {
+      dNode.minX = Infinity;
+      dNode.minY = Infinity;
+      dNode.minZ = Infinity;
+      dNode.maxX = -Infinity;
+      dNode.maxY = -Infinity;
+      dNode.maxZ = -Infinity;
+    } else {
+      dNode = allowNode([]);
+    }
+    for (var i = k, child = void 0; i < p; i++) {
+      child = node.children[i];
+      extend2(dNode, child);
+    }
+    return dNode;
+  };
+  var extend2 = function(a, b) {
+    a.minX = Math.min(a.minX, b.minX);
+    a.minY = Math.min(a.minY, b.minY);
+    a.minZ = Math.min(a.minZ, b.minZ);
+    a.maxX = Math.max(a.maxX, b.maxX);
+    a.maxY = Math.max(a.maxY, b.maxY);
+    a.maxZ = Math.max(a.maxZ, b.maxZ);
+    return a;
+  };
+  var bboxVolume = function(a) {
+    return (a.maxX - a.minX) * (a.maxY - a.minY) * (a.maxZ - a.minZ);
+  };
+  var bboxMargin = function(a) {
+    return a.maxX - a.minX + (a.maxY - a.minY) + (a.maxZ - a.minZ);
+  };
+  var enlargedVolume = function(a, b) {
+    var minX = Math.min(a.minX, b.minX), minY = Math.min(a.minY, b.minY), minZ = Math.min(a.minZ, b.minZ), maxX = Math.max(a.maxX, b.maxX), maxY = Math.max(a.maxY, b.maxY), maxZ = Math.max(a.maxZ, b.maxZ);
+    return (maxX - minX) * (maxY - minY) * (maxZ - minZ);
+  };
+  var intersectionVolume = function(a, b) {
+    var minX = Math.max(a.minX, b.minX), minY = Math.max(a.minY, b.minY), minZ = Math.max(a.minZ, b.minZ), maxX = Math.min(a.maxX, b.maxX), maxY = Math.min(a.maxY, b.maxY), maxZ = Math.min(a.maxZ, b.maxZ);
+    return Math.max(0, maxX - minX) * Math.max(0, maxY - minY) * Math.max(0, maxZ - minZ);
+  };
+  var contains = function(a, b) {
+    return a.minX <= b.minX && a.minY <= b.minY && a.minZ <= b.minZ && b.maxX <= a.maxX && b.maxY <= a.maxY && b.maxZ <= a.maxZ;
+  };
+  exports.intersects = function(a, b) {
+    return b.minX <= a.maxX && b.minY <= a.maxY && b.minZ <= a.maxZ && b.maxX >= a.minX && b.maxY >= a.minY && b.maxZ >= a.minZ;
+  };
+  exports.boxRayIntersects = function(box, ox, oy, oz, idx, idy, idz) {
+    var tx0 = (box.minX - ox) * idx;
+    var tx1 = (box.maxX - ox) * idx;
+    var ty0 = (box.minY - oy) * idy;
+    var ty1 = (box.maxY - oy) * idy;
+    var tz0 = (box.minZ - oz) * idz;
+    var tz1 = (box.maxZ - oz) * idz;
+    var z0 = Math.min(tz0, tz1);
+    var z1 = Math.max(tz0, tz1);
+    var y02 = Math.min(ty0, ty1);
+    var y12 = Math.max(ty0, ty1);
+    var x02 = Math.min(tx0, tx1);
+    var x12 = Math.max(tx0, tx1);
+    var tmin = Math.max(0, x02, y02, z0);
+    var tmax = Math.min(x12, y12, z1);
+    return tmax >= tmin ? tmin : Infinity;
+  };
+  var multiSelect = function(arr, left, right, n, compare) {
+    var stack = [left, right];
+    var mid;
+    while (stack.length) {
+      right = stack.pop();
+      left = stack.pop();
+      if (right - left <= n)
+        continue;
+      mid = left + Math.ceil((right - left) / n / 2) * n;
+      quickselect$1(arr, mid, left, right, compare);
+      stack.push(left, mid, mid, right);
+    }
+  };
+  var compareMinX = function(a, b) {
+    return a.minX - b.minX;
+  };
+  var compareMinY = function(a, b) {
+    return a.minY - b.minY;
+  };
+  var compareMinZ = function(a, b) {
+    return a.minZ - b.minZ;
+  };
+  var RBush3D = function() {
+    function RBush3D2(maxEntries) {
+      if (maxEntries === void 0) {
+        maxEntries = 16;
+      }
+      this.maxEntries = Math.max(maxEntries, 8);
+      this.minEntries = Math.max(4, Math.ceil(this.maxEntries * 0.4));
+      this.clear();
+    }
+    RBush3D2.alloc = function() {
+      return this.pool.pop() || new this();
+    };
+    RBush3D2.free = function(rbush) {
+      rbush.clear();
+      this.pool.push(rbush);
+    };
+    RBush3D2.prototype.search = function(bbox) {
+      var node = this.data;
+      var result = [];
+      if (!exports.intersects(bbox, node))
+        return result;
+      var nodesToSearch = [];
+      while (node) {
+        for (var i = 0, len = node.children.length; i < len; i++) {
+          var child = node.children[i];
+          if (exports.intersects(bbox, child)) {
+            if (isLeafChild(node))
+              result.push(child);
+            else if (contains(bbox, child))
+              this._all(child, result);
+            else
+              nodesToSearch.push(child);
+          }
+        }
+        node = nodesToSearch.pop();
+      }
+      return result;
+    };
+    RBush3D2.prototype.collides = function(bbox) {
+      var node = this.data;
+      if (!exports.intersects(bbox, node))
+        return false;
+      var nodesToSearch = [];
+      while (node) {
+        for (var i = 0, len = node.children.length; i < len; i++) {
+          var child = node.children[i];
+          if (exports.intersects(bbox, child)) {
+            if (isLeafChild(node) || contains(bbox, child))
+              return true;
+            nodesToSearch.push(child);
+          }
+        }
+        node = nodesToSearch.pop();
+      }
+      return false;
+    };
+    RBush3D2.prototype.raycastInv = function(ox, oy, oz, idx, idy, idz, maxLen) {
+      if (maxLen === void 0) {
+        maxLen = Infinity;
+      }
+      var node = this.data;
+      if (idx === Infinity && idy === Infinity && idz === Infinity)
+        return allowDistNode(Infinity, void 0);
+      if (exports.boxRayIntersects(node, ox, oy, oz, idx, idy, idz) === Infinity)
+        return allowDistNode(Infinity, void 0);
+      var heap = [allowDistNode(0, node)];
+      var swap = function(a, b) {
+        var t = heap[a];
+        heap[a] = heap[b];
+        heap[b] = t;
+      };
+      var pop = function() {
+        var top = heap[0];
+        var newLen = heap.length - 1;
+        heap[0] = heap[newLen];
+        heap.length = newLen;
+        var idx2 = 0;
+        while (true) {
+          var left = idx2 << 1 | 1;
+          if (left >= newLen)
+            break;
+          var right = left + 1;
+          if (right < newLen && heap[right].dist < heap[left].dist) {
+            left = right;
+          }
+          if (heap[idx2].dist < heap[left].dist)
+            break;
+          swap(idx2, left);
+          idx2 = left;
+        }
+        freeDistNode(top);
+        return top.node;
+      };
+      var push = function(dist3, node2) {
+        var idx2 = heap.length;
+        heap.push(allowDistNode(dist3, node2));
+        while (idx2 > 0) {
+          var p = idx2 - 1 >> 1;
+          if (heap[p].dist <= heap[idx2].dist)
+            break;
+          swap(idx2, p);
+          idx2 = p;
+        }
+      };
+      var dist2 = maxLen;
+      var result;
+      while (heap.length && heap[0].dist < dist2) {
+        node = pop();
+        for (var i = 0, len = node.children.length; i < len; i++) {
+          var child = node.children[i];
+          var d = exports.boxRayIntersects(child, ox, oy, oz, idx, idy, idz);
+          if (!isLeafChild(node)) {
+            push(d, child);
+          } else if (d < dist2) {
+            if (d === 0) {
+              return allowDistNode(d, child);
+            }
+            dist2 = d;
+            result = child;
+          }
+        }
+      }
+      return allowDistNode(dist2 < maxLen ? dist2 : Infinity, result);
+    };
+    RBush3D2.prototype.raycast = function(ox, oy, oz, dx, dy, dz, maxLen) {
+      if (maxLen === void 0) {
+        maxLen = Infinity;
+      }
+      return this.raycastInv(ox, oy, oz, 1 / dx, 1 / dy, 1 / dz, maxLen);
+    };
+    RBush3D2.prototype.all = function() {
+      return this._all(this.data, []);
+    };
+    RBush3D2.prototype.load = function(data) {
+      if (!(data && data.length))
+        return this;
+      if (data.length < this.minEntries) {
+        for (var i = 0, len = data.length; i < len; i++) {
+          this.insert(data[i]);
+        }
+        return this;
+      }
+      var node = this.build(data.slice(), 0, data.length - 1, 0);
+      if (!this.data.children.length) {
+        this.data = node;
+      } else if (this.data.height === node.height) {
+        this.splitRoot(this.data, node);
+      } else {
+        if (this.data.height < node.height) {
+          var tmpNode = this.data;
+          this.data = node;
+          node = tmpNode;
+        }
+        this._insert(node, this.data.height - node.height - 1, true);
+      }
+      return this;
+    };
+    RBush3D2.prototype.insert = function(item) {
+      if (item)
+        this._insert(item, this.data.height - 1);
+      return this;
+    };
+    RBush3D2.prototype.clear = function() {
+      if (this.data) {
+        freeAllNode(this.data);
+      }
+      this.data = allowNode([]);
+      return this;
+    };
+    RBush3D2.prototype.remove = function(item, equalsFn) {
+      if (!item)
+        return this;
+      var node = this.data;
+      var i = 0;
+      var goingUp = false;
+      var index;
+      var parent;
+      var path = [];
+      var indexes = [];
+      while (node || path.length) {
+        if (!node) {
+          node = path.pop();
+          i = indexes.pop();
+          parent = path[path.length - 1];
+          goingUp = true;
+        }
+        if (isLeaf(node)) {
+          index = findItem(item, node.children, equalsFn);
+          if (index !== -1) {
+            node.children.splice(index, 1);
+            path.push(node);
+            this.condense(path);
+            return this;
+          }
+        }
+        if (!goingUp && !isLeaf(node) && contains(node, item)) {
+          path.push(node);
+          indexes.push(i);
+          i = 0;
+          parent = node;
+          node = node.children[0];
+        } else if (parent) {
+          i++;
+          node = parent.children[i];
+          goingUp = false;
+        } else {
+          node = void 0;
+        }
+      }
+      return this;
+    };
+    RBush3D2.prototype.toJSON = function() {
+      return this.data;
+    };
+    RBush3D2.prototype.fromJSON = function(data) {
+      freeAllNode(this.data);
+      this.data = data;
+      return this;
+    };
+    RBush3D2.prototype.build = function(items, left, right, height) {
+      var N = right - left + 1;
+      var M = this.maxEntries;
+      var node;
+      if (N <= M) {
+        node = allowNode(items.slice(left, right + 1));
+        calcBBox(node);
+        return node;
+      }
+      if (!height) {
+        height = Math.ceil(Math.log(N) / Math.log(M));
+        M = Math.ceil(N / Math.pow(M, height - 1));
+      }
+      node = allowNode([]);
+      node.leaf = false;
+      node.height = height;
+      var N3 = Math.ceil(N / M), N2 = N3 * Math.ceil(Math.pow(M, 2 / 3)), N1 = N3 * Math.ceil(Math.pow(M, 1 / 3));
+      multiSelect(items, left, right, N1, compareMinX);
+      for (var i = left; i <= right; i += N1) {
+        var right2 = Math.min(i + N1 - 1, right);
+        multiSelect(items, i, right2, N2, compareMinY);
+        for (var j = i; j <= right2; j += N2) {
+          var right3 = Math.min(j + N2 - 1, right2);
+          multiSelect(items, j, right3, N3, compareMinZ);
+          for (var k = j; k <= right3; k += N3) {
+            var right4 = Math.min(k + N3 - 1, right3);
+            node.children.push(this.build(items, k, right4, height - 1));
+          }
+        }
+      }
+      calcBBox(node);
+      return node;
+    };
+    RBush3D2.prototype._all = function(node, result) {
+      var nodesToSearch = [];
+      while (node) {
+        if (isLeaf(node))
+          result.push.apply(result, node.children);
+        else
+          nodesToSearch.push.apply(nodesToSearch, node.children);
+        node = nodesToSearch.pop();
+      }
+      return result;
+    };
+    RBush3D2.prototype.chooseSubtree = function(bbox, node, level, path) {
+      var minVolume;
+      var minEnlargement;
+      var targetNode;
+      while (true) {
+        path.push(node);
+        if (isLeaf(node) || path.length - 1 === level)
+          break;
+        minVolume = minEnlargement = Infinity;
+        for (var i = 0, len = node.children.length; i < len; i++) {
+          var child = node.children[i];
+          var volume = bboxVolume(child);
+          var enlargement = enlargedVolume(bbox, child) - volume;
+          if (enlargement < minEnlargement) {
+            minEnlargement = enlargement;
+            minVolume = volume < minVolume ? volume : minVolume;
+            targetNode = child;
+          } else if (enlargement === minEnlargement) {
+            if (volume < minVolume) {
+              minVolume = volume;
+              targetNode = child;
+            }
+          }
+        }
+        node = targetNode || node.children[0];
+      }
+      return node;
+    };
+    RBush3D2.prototype.split = function(insertPath, level) {
+      var node = insertPath[level];
+      var M = node.children.length;
+      var m = this.minEntries;
+      this.chooseSplitAxis(node, m, M);
+      var splitIndex = this.chooseSplitIndex(node, m, M);
+      var newNode = allowNode(node.children.splice(splitIndex, node.children.length - splitIndex));
+      newNode.height = node.height;
+      newNode.leaf = node.leaf;
+      calcBBox(node);
+      calcBBox(newNode);
+      if (level)
+        insertPath[level - 1].children.push(newNode);
+      else
+        this.splitRoot(node, newNode);
+    };
+    RBush3D2.prototype.splitRoot = function(node, newNode) {
+      this.data = allowNode([node, newNode]);
+      this.data.height = node.height + 1;
+      this.data.leaf = false;
+      calcBBox(this.data);
+    };
+    RBush3D2.prototype.chooseSplitIndex = function(node, m, M) {
+      var minOverlap = Infinity;
+      var minVolume = Infinity;
+      var index;
+      for (var i = m; i <= M - m; i++) {
+        var bbox1 = distBBox(node, 0, i);
+        var bbox2 = distBBox(node, i, M);
+        var overlap = intersectionVolume(bbox1, bbox2);
+        var volume = bboxVolume(bbox1) + bboxVolume(bbox2);
+        if (overlap < minOverlap) {
+          minOverlap = overlap;
+          index = i;
+          minVolume = volume < minVolume ? volume : minVolume;
+        } else if (overlap === minOverlap) {
+          if (volume < minVolume) {
+            minVolume = volume;
+            index = i;
+          }
+        }
+      }
+      return index;
+    };
+    RBush3D2.prototype.chooseSplitAxis = function(node, m, M) {
+      var xMargin = this.allDistMargin(node, m, M, compareMinX);
+      var yMargin = this.allDistMargin(node, m, M, compareMinY);
+      var zMargin = this.allDistMargin(node, m, M, compareMinZ);
+      if (xMargin < yMargin && xMargin < zMargin) {
+        node.children.sort(compareMinX);
+      } else if (yMargin < xMargin && yMargin < zMargin) {
+        node.children.sort(compareMinY);
+      }
+    };
+    RBush3D2.prototype.allDistMargin = function(node, m, M, compare) {
+      node.children.sort(compare);
+      var leftBBox = distBBox(node, 0, m);
+      var rightBBox = distBBox(node, M - m, M);
+      var margin = bboxMargin(leftBBox) + bboxMargin(rightBBox);
+      for (var i = m; i < M - m; i++) {
+        var child = node.children[i];
+        extend2(leftBBox, child);
+        margin += bboxMargin(leftBBox);
+      }
+      for (var i = M - m - 1; i >= m; i--) {
+        var child = node.children[i];
+        extend2(rightBBox, child);
+        margin += bboxMargin(rightBBox);
+      }
+      return margin;
+    };
+    RBush3D2.prototype.adjustParentBBoxes = function(bbox, path, level) {
+      for (var i = level; i >= 0; i--) {
+        extend2(path[i], bbox);
+      }
+    };
+    RBush3D2.prototype.condense = function(path) {
+      for (var i = path.length - 1, siblings = void 0; i >= 0; i--) {
+        if (path[i].children.length === 0) {
+          if (i > 0) {
+            siblings = path[i - 1].children;
+            siblings.splice(siblings.indexOf(path[i]), 1);
+            freeNode(path[i]);
+          } else {
+            this.clear();
+          }
+        } else {
+          calcBBox(path[i]);
+        }
+      }
+    };
+    RBush3D2.prototype._insert = function(item, level, isNode) {
+      var insertPath = [];
+      var node = this.chooseSubtree(item, this.data, level, insertPath);
+      node.children.push(item);
+      extend2(node, item);
+      while (level >= 0) {
+        if (insertPath[level].children.length > this.maxEntries) {
+          this.split(insertPath, level);
+          level--;
+        } else
+          break;
+      }
+      this.adjustParentBBoxes(item, insertPath, level);
+    };
+    RBush3D2.pool = [];
+    return RBush3D2;
+  }();
+  exports.RBush3D = RBush3D;
+})(dist);
+class LabelMaker extends Renderer {
+  constructor(selector2, scatterplot) {
+    super(scatterplot.div.node(), scatterplot._root, scatterplot);
+    this.layers = [];
+    this.canvas = scatterplot.elements[2].selectAll("canvas").node();
+    this.tree = new DepthTree(0.5, [1, 1e6], this.ctx);
+    this.bind_zoom(scatterplot._renderer.zoom);
+    this.ctx = this.canvas.getContext("2d");
+  }
+  start(ticks2 = 1e6) {
+    if (this.timer) {
+      this.timer.stop();
+    }
+    this.timer = timer(
+      () => {
+        this.render();
+        ticks2 -= 1;
+        if (ticks2 <= 0) {
+          this.stop();
+        }
+      }
+    );
+  }
+  stop() {
+    if (this.timer) {
+      this.timer.stop();
+      this.ctx.clearRect(0, 0, 4096, 4096);
+      this.timer = void 0;
+    }
+  }
+  update(featureset, label_key, size_key, color_key) {
+    this.tree = new DepthTree(0.5, [0.1, 1e6], this.ctx);
+    this.label_key = label_key;
+    for (const feature of featureset.features) {
+      const { properties, geometry } = feature;
+      if (geometry.type === "Point") {
+        let size = 18;
+        let label = "";
+        if (properties[size_key] !== void 0 && properties[size_key] !== null) {
+          size *= properties[size_key];
+        }
+        if (properties[label_key] !== void 0 && properties[label_key] !== null) {
+          label = properties[label_key];
+        }
+        const p = {
+          x: geometry.coordinates[0],
+          y: geometry.coordinates[1],
+          text: label,
+          height: size
+        };
+        this.tree.insert_point(p);
+      }
+    }
+  }
+  render() {
+    const context = this.ctx;
+    const { x_, y_, x, y } = this.zoom.scales();
+    const { transform } = this.zoom;
+    const { width, height } = this;
+    context.clearRect(0, 0, width, height);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.globalAlpha = 1;
+    transform.k;
+    const corners = this.zoom.current_corners();
+    const overlaps = this.tree.search({
+      minX: corners.x[0],
+      minY: corners.y[0],
+      minZ: transform.k,
+      maxX: corners.x[1],
+      maxY: corners.y[1] * 100,
+      maxZ: transform.k
+    });
+    context.clearRect(0, 0, 4096, 4096);
+    const dim = this.scatterplot.dim("color");
+    for (const d of overlaps) {
+      const { data: datum2 } = d;
+      context.font = `${datum2.height}pt verdana`;
+      context.globalAlpha = 1;
+      context.fillStyle = "white";
+      if (dim.field === this.label_key) {
+        context.shadowColor = dim.scale(datum2.text);
+      } else {
+        context.shadowColor = "black";
+      }
+      context.shadowBlur = 19;
+      context.lineWidth = 3;
+      context.strokeText(datum2.text, x_(datum2.x), y_(datum2.y));
+      context.shadowBlur = 0;
+      context.lineWidth = 4;
+      context.fillStyle = "white";
+      datum2.height;
+      datum2.height * datum2.aspect_ratio;
+      const x2 = x_(datum2.x);
+      const y2 = y_(datum2.y);
+      context.fillText(datum2.text, x2, y2);
+    }
+  }
+}
+function measure_text(d, context) {
+  context.font = `${d.height}pt verdana`;
+  if (d.text === "") {
+    return null;
+  }
+  const ms = context.measureText(d.text);
+  let {
+    actualBoundingBoxLeft,
+    actualBoundingBoxRight,
+    actualBoundingBoxAscent,
+    actualBoundingBoxDescent
+  } = ms;
+  if (isNaN(actualBoundingBoxLeft) || actualBoundingBoxLeft === void 0) {
+    actualBoundingBoxLeft = 0;
+    actualBoundingBoxRight = ms.width;
+    actualBoundingBoxAscent = d.height;
+    actualBoundingBoxDescent = 0;
+  }
+  const aspect_ratio = (actualBoundingBoxLeft + actualBoundingBoxRight) / (actualBoundingBoxAscent + actualBoundingBoxDescent);
+  return {
+    pixel_height: actualBoundingBoxAscent - actualBoundingBoxDescent,
+    aspect_ratio
+  };
+}
+class DepthTree extends dist.RBush3D {
+  constructor(scale_factor = 0.5, zoom2 = [0.1, 1e3], context) {
+    super();
+    this._accessor = (p) => [p.x, p.y];
+    this.scale_factor = scale_factor;
+    this.mindepth = zoom2[0];
+    this.maxdepth = zoom2[1];
+    this.context = context;
+    window.dtree = this;
+  }
+  max_collision_depth(p1, p2) {
+    const [x12, y12] = this._accessor(p1);
+    const [x2, y2] = this._accessor(p2);
+    let diff = Math.abs(x12 - x2);
+    let extension = p1.aspect_ratio * p1.height / 2 + p2.aspect_ratio * p2.height / 2;
+    const width_overlap = extension / diff;
+    diff = Math.abs(y12 - y2);
+    extension = p1.height / 2 + p2.height / 2;
+    const height_overlap = extension / diff;
+    if (p2.text === "STRIKE" && p1.text === "CLOSE AIR SUPPORT") {
+      console.log("IT's", width_overlap, height_overlap);
+    }
+    const max_overlap = Math.min(width_overlap, height_overlap);
+    return max_overlap;
+  }
+  set accessor(f) {
+    this._accessor = f;
+  }
+  get accessor() {
+    return this._accessor;
+  }
+  to3d(point, zoom2 = 1, maxZ) {
+    const [x, y] = this.accessor(point);
+    const { pixel_height, aspect_ratio } = measure_text(point, this.context);
+    console.log(
+      pixel_height,
+      aspect_ratio
+    );
+    const p = {
+      minX: x - aspect_ratio * pixel_height / zoom2 / 2,
+      maxX: x + aspect_ratio * pixel_height / zoom2 / 2,
+      minY: y - pixel_height / zoom2 / 2,
+      maxY: y + pixel_height / zoom2 / 2,
+      minZ: zoom2,
+      maxZ: maxZ || this.maxdepth,
+      data: {
+        ...point,
+        aspect_ratio
+      }
+    };
+    if (isNaN(x) || isNaN(y))
+      throw "Missing position" + JSON.stringify(point);
+    if (isNaN(aspect_ratio))
+      throw "Missing Aspect Ratio" + JSON.stringify(point);
+    return p;
+  }
+  insert_point(point, mindepth = 1) {
+    console.log("Starting to insert", point.text, "from", mindepth);
+    const p3d = this.to3d(point, mindepth, this.maxdepth);
+    if (!this.collides(p3d)) {
+      if (mindepth <= this.mindepth) {
+        p3d.visible_from = mindepth;
+        super.insert(p3d);
+      } else {
+        this.insert_point(point, mindepth / 2);
+      }
+    } else {
+      this.insert_after_collisions(p3d);
+    }
+  }
+  insert_after_collisions(p3d) {
+    let hidden_until = -1;
+    let hidden_by;
+    console.log("Inserting", p3d.data.text);
+    for (const overlapper of this.search(p3d)) {
+      const blocked_until = this.max_collision_depth(p3d.data, overlapper.data);
+      if (blocked_until > hidden_until) {
+        hidden_until = blocked_until;
+        hidden_by = overlapper;
+      }
+    }
+    if (hidden_by && hidden_until < this.maxdepth) {
+      console.log(hidden_by.data.text, " blocks ", p3d.data.text, " until ", hidden_until);
+      const hid_data = hidden_by.data;
+      const hid_start = hidden_by.minZ;
+      this.remove(hidden_by);
+      this.insert(this.to3d(hid_data, hidden_until, this.maxdepth));
+      this.insert(this.to3d(hid_data, hid_start, hidden_until));
+      const revised_3d = this.to3d(p3d.data, hidden_until, this.maxdepth);
+      revised_3d.visible_from = hidden_until;
+      console.log(hidden_until);
+      this.insert(revised_3d);
+    }
+  }
+}
 const base_elements = [
   {
     id: "canvas-2d-background",
@@ -29648,6 +30484,7 @@ const base_elements = [
 ];
 class Scatterplot {
   constructor(selector2, width, height) {
+    this.secondary_renderers = {};
     this.plot_queue = Promise.resolve(0);
     this.bound = false;
     if (selector2 !== void 0) {
@@ -29683,8 +30520,20 @@ class Scatterplot {
     this.bound = true;
   }
   add_identifier_column(name, codes, key_field) {
-    const true_codes = Array.isArray(codes) ? codes.reduce((acc, next) => Object.assign(acc, { [next]: 1 }), {}) : codes;
+    const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
+  }
+  async add_labels_from_url(url, name, label_key, size_key) {
+    const features = await fetch(url).then((data) => data.json()).catch((error) => {
+      console.log(error);
+    });
+    this.add_labels(features, name, label_key, size_key);
+  }
+  add_labels(features, name, label_key, size_key) {
+    const labels = new LabelMaker(this.div, this);
+    labels.update(features, label_key, size_key, void 0);
+    this.secondary_renderers[name] = labels;
+    this.secondary_renderers[name].start();
   }
   async reinitialize() {
     const { prefs } = this;
@@ -29758,6 +30607,9 @@ class Scatterplot {
       }
     }
     merge(this.prefs, prefs);
+  }
+  dim(dimension) {
+    return this._renderer.aes.dim(dimension).current;
   }
   set tooltip_html(func) {
     this.tooltip_handler.f = func;

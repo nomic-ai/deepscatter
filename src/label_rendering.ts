@@ -1,0 +1,329 @@
+import { GeoJsonObject } from 'geojson';
+import { Renderer } from './rendering';
+import { BBox, RBush3D } from 'rbush-3d';
+import { QuadtileSet } from './Dataset';
+import Scatterplot from './deepscatter';
+import { Timer, timer } from 'd3-timer';
+
+export class LabelMaker extends Renderer {
+  public layers : GeoJsonObject[] = [];
+  public ctx : CanvasRenderingContext2D;
+  public canvas : HTMLCanvasElement;
+  public tree : DepthTree;
+  public timer? : Timer;
+  public label_key : string;
+
+  constructor(selector : string, scatterplot : Scatterplot) {    
+    super(scatterplot.div.node(), scatterplot._root, scatterplot);
+    this.canvas = scatterplot.elements[2]
+      .selectAll('canvas').node();
+    this.tree = new DepthTree(.5, [1, 1e6], this.ctx);
+    this.bind_zoom(scatterplot._renderer.zoom);
+    this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+  }
+
+  start(ticks : number = 1e6) {
+    // Render for a set number of ticks. Probably overkill.
+    if (this.timer) {
+      this.timer.stop();
+    }
+
+    this.timer = timer(
+      () => {
+        this.render();
+        ticks -= 1;
+        if (ticks <= 0) {
+          this.stop();
+        }
+      }
+    );
+  }
+
+  stop() {
+    if (this.timer) {
+      this.timer.stop();
+      this.ctx.clearRect(0, 0, 4096, 4096);
+      this.timer = undefined;
+    }
+  }
+
+  public update(featureset : GeoJSON.FeatureCollection, label_key : string, size_key : string, color_key) {
+    // Insert an entire feature collection all at once.
+    this.tree = new DepthTree(.5, [.1, 1e6], this.ctx);
+    this.label_key = label_key;
+    for (const feature of featureset.features) {
+      const { properties, geometry } = feature;
+      if (geometry.type === 'Point') {
+        let size = 18;
+        let label = '';
+        if (properties[size_key] !== undefined && properties[size_key] !== null) {
+          size *= properties[size_key];
+        }
+        if (properties[label_key] !== undefined && properties[label_key] !== null) {
+          label = properties[label_key];
+        }
+        const p : RawPoint = {
+          x: geometry.coordinates[0],
+          y: geometry.coordinates[1],
+          text: label,
+          height: size
+        };
+        // bulk insert not supported
+        this.tree.insert_point(p);
+      }
+    }
+  }
+
+  render() {
+    const context = this.ctx;
+    const { x_, y_, x, y } = this.zoom.scales();    
+    const { transform } = this.zoom;
+    const { width, height } = this;
+
+    context.clearRect(0, 0, width, height);
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.globalAlpha = 1;
+
+    const size_adjust = transform.k;//Math.exp(Math.log(transform.k) * .5)
+    const corners = this.zoom.current_corners();
+    const overlaps = this.tree.search({
+      minX: corners.x[0],
+      minY: corners.y[0],
+      minZ: transform.k,
+      maxX: corners.x[1],
+      maxY: corners.y[1] * 100,
+      maxZ: transform.k
+    });
+//    context.fillStyle = "rgba(0, 0, 0, 0)";
+    context.clearRect(0, 0, 4096, 4096);
+    const dim = this.scatterplot.dim("color")
+    for (const d of overlaps) {
+      const { data: datum } = d;      
+      context.font = `${datum.height}pt verdana`;
+      context.globalAlpha = 1;
+      context.fillStyle = 'white';
+      if (dim.field === this.label_key) {
+        context.shadowColor = dim.scale(datum.text);
+      } else {
+        context.shadowColor = 'black';
+      }
+      context.shadowBlur=19;
+      context.lineWidth=3;
+      context.strokeText(datum.text,x_(datum.x), y_(datum.y));
+      context.shadowBlur=0;
+
+      context.lineWidth=4;
+      context.fillStyle="white";
+      const height = datum.height;
+      const width = datum.height * datum.aspect_ratio;
+      const x = x_(datum.x)
+      const y = y_(datum.y)
+      context.fillText(datum.text, x, y);
+    }
+  }
+
+
+}
+
+// Stuff the user must pass.
+type RawPoint = {
+  x: number,
+  y: number,
+  text: string,
+  // The pixel heights of the point.
+  height: number
+};
+
+// Stuff we calculate
+type Point = RawPoint & {
+  aspect_ratio: number,
+};
+
+// Cast into 3d space as a rectangle.
+type P3d = {
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+  minZ: number,
+  maxZ: number,
+  visible_from?: number,
+  data: Point
+};
+
+function measure_text(d : RawPoint, context : CanvasRenderingContext2D) {
+  // Called for the side-effect of setting `d.aspect_ratio` on the passed item.
+  context.font = `${d.height}pt verdana`;
+  if (d.text === '') {
+    return null;
+  }
+  const ms = context.measureText(d.text);
+  //context.clearRect(0, 0, 300, 100)
+  //context.fillText(d.text, 50, 20) 
+  let { actualBoundingBoxLeft, 
+    actualBoundingBoxRight, actualBoundingBoxAscent, 
+    actualBoundingBoxDescent } = ms;
+
+  if (isNaN(actualBoundingBoxLeft) || actualBoundingBoxLeft === undefined) {
+    // Some browsers don't support the full standard.
+    actualBoundingBoxLeft = 0;
+    actualBoundingBoxRight = ms.width;
+    // Hard coded at 6px
+    actualBoundingBoxAscent =  d.height;
+    actualBoundingBoxDescent = 0;
+  }
+  const aspect_ratio = (actualBoundingBoxLeft + actualBoundingBoxRight)/
+    (actualBoundingBoxAscent + actualBoundingBoxDescent);
+  return {
+    pixel_height: actualBoundingBoxAscent - actualBoundingBoxDescent,
+    aspect_ratio
+  };
+}
+
+class DepthTree extends RBush3D {
+  public scale_factor : number;
+  public mindepth: number;
+  public maxdepth: number;
+  public context : CanvasRenderingContext2D;
+  
+  private _accessor : (p : any) => [number, number] = p => [p.x, p.y];
+
+  constructor(scale_factor = 0.5, zoom = [.1, 1000], context : CanvasRenderingContext2D) {
+    // scale factor used to determine how quickly points scale.
+    // Not implemented.
+    // size = exp(log(k) * scale_factor);
+    
+    super();
+    this.scale_factor = scale_factor;
+    this.mindepth = zoom[0];
+    this.maxdepth = zoom[1];
+    this.context = context;
+    window.dtree = this;
+  }
+  
+  /**
+   * 
+   * @param p1 a point
+   * @param p2 another point
+   * @returns The lowest zoom level at which the two points collide
+   */
+  max_collision_depth(p1 : Point, p2 : Point) {
+    
+    const [x1, y1] = this._accessor(p1);
+    const [x2, y2] = this._accessor(p2);
+    // The zoom factor after which two points do not collide with each other.
+    
+    // First x
+    let diff = Math.abs(x1 - x2);
+    let extension = p1.aspect_ratio*p1.height/2 + p2.aspect_ratio*p2.height/2;
+    const width_overlap = extension/diff;
+    diff = Math.abs(y1 - y2);
+    extension = p1.height/2 + p2.height/2;
+    const height_overlap = extension/diff;
+    if (p2.text === 'STRIKE' && p1.text === 'CLOSE AIR SUPPORT') {
+      console.log("IT's", width_overlap, height_overlap)
+    }
+    // Then y
+    const max_overlap = Math.min(width_overlap, height_overlap);
+    return max_overlap;
+  }
+  
+  set accessor(f) {
+    this._accessor = f;
+  }
+
+  get accessor() {
+    return this._accessor;
+  }
+  
+  to3d(point : RawPoint, zoom = 1, maxZ : number | undefined) {
+    // Each point should have a center, an aspect ratio, and a height.
+    
+    // The height is the pixel height at a zoom level of one.
+    const [x, y] = this.accessor(point);
+    const {pixel_height, aspect_ratio} = measure_text(point, this.context);
+    console.log(
+      pixel_height, aspect_ratio
+    )
+    const p : P3d = {
+      minX: x - (aspect_ratio * pixel_height)/zoom/2,
+      maxX: x + (aspect_ratio * pixel_height)/zoom/2,
+      minY: y - (pixel_height)/zoom/2,
+      maxY: y + (pixel_height)/zoom/2,
+      minZ: zoom,
+      maxZ: maxZ || this.maxdepth,
+      data : {
+        ...point,
+        aspect_ratio
+      }
+    };
+    
+//    if (isNaN(height)) throw 'Missing Height: ' + JSON.stringify(point);
+    if (isNaN(x) || isNaN(y)) throw 'Missing position' + JSON.stringify(point);
+    if (isNaN(aspect_ratio)) throw 'Missing Aspect Ratio' + JSON.stringify(point);
+
+    return p;
+  }
+  
+  insert_point(point : RawPoint, mindepth = 1) {
+    console.log("Starting to insert", point.text, "from", mindepth)
+
+    const p3d = this.to3d(point, mindepth, this.maxdepth);
+    if (!this.collides(p3d)) {
+      if (mindepth <= this.mindepth) {
+        // It's visible from the minimum depth.
+        p3d.visible_from = mindepth;
+        super.insert(p3d);
+      } else {
+        // If we can't find the colliders, try inserting it twice as high up. 
+        // Recursive, so probably expensive.
+        this.insert_point(point, mindepth/2);
+      }
+    } else {
+      this.insert_after_collisions(p3d);
+    }
+  }
+  
+  insert_after_collisions(p3d : P3d) {
+    // The depth until which we're hidden; from min_depth (.1 ish) to max_depth(100 ish)
+    let hidden_until = -1;
+    // The node hiding this one.
+    let hidden_by;
+    console.log("Inserting", p3d.data.text)
+    for (const overlapper of this.search(p3d)) {
+      // Find the most closely overlapping 3d block.
+      // Although the other ones will retain 3d blocks'
+      // that extend all the way down to the 
+      // bottom of the depth tree and so collide with this,
+      // it's guaranteed that their *data*
+      // will not. And it means we can avoid unnecessary trees.
+
+      const blocked_until = this.max_collision_depth(p3d.data, overlapper.data); 
+
+      if (blocked_until > hidden_until) {
+        hidden_until = blocked_until;
+        hidden_by = overlapper;
+      }
+    }
+
+    if (hidden_by && hidden_until < this.maxdepth) {
+      console.log(hidden_by.data.text, " blocks ", p3d.data.text, " until ", hidden_until)
+
+      // Remove the blocker and replace it by two new 3d rectangles.
+      const hid_data = hidden_by.data;
+      const hid_start = hidden_by.minZ;
+      this.remove(hidden_by);
+
+      // Down from here.
+      this.insert(this.to3d(hid_data, hidden_until, this.maxdepth));
+      // Up until this point.
+      this.insert(this.to3d(hid_data, hid_start, hidden_until));
+      // Insert the new point
+      const revised_3d = this.to3d(p3d.data, hidden_until, this.maxdepth);
+      revised_3d.visible_from = hidden_until;
+      console.log(hidden_until);
+      this.insert(revised_3d);
+    }
+  }
+}

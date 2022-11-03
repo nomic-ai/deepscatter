@@ -7,6 +7,7 @@ import type { APICall } from './types';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 import { timer, Timer } from 'd3-timer';
+import { Dataset, QuadtileSet } from './Dataset';
 
 abstract class PlotSetting {
   abstract start: number;
@@ -119,7 +120,7 @@ export class Renderer {
   public _zoom : Zoom;
   public _initializations : Promise<any>[];
   public render_props : RenderProps;
-  constructor(selector, tileSet, scatterplot) {
+  constructor(selector : string, tileSet : QuadtileSet, scatterplot : Scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
     this.canvas = select(this.holder.node().firstElementChild);
@@ -219,7 +220,7 @@ export class Renderer {
 
   async initialize() {
     // Asynchronously wait for the basic elements to be done.
-    await this._initializations;
-    this.zoom.restart_timer(500_000);
+    // await this._initializations;
+    // this.zoom.restart_timer(500_000);
   }
 }

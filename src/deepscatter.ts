@@ -7,6 +7,9 @@ import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
 import { APICall } from './types';
 import { StructRowProxy } from 'apache-arrow';
+import { FeatureCollection } from 'geojson';
+import { LabelMaker } from './label_rendering';
+import { Renderer } from './rendering';
 
 // DOM elements that deepscatter uses.
 const base_elements = [
@@ -34,6 +37,7 @@ export default class Scatterplot {
   public height : number;
   public _root : Dataset<any>;
   public elements? : Selection<SVGElement, any, any, any>[];
+  public secondary_renderers : Record<string, Renderer> = {};
   div : Selection<any, any, any, any>;
   bound : boolean;
   //  d3 : Object;
@@ -64,7 +68,7 @@ export default class Scatterplot {
       point_size: 1, // base size before aes modifications.
       alpha: 40, // Overall screen saturation target.
     };
-//    this.d3 = { select };
+    //    this.d3 = { select };
   }
   /**
    * @param selector A selector for the root element of the deepscatter; must already exist.
@@ -122,9 +126,42 @@ export default class Scatterplot {
    */
   add_identifier_column(name : string, codes: string[] | Record<string, number>, key_field : string) {
     const true_codes : Record<string, number> = Array.isArray(codes) ?
-      codes.reduce((acc, next) => Object.assign(acc, { [next] : 1 }), {}) :
+      Object.fromEntries(codes.map(( next) => [next, 1])) :
       codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
+  }
+
+
+  async add_labels_from_url(url : string, name : string, label_key : string, size_key : string | undefined) {
+    const features = await fetch(url)
+      .then((data) => data.json() as Promise<FeatureCollection>)
+      .catch((error) => {console.log(error);});
+    this.add_labels(features, name , label_key, size_key);
+  }
+  /**
+   * 
+   * @param features A geojson feature collection containing point labels
+   * @param name A unique key to associate with this labelset. Labels can be enabled or disabled using this key.
+   * @param label_key The text field in which the labels are stored in the geojson object. 
+   * @param size_key A field in the dataset to associate with the *size* of the labels.
+   * 
+   * Usage: 
+   * 
+   * To add a set of labels to your map, create a geojson array of points where
+   * the 'properties' field contains a column to use for labels. E.g., each entry might look like 
+   * this. Each feature will be inserted into a label hierarchy to attempt to avoid inclusion.
+   * If the label_key corresponds to the currently active color dimension on your map, 
+   * the labels will be drawn with appropriately colored outlines: otherwise, they will
+   * all have a black outline.
+   * **Currently it is necessary that labels be inserted in order**. 
+   * 
+   * 
+  */
+  add_labels(features : FeatureCollection, name : string, label_key : string, size_key : string | undefined) {
+    const labels = new LabelMaker(this.div, this);
+    labels.update(features, label_key, size_key, undefined);
+    this.secondary_renderers[name] = labels;
+    this.secondary_renderers[name].start();
   }
 
   async reinitialize() {
@@ -223,7 +260,6 @@ export default class Scatterplot {
       }, i * 400);
     }
     setTimeout(() => ctx.clearRect(0, 0, 10_000, 10_000), 17 * 400);
-
   }
 
   /**
@@ -248,6 +284,17 @@ export default class Scatterplot {
     }
     merge(this.prefs, prefs);
 
+  }
+
+  /**
+   * 
+   * @param dimension The name of the encoding dimension to access
+   * information about
+   * @returns 
+   */
+
+  public dim(dimension : string) {
+    return this._renderer.aes.dim(dimension).current
   }
 
   set tooltip_html(func) {
@@ -357,7 +404,7 @@ export default class Scatterplot {
       this._renderer.tick('Basic');
     });
 
-    this._zoom.restart_timer(60000);
+    this._zoom.restart_timer(60_000);
   }
 
   async root_table() {
@@ -366,7 +413,7 @@ export default class Scatterplot {
     }
     return this._root.record_batch;
   }
-  
+
   /**
    * Return the current state of the query. Can be used to save an API
    * call for use programatically.
@@ -400,7 +447,6 @@ export default class Scatterplot {
 
   contours(aes) {
     const data = this._renderer.calculate_contours(aes);
-
     const {
       x, y, x_, y_,
     } = this._zoom.scales();
@@ -469,7 +515,7 @@ class TooltipHTML extends SettableFunction<string> {
     const nope = new Set([
       'x', 'y', 'ix', null, 'tile_key',
     ]);
-    console.log({...point});
+    console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) { continue; }
       // Private value.
