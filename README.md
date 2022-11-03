@@ -83,7 +83,7 @@ To edit the visualization, or to troubleshoot, look at the file `index-simplest-
 
 Explore `index.html`, and render it at `http://localhost:3345/index.html`, for a more advanced example.
 
-Note: Ideally, in a future release will you'll be able to create these specs in away that doesn't require coding JSON directly.
+Note: Ideally, in a future release you'll be able to create these specs in away that doesn't require coding JSON directly.
 
 
 ## Build the module
