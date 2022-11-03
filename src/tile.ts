@@ -328,12 +328,26 @@ export class QuadTile extends Tile {
     this.class = new.target;
   }
 
-
   get extent() : Rectangle {
     if (this._extent) {
       return this._extent;
     }
     return this.theoretical_extent;
+  }
+
+  async download_to_depth(max_ix : number) : Promise<void> {
+    /**
+     * Recursive fetch all tiles up to a certain depth. Triggers many unnecessary calls: prefer
+     * download instead if possible.
+     */
+    await this.download();
+    let promises : Array<Promise<void>> = [];
+    if (this.max_ix < max_ix) {
+      promises = this.children.map(
+        child => child.download_to_depth(max_ix)
+      );
+    }
+    return Promise.all(promises);
   }
 
   async download() : Promise<void> {

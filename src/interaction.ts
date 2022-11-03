@@ -108,7 +108,7 @@ export default class Zoom {
       });
   }
 
-  zoom_to_bbox(corners, duration = 4000) {
+  zoom_to_bbox(corners, duration = 4000, buffer = 1.111) {
     // Zooms to two points.
     const scales = this.scales();
     const [x0, x1] = corners.x.map(scales.x);
@@ -120,7 +120,7 @@ export default class Zoom {
 
     const t = zoomIdentity
       .translate(width / 2, height / 2)
-      .scale(0.9 / Math.max((x1 - x0) / width, (y1 - y0) / height))
+      .scale((1 / buffer) / Math.max((x1 - x0) / width, (y1 - y0) / height))
       .translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
 
     canvas

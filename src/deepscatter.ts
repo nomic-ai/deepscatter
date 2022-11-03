@@ -1,6 +1,6 @@
 import { select, Selection } from 'd3-selection';
 import { geoPath, geoIdentity } from 'd3-geo';
-import { max, range } from 'd3-array';
+import { max, range, sum } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
@@ -159,7 +159,7 @@ export default class Scatterplot {
   */
   add_labels(features : FeatureCollection, name : string, label_key : string, size_key : string | undefined) {
     const labels = new LabelMaker(this.div, this);
-    labels.update(features, label_key, size_key, undefined);
+    labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }
@@ -262,6 +262,81 @@ export default class Scatterplot {
     setTimeout(() => ctx.clearRect(0, 0, 10_000, 10_000), 17 * 400);
   }
 
+  async make_big_png(xtimes = 3, points = 1e7) {
+    await this._root.download_to_depth(points);
+    const { width, height } = this._renderer;
+    this.plotAPI({duration: 0});
+    const canvas = document.createElement('canvas');
+    canvas.setAttribute('width', (xtimes * width).toString());
+    canvas.setAttribute('height', (xtimes * height).toString());
+    const ctx = canvas.getContext('2d');
+
+    const corners = this._zoom.current_corners();
+    const current_zoom = this._zoom.transform.k;
+    const xstep = (corners.x[1] - corners.x[0]) / xtimes;
+    const ystep = (corners.y[1] - corners.y[0]) / xtimes;
+
+    const timeper = 100;
+    const p : Promise<void> = new Promise((resolve, reject) => {
+      for (let i = 0; i < xtimes; i++) {
+        for (let j = 0; j < xtimes; j++) {
+          setTimeout( () => 
+          {
+            this._zoom.zoom_to_bbox( 
+              { x: [corners.x[0] + xstep * i, corners.x[0] + xstep * (i + 1)],
+                y: [corners.y[0] + ystep * j, corners.y[0] + ystep * (j + 1)]
+              }, timeper / 5, 1);              
+            setTimeout(() => {
+              plot._renderer.fbos.colorpicker.use(() => {
+                plot._renderer.render_all(plot._renderer.props);
+
+                const pixels = this._renderer.regl.read(0, 0, width, height) as Uint8Array;
+                console.log(i, j, sum(pixels));
+
+                // https://stackoverflow.com/questions/41969562/how-can-i-flip-the-result-of-webglrenderingcontext-readpixels
+                const halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
+                const bytesPerRow = width * 4;
+                // make a temp buffer to hold one row
+                var temp = new Uint8Array(width * 4);
+                for (var y = 0; y < halfHeight; ++y) {
+                  var topOffset = y * bytesPerRow;
+                  var bottomOffset = (height - y - 1) * bytesPerRow;
+                  // make copy of a row on the top half
+                  temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
+                  // copy a row from the bottom half to the top
+                  pixels.copyWithin(topOffset, bottomOffset, bottomOffset + bytesPerRow);
+                  // copy the copy of the top half row to the bottom half 
+                  pixels.set(temp, bottomOffset);
+                }
+                const imageData = new ImageData(new Uint8ClampedArray(pixels), width);
+                ctx.putImageData(imageData, width * i, height * j);
+//                ctx?.strokeRect(width * i, height * j, width, height)
+              });
+              if (i == xtimes - 1 && j === xtimes - 1 ) {
+                resolve();
+              }
+            }, timeper / 2);
+          }
+          , 
+          i * timeper * xtimes + j * timeper);
+        }
+      }
+    });
+
+    p.then(() => {
+      const canvasUrl = canvas.toDataURL();
+      // Create an anchor, and set the href value to our data URL
+      const createEl = document.createElement('a');
+      createEl.href = canvasUrl;
+      createEl.style = 'position:fixed;top:40vh;left:40vw;z-index:999;';
+      // This is the name of our downloaded file
+      createEl.download = 'deepscatter';
+
+      // Click the download button, causing a download, and then remove it
+      createEl.click();
+      createEl.remove();
+    });    
+  }
   /**
    * Destroy the scatterplot and release all associated resources.
    * This is necessary because removing a deepscatter instance
@@ -294,7 +369,7 @@ export default class Scatterplot {
    */
 
   public dim(dimension : string) {
-    return this._renderer.aes.dim(dimension).current
+    return this._renderer.aes.dim(dimension).current;
   }
 
   set tooltip_html(func) {

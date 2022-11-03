@@ -242,6 +242,10 @@ export class QuadtileSet extends Dataset<QuadTile> {
     return this.root_tile.extent;
   }
 
+  async download_to_depth(max_ix) {
+    await this.root_tile.download_to_depth(max_ix);
+  }
+
   download_most_needed_tiles(bbox : Rectangle | undefined, max_ix: number, queue_length = 4) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
