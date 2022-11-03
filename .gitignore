@@ -1,7 +1,6 @@
 node_modules
 public/tiles
 .vscode
-.idea
 
 dist/tiles
 test-results/
