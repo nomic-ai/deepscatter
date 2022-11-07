@@ -262,7 +262,7 @@ export default class Scatterplot {
     setTimeout(() => ctx.clearRect(0, 0, 10_000, 10_000), 17 * 400);
   }
 
-  async make_big_png(xtimes = 3, points = 1e7) {
+  async make_big_png(xtimes = 3, points = 1e7, timeper = 100) {
     await this._root.download_to_depth(points);
     const { width, height } = this._renderer;
     this.plotAPI({duration: 0});
@@ -276,7 +276,6 @@ export default class Scatterplot {
     const xstep = (corners.x[1] - corners.x[0]) / xtimes;
     const ystep = (corners.y[1] - corners.y[0]) / xtimes;
 
-    const timeper = 100;
     const p : Promise<void> = new Promise((resolve, reject) => {
       for (let i = 0; i < xtimes; i++) {
         for (let j = 0; j < xtimes; j++) {
@@ -287,8 +286,8 @@ export default class Scatterplot {
                 y: [corners.y[0] + ystep * j, corners.y[0] + ystep * (j + 1)]
               }, timeper / 5, 1);              
             setTimeout(() => {
-              plot._renderer.fbos.colorpicker.use(() => {
-                plot._renderer.render_all(plot._renderer.props);
+              this._renderer.fbos.colorpicker.use(() => {
+                this._renderer.render_all(this._renderer.props);
 
                 const pixels = this._renderer.regl.read(0, 0, width, height) as Uint8Array;
                 console.log(i, j, sum(pixels));

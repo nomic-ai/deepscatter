@@ -92,7 +92,6 @@
 
   first_draw.then( async (d) => {
     await scatterplot.add_labels_from_url("tests/TAKEOFFLOCATION.geojson", "takeoff", "TAKEOFFLOCATION");
-    scatterplot.secondary_renderers['takeoff'].start();
   })
 
   // Simple animation demonstration.
