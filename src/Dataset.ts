@@ -6,8 +6,6 @@ import {
 } from 'd3-array';
 import * as Comlink from 'comlink';
 
-//@ts-ignore
-import TileWorker from './tileworker.worker.js?worker&inline';
 
 import { APICall, PointUpdate } from './types';
 import Scatterplot from './deepscatter';
@@ -21,7 +19,6 @@ export abstract class Dataset<T extends Tile> {
   public transformations: Record<string, (arg0 : T) => RecordBatch> = {};
   abstract root_tile : T;
   protected plot : Scatterplot;
-  protected _tileworkers: TileWorker[] = [];
   abstract ready : Promise<void>;
   abstract get extent() : Rectangle;
   abstract promise : Promise<void>;
@@ -178,25 +175,6 @@ export abstract class Dataset<T extends Tile> {
     return matches;
   }
 
-
-  get tileWorker() {
-    const NUM_WORKERS = 4;
-    if (this._tileworkers.length > 0) {
-      // Apportion the workers randomly whener one is asked for.
-      // Might be a way to have a promise queue that's a little more
-      // orderly.
-      this._tileworkers.unshift(this._tileworkers.pop());
-      return this._tileworkers[0];
-    }
-    for (const {} of range(NUM_WORKERS)) {
-      this._tileworkers.push(
-        //          Comlink.wrap(new Worker(this.url + '/../worker.js')),
-        Comlink.wrap(new TileWorker()),
-      );
-    }
-    return this._tileworkers[0];
-  }
-
 }
 
 export class ArrowDataset extends Dataset<ArrowTile> {
@@ -224,7 +202,6 @@ export class ArrowDataset extends Dataset<ArrowTile> {
 }
 
 export class QuadtileSet extends Dataset<QuadTile> {
-  protected _tileWorkers : TileWorker[] = [];
   protected _download_queue : Set<Key> = new Set();
   public promise : Promise<void> = new Promise(nothing);
   root_tile : QuadTile;

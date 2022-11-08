@@ -15,13 +15,13 @@ import { APICall, Encoding, Dimension } from './types';
 import REGL from 'regl';
 import { Dataset } from './Dataset';
 import { Frame } from '@playwright/test';
+import Scatterplot from './deepscatter';
 
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer<T extends Tile> extends Renderer {
   public regl : Regl;
   public aes : AestheticSet;
   public buffer_size = 1024 * 1024 * 64;
-  public canvas? : d3.Selection<HTMLCanvasElement, any, any, any>;
   private _buffers : MultipurposeBufferSet;
   public _initializations : Promise<void>[];
   public tileSet : Dataset<T>;
@@ -45,8 +45,13 @@ export class ReglRenderer<T extends Tile> extends Renderer {
   //  public _renderer :  Renderer;
 
 
-  constructor(selector, tileSet : Dataset<T>, scatterplot) {
+  constructor(selector, tileSet : Dataset<T>, scatterplot : Scatterplot) {
     super(selector, tileSet, scatterplot);
+    const c = this.canvas;
+    if (this.canvas === undefined) {
+      throw new Error('No canvas found');
+    }
+
     this.regl = wrapREGL(
       {
         //      extensions: 'angle_instanced_arrays',
@@ -56,10 +61,9 @@ export class ReglRenderer<T extends Tile> extends Renderer {
           'OES_texture_float',
           'OES_texture_half_float',
         ],
-        canvas: this.canvas.node(),
+        canvas: c
       },
     );
-
     this.tileSet = tileSet;
 
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
@@ -656,7 +660,6 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     // Coerce to int. unpackFloat returns float but findPoint expects int.
     const point_as_int = Math.round(point_as_float);
 
-//    console.log(point_as_int, `${field} (${props.color_picker_mode})`);
     return point_as_int;
   }
 
@@ -1013,7 +1016,6 @@ class TileBufferManager {
 
       if (current === null) {
         // It's in the process of being built.
-//        console.log('Building', key);
         return false;
       } if (current === undefined) {
         if (!this.tile.ready) {
@@ -1074,10 +1076,18 @@ class TileBufferManager {
     }
     // Anything that isn't a single-precision float must be coerced.
     if (column.type.typeId !== 3) {
-      console.warn(`Coercing ${key} to float32--it shouldn't be passed here as something else, though.`);
-      const buffer = new Float32Array(tile.record_batch.length);
-      for (let i = 0; i < tile.record_batch.numRows; i++) {
-        buffer[i] = column.data[0].values[i];
+      const buffer = new Float32Array(tile.record_batch.numRows);
+      let source_buffer = column.data[0];
+      if (column.type.dictionary) {
+        // We set the dictionary values down by 2047 so that we can use the
+        // even half-precision floats for direct indexing.
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = source_buffer.values[i] - 2047;
+        }
+      } else {
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = Number(source_buffer.values[i]);
+        }
       }
       return buffer;
     }

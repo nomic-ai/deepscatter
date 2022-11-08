@@ -5,9 +5,9 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
-import { APICall } from './types';
-import { StructRowProxy } from 'apache-arrow';
-import { FeatureCollection } from 'geojson';
+import type { APICall } from './types';
+import type { StructRowProxy } from 'apache-arrow';
+import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
 

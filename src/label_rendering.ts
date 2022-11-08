@@ -8,7 +8,6 @@ import { Timer, timer } from 'd3-timer';
 export class LabelMaker extends Renderer {
   public layers : GeoJsonObject[] = [];
   public ctx : CanvasRenderingContext2D;
-  public canvas : HTMLCanvasElement;
   public tree : DepthTree;
   public timer? : Timer;
   public label_key : string;

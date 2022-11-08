@@ -17,7 +17,6 @@ import {
   Field
 } from 'apache-arrow';
 
-import TileWorker from './tileworker.worker.js?worker&inline';
 import type { Dataset, QuadtileSet } from './Dataset';
 import Scatterplot from './deepscatter';
 type MinMax = [number, number];
@@ -106,12 +105,6 @@ export abstract class Tile {
         || c.y[0] > viewport_limits.y[1]
         || c.y[1] < viewport_limits.y[0]));
   }
-
-  get tileWorker() : TileWorker {
-    const worker : TileWorker = this.dataset.tileWorker;
-    return worker;
-  }
-
 
   *points(bounding : Rectangle | undefined, sorted = false) : Iterable<StructRowProxy> {
     //if (!this.is_visible(1e100, bounding)) {
@@ -371,18 +364,22 @@ export class QuadTile extends Tile {
       } :
       undefined;
 
-    this._download = this.tileWorker
-      .fetch(url, {}, request)
-      .then(([buffer, metadata, codes]): Table<any> => {
+    
+    this._download = fetch(url, request)
+      .then(async (response) : Table<any> => {
+        const buffer = await response.arrayBuffer();
         this.download_state = 'Complete';
         this._table_buffer = buffer;
         this._batch = tableFromIPC(buffer).batches[0];
-        if (this._batch === undefined) {
-          throw 'Batch was empty'
+        const metadata = this._batch.schema.metadata;
+        const extent = metadata.get('extent');
+        if (extent) {
+          this._extent = JSON.parse(extent) as Rectangle;
         }
-
-        this._extent = JSON.parse(metadata.get('extent'));
-        this.child_locations = JSON.parse(metadata.get('children'));
+        const children = metadata.get('children');
+        if (children) {
+          this.child_locations = JSON.parse(children) as string[];
+        }
         const ixes = this._batch.getChild('ix');
         if (ixes === null) {
           throw 'No ix column in table';
@@ -390,14 +387,13 @@ export class QuadTile extends Tile {
         this._min_ix = Number(ixes.get(0));
         this.max_ix = Number(ixes.get(ixes.length - 1));
         this.highest_known_ix = this.max_ix;
-        this._current_mutations = JSON.parse(JSON.stringify(this.needed_mutations || {}));
-        this.local_dictionary_lookups = codes;
 //        this.update_master_dictionary_lookups();
       })
       .catch((error) => {        
+        console.log(error);
         this.download_state = 'Failed';
         console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
-        
+
         `);
         throw error;
       });

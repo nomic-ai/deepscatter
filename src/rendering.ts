@@ -109,7 +109,7 @@ export class Renderer {
   // A renderer handles drawing to a display element.
   public scatterplot : Scatterplot;
   public holder : d3.Selection<any, any, any, any>;
-  public canvas : d3.Selection<any, any, any, any>;
+  public canvas: HTMLCanvasElement;
   public tileSet : Tileset;
   public width : number;
   public height : number;
@@ -123,10 +123,10 @@ export class Renderer {
   constructor(selector : string, tileSet : QuadtileSet, scatterplot : Scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
-    this.canvas = select(this.holder.node().firstElementChild);
+    this.canvas = select(this.holder.node().firstElementChild).node();
     this.tileSet = tileSet;
-    this.width = +this.canvas.attr('width');
-    this.height = +this.canvas.attr('height');
+    this.width = +select(this.canvas).attr('width');
+    this.height = +select(this.canvas).attr('height');
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
     this.render_props = new RenderProps();
