@@ -57,34 +57,34 @@ npm i
 npm run dev
 ```
 
-If you go to localhost:3344, it should have an interactive scatterplot waiting.
+If you go to `localhost:3344`, you should see an interactive scatterplot. To dig into what you're seeing, open `index.html`.
 (In 2021, this development site works in Chrome, not Safari or Firefox, because it uses ES6 module syntax inside the webworker. The distributed version of 
 the module should work in all browsers.)
 
 ## Your own data.
 
 1. Create a CSV, parquet, or feather file that has columns called 'x' and 'y'. (Or a feather file that has columns `x`, `y`). Any other columns (categorical information, etc.) can be included as additional columns.
-3. Tile it:
-  ```sh
-  quadfeather --files tmp.csv --tile_size 50000 --destination tiles
-  ```
-3. Edit the file at `index.html` to use an encoding scheme that matches your data. The API call describing the basic plot is at [lines 45-78 in the example code]( https://github.com/CreatingData/deepscatter/blob/master/index.html#L45-L78), and includes some aesthetic descriptions like [`{field : "class"}`](https://github.com/CreatingData/deepscatter/blob/master/index.html#L55) on various lines that refer to CSV columns that are likely *not* in your data. So if you have a field called `species`, for example, you might change `{field : "class"}` to `{field : "species"}`, and replace 
-   ```
-   "size": {
-        "field": "quantity",
-        "transform": "sqrt",
-        "domain": [0, 3],
-        "range": [0, 4]
-   }
-   ```
-   with 
-   ```
-    "size": {
-        "field": "species",
-        "range": "category10"
-     }
-     ```
-At some point soon I hope to share an easier way to create these specs that does not require coding JSON directly.
+
+2. Tile it:
+
+```sh
+cd deepscatter # if you're not already there
+quadfeather --files ../some-path-to/your-data.csv --tile_size 50000 --destination tiles
+```
+
+3. Assuming your dataset has an `x` and `y` column and the `tiles` folder is in the root directory of this project, you can see the data visualized by running
+
+```sh
+npm run dev
+```
+
+and opening `http://localhost:3345/index-simplest-way-to-start.html` in your browser.
+
+To edit the visualization, or to troubleshoot, look at the file `index-simplest-way-to-start.html`, where you should find a bare-bones implementation of deepscatter.
+
+Explore `index.html`, and render it at `http://localhost:3345/index.html`, for a more advanced example.
+
+Note: Ideally, in a future release you'll be able to create these specs in away that doesn't require coding JSON directly.
 
 
 ## Build the module
