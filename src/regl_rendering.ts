@@ -1058,7 +1058,7 @@ class TileBufferManager {
       throw 'Tile table not present.';
     }
 
-    let column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
+    let column = tile.record_batch.getChild(key);
 
     if (!column) {
       if (tile.dataset.transformations[key]) {
@@ -1083,6 +1083,31 @@ class TileBufferManager {
         // even half-precision floats for direct indexing.
         for (let i = 0; i < tile.record_batch.numRows; i++) {
           buffer[i] = source_buffer.values[i] - 2047;
+        }
+      } else if (source_buffer.stride === 2 && column.type.typeId === 10) {
+        
+        // 64-bit timestamped are internally represented as two 32-bit ints in the arrow arrays.
+        // This does a moderately expensive copy as a stopgap.
+        // This problem may creep up in other 64-bit types as we go, so keep an eye out.
+        const copy = (new Int32Array(source_buffer.values)).buffer;        
+        const view64 = new BigInt64Array(copy);
+        const timetype = column.type.unit;
+
+        // All times are represented as milliseconds on the 
+        // GPU to align with the Javascript numbers. More or less, 
+        // at least.
+
+        const divisor = 
+          timetype === 0 ? 1e-3 : // second
+          timetype === 1 ? 1e0 : // millisecond
+          timetype === 2 ? 1e3 : // microsecond
+          timetype === 3 ? 1e6 : // nanosecond
+          42; // default to milliseconds
+
+        if (divisor === 42) { throw new Error(`Unknown time type ${timetype}`); }
+
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = Number(view64[i])  / divisor;
         }
       } else {
         for (let i = 0; i < tile.record_batch.numRows; i++) {

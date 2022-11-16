@@ -592,8 +592,6 @@ class TooltipHTML extends SettableFunction<string> {
     console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) { continue; }
-      // Private value.
-      if (/_float_version/.test(k)) { continue; }
       // Don't show missing data.
       if (v === null) { continue; }
       // Don't show empty data.

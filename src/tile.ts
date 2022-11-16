@@ -255,6 +255,15 @@ export abstract class Tile {
           extent: extent(this.record_batch.getChild(name).data[0].values),
         });
       }
+      if (type?.typeId === 10) {
+        // MUST HANDLE RESOLUTIONS HERE.
+        return [10, 100];
+        attributes.push({
+          name,
+          type: 'datetime',
+          extent: this.dataset.domain(name),
+        });
+      }
       if (type && type.typeId == 3) {
         attributes.push({
           name, type: 'float', extent: extent(this.record_batch.getChild(name).data[0].values),
@@ -455,14 +464,14 @@ export class ArrowTile extends Tile {
     if (row_last === null) {
       throw ('No rows in table');
     }
-    this.max_ix = row_last.ix;
-    this.highest_known_ix = this.max_ix;
+    this.max_ix = Number(row_last.ix);
+    this.highest_known_ix = Number(this.max_ix);
     const row_1 = this._batch.get(0);
     if (row_1 === null) {
       throw ('No rows in table');
     }
-    this._min_ix = row_1.ix;
-    this.highest_known_ix = this.max_ix;
+    this._min_ix = Number(row_1.ix);
+    this.highest_known_ix = Number(this.max_ix);
     this.create_children();
   }
 
@@ -475,7 +484,6 @@ export class ArrowTile extends Tile {
     }
   }  
   download() : Promise<RecordBatch> {
-    
     return Promise.resolve(this._batch);
   }
   get ready() : boolean {

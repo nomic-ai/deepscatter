@@ -1,9 +1,3 @@
-var __defProp = Object.defineProperty;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __publicField = (obj, key, value) => {
-  __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-  return value;
-};
 var xhtml = "http://www.w3.org/1999/xhtml";
 const namespaces = {
   svg: "http://www.w3.org/2000/svg",
@@ -2000,7 +1994,7 @@ var lodash_merge = { exports: {} };
   var reIsNative = RegExp(
     "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
   );
-  var Buffer3 = moduleExports ? root2.Buffer : void 0, Symbol2 = root2.Symbol, Uint8Array2 = root2.Uint8Array, allocUnsafe = Buffer3 ? Buffer3.allocUnsafe : void 0, getPrototype = overArg(Object.getPrototypeOf, Object), objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, symToStringTag = Symbol2 ? Symbol2.toStringTag : void 0;
+  var Buffer2 = moduleExports ? root2.Buffer : void 0, Symbol2 = root2.Symbol, Uint8Array2 = root2.Uint8Array, allocUnsafe = Buffer2 ? Buffer2.allocUnsafe : void 0, getPrototype = overArg(Object.getPrototypeOf, Object), objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, symToStringTag = Symbol2 ? Symbol2.toStringTag : void 0;
   var defineProperty = function() {
     try {
       var func = getNative(Object, "defineProperty");
@@ -2009,7 +2003,7 @@ var lodash_merge = { exports: {} };
     } catch (e) {
     }
   }();
-  var nativeIsBuffer = Buffer3 ? Buffer3.isBuffer : void 0, nativeMax = Math.max, nativeNow = Date.now;
+  var nativeIsBuffer = Buffer2 ? Buffer2.isBuffer : void 0, nativeMax = Math.max, nativeNow = Date.now;
   var Map2 = getNative(root2, "Map"), nativeCreate = getNative(Object, "create");
   var baseCreate = function() {
     function object2() {
@@ -5347,18 +5341,6 @@ function sequentialPow() {
 }
 class Zoom {
   constructor(selector2, prefs, plot) {
-    __publicField(this, "prefs");
-    __publicField(this, "svg_element_selection");
-    __publicField(this, "width");
-    __publicField(this, "height");
-    __publicField(this, "renderers");
-    __publicField(this, "tileSet");
-    __publicField(this, "_timer");
-    __publicField(this, "_scales");
-    __publicField(this, "zoomer");
-    __publicField(this, "transform");
-    __publicField(this, "_start");
-    __publicField(this, "scatterplot");
     this.prefs = prefs;
     this.svg_element_selection = select(selector2);
     this.width = +this.svg_element_selection.attr("width");
@@ -15397,8 +15379,6 @@ function decodeFloat(x, y, z, w) {
 }
 class PlotSetting {
   constructor() {
-    __publicField(this, "timer");
-    __publicField(this, "transform");
     this.transform = "arithmetic";
   }
   update(value, duration) {
@@ -15434,34 +15414,31 @@ class PlotSetting {
 class MaxPoints extends PlotSetting {
   constructor() {
     super();
-    __publicField(this, "value", 1e4);
-    __publicField(this, "start", 1e4);
-    __publicField(this, "target", 1e4);
+    this.value = 1e4;
+    this.start = 1e4;
+    this.target = 1e4;
     this.transform = "geometric";
   }
 }
 class TargetOpacity extends PlotSetting {
   constructor() {
     super(...arguments);
-    __publicField(this, "value", 10);
-    __publicField(this, "start", 10);
-    __publicField(this, "target", 10);
+    this.value = 10;
+    this.start = 10;
+    this.target = 10;
   }
 }
 class PointSize extends PlotSetting {
   constructor() {
     super();
-    __publicField(this, "value", 2);
-    __publicField(this, "start", 2);
-    __publicField(this, "target", 2);
+    this.value = 2;
+    this.start = 2;
+    this.target = 2;
     this.transform = "geometric";
   }
 }
 class RenderProps {
   constructor() {
-    __publicField(this, "maxPoints");
-    __publicField(this, "targetOpacity");
-    __publicField(this, "pointSize");
     this.maxPoints = new MaxPoints();
     this.targetOpacity = new TargetOpacity();
     this.pointSize = new PointSize();
@@ -15484,19 +15461,7 @@ class RenderProps {
 }
 class Renderer {
   constructor(selector2, tileSet, scatterplot) {
-    __publicField(this, "scatterplot");
-    __publicField(this, "holder");
-    __publicField(this, "canvas");
-    __publicField(this, "tileSet");
-    __publicField(this, "width");
-    __publicField(this, "height");
-    __publicField(this, "deferred_functions");
-    __publicField(this, "_use_scale_to_download_tiles", true);
-    __publicField(this, "zoom");
-    __publicField(this, "aes");
-    __publicField(this, "_zoom");
-    __publicField(this, "_initializations");
-    __publicField(this, "render_props");
+    this._use_scale_to_download_tiles = true;
     this.scatterplot = scatterplot;
     this.holder = select(selector2);
     this.canvas = select(this.holder.node().firstElementChild).node();
@@ -17466,22 +17431,11 @@ function okabe() {
 okabe();
 class Aesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
-    __publicField(this, "scatterplot");
-    __publicField(this, "field", null);
-    __publicField(this, "regl");
-    __publicField(this, "_texture_buffer", null);
-    __publicField(this, "_domain");
-    __publicField(this, "_range");
-    __publicField(this, "_transform");
-    __publicField(this, "dataset");
-    __publicField(this, "partner", null);
-    __publicField(this, "_textures", {});
-    __publicField(this, "_constant");
-    __publicField(this, "_scale", (p) => 1);
-    __publicField(this, "current_encoding");
-    __publicField(this, "aesthetic_map");
-    __publicField(this, "id");
-    __publicField(this, "_domains");
+    this.field = null;
+    this._texture_buffer = null;
+    this.partner = null;
+    this._textures = {};
+    this._scale = (p) => 1;
     this.aesthetic_map = aesthetic_map;
     if (this.aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined");
@@ -17822,8 +17776,8 @@ class BooleanAesthetic extends Aesthetic {
 class Size extends OneDAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "default_constant", 1);
-    __publicField(this, "default_transform", "sqrt");
+    this.default_constant = 1;
+    this.default_transform = "sqrt";
   }
   static get default_constant() {
     return 1.5;
@@ -17841,9 +17795,9 @@ class Size extends OneDAesthetic {
 class PositionalAesthetic extends OneDAesthetic {
   constructor(scatterplot, regl2, tile, map2) {
     super(scatterplot, regl2, tile, map2);
-    __publicField(this, "default_range", [-1, 1]);
-    __publicField(this, "default_constant", 0);
-    __publicField(this, "default_transform", "literal");
+    this.default_range = [-1, 1];
+    this.default_constant = 0;
+    this.default_transform = "literal";
     this._transform = "literal";
   }
   get range() {
@@ -17861,7 +17815,7 @@ class PositionalAesthetic extends OneDAesthetic {
 class X extends PositionalAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "field", "x");
+    this.field = "x";
   }
 }
 class X0 extends X {
@@ -17869,7 +17823,7 @@ class X0 extends X {
 class Y extends PositionalAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "field", "y");
+    this.field = "y";
   }
 }
 class Y0 extends Y {
@@ -17877,10 +17831,9 @@ class Y0 extends Y {
 class AbstractFilter extends BooleanAesthetic {
   constructor(scatterplot, regl2, tile, map2) {
     super(scatterplot, regl2, tile, map2);
-    __publicField(this, "current_encoding");
-    __publicField(this, "default_transform", "literal");
-    __publicField(this, "default_constant", 1);
-    __publicField(this, "default_range", [0, 1]);
+    this.default_transform = "literal";
+    this.default_constant = 1;
+    this.default_range = [0, 1];
     this.current_encoding = { constant: 1 };
   }
   get default_domain() {
@@ -17917,9 +17870,9 @@ class Filter extends AbstractFilter {
 class Jitter_speed extends Aesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "default_transform", "linear");
-    __publicField(this, "default_range", [0, 1]);
-    __publicField(this, "default_constant", 0.5);
+    this.default_transform = "linear";
+    this.default_range = [0, 1];
+    this.default_constant = 0.5;
   }
   get default_domain() {
     return [0, 1];
@@ -17946,9 +17899,9 @@ function encode_jitter_to_int(jitter) {
 class Jitter_radius extends Aesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "jitter_int_formatted", 0);
-    __publicField(this, "default_transform", "linear");
-    __publicField(this, "_method", "None");
+    this.jitter_int_formatted = 0;
+    this.default_transform = "linear";
+    this._method = "None";
   }
   get default_constant() {
     return 0;
@@ -17973,12 +17926,12 @@ const default_color = [0.7, 0, 0.5];
 class Color extends Aesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "texture_type", "uint8");
-    __publicField(this, "default_constant", [0.7, 0, 0.5]);
-    __publicField(this, "default_transform", "linear");
-    __publicField(this, "current_encoding", {
+    this.texture_type = "uint8";
+    this.default_constant = [0.7, 0, 0.5];
+    this.default_transform = "linear";
+    this.current_encoding = {
       constant: default_color
-    });
+    };
   }
   get default_range() {
     return [0, 1];
@@ -18040,12 +17993,7 @@ class Color extends Aesthetic {
 }
 class StatefulAesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
-    __publicField(this, "_states");
-    __publicField(this, "dataset");
-    __publicField(this, "regl");
-    __publicField(this, "scatterplot");
-    __publicField(this, "needs_transitions", false);
-    __publicField(this, "aesthetic_map");
+    this.needs_transitions = false;
     if (aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined.");
     }
@@ -18179,13 +18127,6 @@ function lambda_to_function(input) {
 }
 class AestheticSet {
   constructor(scatterplot, regl2, tileSet) {
-    __publicField(this, "tileSet");
-    __publicField(this, "scatterplot");
-    __publicField(this, "regl");
-    __publicField(this, "encoding");
-    __publicField(this, "position_interpolation");
-    __publicField(this, "store");
-    __publicField(this, "aesthetic_map");
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl2;
@@ -18266,15 +18207,8 @@ class AestheticSet {
 }
 class TextureSet {
   constructor(regl2, texture_size = 4096, texture_widths = 32) {
-    __publicField(this, "_one_d_texture");
-    __publicField(this, "_color_texture");
-    __publicField(this, "texture_size");
-    __publicField(this, "regl");
-    __publicField(this, "id_locs", {});
-    __publicField(this, "texture_widths");
-    __publicField(this, "offsets", {});
-    __publicField(this, "_one_d_position");
-    __publicField(this, "_color_position");
+    this.id_locs = {};
+    this.offsets = {};
     this.texture_size = texture_size;
     this.texture_widths = texture_widths;
     this.regl = regl2;
@@ -18345,30 +18279,10 @@ class TextureSet {
 class ReglRenderer extends Renderer {
   constructor(selector2, tileSet, scatterplot) {
     super(selector2, tileSet, scatterplot);
-    __publicField(this, "regl");
-    __publicField(this, "aes");
-    __publicField(this, "buffer_size", 1024 * 1024 * 64);
-    __publicField(this, "_buffers");
-    __publicField(this, "_initializations");
-    __publicField(this, "tileSet");
-    __publicField(this, "zoom");
-    __publicField(this, "_zoom");
-    __publicField(this, "_start");
-    __publicField(this, "most_recent_restart");
-    __publicField(this, "_default_webgl_scale");
-    __publicField(this, "_webgl_scale_history");
-    __publicField(this, "_renderer");
-    __publicField(this, "_use_scale_to_download_tiles", true);
-    __publicField(this, "sprites");
-    __publicField(this, "fbos", {});
-    __publicField(this, "textures", {});
-    __publicField(this, "_fill_buffer");
-    __publicField(this, "contour_vals");
-    __publicField(this, "tick_num");
-    __publicField(this, "reglframe");
-    __publicField(this, "aes_to_buffer_num");
-    __publicField(this, "variable_to_buffer_num");
-    __publicField(this, "buffer_num_to_variable");
+    this.buffer_size = 1024 * 1024 * 64;
+    this._use_scale_to_download_tiles = true;
+    this.fbos = {};
+    this.textures = {};
     const c2 = this.canvas;
     if (this.canvas === void 0) {
       throw new Error("No canvas found");
@@ -18965,10 +18879,6 @@ class ReglRenderer extends Renderer {
 }
 class TileBufferManager {
   constructor(regl2, tile, renderer) {
-    __publicField(this, "tile");
-    __publicField(this, "regl");
-    __publicField(this, "renderer");
-    __publicField(this, "regl_elements");
     this.tile = tile;
     this.regl = regl2;
     this.renderer = renderer;
@@ -19029,7 +18939,7 @@ class TileBufferManager {
     if (!tile.ready) {
       throw "Tile table not present.";
     }
-    let column = tile.record_batch.getChild(`${key}_float_version`) || tile.record_batch.getChild(key);
+    let column = tile.record_batch.getChild(key);
     if (!column) {
       if (tile.dataset.transformations[key]) {
         tile._batch = tile.dataset.transformations[key](tile);
@@ -19048,6 +18958,17 @@ class TileBufferManager {
       if (column.type.dictionary) {
         for (let i = 0; i < tile.record_batch.numRows; i++) {
           buffer[i] = source_buffer.values[i] - 2047;
+        }
+      } else if (source_buffer.stride === 2 && column.type.typeId === 10) {
+        const copy2 = new Int32Array(source_buffer.values).buffer;
+        const view64 = new BigInt64Array(copy2);
+        const timetype = column.type.unit;
+        const divisor = timetype === 0 ? 1e-3 : timetype === 1 ? 1 : timetype === 2 ? 1e3 : timetype === 3 ? 1e6 : 42;
+        if (divisor === 42) {
+          throw new Error(`Unknown time type ${timetype}`);
+        }
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = Number(view64[i]) / divisor;
         }
       } else {
         for (let i = 0; i < tile.record_batch.numRows; i++) {
@@ -19083,11 +19004,6 @@ class TileBufferManager {
 }
 class MultipurposeBufferSet {
   constructor(regl2, buffer_size) {
-    __publicField(this, "regl");
-    __publicField(this, "buffers");
-    __publicField(this, "buffer_size");
-    __publicField(this, "buffer_offsets");
-    __publicField(this, "pointer");
     this.regl = regl2;
     this.buffer_size = buffer_size;
     this.buffers = [];
@@ -19927,7 +19843,7 @@ function decimalToString(a) {
     base64[0] = base64[0] - base64[1] * 10;
     digits = `${base64[0]}${digits}`;
   } while (checks[0] || checks[1] || checks[2] || checks[3]);
-  return digits !== null && digits !== void 0 ? digits : `0`;
+  return digits ? digits : `0`;
 }
 class BN {
   static new(num, isSigned) {
@@ -26013,7 +25929,7 @@ class ListBuilder extends VariableWidthBuilder {
     const offsets = this._offsets;
     const [child] = this.children;
     for (const [index, value] of pending) {
-      if (typeof value === "undefined") {
+      if (value === void 0) {
         offsets.set(index, 0);
       } else {
         const n = value.length;
@@ -27038,7 +26954,7 @@ class BodyCompression {
     return BodyCompression.endBodyCompression(builder);
   }
 }
-class Buffer2 {
+class Buffer {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -27121,7 +27037,7 @@ class RecordBatch$1 {
   }
   buffers(index, obj) {
     const offset = this.bb.__offset(this.bb_pos, 8);
-    return offset ? (obj || new Buffer2()).__init(this.bb.__vector(this.bb_pos + offset) + index * 16, this.bb) : null;
+    return offset ? (obj || new Buffer()).__init(this.bb.__vector(this.bb_pos + offset) + index * 16, this.bb) : null;
   }
   buffersLength() {
     const offset = this.bb.__offset(this.bb_pos, 8);
@@ -27967,7 +27883,7 @@ function encodeFieldNode(b, node) {
   return FieldNode$1.createFieldNode(b, new Long(node.length, 0), new Long(node.nullCount, 0));
 }
 function encodeBufferRegion(b, node) {
-  return Buffer2.createBuffer(b, new Long(node.offset, 0), new Long(node.length, 0));
+  return Buffer.createBuffer(b, new Long(node.offset, 0), new Long(node.length, 0));
 }
 const platformIsLittleEndian = (() => {
   const buffer = new ArrayBuffer(2);
@@ -28860,23 +28776,8 @@ function tableFromIPC(input) {
 let tile_identifier = 0;
 class Tile {
   constructor(dataset) {
-    __publicField(this, "max_ix", -1);
-    __publicField(this, "key");
-    __publicField(this, "promise");
-    __publicField(this, "download_state");
-    __publicField(this, "_batch");
-    __publicField(this, "parent");
-    __publicField(this, "_table_buffer");
-    __publicField(this, "_children", []);
-    __publicField(this, "_highest_known_ix");
-    __publicField(this, "_min_ix");
-    __publicField(this, "_max_ix");
-    __publicField(this, "dataset");
-    __publicField(this, "_download");
-    __publicField(this, "__schema");
-    __publicField(this, "local_dictionary_lookups");
-    __publicField(this, "_extent");
-    __publicField(this, "numeric_id");
+    this.max_ix = -1;
+    this._children = [];
     this.promise = Promise.resolve();
     this.download_state = "Unattempted";
     this.key = String(Math.random());
@@ -29035,6 +28936,13 @@ class Tile {
           extent: extent(this.record_batch.getChild(name).data[0].values)
         });
       }
+      if ((type == null ? void 0 : type.typeId) === 10) {
+        attributes.push({
+          name,
+          type: "datetime",
+          extent: extent(this.record_batch.getChild(name).data[0].values)
+        });
+      }
       if (type && type.typeId == 3) {
         attributes.push({
           name,
@@ -29078,13 +28986,10 @@ class Tile {
 class QuadTile extends Tile {
   constructor(base_url, key, parent, dataset, prefs) {
     super(dataset);
-    __publicField(this, "url");
-    __publicField(this, "bearer_token", "");
-    __publicField(this, "key");
-    __publicField(this, "_children", []);
-    __publicField(this, "codes");
-    __publicField(this, "_already_called", false);
-    __publicField(this, "child_locations", []);
+    this.bearer_token = "";
+    this._children = [];
+    this._already_called = false;
+    this.child_locations = [];
     this.url = base_url;
     if (prefs != void 0 && "bearer_token" in prefs) {
       this.bearer_token = prefs["bearer_token"];
@@ -29142,12 +29047,12 @@ class QuadTile extends Tile {
       if (children2) {
         this.child_locations = JSON.parse(children2);
       }
-      const ixes = this._batch.getChild("ix");
-      if (ixes === null) {
+      const ixes2 = this._batch.getChild("ix");
+      if (ixes2 === null) {
         throw "No ix column in table";
       }
-      this._min_ix = Number(ixes.get(0));
-      this.max_ix = Number(ixes.get(ixes.length - 1));
+      this._min_ix = Number(ixes2.get(0));
+      this.max_ix = Number(ixes2.get(ixes2.length - 1));
       this.highest_known_ix = this.max_ix;
     }).catch((error) => {
       console.log(error);
@@ -29186,8 +29091,6 @@ class QuadTile extends Tile {
 class ArrowTile extends Tile {
   constructor(table2, dataset, batch_num, plot, parent = null) {
     super(dataset);
-    __publicField(this, "batch_num");
-    __publicField(this, "full_tab");
     this.full_tab = table2;
     this._batch = table2.batches[batch_num];
     this.download_state = "Complete";
@@ -29201,14 +29104,14 @@ class ArrowTile extends Tile {
     if (row_last === null) {
       throw "No rows in table";
     }
-    this.max_ix = row_last.ix;
-    this.highest_known_ix = this.max_ix;
+    this.max_ix = Number(row_last.ix);
+    this.highest_known_ix = Number(this.max_ix);
     const row_1 = this._batch.get(0);
     if (row_1 === null) {
       throw "No rows in table";
     }
-    this._min_ix = row_1.ix;
-    this.highest_known_ix = this.max_ix;
+    this._min_ix = Number(row_1.ix);
+    this.highest_known_ix = Number(this.max_ix);
     this.create_children();
   }
   create_children() {
@@ -29220,6 +29123,7 @@ class ArrowTile extends Tile {
     }
   }
   download() {
+    console.log(ixes.get(0));
     return Promise.resolve(this._batch);
   }
   get ready() {
@@ -29236,9 +29140,8 @@ function nothing() {
 }
 class Dataset {
   constructor(plot) {
-    __publicField(this, "transformations", {});
-    __publicField(this, "plot");
-    __publicField(this, "extents", {});
+    this.transformations = {};
+    this.extents = {};
     this.plot = plot;
   }
   get highest_known_ix() {
@@ -29344,8 +29247,7 @@ class Dataset {
 class ArrowDataset extends Dataset {
   constructor(table, prefs, plot) {
     super(plot);
-    __publicField(this, "promise", Promise.resolve());
-    __publicField(this, "root_tile");
+    this.promise = Promise.resolve();
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
   get extent() {
@@ -29361,9 +29263,8 @@ class ArrowDataset extends Dataset {
 class QuadtileSet extends Dataset {
   constructor(base_url, prefs, plot) {
     super(plot);
-    __publicField(this, "_download_queue", /* @__PURE__ */ new Set());
-    __publicField(this, "promise", new Promise(nothing));
-    __publicField(this, "root_tile");
+    this._download_queue = /* @__PURE__ */ new Set();
+    this.promise = new Promise(nothing);
     this.root_tile = new QuadTile(base_url, "0/0/0", null, this, {});
     this.promise = this.root_tile.promise;
   }
@@ -30105,11 +30006,7 @@ var quickselect = { exports: {} };
 class LabelMaker extends Renderer {
   constructor(selector2, scatterplot) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
-    __publicField(this, "layers", []);
-    __publicField(this, "ctx");
-    __publicField(this, "tree");
-    __publicField(this, "timer");
-    __publicField(this, "label_key");
+    this.layers = [];
     this.canvas = scatterplot.elements[2].selectAll("canvas").node();
     this.tree = new DepthTree(0.5, [1, 1e6], this.ctx);
     this.tree.accessor = (x, y) => {
@@ -30235,12 +30132,8 @@ function measure_text(d, context) {
 class DepthTree extends dist.RBush3D {
   constructor(scale_factor = 0.5, zoom2 = [0.1, 1e3], context) {
     super();
-    __publicField(this, "scale_factor");
-    __publicField(this, "mindepth");
-    __publicField(this, "maxdepth");
-    __publicField(this, "context");
-    __publicField(this, "insertion_log", []);
-    __publicField(this, "_accessor", (p) => [p.x, p.y]);
+    this.insertion_log = [];
+    this._accessor = (p) => [p.x, p.y];
     this.scale_factor = scale_factor;
     this.mindepth = zoom2[0];
     this.maxdepth = zoom2[1];
@@ -30360,20 +30253,8 @@ const base_elements = [
 ];
 class Scatterplot {
   constructor(selector2, width, height) {
-    __publicField(this, "_renderer");
-    __publicField(this, "width");
-    __publicField(this, "height");
-    __publicField(this, "_root");
-    __publicField(this, "elements");
-    __publicField(this, "secondary_renderers", {});
-    __publicField(this, "div");
-    __publicField(this, "bound");
-    __publicField(this, "_zoom");
-    __publicField(this, "plot_queue", Promise.resolve(0));
-    __publicField(this, "prefs");
-    __publicField(this, "ready");
-    __publicField(this, "click_handler");
-    __publicField(this, "tooltip_handler");
+    this.secondary_renderers = {};
+    this.plot_queue = Promise.resolve(0);
     this.bound = false;
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
@@ -30680,9 +30561,6 @@ class Scatterplot {
 }
 class SettableFunction {
   constructor(plot) {
-    __publicField(this, "_f");
-    __publicField(this, "string_rep");
-    __publicField(this, "plot");
     this.string_rep = "";
     this.plot = plot;
   }
@@ -30721,9 +30599,6 @@ class TooltipHTML extends SettableFunction {
     console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) {
-        continue;
-      }
-      if (/_float_version/.test(k)) {
         continue;
       }
       if (v === null) {
