@@ -1,0 +1,44 @@
+<!-- 
+  Hello! Assuming you've run a dataset with an x & y column
+  through quadfeather into a folder called tiles located in the
+  root of this repo, then this file should launch your scatter plot
+  exactly as is, no changes necessary.
+  It demonstrates the bare minimum needed to get started.
+  Checkout other examples for more advanced possibilities.
+-->
+
+<body>
+  <div id="deepscatter"></div>
+</body>
+
+<script type="module">
+  import Scatterplot from "./src/deepscatter";
+
+  const prefs = {
+    source_url: "/tiles", // the output of the quadfeather tiling engine
+    max_points: 1000000, // a full cap.
+    alpha: 5, // Target saturation for the full page.
+    zoom_balance: 0.7, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
+    point_size: 16, // Default point size before application of size scaling
+    background_color: "#000000",
+    click_function: "console.log(JSON.stringify(datum, undefined, 2))",
+
+    // encoding API based roughly on Vega Lite: https://vega.github.io/vega-lite/docs/encoding.html
+    encoding: {
+      x: {
+        field: "x",
+        transform: "literal",
+      },
+      y: {
+        field: "y",
+        transform: "literal",
+      },
+      color: {
+        constant: "#00ff00",
+      },
+    },
+  };
+
+  const scatterplot = new Scatterplot("#deepscatter");
+  scatterplot.plotAPI(prefs);
+</script>
