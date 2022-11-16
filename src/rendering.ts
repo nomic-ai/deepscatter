@@ -13,7 +13,7 @@ abstract class PlotSetting {
   abstract start: number;
   abstract value: number;
   abstract target: number;
-  timer : Timer | undefined;
+  timer: Timer | undefined;
   transform: 'geometric' | 'arithmetic';
   constructor() {
     this.transform = 'arithmetic';
@@ -43,7 +43,10 @@ abstract class PlotSetting {
       }
       const w1 = 1 - t;
       const w2 = t;
-      this.value = this.transform === 'geometric' ? this.start ** (w1) * this.target ** (w2) : this.start * (w1) + this.target * (w2);
+      this.value =
+        this.transform === 'geometric'
+          ? this.start ** w1 * this.target ** w2
+          : this.start * w1 + this.target * w2;
     });
     this.timer = timer_object;
   }
@@ -87,8 +90,7 @@ class RenderProps {
     this.targetOpacity = new TargetOpacity();
     this.pointSize = new PointSize();
   }
-  apply_prefs(prefs : APICall) {
-
+  apply_prefs(prefs: APICall) {
     const { duration } = prefs;
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
@@ -107,26 +109,30 @@ class RenderProps {
 
 export class Renderer {
   // A renderer handles drawing to a display element.
-  public scatterplot : Scatterplot;
-  public holder : d3.Selection<any, any, any, any>;
-  public canvas : d3.Selection<any, any, any, any>;
-  public tileSet : Tileset;
-  public width : number;
-  public height : number;
-  public deferred_functions : Array<() => void>;
-  public _use_scale_to_download_tiles  = true;
-  public zoom : Zoom;
-  public aes : AestheticSet;
-  public _zoom : Zoom;
-  public _initializations : Promise<any>[];
-  public render_props : RenderProps;
-  constructor(selector : string, tileSet : QuadtileSet, scatterplot : Scatterplot) {
+  public scatterplot: Scatterplot;
+  public holder: d3.Selection<any, any, any, any>;
+  public canvas: HTMLCanvasElement;
+  public tileSet: Tileset;
+  public width: number;
+  public height: number;
+  public deferred_functions: Array<() => void>;
+  public _use_scale_to_download_tiles = true;
+  public zoom: Zoom;
+  public aes: AestheticSet;
+  public _zoom: Zoom;
+  public _initializations: Promise<any>[];
+  public render_props: RenderProps;
+  constructor(
+    selector: string,
+    tileSet: QuadtileSet,
+    scatterplot: Scatterplot
+  ) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
-    this.canvas = select(this.holder.node().firstElementChild);
+    this.canvas = select(this.holder.node().firstElementChild).node();
     this.tileSet = tileSet;
-    this.width = +this.canvas.attr('width');
-    this.height = +this.canvas.attr('height');
+    this.width = +select(this.canvas).attr('width');
+    this.height = +select(this.canvas).attr('height');
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
     this.render_props = new RenderProps();
@@ -139,12 +145,11 @@ export class Renderer {
     return 0;
   }
 
-  get prefs() : APICall{
+  get prefs(): APICall {
     const p = { ...this.scatterplot.prefs };
     p.arrow_table = undefined;
     p.arrow_buffer = undefined;
     return p;
-
   }
 
   //color_pick() {
@@ -158,22 +163,24 @@ export class Renderer {
     // This is extends a formula suggested by Ricky Reusser.
 
     const { zoom_balance } = this.prefs;
-    const {
-      alpha, point_size,
-      max_ix, width, discard_share, height,
-    } = this;
+    const { alpha, point_size, max_ix, width, discard_share, height } = this;
     const { k } = this.zoom.transform;
     const target_share = alpha;
     const fraction_of_total_visible = 1 / k ** 2;
     const pixel_area = width * height;
-    const total_intended_points = min([max_ix, this.tileSet.highest_known_ix || 1e10]);
+    const total_intended_points = min([
+      max_ix,
+      this.tileSet.highest_known_ix || 1e10,
+    ]);
     const total_points = total_intended_points * (1 - discard_share);
-    const area_of_point = (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2;
-    const target = (target_share * pixel_area)
-      / (total_points * fraction_of_total_visible * area_of_point);
+    const area_of_point =
+      (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2;
+    const target =
+      (target_share * pixel_area) /
+      (total_points * fraction_of_total_visible * area_of_point);
     // constrain within realistic bounds.
     // would also be possible to adjust size to meet the goal.
-    return target > 1 ? 1 : (target < 1 / 255 ? 1 / 255 : target);
+    return target > 1 ? 1 : target < 1 / 255 ? 1 / 255 : target;
   }
 
   get point_size() {
@@ -188,32 +195,38 @@ export class Renderer {
     }
     const { k } = this.zoom.transform;
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
-    return max_points * k * k / point_size_adjust / point_size_adjust;
+    return (max_points * k * k) / point_size_adjust / point_size_adjust;
   }
 
-  visible_tiles() : Array<Tile> {
+  visible_tiles(): Array<Tile> {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
     const { tileSet } = this;
     // Materialize using a tileset method.
     let all_tiles;
-    const natural_display = this.aes.dim('x').current.field == 'x' &&
+    const natural_display =
+      this.aes.dim('x').current.field == 'x' &&
       this.aes.dim('y').current.field == 'y' &&
       this.aes.dim('x').last.field == 'x' &&
       this.aes.dim('y').last.field == 'y';
-    
-    all_tiles = natural_display ? tileSet.map((d : Tile) => d)
-      .filter((tile) => {
-        const visible = tile.is_visible(max_ix, this.zoom.current_corners());
-        return visible;
-      }) : tileSet.map((d) => d)
-      .filter((tile) => tile.min_ix < this.max_ix);
+
+    all_tiles = natural_display
+      ? tileSet
+          .map((d: Tile) => d)
+          .filter((tile) => {
+            const visible = tile.is_visible(
+              max_ix,
+              this.zoom.current_corners()
+            );
+            return visible;
+          })
+      : tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
     return all_tiles;
   }
 
-  bind_zoom(zoom : Zoom) {
+  bind_zoom(zoom: Zoom) {
     this.zoom = zoom;
     return this;
   }

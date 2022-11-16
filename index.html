@@ -52,10 +52,10 @@
     "encoding": {
       "color": {
         field: "x",
-        range: "ylorrd"    
-/*        "field": "class",
+//        range: "ylorrd"    
+        "field": "class",
         "range": "category10",
-        "domain": [-2047, 2047] */
+        "domain": [-2047, 2047]
       },
       "x": {
         field: "x",
@@ -102,6 +102,7 @@
   const scatterplot = new Scatterplot("#deepscatter")
   scatterplot.plotAPI(prefs).then(d => scatterplot.plotAPI(prefs));
   window.plot = scatterplot; // For debugging
+  console.log(scatterplot)
   console.log(scatterplot.database)
   // Simple animation demonstration.
 
