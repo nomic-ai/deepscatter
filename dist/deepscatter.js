@@ -28937,11 +28937,7 @@ class Tile {
         });
       }
       if ((type == null ? void 0 : type.typeId) === 10) {
-        attributes.push({
-          name,
-          type: "datetime",
-          extent: extent(this.record_batch.getChild(name).data[0].values)
-        });
+        return [10, 100];
       }
       if (type && type.typeId == 3) {
         attributes.push({
@@ -29047,12 +29043,12 @@ class QuadTile extends Tile {
       if (children2) {
         this.child_locations = JSON.parse(children2);
       }
-      const ixes2 = this._batch.getChild("ix");
-      if (ixes2 === null) {
+      const ixes = this._batch.getChild("ix");
+      if (ixes === null) {
         throw "No ix column in table";
       }
-      this._min_ix = Number(ixes2.get(0));
-      this.max_ix = Number(ixes2.get(ixes2.length - 1));
+      this._min_ix = Number(ixes.get(0));
+      this.max_ix = Number(ixes.get(ixes.length - 1));
       this.highest_known_ix = this.max_ix;
     }).catch((error) => {
       console.log(error);
@@ -29123,7 +29119,6 @@ class ArrowTile extends Tile {
     }
   }
   download() {
-    console.log(ixes.get(0));
     return Promise.resolve(this._batch);
   }
   get ready() {
