@@ -1,3 +1,9 @@
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => {
+  __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+  return value;
+};
 var xhtml = "http://www.w3.org/1999/xhtml";
 const namespaces = {
   svg: "http://www.w3.org/2000/svg",
@@ -1994,7 +2000,7 @@ var lodash_merge = { exports: {} };
   var reIsNative = RegExp(
     "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
   );
-  var Buffer2 = moduleExports ? root2.Buffer : void 0, Symbol2 = root2.Symbol, Uint8Array2 = root2.Uint8Array, allocUnsafe = Buffer2 ? Buffer2.allocUnsafe : void 0, getPrototype = overArg(Object.getPrototypeOf, Object), objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, symToStringTag = Symbol2 ? Symbol2.toStringTag : void 0;
+  var Buffer3 = moduleExports ? root2.Buffer : void 0, Symbol2 = root2.Symbol, Uint8Array2 = root2.Uint8Array, allocUnsafe = Buffer3 ? Buffer3.allocUnsafe : void 0, getPrototype = overArg(Object.getPrototypeOf, Object), objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, symToStringTag = Symbol2 ? Symbol2.toStringTag : void 0;
   var defineProperty = function() {
     try {
       var func = getNative(Object, "defineProperty");
@@ -2003,7 +2009,7 @@ var lodash_merge = { exports: {} };
     } catch (e) {
     }
   }();
-  var nativeIsBuffer = Buffer2 ? Buffer2.isBuffer : void 0, nativeMax = Math.max, nativeNow = Date.now;
+  var nativeIsBuffer = Buffer3 ? Buffer3.isBuffer : void 0, nativeMax = Math.max, nativeNow = Date.now;
   var Map2 = getNative(root2, "Map"), nativeCreate = getNative(Object, "create");
   var baseCreate = function() {
     function object2() {
@@ -5341,6 +5347,18 @@ function sequentialPow() {
 }
 class Zoom {
   constructor(selector2, prefs, plot) {
+    __publicField(this, "prefs");
+    __publicField(this, "svg_element_selection");
+    __publicField(this, "width");
+    __publicField(this, "height");
+    __publicField(this, "renderers");
+    __publicField(this, "tileSet");
+    __publicField(this, "_timer");
+    __publicField(this, "_scales");
+    __publicField(this, "zoomer");
+    __publicField(this, "transform");
+    __publicField(this, "_start");
+    __publicField(this, "scatterplot");
     this.prefs = prefs;
     this.svg_element_selection = select(selector2);
     this.width = +this.svg_element_selection.attr("width");
@@ -5362,12 +5380,7 @@ class Zoom {
   }
   zoom_to(k, x = null, y = null, duration = 4e3) {
     const scales2 = this.scales();
-    const {
-      svg_element_selection: canvas,
-      zoomer,
-      width,
-      height
-    } = this;
+    const { svg_element_selection: canvas, zoomer, width, height } = this;
     const t = identity$3.translate(width / 2, height / 2).scale(k).translate(-scales2.x(x), -scales2.y(y));
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
@@ -5391,19 +5404,17 @@ class Zoom {
     const scales2 = this.scales();
     const [x02, x12] = corners.x.map(scales2.x);
     const [y02, y12] = corners.y.map(scales2.y);
-    const {
-      svg_element_selection: canvas,
-      zoomer,
-      width,
-      height
-    } = this;
+    const { svg_element_selection: canvas, zoomer, width, height } = this;
     const t = identity$3.translate(width / 2, height / 2).scale(1 / buffer / Math.max((x12 - x02) / width, (y12 - y02) / height)).translate(-(x02 + x12) / 2, -(y02 + y12) / 2);
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
   initialize_zoom() {
     const { width, height, svg_element_selection: canvas } = this;
     this.transform = identity$3;
-    const zoomer = zoom().scaleExtent([1 / 3, 1e5]).extent([[0, 0], [width, height]]).on("zoom", (event) => {
+    const zoomer = zoom().scaleExtent([1 / 3, 1e5]).extent([
+      [0, 0],
+      [width, height]
+    ]).on("zoom", (event) => {
       try {
         document.getElementById("tooltipcircle").remove();
       } catch (error) {
@@ -5453,8 +5464,14 @@ class Zoom {
       const { x_, y_ } = this.scales();
       this.html_annotation(annotations);
       select("#deepscatter-svg").selectAll("circle.label").data(data, (d_) => d_.ix).join(
-        (enter) => enter.append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))),
-        (update) => update.attr("fill", (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)),
+        (enter) => enter.append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr(
+          "fill",
+          (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)
+        ).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))),
+        (update) => update.attr(
+          "fill",
+          (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)
+        ),
         (exit) => exit.call((e) => {
           e.remove();
           if (this.prefs.exit_function) {
@@ -5480,10 +5497,7 @@ class Zoom {
   }
   current_center() {
     const { x, y } = this.current_corners();
-    return [
-      (x[0] + x[1]) / 2,
-      (y[0] + y[1]) / 2
-    ];
+    return [(x[0] + x[1]) / 2, (y[0] + y[1]) / 2];
   }
   restart_timer(run_at_least = 1e4) {
     let stop_at = Date.now() + run_at_least;
@@ -5521,7 +5535,10 @@ class Zoom {
       throw new Error("Error--scales created before extent present.");
     }
     const scale_dat = {};
-    for (const [name, dim] of [["x", width], ["y", height]]) {
+    for (const [name, dim] of [
+      ["x", width],
+      ["y", height]
+    ]) {
       const limits = extent2[name];
       const size_range = limits[1] - limits[0];
       scale_dat[name] = {
@@ -15379,6 +15396,8 @@ function decodeFloat(x, y, z, w) {
 }
 class PlotSetting {
   constructor() {
+    __publicField(this, "timer");
+    __publicField(this, "transform");
     this.transform = "arithmetic";
   }
   update(value, duration) {
@@ -15414,31 +15433,34 @@ class PlotSetting {
 class MaxPoints extends PlotSetting {
   constructor() {
     super();
-    this.value = 1e4;
-    this.start = 1e4;
-    this.target = 1e4;
+    __publicField(this, "value", 1e4);
+    __publicField(this, "start", 1e4);
+    __publicField(this, "target", 1e4);
     this.transform = "geometric";
   }
 }
 class TargetOpacity extends PlotSetting {
   constructor() {
     super(...arguments);
-    this.value = 10;
-    this.start = 10;
-    this.target = 10;
+    __publicField(this, "value", 10);
+    __publicField(this, "start", 10);
+    __publicField(this, "target", 10);
   }
 }
 class PointSize extends PlotSetting {
   constructor() {
     super();
-    this.value = 2;
-    this.start = 2;
-    this.target = 2;
+    __publicField(this, "value", 2);
+    __publicField(this, "start", 2);
+    __publicField(this, "target", 2);
     this.transform = "geometric";
   }
 }
 class RenderProps {
   constructor() {
+    __publicField(this, "maxPoints");
+    __publicField(this, "targetOpacity");
+    __publicField(this, "pointSize");
     this.maxPoints = new MaxPoints();
     this.targetOpacity = new TargetOpacity();
     this.pointSize = new PointSize();
@@ -15461,7 +15483,19 @@ class RenderProps {
 }
 class Renderer {
   constructor(selector2, tileSet, scatterplot) {
-    this._use_scale_to_download_tiles = true;
+    __publicField(this, "scatterplot");
+    __publicField(this, "holder");
+    __publicField(this, "canvas");
+    __publicField(this, "tileSet");
+    __publicField(this, "width");
+    __publicField(this, "height");
+    __publicField(this, "deferred_functions");
+    __publicField(this, "_use_scale_to_download_tiles", true);
+    __publicField(this, "zoom");
+    __publicField(this, "aes");
+    __publicField(this, "_zoom");
+    __publicField(this, "_initializations");
+    __publicField(this, "render_props");
     this.scatterplot = scatterplot;
     this.holder = select(selector2);
     this.canvas = select(this.holder.node().firstElementChild).node();
@@ -15486,19 +15520,15 @@ class Renderer {
   }
   get optimal_alpha() {
     const { zoom_balance } = this.prefs;
-    const {
-      alpha,
-      point_size,
-      max_ix,
-      width,
-      discard_share,
-      height
-    } = this;
+    const { alpha, point_size, max_ix, width, discard_share, height } = this;
     const { k } = this.zoom.transform;
     const target_share = alpha;
     const fraction_of_total_visible = 1 / k ** 2;
     const pixel_area = width * height;
-    const total_intended_points = min([max_ix, this.tileSet.highest_known_ix || 1e10]);
+    const total_intended_points = min([
+      max_ix,
+      this.tileSet.highest_known_ix || 1e10
+    ]);
     const total_points = total_intended_points * (1 - discard_share);
     const area_of_point = (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2;
     const target = target_share * pixel_area / (total_points * fraction_of_total_visible * area_of_point);
@@ -15523,7 +15553,10 @@ class Renderer {
     let all_tiles;
     const natural_display = this.aes.dim("x").current.field == "x" && this.aes.dim("y").current.field == "y" && this.aes.dim("x").last.field == "x" && this.aes.dim("y").last.field == "y";
     all_tiles = natural_display ? tileSet.map((d) => d).filter((tile) => {
-      const visible = tile.is_visible(max_ix, this.zoom.current_corners());
+      const visible = tile.is_visible(
+        max_ix,
+        this.zoom.current_corners()
+      );
       return visible;
     }) : tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
@@ -17416,7 +17449,15 @@ for (const [k, v] of Object.entries(d3Chromatic)) {
   }
 }
 function okabe() {
-  const okabe_palette = ["#E69F00", "#CC79A7", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442"];
+  const okabe_palette = [
+    "#E69F00",
+    "#CC79A7",
+    "#56B4E9",
+    "#009E73",
+    "#0072B2",
+    "#D55E00",
+    "#F0E442"
+  ];
   const colors2 = Array.from({ length: palette_size });
   const scheme2 = okabe_palette.map((v) => {
     const col = rgb(v);
@@ -17431,11 +17472,22 @@ function okabe() {
 okabe();
 class Aesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
-    this.field = null;
-    this._texture_buffer = null;
-    this.partner = null;
-    this._textures = {};
-    this._scale = (p) => 1;
+    __publicField(this, "scatterplot");
+    __publicField(this, "field", null);
+    __publicField(this, "regl");
+    __publicField(this, "_texture_buffer", null);
+    __publicField(this, "_domain");
+    __publicField(this, "_range");
+    __publicField(this, "_transform");
+    __publicField(this, "dataset");
+    __publicField(this, "partner", null);
+    __publicField(this, "_textures", {});
+    __publicField(this, "_constant");
+    __publicField(this, "_scale", (p) => 1);
+    __publicField(this, "current_encoding");
+    __publicField(this, "aesthetic_map");
+    __publicField(this, "id");
+    __publicField(this, "_domains");
     this.aesthetic_map = aesthetic_map;
     if (this.aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined");
@@ -17526,7 +17578,9 @@ class Aesthetic {
     } else {
       this._domains[this.field] = extent(column.toArray());
     }
-    console.log("Inferring range of " + this.field + " to be " + this._domains[this.field]);
+    console.log(
+      "Inferring range of " + this.field + " to be " + this._domains[this.field]
+    );
     return this._domains[this.field];
   }
   default_data() {
@@ -17559,10 +17613,7 @@ class Aesthetic {
     return this._texture_buffer;
   }
   post_to_regl_buffer() {
-    this.aesthetic_map.set_one_d(
-      this.id,
-      this.texture_buffer
-    );
+    this.aesthetic_map.set_one_d(this.id, this.texture_buffer);
   }
   convert_string_encoding(channel) {
     const v = {
@@ -17669,10 +17720,7 @@ class Aesthetic {
       return;
     }
     if (isLambdaChannel(encoding)) {
-      const {
-        lambda,
-        field
-      } = encoding;
+      const { lambda, field } = encoding;
       if (lambda) {
         this.apply_function_for_textures(field, this.domain, lambda);
         this.post_to_regl_buffer();
@@ -17776,8 +17824,8 @@ class BooleanAesthetic extends Aesthetic {
 class Size extends OneDAesthetic {
   constructor() {
     super(...arguments);
-    this.default_constant = 1;
-    this.default_transform = "sqrt";
+    __publicField(this, "default_constant", 1);
+    __publicField(this, "default_transform", "sqrt");
   }
   static get default_constant() {
     return 1.5;
@@ -17795,9 +17843,9 @@ class Size extends OneDAesthetic {
 class PositionalAesthetic extends OneDAesthetic {
   constructor(scatterplot, regl2, tile, map2) {
     super(scatterplot, regl2, tile, map2);
-    this.default_range = [-1, 1];
-    this.default_constant = 0;
-    this.default_transform = "literal";
+    __publicField(this, "default_range", [-1, 1]);
+    __publicField(this, "default_constant", 0);
+    __publicField(this, "default_transform", "literal");
     this._transform = "literal";
   }
   get range() {
@@ -17815,7 +17863,7 @@ class PositionalAesthetic extends OneDAesthetic {
 class X extends PositionalAesthetic {
   constructor() {
     super(...arguments);
-    this.field = "x";
+    __publicField(this, "field", "x");
   }
 }
 class X0 extends X {
@@ -17823,7 +17871,7 @@ class X0 extends X {
 class Y extends PositionalAesthetic {
   constructor() {
     super(...arguments);
-    this.field = "y";
+    __publicField(this, "field", "y");
   }
 }
 class Y0 extends Y {
@@ -17831,9 +17879,10 @@ class Y0 extends Y {
 class AbstractFilter extends BooleanAesthetic {
   constructor(scatterplot, regl2, tile, map2) {
     super(scatterplot, regl2, tile, map2);
-    this.default_transform = "literal";
-    this.default_constant = 1;
-    this.default_range = [0, 1];
+    __publicField(this, "current_encoding");
+    __publicField(this, "default_transform", "literal");
+    __publicField(this, "default_constant", 1);
+    __publicField(this, "default_range", [0, 1]);
     this.current_encoding = { constant: 1 };
   }
   get default_domain() {
@@ -17870,9 +17919,9 @@ class Filter extends AbstractFilter {
 class Jitter_speed extends Aesthetic {
   constructor() {
     super(...arguments);
-    this.default_transform = "linear";
-    this.default_range = [0, 1];
-    this.default_constant = 0.5;
+    __publicField(this, "default_transform", "linear");
+    __publicField(this, "default_range", [0, 1]);
+    __publicField(this, "default_constant", 0.5);
   }
   get default_domain() {
     return [0, 1];
@@ -17899,9 +17948,9 @@ function encode_jitter_to_int(jitter) {
 class Jitter_radius extends Aesthetic {
   constructor() {
     super(...arguments);
-    this.jitter_int_formatted = 0;
-    this.default_transform = "linear";
-    this._method = "None";
+    __publicField(this, "jitter_int_formatted", 0);
+    __publicField(this, "default_transform", "linear");
+    __publicField(this, "_method", "None");
   }
   get default_constant() {
     return 0;
@@ -17926,12 +17975,12 @@ const default_color = [0.7, 0, 0.5];
 class Color extends Aesthetic {
   constructor() {
     super(...arguments);
-    this.texture_type = "uint8";
-    this.default_constant = [0.7, 0, 0.5];
-    this.default_transform = "linear";
-    this.current_encoding = {
+    __publicField(this, "texture_type", "uint8");
+    __publicField(this, "default_constant", [0.7, 0, 0.5]);
+    __publicField(this, "default_transform", "linear");
+    __publicField(this, "current_encoding", {
       constant: default_color
-    };
+    });
   }
   get default_range() {
     return [0, 1];
@@ -17955,10 +18004,7 @@ class Color extends Aesthetic {
     return [r / 255, g / 255, b / 255];
   }
   post_to_regl_buffer() {
-    this.aesthetic_map.set_color(
-      this.id,
-      this.texture_buffer
-    );
+    this.aesthetic_map.set_color(this.id, this.texture_buffer);
   }
   update(encoding) {
     console.log("UPDATING COLOR");
@@ -17993,7 +18039,12 @@ class Color extends Aesthetic {
 }
 class StatefulAesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
-    this.needs_transitions = false;
+    __publicField(this, "_states");
+    __publicField(this, "dataset");
+    __publicField(this, "regl");
+    __publicField(this, "scatterplot");
+    __publicField(this, "needs_transitions", false);
+    __publicField(this, "aesthetic_map");
     if (aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined.");
     }
@@ -18014,8 +18065,18 @@ class StatefulAesthetic {
       return this._states;
     }
     this._states = [
-      new this.Factory(this.scatterplot, this.regl, this.dataset, this.aesthetic_map),
-      new this.Factory(this.scatterplot, this.regl, this.dataset, this.aesthetic_map)
+      new this.Factory(
+        this.scatterplot,
+        this.regl,
+        this.dataset,
+        this.aesthetic_map
+      ),
+      new this.Factory(
+        this.scatterplot,
+        this.regl,
+        this.dataset,
+        this.aesthetic_map
+      )
     ];
     return this._states;
   }
@@ -18113,10 +18174,7 @@ function lambda_to_function(input) {
   if (typeof input.lambda === "function") {
     throw "Must pass a string to lambda, not a function.";
   }
-  const {
-    lambda,
-    field
-  } = input;
+  const { lambda, field } = input;
   if (field === void 0) {
     throw "Must pass a field to lambda.";
   }
@@ -18127,6 +18185,13 @@ function lambda_to_function(input) {
 }
 class AestheticSet {
   constructor(scatterplot, regl2, tileSet) {
+    __publicField(this, "tileSet");
+    __publicField(this, "scatterplot");
+    __publicField(this, "regl");
+    __publicField(this, "encoding");
+    __publicField(this, "position_interpolation");
+    __publicField(this, "store");
+    __publicField(this, "aesthetic_map");
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl2;
@@ -18207,8 +18272,15 @@ class AestheticSet {
 }
 class TextureSet {
   constructor(regl2, texture_size = 4096, texture_widths = 32) {
-    this.id_locs = {};
-    this.offsets = {};
+    __publicField(this, "_one_d_texture");
+    __publicField(this, "_color_texture");
+    __publicField(this, "texture_size");
+    __publicField(this, "regl");
+    __publicField(this, "id_locs", {});
+    __publicField(this, "texture_widths");
+    __publicField(this, "offsets", {});
+    __publicField(this, "_one_d_position");
+    __publicField(this, "_color_position");
     this.texture_size = texture_size;
     this.texture_widths = texture_widths;
     this.regl = regl2;
@@ -18227,11 +18299,15 @@ class TextureSet {
       offset = this._one_d_position++;
       offsets[id2] = offset;
     }
-    this.one_d_texture.subimage({
-      data: value,
-      width: 1,
-      height: this.texture_size
-    }, offset - 1, 0);
+    this.one_d_texture.subimage(
+      {
+        data: value,
+        width: 1,
+        height: this.texture_size
+      },
+      offset - 1,
+      0
+    );
   }
   set_color(id2, value) {
     let offset;
@@ -18242,11 +18318,15 @@ class TextureSet {
       offset = this._color_position--;
       offsets[id2] = offset;
     }
-    this.color_texture.subimage({
-      data: value,
-      width: 1,
-      height: this.texture_size
-    }, -offset - 1, 0);
+    this.color_texture.subimage(
+      {
+        data: value,
+        width: 1,
+        height: this.texture_size
+      },
+      -offset - 1,
+      0
+    );
   }
   get one_d_texture() {
     if (this._one_d_texture) {
@@ -18279,32 +18359,53 @@ class TextureSet {
 class ReglRenderer extends Renderer {
   constructor(selector2, tileSet, scatterplot) {
     super(selector2, tileSet, scatterplot);
-    this.buffer_size = 1024 * 1024 * 64;
-    this._use_scale_to_download_tiles = true;
-    this.fbos = {};
-    this.textures = {};
+    __publicField(this, "regl");
+    __publicField(this, "aes");
+    __publicField(this, "buffer_size", 1024 * 1024 * 64);
+    __publicField(this, "_buffers");
+    __publicField(this, "_initializations");
+    __publicField(this, "tileSet");
+    __publicField(this, "zoom");
+    __publicField(this, "_zoom");
+    __publicField(this, "_start");
+    __publicField(this, "most_recent_restart");
+    __publicField(this, "_default_webgl_scale");
+    __publicField(this, "_webgl_scale_history");
+    __publicField(this, "_renderer");
+    __publicField(this, "_use_scale_to_download_tiles", true);
+    __publicField(this, "sprites");
+    __publicField(this, "fbos", {});
+    __publicField(this, "textures", {});
+    __publicField(this, "_fill_buffer");
+    __publicField(this, "contour_vals");
+    __publicField(this, "tick_num");
+    __publicField(this, "reglframe");
+    __publicField(this, "aes_to_buffer_num");
+    __publicField(this, "variable_to_buffer_num");
+    __publicField(this, "buffer_num_to_variable");
     const c2 = this.canvas;
     if (this.canvas === void 0) {
       throw new Error("No canvas found");
     }
-    this.regl = wrapREGL(
-      {
-        optionalExtensions: [
-          "OES_standard_derivatives",
-          "OES_element_index_uint",
-          "OES_texture_float",
-          "OES_texture_half_float"
-        ],
-        canvas: c2
-      }
-    );
+    this.regl = wrapREGL({
+      optionalExtensions: [
+        "OES_standard_derivatives",
+        "OES_element_index_uint",
+        "OES_texture_float",
+        "OES_texture_half_float"
+      ],
+      canvas: c2
+    });
     this.tileSet = tileSet;
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
     this.initialize_textures();
     this._initializations = [
       this.tileSet.promise.then(() => {
         this.remake_renderer();
-        this._webgl_scale_history = [this.default_webgl_scale, this.default_webgl_scale];
+        this._webgl_scale_history = [
+          this.default_webgl_scale,
+          this.default_webgl_scale
+        ];
       })
     ];
     this.initialize();
@@ -18323,7 +18424,12 @@ class ReglRenderer extends Renderer {
   }
   get props() {
     this.allocate_aesthetic_buffers();
-    const { prefs, aes_to_buffer_num, buffer_num_to_variable, variable_to_buffer_num } = this;
+    const {
+      prefs,
+      aes_to_buffer_num,
+      buffer_num_to_variable,
+      variable_to_buffer_num
+    } = this;
     const { transform } = this.zoom;
     const props = {
       aes: { encoding: this.aes.encoding },
@@ -18389,7 +18495,10 @@ class ReglRenderer extends Renderer {
     this.tick_num = this.tick_num || 0;
     this.tick_num++;
     if (this._use_scale_to_download_tiles) {
-      tileSet.download_most_needed_tiles(this.zoom.current_corners(), this.props.max_ix);
+      tileSet.download_most_needed_tiles(
+        this.zoom.current_corners(),
+        this.props.max_ix
+      );
     } else {
       tileSet.download_most_needed_tiles(prefs.max_points);
     }
@@ -18420,15 +18529,17 @@ class ReglRenderer extends Renderer {
     const { regl: regl2 } = this;
     fbo2.use(() => {
       regl2.clear({ color: [0, 0, 0, 0] });
-      regl2(
-        {
-          frag: gaussian_blur,
-          uniforms: {
-            iResolution: ({ viewportWidth, viewportHeight }) => [viewportWidth, viewportHeight],
-            iChannel0: fbo1,
-            direction
-          },
-          vert: `
+      regl2({
+        frag: gaussian_blur,
+        uniforms: {
+          iResolution: ({ viewportWidth, viewportHeight }) => [
+            viewportWidth,
+            viewportHeight
+          ],
+          iChannel0: fbo1,
+          direction
+        },
+        vert: `
         precision mediump float;
         attribute vec2 position;
         varying vec2 uv;
@@ -18436,13 +18547,12 @@ class ReglRenderer extends Renderer {
           uv = 0.5 * (position + 1.0);
           gl_Position = vec4(position, 0, 1);
         }`,
-          attributes: {
-            position: [-4, -4, 4, -4, 0, 4]
-          },
-          depth: { enable: false },
-          count: 3
-        }
-      )();
+        attributes: {
+          position: [-4, -4, 4, -4, 0, 4]
+        },
+        depth: { enable: false },
+        count: 3
+      })();
     });
   }
   blur(fbo1, fbo2, passes = 3) {
@@ -18638,9 +18748,7 @@ class ReglRenderer extends Renderer {
   get fill_buffer() {
     if (!this._fill_buffer) {
       const { regl: regl2 } = this;
-      this._fill_buffer = regl2.buffer(
-        { data: [-4, -4, 4, -4, 0, 4] }
-      );
+      this._fill_buffer = regl2.buffer({ data: [-4, -4, 4, -4, 0, 4] });
     }
     return this._fill_buffer;
   }
@@ -18830,7 +18938,11 @@ class ReglRenderer extends Renderer {
       for (const time of times) {
         try {
           if (this.aes.dim(aesthetic)[time].field) {
-            buffers.push({ aesthetic, time, field: this.aes.dim(aesthetic)[time].field });
+            buffers.push({
+              aesthetic,
+              time,
+              field: this.aes.dim(aesthetic)[time].field
+            });
           }
         } catch (error) {
           this.reglframe.cancel();
@@ -18879,15 +18991,22 @@ class ReglRenderer extends Renderer {
 }
 class TileBufferManager {
   constructor(regl2, tile, renderer) {
+    __publicField(this, "tile");
+    __publicField(this, "regl");
+    __publicField(this, "renderer");
+    __publicField(this, "regl_elements");
     this.tile = tile;
     this.regl = regl2;
     this.renderer = renderer;
     tile._regl_elements = tile._regl_elements || /* @__PURE__ */ new Map([
-      ["ix_in_tile", {
-        offset: 0,
-        stride: 4,
-        buffer: renderer.integer_buffer
-      }]
+      [
+        "ix_in_tile",
+        {
+          offset: 0,
+          stride: 4,
+          buffer: renderer.integer_buffer
+        }
+      ]
     ]);
     this.regl_elements = tile._regl_elements;
   }
@@ -18949,7 +19068,11 @@ class TileBufferManager {
         }
       } else {
         const col_names = tile.record_batch.schema.fields.map((d) => d.name);
-        throw new Error(`Requested ${key} but table lacks that; the present columns are "${col_names.join('", "')}"`);
+        throw new Error(
+          `Requested ${key} but table lacks that; the present columns are "${col_names.join(
+            '", "'
+          )}"`
+        );
       }
     }
     if (column.type.typeId !== 3) {
@@ -18995,15 +19118,17 @@ class TileBufferManager {
       data_length,
       item_size
     );
-    regl_elements.set(
-      key,
-      buffer_desc
-    );
+    regl_elements.set(key, buffer_desc);
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
   }
 }
 class MultipurposeBufferSet {
   constructor(regl2, buffer_size) {
+    __publicField(this, "regl");
+    __publicField(this, "buffers");
+    __publicField(this, "buffer_size");
+    __publicField(this, "buffer_offsets");
+    __publicField(this, "pointer");
     this.regl = regl2;
     this.buffer_size = buffer_size;
     this.buffers = [];
@@ -19843,7 +19968,7 @@ function decimalToString(a) {
     base64[0] = base64[0] - base64[1] * 10;
     digits = `${base64[0]}${digits}`;
   } while (checks[0] || checks[1] || checks[2] || checks[3]);
-  return digits ? digits : `0`;
+  return digits !== null && digits !== void 0 ? digits : `0`;
 }
 class BN {
   static new(num, isSigned) {
@@ -25929,7 +26054,7 @@ class ListBuilder extends VariableWidthBuilder {
     const offsets = this._offsets;
     const [child] = this.children;
     for (const [index, value] of pending) {
-      if (value === void 0) {
+      if (typeof value === "undefined") {
         offsets.set(index, 0);
       } else {
         const n = value.length;
@@ -26954,7 +27079,7 @@ class BodyCompression {
     return BodyCompression.endBodyCompression(builder);
   }
 }
-class Buffer {
+class Buffer2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -27037,7 +27162,7 @@ class RecordBatch$1 {
   }
   buffers(index, obj) {
     const offset = this.bb.__offset(this.bb_pos, 8);
-    return offset ? (obj || new Buffer()).__init(this.bb.__vector(this.bb_pos + offset) + index * 16, this.bb) : null;
+    return offset ? (obj || new Buffer2()).__init(this.bb.__vector(this.bb_pos + offset) + index * 16, this.bb) : null;
   }
   buffersLength() {
     const offset = this.bb.__offset(this.bb_pos, 8);
@@ -27883,7 +28008,7 @@ function encodeFieldNode(b, node) {
   return FieldNode$1.createFieldNode(b, new Long(node.length, 0), new Long(node.nullCount, 0));
 }
 function encodeBufferRegion(b, node) {
-  return Buffer.createBuffer(b, new Long(node.offset, 0), new Long(node.length, 0));
+  return Buffer2.createBuffer(b, new Long(node.offset, 0), new Long(node.length, 0));
 }
 const platformIsLittleEndian = (() => {
   const buffer = new ArrayBuffer(2);
@@ -28776,8 +28901,23 @@ function tableFromIPC(input) {
 let tile_identifier = 0;
 class Tile {
   constructor(dataset) {
-    this.max_ix = -1;
-    this._children = [];
+    __publicField(this, "max_ix", -1);
+    __publicField(this, "key");
+    __publicField(this, "promise");
+    __publicField(this, "download_state");
+    __publicField(this, "_batch");
+    __publicField(this, "parent");
+    __publicField(this, "_table_buffer");
+    __publicField(this, "_children", []);
+    __publicField(this, "_highest_known_ix");
+    __publicField(this, "_min_ix");
+    __publicField(this, "_max_ix");
+    __publicField(this, "dataset");
+    __publicField(this, "_download");
+    __publicField(this, "__schema");
+    __publicField(this, "local_dictionary_lookups");
+    __publicField(this, "_extent");
+    __publicField(this, "numeric_id");
     this.promise = Promise.resolve();
     this.download_state = "Unattempted";
     this.key = String(Math.random());
@@ -28926,7 +29066,10 @@ class Tile {
           name,
           type: "dictionary",
           keys: this.record_batch.getChild(name).data[0].dictionary.toArray(),
-          extent: [-2047, this.record_batch.getChild(name).data[0].dictionary.length - 2047]
+          extent: [
+            -2047,
+            this.record_batch.getChild(name).data[0].dictionary.length - 2047
+          ]
         });
       }
       if (type && type.typeId == 8) {
@@ -28937,11 +29080,7 @@ class Tile {
         });
       }
       if ((type == null ? void 0 : type.typeId) === 10) {
-        attributes.push({
-          name,
-          type: "datetime",
-          extent: extent(this.record_batch.getChild(name).data[0].values)
-        });
+        return [10, 100];
       }
       if (type && type.typeId == 3) {
         attributes.push({
@@ -28986,10 +29125,13 @@ class Tile {
 class QuadTile extends Tile {
   constructor(base_url, key, parent, dataset, prefs) {
     super(dataset);
-    this.bearer_token = "";
-    this._children = [];
-    this._already_called = false;
-    this.child_locations = [];
+    __publicField(this, "url");
+    __publicField(this, "bearer_token", "");
+    __publicField(this, "key");
+    __publicField(this, "_children", []);
+    __publicField(this, "codes");
+    __publicField(this, "_already_called", false);
+    __publicField(this, "child_locations", []);
     this.url = base_url;
     if (prefs != void 0 && "bearer_token" in prefs) {
       this.bearer_token = prefs["bearer_token"];
@@ -29010,9 +29152,7 @@ class QuadTile extends Tile {
     await this.download();
     let promises = [];
     if (this.max_ix < max_ix) {
-      promises = this.children.map(
-        (child) => child.download_to_depth(max_ix)
-      );
+      promises = this.children.map((child) => child.download_to_depth(max_ix));
     }
     return Promise.all(promises);
   }
@@ -29031,7 +29171,7 @@ class QuadTile extends Tile {
     }
     const request = this.bearer_token ? {
       method: "GET",
-      headers: { "Authorization": "Bearer " + this.bearer_token }
+      headers: { Authorization: "Bearer " + this.bearer_token }
     } : void 0;
     this._download = fetch(url, request).then(async (response) => {
       const buffer = await response.arrayBuffer();
@@ -29047,12 +29187,12 @@ class QuadTile extends Tile {
       if (children2) {
         this.child_locations = JSON.parse(children2);
       }
-      const ixes2 = this._batch.getChild("ix");
-      if (ixes2 === null) {
+      const ixes = this._batch.getChild("ix");
+      if (ixes === null) {
         throw "No ix column in table";
       }
-      this._min_ix = Number(ixes2.get(0));
-      this.max_ix = Number(ixes2.get(ixes2.length - 1));
+      this._min_ix = Number(ixes.get(0));
+      this.max_ix = Number(ixes.get(ixes.length - 1));
       this.highest_known_ix = this.max_ix;
     }).catch((error) => {
       console.log(error);
@@ -29070,7 +29210,11 @@ class QuadTile extends Tile {
     }
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
-        this._children.push(new this.class(this.url, key, this, this.dataset, { "bearer_token": this.bearer_token }));
+        this._children.push(
+          new this.class(this.url, key, this, this.dataset, {
+            bearer_token: this.bearer_token
+          })
+        );
       }
     }
     return this._children;
@@ -29091,6 +29235,8 @@ class QuadTile extends Tile {
 class ArrowTile extends Tile {
   constructor(table2, dataset, batch_num, plot, parent = null) {
     super(dataset);
+    __publicField(this, "batch_num");
+    __publicField(this, "full_tab");
     this.full_tab = table2;
     this._batch = table2.batches[batch_num];
     this.download_state = "Complete";
@@ -29118,12 +29264,13 @@ class ArrowTile extends Tile {
     let ix = this.batch_num * 4;
     while (++ix <= this.batch_num * 4 + 4) {
       if (ix < this.full_tab.batches.length) {
-        this._children.push(new ArrowTile(this.full_tab, this.dataset, ix, this.plot, this));
+        this._children.push(
+          new ArrowTile(this.full_tab, this.dataset, ix, this.plot, this)
+        );
       }
     }
   }
   download() {
-    console.log(ixes.get(0));
     return Promise.resolve(this._batch);
   }
   get ready() {
@@ -29140,8 +29287,9 @@ function nothing() {
 }
 class Dataset {
   constructor(plot) {
-    this.transformations = {};
-    this.extents = {};
+    __publicField(this, "transformations", {});
+    __publicField(this, "plot");
+    __publicField(this, "extents", {});
     this.plot = plot;
   }
   get highest_known_ix() {
@@ -29157,7 +29305,10 @@ class Dataset {
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
-    this.extents[dimension] = extent(this.points(void 0, max_ix), (d) => d[dimension]);
+    this.extents[dimension] = extent(
+      this.points(void 0, max_ix),
+      (d) => d[dimension]
+    );
     return this.extents[dimension];
   }
   *points(bbox, max_ix = 1e99) {
@@ -29223,10 +29374,17 @@ class Dataset {
   }
   add_label_identifiers(ids, field_name, key_field = "_id") {
     if (this.transformations[field_name]) {
-      throw new Error(`Can't overwrite existing transformation for ${field_name}`);
+      throw new Error(
+        `Can't overwrite existing transformation for ${field_name}`
+      );
     }
     this.transformations[field_name] = function(tile) {
-      return supplement_identifiers(tile.record_batch, ids, field_name, key_field);
+      return supplement_identifiers(
+        tile.record_batch,
+        ids,
+        field_name,
+        key_field
+      );
     };
   }
   findPoint(ix) {
@@ -29235,7 +29393,10 @@ class Dataset {
       if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
         return;
       }
-      const mid = bisectLeft([...tile.record_batch.getChild("ix").data[0].values], ix);
+      const mid = bisectLeft(
+        [...tile.record_batch.getChild("ix").data[0].values],
+        ix
+      );
       const val = tile.record_batch.get(mid);
       if (val.ix === ix) {
         matches.push(val);
@@ -29247,7 +29408,8 @@ class Dataset {
 class ArrowDataset extends Dataset {
   constructor(table, prefs, plot) {
     super(plot);
-    this.promise = Promise.resolve();
+    __publicField(this, "promise", Promise.resolve());
+    __publicField(this, "root_tile");
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
   get extent() {
@@ -29263,8 +29425,9 @@ class ArrowDataset extends Dataset {
 class QuadtileSet extends Dataset {
   constructor(base_url, prefs, plot) {
     super(plot);
-    this._download_queue = /* @__PURE__ */ new Set();
-    this.promise = new Promise(nothing);
+    __publicField(this, "_download_queue", /* @__PURE__ */ new Set());
+    __publicField(this, "promise", new Promise(nothing));
+    __publicField(this, "root_tile");
     this.root_tile = new QuadTile(base_url, "0/0/0", null, this, {});
     this.promise = this.root_tile.promise;
   }
@@ -29292,9 +29455,7 @@ class QuadtileSet extends Dataset {
         scores.push([distance, tile, bbox]);
       }
     }
-    this.visit(
-      callback
-    );
+    this.visit(callback);
     scores.sort((a, b) => a[0] - b[0]);
     while (scores.length > 0 && queue.size < queue_length) {
       const upnext = scores.pop();
@@ -29323,14 +29484,8 @@ function check_overlap(tile, bbox) {
     return 0;
   }
   const intersection = {
-    x: [
-      max([bbox.x[0], c2.x[0]]),
-      min([bbox.x[1], c2.x[1]])
-    ],
-    y: [
-      max([bbox.y[0], c2.y[0]]),
-      min([bbox.y[1], c2.y[1]])
-    ]
+    x: [max([bbox.x[0], c2.x[0]]), min([bbox.x[1], c2.x[1]])],
+    y: [max([bbox.y[0], c2.y[0]]), min([bbox.y[1], c2.y[1]])]
   };
   const { x, y } = intersection;
   let disqualify = 0;
@@ -29346,7 +29501,9 @@ function check_overlap(tile, bbox) {
   return area(intersection) / area(bbox);
 }
 function bind_column(batch, field_name, data) {
-  const current_keys = new Set([...batch.schema.fields].map((d) => d.name));
+  const current_keys = new Set(
+    [...batch.schema.fields].map((d) => d.name)
+  );
   if (current_keys.has(field_name)) {
     throw new Error(`Field ${field_name} already exists in batch`);
   }
@@ -30006,7 +30163,11 @@ var quickselect = { exports: {} };
 class LabelMaker extends Renderer {
   constructor(selector2, scatterplot) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
-    this.layers = [];
+    __publicField(this, "layers", []);
+    __publicField(this, "ctx");
+    __publicField(this, "tree");
+    __publicField(this, "timer");
+    __publicField(this, "label_key");
     this.canvas = scatterplot.elements[2].selectAll("canvas").node();
     this.tree = new DepthTree(0.5, [1, 1e6], this.ctx);
     this.tree.accessor = (x, y) => {
@@ -30020,15 +30181,13 @@ class LabelMaker extends Renderer {
     if (this.timer) {
       this.timer.stop();
     }
-    this.timer = timer(
-      () => {
-        this.render();
-        ticks2 -= 1;
-        if (ticks2 <= 0) {
-          this.stop();
-        }
+    this.timer = timer(() => {
+      this.render();
+      ticks2 -= 1;
+      if (ticks2 <= 0) {
+        this.stop();
       }
-    );
+    });
   }
   stop() {
     if (this.timer) {
@@ -30132,8 +30291,12 @@ function measure_text(d, context) {
 class DepthTree extends dist.RBush3D {
   constructor(scale_factor = 0.5, zoom2 = [0.1, 1e3], context) {
     super();
-    this.insertion_log = [];
-    this._accessor = (p) => [p.x, p.y];
+    __publicField(this, "scale_factor");
+    __publicField(this, "mindepth");
+    __publicField(this, "maxdepth");
+    __publicField(this, "context");
+    __publicField(this, "insertion_log", []);
+    __publicField(this, "_accessor", (p) => [p.x, p.y]);
     this.scale_factor = scale_factor;
     this.mindepth = zoom2[0];
     this.maxdepth = zoom2[1];
@@ -30208,14 +30371,26 @@ class DepthTree extends dist.RBush3D {
     console.log("Inserting", p3d.data.text);
     for (const overlapper of this.search(p3d)) {
       const blocked_until = this.max_collision_depth(p3d.data, overlapper.data);
-      console.log(overlapper.data.text, " blocks ", p3d.data.text, " until ", blocked_until);
+      console.log(
+        overlapper.data.text,
+        " blocks ",
+        p3d.data.text,
+        " until ",
+        blocked_until
+      );
       if (blocked_until > hidden_until) {
         hidden_until = blocked_until;
         hidden_by = overlapper;
       }
     }
     if (hidden_by && hidden_until < this.maxdepth) {
-      console.log(hidden_by.data.text, " used to blocks ", p3d.data.text, " until ", hidden_until);
+      console.log(
+        hidden_by.data.text,
+        " used to blocks ",
+        p3d.data.text,
+        " until ",
+        hidden_until
+      );
       const hid_data = hidden_by.data;
       const hid_start = hidden_by.minZ;
       const hid_end = hidden_by.maxZ;
@@ -30253,8 +30428,20 @@ const base_elements = [
 ];
 class Scatterplot {
   constructor(selector2, width, height) {
-    this.secondary_renderers = {};
-    this.plot_queue = Promise.resolve(0);
+    __publicField(this, "_renderer");
+    __publicField(this, "width");
+    __publicField(this, "height");
+    __publicField(this, "_root");
+    __publicField(this, "elements");
+    __publicField(this, "secondary_renderers", {});
+    __publicField(this, "div");
+    __publicField(this, "bound");
+    __publicField(this, "_zoom");
+    __publicField(this, "plot_queue", Promise.resolve(0));
+    __publicField(this, "prefs");
+    __publicField(this, "ready");
+    __publicField(this, "click_handler");
+    __publicField(this, "tooltip_handler");
     this.bound = false;
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
@@ -30377,41 +30564,50 @@ class Scatterplot {
     const p = new Promise((resolve, reject) => {
       for (let i = 0; i < xtimes; i++) {
         for (let j = 0; j < xtimes; j++) {
-          setTimeout(
-            () => {
-              this._zoom.zoom_to_bbox(
-                {
-                  x: [corners.x[0] + xstep * i, corners.x[0] + xstep * (i + 1)],
-                  y: [corners.y[0] + ystep * j, corners.y[0] + ystep * (j + 1)]
-                },
-                timeper / 5,
-                1
-              );
-              setTimeout(() => {
-                this._renderer.fbos.colorpicker.use(() => {
-                  this._renderer.render_all(this._renderer.props);
-                  const pixels = this._renderer.regl.read(0, 0, width, height);
-                  console.log(i, j, sum$1(pixels));
-                  const halfHeight = height / 2 | 0;
-                  const bytesPerRow = width * 4;
-                  var temp = new Uint8Array(width * 4);
-                  for (var y = 0; y < halfHeight; ++y) {
-                    var topOffset = y * bytesPerRow;
-                    var bottomOffset = (height - y - 1) * bytesPerRow;
-                    temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
-                    pixels.copyWithin(topOffset, bottomOffset, bottomOffset + bytesPerRow);
-                    pixels.set(temp, bottomOffset);
-                  }
-                  const imageData = new ImageData(new Uint8ClampedArray(pixels), width);
-                  ctx.putImageData(imageData, width * i, height * j);
-                });
-                if (i == xtimes - 1 && j === xtimes - 1) {
-                  resolve();
+          setTimeout(() => {
+            this._zoom.zoom_to_bbox(
+              {
+                x: [corners.x[0] + xstep * i, corners.x[0] + xstep * (i + 1)],
+                y: [corners.y[0] + ystep * j, corners.y[0] + ystep * (j + 1)]
+              },
+              timeper / 5,
+              1
+            );
+            setTimeout(() => {
+              this._renderer.fbos.colorpicker.use(() => {
+                this._renderer.render_all(this._renderer.props);
+                const pixels = this._renderer.regl.read(
+                  0,
+                  0,
+                  width,
+                  height
+                );
+                console.log(i, j, sum$1(pixels));
+                const halfHeight = height / 2 | 0;
+                const bytesPerRow = width * 4;
+                var temp = new Uint8Array(width * 4);
+                for (var y = 0; y < halfHeight; ++y) {
+                  var topOffset = y * bytesPerRow;
+                  var bottomOffset = (height - y - 1) * bytesPerRow;
+                  temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
+                  pixels.copyWithin(
+                    topOffset,
+                    bottomOffset,
+                    bottomOffset + bytesPerRow
+                  );
+                  pixels.set(temp, bottomOffset);
                 }
-              }, timeper / 2);
-            },
-            i * timeper * xtimes + j * timeper
-          );
+                const imageData = new ImageData(
+                  new Uint8ClampedArray(pixels),
+                  width
+                );
+                ctx.putImageData(imageData, width * i, height * j);
+              });
+              if (i == xtimes - 1 && j === xtimes - 1) {
+                resolve();
+              }
+            }, timeper / 2);
+          }, i * timeper * xtimes + j * timeper);
         }
       }
     });
@@ -30526,19 +30722,20 @@ class Scatterplot {
       context.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
       context.strokeStyle = "#8a0303";
       context.fillStyle = "rgba(30, 30, 34, 1)";
-      context.lineWidth = max([0.45, 0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))]);
-      const path = geoPath(geoIdentity().scale(this._zoom.transform.k).translate([this._zoom.transform.x, this._zoom.transform.y]), context);
+      context.lineWidth = max([
+        0.45,
+        0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))
+      ]);
+      const path = geoPath(
+        geoIdentity().scale(this._zoom.transform.k).translate([this._zoom.transform.x, this._zoom.transform.y]),
+        context
+      );
       context.beginPath(), path(contour), context.fill();
     }
   }
   contours(aes) {
     const data = this._renderer.calculate_contours(aes);
-    const {
-      x,
-      y,
-      x_,
-      y_
-    } = this._zoom.scales();
+    const { x, y, x_, y_ } = this._zoom.scales();
     function fix_point(p) {
       if (!p) {
         return;
@@ -30561,6 +30758,9 @@ class Scatterplot {
 }
 class SettableFunction {
   constructor(plot) {
+    __publicField(this, "_f");
+    __publicField(this, "string_rep");
+    __publicField(this, "plot");
     this.string_rep = "";
     this.plot = plot;
   }
@@ -30589,13 +30789,7 @@ class ClickFunction extends SettableFunction {
 class TooltipHTML extends SettableFunction {
   default(point) {
     let output = "<dl>";
-    const nope = /* @__PURE__ */ new Set([
-      "x",
-      "y",
-      "ix",
-      null,
-      "tile_key"
-    ]);
+    const nope = /* @__PURE__ */ new Set(["x", "y", "ix", null, "tile_key"]);
     console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) {
