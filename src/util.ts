@@ -12,7 +12,7 @@ export function encodeFloatsRGBArange(values, array) {
     array = new Uint32Array(values.length);
   }
 
-  const scale_size = (2 ** 32) / (max - min);
+  const scale_size = 2 ** 32 / (max - min);
 
   let i = 0;
 

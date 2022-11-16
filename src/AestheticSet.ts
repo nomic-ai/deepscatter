@@ -1,22 +1,20 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
-import { 
-  stateful_aesthetics,
-} from './Aesthetic';
+import { stateful_aesthetics } from './Aesthetic';
 import type Scatterplot from './deepscatter';
 import type QuadtreeRoot from './tile';
 import type { Encoding } from './types';
 import type { StatefulAesthetic } from './Aesthetic';
 
 export class AestheticSet {
-  public tileSet : QuadtreeRoot;
-  public scatterplot : Scatterplot;
-  public regl : Regl;
-  public encoding : Encoding;
-  public position_interpolation : boolean;
-  private store : Record<string, StatefulAesthetic<any>>;
-  public aesthetic_map : TextureSet;
-  constructor(scatterplot : Scatterplot, regl : Regl, tileSet : QuadtreeRoot) {
+  public tileSet: QuadtreeRoot;
+  public scatterplot: Scatterplot;
+  public regl: Regl;
+  public encoding: Encoding;
+  public position_interpolation: boolean;
+  private store: Record<string, StatefulAesthetic<any>>;
+  public aesthetic_map: TextureSet;
+  constructor(scatterplot: Scatterplot, regl: Regl, tileSet: QuadtreeRoot) {
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl;
@@ -26,29 +24,30 @@ export class AestheticSet {
     return this;
   }
 
-  public dim(aesthetic : string) {
+  public dim(aesthetic: string) {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
     if (this.store[aesthetic]) {
       return this.store[aesthetic];
     }
     if (stateful_aesthetics[aesthetic] !== undefined) {
       this.store[aesthetic] = new stateful_aesthetics[aesthetic](
-        this.scatterplot, this.regl, this.tileSet, 
+        this.scatterplot,
+        this.regl,
+        this.tileSet,
         this.aesthetic_map
       );
       return this.store[aesthetic];
     }
     throw new Error(`Unknown aesthetic ${aesthetic}`);
   }
-  
-  *[Symbol.iterator]() : Iterator<[string, StatefulAesthetic<any>]> {
+
+  *[Symbol.iterator](): Iterator<[string, StatefulAesthetic<any>]> {
     for (const [k, v] of Object.entries(this.store)) {
       yield [k, v];
     }
   }
 
-  interpret_position(encoding : Encoding) {
-    
+  interpret_position(encoding: Encoding) {
     /*
       You can specify just 'position' or 'position0' as a string and it will 
       parse into 'position.x' or 'position.x0' and 'position.y' or 'position.y0'.
@@ -69,20 +68,24 @@ export class AestheticSet {
         const suffix = p.replace('position', '');
         if (encoding[p]) {
           if (encoding[p] === 'literal') {
-          // A shortcut.
+            // A shortcut.
             encoding[`x${suffix}`] = {
-              field: 'x', transform: 'literal',
+              field: 'x',
+              transform: 'literal',
             };
             encoding[`y${suffix}`] = {
-              field: 'y', transform: 'literal',
+              field: 'y',
+              transform: 'literal',
             };
           } else {
             const field = encoding[p];
             encoding[`x${suffix}`] = {
-              field: `${field}.x`, transform: 'literal',
+              field: `${field}.x`,
+              transform: 'literal',
             };
             encoding[`y${suffix}`] = {
-              field: `${field}.y`, transform: 'literal',
+              field: `${field}.y`,
+              transform: 'literal',
             };
           }
           delete encoding[p];
@@ -112,16 +115,16 @@ export class AestheticSet {
 }
 
 export class TextureSet {
-  private _one_d_texture : Texture2D;
-  private _color_texture : Texture2D;
-  public texture_size : number;
-  public regl : Regl;
-  public id_locs : Record<string, number> = {};
-  public texture_widths : number;
-  private offsets : Record<string, number> = {};
-  private _one_d_position : number;
-  private _color_position : number;
-  constructor(regl : Regl, texture_size = 4096, texture_widths = 32) {
+  private _one_d_texture: Texture2D;
+  private _color_texture: Texture2D;
+  public texture_size: number;
+  public regl: Regl;
+  public id_locs: Record<string, number> = {};
+  public texture_widths: number;
+  private offsets: Record<string, number> = {};
+  private _one_d_position: number;
+  private _color_position: number;
+  constructor(regl: Regl, texture_size = 4096, texture_widths = 32) {
     this.texture_size = texture_size;
     this.texture_widths = texture_widths;
     this.regl = regl;
@@ -129,11 +132,11 @@ export class TextureSet {
     this._color_position = -1;
   }
 
-  public get_position(id : string) {
+  public get_position(id: string) {
     return this.offsets[id] || 0;
   }
 
-  public set_one_d(id : string, value : number[] | Uint8Array | Float32Array) {
+  public set_one_d(id: string, value: number[] | Uint8Array | Float32Array) {
     // id: a unique identifier for the specific aesthetic.
     // value: the array to stash onto the texture.
     let offset;
@@ -146,14 +149,18 @@ export class TextureSet {
     }
     // Draw a stripe with the data of a single pixel width,
     // going down.
-    this.one_d_texture.subimage({
-      data: value,
-      width: 1,
-      height: this.texture_size
-    }, offset - 1, 0);
+    this.one_d_texture.subimage(
+      {
+        data: value,
+        width: 1,
+        height: this.texture_size,
+      },
+      offset - 1,
+      0
+    );
   }
 
-  public set_color(id : string, value : Uint8Array) {
+  public set_color(id: string, value: Uint8Array) {
     let offset;
     const { offsets } = this;
     if (offsets[id]) {
@@ -162,11 +169,15 @@ export class TextureSet {
       offset = this._color_position--;
       offsets[id] = offset;
     }
-    this.color_texture.subimage({
-      data: value,
-      width: 1,
-      height: this.texture_size
-    }, (-offset) - 1, 0);
+    this.color_texture.subimage(
+      {
+        data: value,
+        width: 1,
+        height: this.texture_size,
+      },
+      -offset - 1,
+      0
+    );
     // -offset because we're coding the color buffer
     // on the negative side of the number line.
   }
@@ -175,9 +186,11 @@ export class TextureSet {
     if (this._one_d_texture) {
       return this._one_d_texture;
     }
-    const texture_type = this.regl.hasExtension('OES_texture_float') ? 
-      'float' : (this.regl.hasExtension('OES_texture_half_float') ? 
-        'half float' : 'uint8');
+    const texture_type = this.regl.hasExtension('OES_texture_float')
+      ? 'float'
+      : this.regl.hasExtension('OES_texture_half_float')
+      ? 'half float'
+      : 'uint8';
     const format = texture_type === 'uint8' ? 'rgba' : 'alpha';
 
     const params = {
@@ -186,11 +199,11 @@ export class TextureSet {
       type: texture_type,
       format,
     };
-      // Store the current and the last values for transitions.
+    // Store the current and the last values for transitions.
     this._one_d_texture = this.regl.texture(params);
     return this._one_d_texture;
   }
-  
+
   get color_texture() {
     if (this._color_texture) {
       return this._color_texture;

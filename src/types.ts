@@ -4,9 +4,9 @@ import { Table } from 'apache-arrow';
  * Operations to be performed on the GPU taking a single argument.
  */
 type OneArgumentOp = {
-  op: 'gt' | 'lt' | 'eq'
-  field : string;
-  a : number;
+  op: 'gt' | 'lt' | 'eq';
+  field: string;
+  a: number;
 };
 
 /**
@@ -14,9 +14,9 @@ type OneArgumentOp = {
  */
 
 type TwoArgumentOp = {
-  op: 'within' | 'between',
-  field: string,
-  a: number,
+  op: 'within' | 'between';
+  field: string;
+  a: number;
   b: number;
 };
 
@@ -24,18 +24,17 @@ export type OpChannel = OneArgumentOp | TwoArgumentOp;
 
 // Functions that are defined as strings and executed in JS.
 export type LambdaChannel = {
-  lambda : string;
-  field : string;
-  domain? : [number, number];
-  range? : [number, number];
+  lambda: string;
+  field: string;
+  domain?: [number, number];
+  range?: [number, number];
 };
 
 export type FunctionalChannel = LambdaChannel | OpChannel;
 
 export type ConstantChannel = {
-  constant : number;
+  constant: number;
 };
-
 
 /**
  * A channel represents the information necessary to map a single dimension
@@ -43,24 +42,24 @@ export type ConstantChannel = {
  * to construct a scale and to pass any other necessary information to assist
  * in converting tabular data to visual representation. In some cases it is a scale;
  * in others it is parameters used to define a function on the GPU.
- * 
- * The names and design are taken largely from channels as defined in Vega-Lite, 
+ *
+ * The names and design are taken largely from channels as defined in Vega-Lite,
  * but the syntax differs for a number of operations.
  * https://vega.github.io/vega-lite/docs/encoding.html
  */
 export interface BasicChannel {
   /** The name of a column in the data table to be encoded. */
   field: string; // .
-  /** 
-   * A transformation to apply on the field. 
+  /**
+   * A transformation to apply on the field.
    * 'literal' maps in the implied dataspace set by 'x', 'y', while
    * 'linear' transforms the data by the range and domain.
-  */
-  transform? : 'log' | 'linear' | 'sqrt' | 'literal';
-  // The domain over which the data extends 
-  domain? : [number, number];
+   */
+  transform?: 'log' | 'linear' | 'sqrt' | 'literal';
+  // The domain over which the data extends
+  domain?: [number, number];
   // The range into which to map the data.
-  range? : [number, number];
+  range?: [number, number];
 }
 
 export type JitterChannel = {
@@ -72,7 +71,7 @@ export type JitterChannel = {
    * 'circle' animates a circle around the point.
    * 'time' lapses the point in and out of view.
    */
-  method : null | 'spiral' | 'uniform' | 'normal' | 'circle' | 'time'
+  method: null | 'spiral' | 'uniform' | 'normal' | 'circle' | 'time';
 };
 
 export interface CategoricalChannel {
@@ -80,27 +79,31 @@ export interface CategoricalChannel {
 }
 
 export type BasicColorChannel = BasicChannel & {
-  range? : [[number, number, number], [number, number, number]] | string;
-  domain? : [number, number];
+  range?: [[number, number, number], [number, number, number]] | string;
+  domain?: [number, number];
 };
 
 export type CategoricalColorChannel = CategoricalChannel & {
-  range? : [number, number, number][] | string;
-  domain? : string[];
+  range?: [number, number, number][] | string;
+  domain?: string[];
 };
 
 export type ConstantColorChannel = ConstantChannel & {
-  constant? : [number, number, number]
+  constant?: [number, number, number];
 };
 
-export type ColorChannel = BasicColorChannel | CategoricalColorChannel | ConstantColorChannel;
-export type Channel = BasicChannel | string | ConstantChannel | OpChannel | LambdaChannel;
+export type ColorChannel =
+  | BasicColorChannel
+  | CategoricalColorChannel
+  | ConstantColorChannel;
+export type Channel =
+  | BasicChannel
+  | string
+  | ConstantChannel
+  | OpChannel
+  | LambdaChannel;
 
-export type OpArray = [
-  number,
-  number, 
-  number
-]; // A description of a functional operation to be passsed to the shader.
+export type OpArray = [number, number, number]; // A description of a functional operation to be passsed to the shader.
 
 /**
  * And encoding.
@@ -118,16 +121,16 @@ export type Encoding = {
   jitter_radius?: Channel;
   jitter_speed?: Channel;
   x0?: Channel;
-  y0? : Channel;
+  y0?: Channel;
   position?: string;
-  position0? : string;
+  position0?: string;
 };
 
 type TileKey = `${number}/${number}/${number}`;
 
 export type PointUpdate = {
-  column_name: string,
-  values: Record<string, Record<number, number>>
+  column_name: string;
+  values: Record<string, Record<number, number>>;
 };
 
 export type Dimension = keyof Encoding;
@@ -137,13 +140,14 @@ export type Dimension = keyof Encoding;
 // 2. A URL to a Quadtile source.
 // 3. An array buffer that contains a serialized Table.
 
-type DataSpec = Record<string, never> & (
-  | { source_url?: never; arrow_table?: never; arrow_buffer: ArrayBuffer; }
-  | { source_url: string; arrow_table?: never; arrow_buffer?: never; }
-  | { source_url?: never; arrow_table: Table; arrow_buffer?: never; }
-);
+type DataSpec = Record<string, never> &
+  (
+    | { source_url?: never; arrow_table?: never; arrow_buffer: ArrayBuffer }
+    | { source_url: string; arrow_table?: never; arrow_buffer?: never }
+    | { source_url?: never; arrow_table: Table; arrow_buffer?: never }
+  );
 
-export type APICall = { 
+export type APICall = {
   /** The magnification coefficient for a zooming item */
   zoom_balance: number;
 
@@ -154,14 +158,14 @@ export type APICall = {
   point_size: number;
 
   /** The maximum number of points to load */
-  max_points : number;
+  max_points: number;
   /** Overall screen saturation target at average point density */
   alpha: number;
 
   /** A function defind as a string that takes implied argument 'datum' */
-  click_function : string;
+  click_function: string;
 
-  encoding: Encoding
+  encoding: Encoding;
 } & DataSpec;
 
 export function isOpChannel(input: Channel): input is OpChannel {
