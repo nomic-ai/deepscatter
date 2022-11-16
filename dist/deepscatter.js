@@ -29518,9 +29518,10 @@ function bind_column(batch, field_name, data) {
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
   const hashtab = /* @__PURE__ */ new Set();
   for (const item of Object.keys(ids)) {
-    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i)).join("");
+    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || "").join("");
     hashtab.add(code);
   }
+  console.log(hashtab);
   const updatedFloatArray = new Float32Array(batch.numRows);
   const kfield = batch.getChild(key_field);
   if (kfield === null) {
