@@ -147,6 +147,8 @@ type DataSpec = Record<string, never> &
     | { source_url?: never; arrow_table: Table; arrow_buffer?: never }
   );
 
+export type onZoomCallback = (transform: d3.ZoomTransform) => null
+
 export type APICall = {
   /** The magnification coefficient for a zooming item */
   zoom_balance: number;
@@ -164,6 +166,8 @@ export type APICall = {
 
   /** A function defind as a string that takes implied argument 'datum' */
   click_function: string;
+
+  on_zoom: onZoomCallback;
 
   encoding: Encoding;
 } & DataSpec;

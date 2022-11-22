@@ -4,7 +4,7 @@ import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
-import { APICall, Encoding } from './types';
+import { APICall, Encoding, onZoomCallback } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type { Renderer } from './rendering';
 import type QuadtreeRoot from './tile';
@@ -28,6 +28,7 @@ export default class Zoom {
   public _scales: Record<string, d3.ScaleLinear<number, number>>;
   public zoomer: d3.ZoomBehavior<Element, any>;
   public transform: d3.ZoomTransform;
+  private _consumer_on_zoom_callback?: onZoomCallback;
   public _start: number;
   public scatterplot: Scatterplot;
   constructor(selector: string, prefs: APICall, plot: Scatterplot) {
@@ -42,6 +43,7 @@ export default class Zoom {
     this.height = +this.svg_element_selection.attr('height');
     this.renderers = new Map();
     this.scatterplot = plot;
+    this._consumer_on_zoom_callback = prefs.on_zoom;
     // A zoom keeps track of all the renderers
     // that it's in charge of adjusting.
 
@@ -139,6 +141,7 @@ export default class Zoom {
         } catch (error) {}
         this.transform = event.transform;
         this.restart_timer(10 * 1000);
+        this._consumer_on_zoom_callback?.(event.transform);
       });
 
     canvas.call(zoomer);
