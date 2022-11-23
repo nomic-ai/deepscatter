@@ -106,6 +106,9 @@
   console.log(scatterplot.database)
   // Simple animation demonstration.
 
+  // In practice, you might transform an external annotations layer using this
+  scatterplot.on_zoom = (transform) => console.log('zoomed:', transform)
+
   let cycle = 0;
   select("#jitter").on("change", (event) => {
     scatterplot.plotAPI({
