@@ -312,7 +312,7 @@ export abstract class Tile {
     };
   }
 
-  [Symbol.iterator]() : IterableIterator<StructRowProxy> {
+  [Symbol.iterator](): IterableIterator<StructRowProxy> {
     return this.yielder();
   }
 

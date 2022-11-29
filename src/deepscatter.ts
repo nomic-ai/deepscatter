@@ -48,12 +48,14 @@ export default class Scatterplot {
   ready: Promise<void>;
   public click_handler: ClickFunction;
   public tooltip_handler: TooltipHTML;
-  private plot_queue : Promise<void> = Promise.resolve(0);
-  public prefs : APICall;
-  ready : Promise<void>;
-  mark_ready : () => void = function() {/*pass*/};
-  public click_handler : ClickFunction;
-  public tooltip_handler : TooltipHTML;
+  private plot_queue: Promise<void> = Promise.resolve(0);
+  public prefs: APICall;
+  ready: Promise<void>;
+  mark_ready: () => void = function () {
+    /*pass*/
+  };
+  public click_handler: ClickFunction;
+  public tooltip_handler: TooltipHTML;
 
   constructor(selector: string, width: number, height: number) {
     this.bound = false;
@@ -155,14 +157,20 @@ export default class Scatterplot {
         console.log(error);
       });
     this.add_labels(features, name, label_key, size_key);
+  }
 
-  async add_labels_from_url(url : string, name : string, label_key : string, size_key : string | undefined) : Promise<void> {
+  async add_labels_from_url(
+    url: string,
+    name: string,
+    label_key: string,
+    size_key: string | undefined
+  ): Promise<void> {
     await this.ready;
     await this._root.promise;
     return fetch(url)
       .then(async (data) => {
-        const features = await (data.json() as Promise<FeatureCollection>)
-        this.add_labels(features, name , label_key, size_key);
+        const features = await (data.json() as Promise<FeatureCollection>);
+        this.add_labels(features, name, label_key, size_key);
       })
       .catch((error) => {
         this.stop_labellers();
@@ -446,7 +454,7 @@ export default class Scatterplot {
     return this.click_handler.f;
   }
 
-  async plotAPI(prefs : APICall) : Promise<void> {
+  async plotAPI(prefs: APICall): Promise<void> {
     await this.plot_queue;
     this.plot_queue = this.unsafe_plotAPI(prefs);
     return await this.plot_queue;
@@ -465,7 +473,7 @@ export default class Scatterplot {
     if (prefs.tooltip_html) {
       this.tooltip_html = Function('datum', prefs.tooltip_html);
     }
-    
+
     if (prefs.labels) {
       const { url, label_field, size_field } = prefs.labels;
       const name = prefs.labels.name || prefs.labels.url;

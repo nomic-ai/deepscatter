@@ -1,51 +1,48 @@
 <head>
   <style>
-      .ttooltip {
-        z-index: 99;
-        min-width: 500px;
-        display : flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-      }
-      dl {
-        display : flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-      }
-      dt {
-          font-weight: bold;
-          color: rgb(128, 19, 0);
-      }
+    .ttooltip {
+      z-index: 99;
+      min-width: 500px;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    dl {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+    dt {
+      font-weight: bold;
+      color: rgb(128, 19, 0);
+    }
 
-      dt::after {
-          content: ":";
-      }
+    dt::after {
+      content: ':';
+    }
 
-      dd {
-          margin: 0 0 0 10px;
-          padding: 0 0 0.5em 0;
-          width: 180px;
-      }
-      #date {
-        width: 100%
-      }
+    dd {
+      margin: 0 0 0 10px;
+      padding: 0 0 0.5em 0;
+      width: 180px;
+    }
+    #date {
+      width: 100%;
+    }
   </style>
 </head>
 
 <body>
   <h1>Vietnam</h1>
   <div id="datestring"></div>
-  <input id="date" title="date selector" type="range" min="-1800" max="1500"/>
+  <input id="date" title="date selector" type="range" min="-1800" max="1500" />
   <div id="deepscatter">
     <div>
       <div id="left-overlay" class="overlay"></div>
-      <div id="color-legend" class="overlay"> </div>
+      <div id="color-legend" class="overlay"></div>
     </div>
   </div>
-
 </body>
-
-
 
 <script type="module" lang="ts">
   import Scatterplot from './src/deepscatter';
@@ -54,44 +51,48 @@
   window.select = select; // For the click function below.
 
   const prefs = {
-    "source_url" : 'https://bmschmidt.github.io/vietnam_war/',
-    "max_points": 100000,
-    "alpha" : 10.12, // Target saturation for the full page.
-    "zoom_balance" : 0.12, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
-    "point_size": 2, // Default point size before application of size scaling
-    "background_color": "#112233",
-    "click_function": "select('#ident').html(JSON.stringify(datum, undefined, 2))",
+    source_url: 'https://bmschmidt.github.io/vietnam_war/',
+    max_points: 100000,
+    alpha: 10.12, // Target saturation for the full page.
+    zoom_balance: 0.12, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
+    point_size: 2, // Default point size before application of size scaling
+    background_color: '#112233',
+    click_function:
+      "select('#ident').html(JSON.stringify(datum, undefined, 2))",
     zoom: {
-      bbox: {"x":[99.15172120932304,114.17888963818825],"y":[7.0849741134400706,23.626158008070647]}
+      bbox: {
+        x: [99.15172120932304, 114.17888963818825],
+        y: [7.0849741134400706, 23.626158008070647],
+      },
     },
-    "labels": {
-      url: "/tests/UNIT.geojson",
+    labels: {
+      url: '/tests/UNIT.geojson',
       name: undefined,
-      label_field: "UNIT",
-      size_field: undefined
+      label_field: 'UNIT',
+      size_field: undefined,
     },
-    "encoding": {
-      jitter_radius : {
+    encoding: {
+      jitter_radius: {
         constant: 0.001,
-        method: "normal"
+        method: 'normal',
       },
-      "color": {
-        "field": "UNIT",
-        "range": "category10",
-        domain: [-2047, 2047]
+      color: {
+        field: 'UNIT',
+        range: 'category10',
+        domain: [-2047, 2047],
       },
-      "x": {
-        field: "x",
-        transform: "literal"
+      x: {
+        field: 'x',
+        transform: 'literal',
       },
-      "y": {
-        field: "y", 
-        transform: "literal"
-      }
-    }
+      y: {
+        field: 'y',
+        transform: 'literal',
+      },
+    },
   };
 
-  const scatterplot = new Scatterplot("#deepscatter");
+  const scatterplot = new Scatterplot('#deepscatter');
   const first_draw = scatterplot.plotAPI(prefs);
   window.plot = scatterplot; // For debugging
 
@@ -100,67 +101,87 @@
   let cycle = 0;
 
   const width = 600;
-  function redo_scale () {
-    const scale = scatterplot._renderer.aes.store.color.current.scale
-    const domain = scale.domain()
-    const range = scale.range()
-    select("#color-legend").selectAll("div").data(domain.slice(0, 15))
-    .join("div")
-    .attr("class", "legend-div")
-    .text(d => d)
-    .style("background-color", d => scale(d))
-
+  function redo_scale() {
+    const scale = scatterplot._renderer.aes.store.color.current.scale;
+    const domain = scale.domain();
+    const range = scale.range();
+    select('#color-legend')
+      .selectAll('div')
+      .data(domain.slice(0, 15))
+      .join('div')
+      .attr('class', 'legend-div')
+      .text((d) => d)
+      .style('background-color', (d) => scale(d));
   }
-  first_draw.then( () => {
-    const holder = select("#left-overlay")
-    const buttons = holder.selectAll("button").data([
-      "MILSERVICE", "PERIODOFDAY", "UNIT", "GEOZONE",
-      "AIRFORCEGROUP", "TGTTYPE", "MFUNC_DESC", "TAKEOFFLOCATION"
-    ])
-    redo_scale()
-    buttons.enter().append("div").style("display", "flex").style("flex", "row").append("button").text(d => d).on("click", function(d) {
-      const button = select(this);
-      const field = button.text();
-      scatterplot.plotAPI({
-        duration: 0.500,
-        "labels": {
-          url: `/tests/${field}.geojson`,
-          name: undefined,
-          label_field: field,
-          size_field: undefined
-        },
-        encoding: {
-          'color': {
-            'field': field,
-            'range': 'category10',
-            'domain': [-2047, 2047]
-          }
-        }
-      }).then(redo_scale)
-    })
-    select("#date").on("input", function(a, b) {
-      console.log(this, a, b)
-      const date1 = new Date(1970, 0, this.valueAsNumber - 15)
-      const date2 = new Date(1970, 0, this.valueAsNumber + 15)
-      document.getElementById("datestring").innerHTML = date1.toDateString() + " to " + date2.toDateString()
-      scatterplot.plotAPI({
-        alpha: 3.5,
-        max_points: 10000,
-        point_size: 5,
-        duration: 0.1,
-        encoding: {
-          'filter': {
-            'field': "MSNDATE",
-            op: 'within',
-            a: 15,
-            b: this.valueAsNumber
-          }
-        }
-      }).then(redo_scale)
-    })
-  })
+  first_draw.then(() => {
+    const holder = select('#left-overlay');
+    const buttons = holder
+      .selectAll('button')
+      .data([
+        'MILSERVICE',
+        'PERIODOFDAY',
+        'UNIT',
+        'GEOZONE',
+        'AIRFORCEGROUP',
+        'TGTTYPE',
+        'MFUNC_DESC',
+        'TAKEOFFLOCATION',
+      ]);
+    redo_scale();
+    buttons
+      .enter()
+      .append('div')
+      .style('display', 'flex')
+      .style('flex', 'row')
+      .append('button')
+      .text((d) => d)
+      .on('click', function (d) {
+        const button = select(this);
+        const field = button.text();
+        scatterplot
+          .plotAPI({
+            duration: 0.5,
+            labels: {
+              url: `/tests/${field}.geojson`,
+              name: undefined,
+              label_field: field,
+              size_field: undefined,
+            },
+            encoding: {
+              color: {
+                field: field,
+                range: 'category10',
+                domain: [-2047, 2047],
+              },
+            },
+          })
+          .then(redo_scale);
+      });
+    select('#date').on('input', function (a, b) {
+      console.log(this, a, b);
+      const date1 = new Date(1970, 0, this.valueAsNumber - 15);
+      const date2 = new Date(1970, 0, this.valueAsNumber + 15);
+      document.getElementById('datestring').innerHTML =
+        date1.toDateString() + ' to ' + date2.toDateString();
+      scatterplot
+        .plotAPI({
+          alpha: 3.5,
+          max_points: 10000,
+          point_size: 5,
+          duration: 0.1,
+          encoding: {
+            filter: {
+              field: 'MSNDATE',
+              op: 'within',
+              a: 15,
+              b: this.valueAsNumber,
+            },
+          },
+        })
+        .then(redo_scale);
+    });
+  });
 </script>
-
 
 <style>
   #deepscatter {
@@ -181,7 +202,6 @@
     flex-direction: column;
     align-items: right;
     justify-content: right;
-
   }
   .legend-div {
     margin: 5px;
@@ -193,5 +213,4 @@
   button:hover {
     background-color: #eee;
   }
-  
 </style>

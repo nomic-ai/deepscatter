@@ -30310,7 +30310,7 @@ class DepthTree extends dist.RBush3D {
     const xoverlap = (p1.pixel_width + p2.pixel_width) / 8;
     const width_overlap = xoverlap / xdiff;
     const ydiff = Math.abs(y12 - y2);
-    const yoverlap = (p2.pixel_height + p2.pixel_height) / 8;
+    const yoverlap = (p2.pixel_height + p2.pixel_height) / 2;
     const height_overlap = yoverlap / ydiff;
     const max_overlap = Math.min(width_overlap, height_overlap);
     return max_overlap;
@@ -30442,13 +30442,21 @@ class Scatterplot {
     __publicField(this, "ready");
     __publicField(this, "click_handler");
     __publicField(this, "tooltip_handler");
+    __publicField(this, "plot_queue", Promise.resolve(0));
+    __publicField(this, "prefs");
+    __publicField(this, "ready");
+    __publicField(this, "mark_ready", function() {
+    });
+    __publicField(this, "click_handler");
+    __publicField(this, "tooltip_handler");
     this.bound = false;
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
     }
     this.width = width;
     this.height = height;
-    this.ready = new Promise(() => {
+    this.ready = new Promise((resolve, reject) => {
+      this.mark_ready = resolve;
     });
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
@@ -30485,6 +30493,17 @@ class Scatterplot {
     });
     this.add_labels(features, name, label_key, size_key);
   }
+  async add_labels_from_url(url, name, label_key, size_key) {
+    await this.ready;
+    await this._root.promise;
+    return fetch(url).then(async (data) => {
+      const features = await data.json();
+      this.add_labels(features, name, label_key, size_key);
+    }).catch((error) => {
+      this.stop_labellers();
+      console.log(error);
+    });
+  }
   add_labels(features, name, label_key, size_key) {
     const labels = new LabelMaker(this.div, this);
     labels.update(features, label_key, size_key);
@@ -30515,7 +30534,7 @@ class Scatterplot {
     ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
     this._renderer.initialize();
-    this.ready = this._root.promise;
+    void this._root.promise.then(() => this.mark_ready());
     return this.ready;
   }
   visualize_tiles() {
@@ -30636,6 +30655,14 @@ class Scatterplot {
     }
     merge(this.prefs, prefs);
   }
+  stop_labellers() {
+    for (const [k, v] of Object.entries(this.secondary_renderers)) {
+      if (v && v["label_key"] !== void 0) {
+        this.secondary_renderers[k].stop();
+        this.secondary_renderers[k] = void 0;
+      }
+    }
+  }
   dim(dimension) {
     return this._renderer.aes.dim(dimension).current;
   }
@@ -30652,9 +30679,6 @@ class Scatterplot {
     return this.click_handler.f;
   }
   async plotAPI(prefs) {
-    if (prefs.encoding && prefs.encoding.filter && prefs.encoding.filter.domain) {
-      throw new Error("Filtering is not supported in the API");
-    }
     await this.plot_queue;
     this.plot_queue = this.unsafe_plotAPI(prefs);
     return await this.plot_queue;
@@ -30665,6 +30689,14 @@ class Scatterplot {
     }
     if (prefs.tooltip_html) {
       this.tooltip_html = Function("datum", prefs.tooltip_html);
+    }
+    if (prefs.labels) {
+      const { url, label_field, size_field } = prefs.labels;
+      const name = prefs.labels.name || prefs.labels.url;
+      if (!this.secondary_renderers[name]) {
+        this.stop_labellers();
+        this.add_labels_from_url(url, name, label_field, size_field);
+      }
     }
     this.update_prefs(prefs);
     if (this._root === void 0) {

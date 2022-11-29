@@ -239,7 +239,7 @@ class DepthTree extends RBush3D {
     const width_overlap = xoverlap / xdiff;
 
     const ydiff = Math.abs(y1 - y2);
-    const yoverlap = (p2.pixel_height + p2.pixel_height)/2;
+    const yoverlap = (p2.pixel_height + p2.pixel_height) / 2;
     const height_overlap = yoverlap / ydiff;
     //    console.log("IT's", {width_overlap, height_overlap}, p1.text, p2.text);
     // Then y
