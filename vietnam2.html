@@ -64,13 +64,19 @@
     zoom: {
       bbox: {"x":[99.15172120932304,114.17888963818825],"y":[7.0849741134400706,23.626158008070647]}
     },
+    "labels": {
+      url: "/tests/UNIT.geojson",
+      name: undefined,
+      label_field: "UNIT",
+      size_field: undefined
+    },
     "encoding": {
       jitter_radius : {
         constant: 0.001,
         method: "normal"
       },
       "color": {
-        "field": "COUNTRYFLYINGMISSION",
+        "field": "UNIT",
         "range": "category10",
         domain: [-2047, 2047]
       },
@@ -85,14 +91,9 @@
     }
   };
 
-
-  const scatterplot = new Scatterplot("#deepscatter")
+  const scatterplot = new Scatterplot("#deepscatter");
   const first_draw = scatterplot.plotAPI(prefs);
   window.plot = scatterplot; // For debugging
-
-  first_draw.then( async (d) => {
-    await scatterplot.add_labels_from_url("tests/TAKEOFFLOCATION.geojson", "takeoff", "TAKEOFFLOCATION");
-  })
 
   // Simple animation demonstration.
 
@@ -122,6 +123,12 @@
       const field = button.text();
       scatterplot.plotAPI({
         duration: 0.500,
+        "labels": {
+          url: `/tests/${field}.geojson`,
+          name: undefined,
+          label_field: field,
+          size_field: undefined
+        },
         encoding: {
           'color': {
             'field': field,
