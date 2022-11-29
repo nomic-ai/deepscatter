@@ -1,7 +1,6 @@
 import { GeoJsonObject } from 'geojson';
 import { Renderer } from './rendering';
-import { BBox, RBush3D } from 'rbush-3d';
-import { QuadtileSet } from './Dataset';
+import { RBush3D } from 'rbush-3d';
 import Scatterplot from './deepscatter';
 import { Timer, timer } from 'd3-timer';
 
@@ -221,11 +220,11 @@ class DepthTree extends RBush3D {
 //    console.log(p1.pixel_width + p2.pixel_width)
     // First x
     const xdiff = Math.abs(x1 - x2);
-    const xoverlap = (p1.pixel_width + p2.pixel_width)/8;
+    const xoverlap = (p1.pixel_width + p2.pixel_width)/2;
     const width_overlap = xoverlap / xdiff;
 
     const ydiff = Math.abs(y1 - y2);
-    const yoverlap = (p2.pixel_height + p2.pixel_height)/8;
+    const yoverlap = (p2.pixel_height + p2.pixel_height)/2;
     const height_overlap = yoverlap / ydiff;
 //    console.log("IT's", {width_overlap, height_overlap}, p1.text, p2.text);
     // Then y

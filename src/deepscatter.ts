@@ -46,6 +46,7 @@ export default class Scatterplot {
   private plot_queue : Promise<void> = Promise.resolve(0);
   public prefs : APICall;
   ready : Promise<void>;
+  mark_ready : () => void = function() {/*pass*/};
   public click_handler : ClickFunction;
   public tooltip_handler : TooltipHTML;
 
@@ -57,7 +58,9 @@ export default class Scatterplot {
     this.width = width;
     this.height = height;
     // Unresolvable.
-    this.ready = new Promise(() => {/*pass*/});
+    this.ready = new Promise((resolve, reject) => {
+      this.mark_ready = resolve;
+    });
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.prefs = {
@@ -132,11 +135,18 @@ export default class Scatterplot {
   }
 
 
-  async add_labels_from_url(url : string, name : string, label_key : string, size_key : string | undefined) {
-    const features = await fetch(url)
-      .then((data) => data.json() as Promise<FeatureCollection>)
-      .catch((error) => {console.log(error);});
-    this.add_labels(features, name , label_key, size_key);
+  async add_labels_from_url(url : string, name : string, label_key : string, size_key : string | undefined) : Promise<void> {
+    await this.ready;
+    await this._root.promise;
+    return fetch(url)
+      .then(async (data) => {
+        const features = await (data.json() as Promise<FeatureCollection>)
+        this.add_labels(features, name , label_key, size_key);
+      })
+      .catch((error) => {
+        this.stop_labellers();
+        console.log(error);
+      });
   }
   /**
    * 
@@ -158,6 +168,7 @@ export default class Scatterplot {
    * 
   */
   add_labels(features : FeatureCollection, name : string, label_key : string, size_key : string | undefined) {
+    console.log({features, name, label_key})
     const labels = new LabelMaker(this.div, this);
     labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
@@ -197,7 +208,7 @@ export default class Scatterplot {
 
     this._renderer.initialize();
 
-    this.ready = this._root.promise;
+    void this._root.promise.then(() => this.mark_ready());
     return this.ready;
   }
 
@@ -360,6 +371,15 @@ export default class Scatterplot {
 
   }
 
+  public stop_labellers() {
+    for (const [k, v] of Object.entries(this.secondary_renderers)) {
+      // Stop any existing labels
+      if (v && v['label_key'] !== undefined) {
+        this.secondary_renderers[k].stop();
+        this.secondary_renderers[k] = undefined;
+      }
+    }
+  }
   /**
    * 
    * @param dimension The name of the encoding dimension to access
@@ -388,9 +408,6 @@ export default class Scatterplot {
   }
 
   async plotAPI(prefs : APICall) : Promise<void> {
-    if (prefs.encoding && prefs.encoding.filter && prefs.encoding.filter.domain) {
-      throw new Error('Filtering is not supported in the API');
-    }
     await this.plot_queue;
     this.plot_queue = this.unsafe_plotAPI(prefs);
     return await this.plot_queue;
@@ -410,6 +427,14 @@ export default class Scatterplot {
       this.tooltip_html = Function('datum', prefs.tooltip_html);
     }
     
+    if (prefs.labels) {
+      const { url, label_field, size_field } = prefs.labels;
+      const name = prefs.labels.name || prefs.labels.url;
+      if (!this.secondary_renderers[name]) {
+        this.stop_labellers();
+        this.add_labels_from_url(url, name, label_field, size_field);
+      }
+    }
     this.update_prefs(prefs);
 
     // Some things have to be done *before* we can actually run this;

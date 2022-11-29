@@ -14,7 +14,8 @@ import {
   RecordBatch,
   Schema,
   Data,
-  Field
+  Field,
+  StructRowProxy
 } from 'apache-arrow';
 
 import type { Dataset, QuadtileSet } from './Dataset';
@@ -292,7 +293,7 @@ export abstract class Tile {
     };
   }
 
-  [Symbol.iterator]() {
+  [Symbol.iterator]() : IterableIterator<StructRowProxy> {
     return this.yielder();
   }
 
