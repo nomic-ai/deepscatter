@@ -27,7 +27,7 @@ import type {
   ColorChannel,
   OpArray,
 } from './types';
-import type { Dataset, QuadtileSet } from './Dataset';
+import type { QuadtileSet } from './Dataset';
 import { Vector, tableToIPC, makeVector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { Tile } from './tile';
@@ -267,7 +267,10 @@ abstract class Aesthetic {
     }
     console.log(column.type);
     if (column.type.dictionary) {
-      this._domains[this.field] = [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
+      this._domains[this.field] = [
+        -2047,
+        Math.floor(this.aesthetic_map.texture_size / 2) - 1,
+      ];
     } else {
       if (this.scatterplot._root._schema) {
         const field = this.scatterplot._root._schema.fields.find(
@@ -276,13 +279,13 @@ abstract class Aesthetic {
         if (field && field.metadata) {
           const minmax = field.metadata.get('extent');
           if (minmax) {
-            let [min, max] = JSON.parse(minmax);
+            let [min, max] = JSON.parse(minmax) as [number, number];
             if (field.typeId === 10) {
               // Dates must be parsed as ms from epoch.
               min = Number(new Date(min));
               max = Number(new Date(max));
             }
-            this._domains[this.field] = [min, max]
+            this._domains[this.field] = [min, max];
           }
         }
       }
@@ -290,9 +293,6 @@ abstract class Aesthetic {
         this._domains[this.field] = extent(column.toArray());
       }
     }
-    console.log(
-      'Inferring range of ' + this.field + ' to be ' + this._domains[this.field]
-    );
     return this._domains[this.field];
   }
 
