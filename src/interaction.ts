@@ -11,6 +11,7 @@ import type QuadtreeRoot from './tile';
 import { ReglRenderer } from './regl_rendering';
 import Scatterplot from './deepscatter';
 import { StructRow } from 'apache-arrow';
+import { Rectangle } from './tile';
 
 export default class Zoom {
   public prefs: APICall;
@@ -246,7 +247,7 @@ export default class Zoom {
     });
   }
 
-  current_corners() {
+  current_corners() : Rectangle | undefined {
     // The corners of the current zoom transform, in data coordinates.
     const { width, height } = this;
 
@@ -258,8 +259,8 @@ export default class Zoom {
     const { x_, y_ } = scales;
 
     return {
-      x: [x_.invert(0), x_.invert(width)],
-      y: [y_.invert(0), y_.invert(height)],
+      x: [x_.invert(0) as number, x_.invert(width) as number],
+      y: [y_.invert(0) as number, y_.invert(height) as number],
     };
   }
 

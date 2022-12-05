@@ -1,0 +1,799 @@
+{
+  "type": "FeatureCollection",
+  "name": "MILSERVICE",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 2, "size": 967949 },
+      "geometry": { "type": "Point", "coordinates": [106.501111, 16.786388] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 8, "size": 334826 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.543584900000013, 11.22173928]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 2, "size": 326843 },
+      "geometry": { "type": "Point", "coordinates": [107.6573162, 16.2165778] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 3, "size": 169459 },
+      "geometry": { "type": "Point", "coordinates": [105.742, 18.563333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 17, "size": 169428 },
+      "geometry": { "type": "Point", "coordinates": [103.383, 19.55] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 1, "size": 147053 },
+      "geometry": { "type": "Point", "coordinates": [106.417, 16.7788607] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 18, "size": 106017 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.718840700000015, 14.89299819]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 0, "size": 69845 },
+      "geometry": { "type": "Point", "coordinates": [105.861944, 16.000833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 0, "size": 37258 },
+      "geometry": { "type": "Point", "coordinates": [106.7001385, 16.7] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 0, "size": 27600 },
+      "geometry": { "type": "Point", "coordinates": [107.353055, 12.041666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 0, "size": 23280 },
+      "geometry": { "type": "Point", "coordinates": [106.7, 15.966666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 15, "size": 18295 },
+      "geometry": { "type": "Point", "coordinates": [106.586681, 11.114722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 21, "size": 17995 },
+      "geometry": { "type": "Point", "coordinates": [106.370277, 10.14936577] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 3, "size": 17621 },
+      "geometry": { "type": "Point", "coordinates": [105.9358636, 10.45556941] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 82, "size": 14407 },
+      "geometry": { "type": "Point", "coordinates": [106.2013514, 10.3761285] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 32, "size": 11942 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.144316700000019, 13.20158515]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 17, "size": 11329 },
+      "geometry": { "type": "Point", "coordinates": [106.027954, 10.43053741] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 6, "size": 10566 },
+      "geometry": { "type": "Point", "coordinates": [105.895, 11.861666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 44, "size": 9667 },
+      "geometry": { "type": "Point", "coordinates": [105.9351382, 10.11001552] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 3, "size": 9506 },
+      "geometry": { "type": "Point", "coordinates": [106.3318707, 10.79014269] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 20, "size": 8340 },
+      "geometry": { "type": "Point", "coordinates": [105.246666, 11.386111] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 31, "size": 7964 },
+      "geometry": { "type": "Point", "coordinates": [103.164444, 11.755] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 113, "size": 7863 },
+      "geometry": { "type": "Point", "coordinates": [106.8063085, 10.51279976] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 40, "size": 7703 },
+      "geometry": { "type": "Point", "coordinates": [108.4522396, 13.95751135] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 25, "size": 6691 },
+      "geometry": { "type": "Point", "coordinates": [105.872, 19.815277] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 183, "size": 6598 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.611224099999987, 10.00719522]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 70, "size": 6463 },
+      "geometry": { "type": "Point", "coordinates": [109.1053139, 12.2068431] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 152, "size": 6369 },
+      "geometry": { "type": "Point", "coordinates": [108.012777, 11.07853589] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 5, "size": 6321 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.262196799999984, 15.698888]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "RLAF", "cluster": 0, "size": 6034 },
+      "geometry": { "type": "Point", "coordinates": [104.608611, 17.952777] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 41, "size": 5394 },
+      "geometry": { "type": "Point", "coordinates": [105.866666, 20.118944] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 59, "size": 5291 },
+      "geometry": { "type": "Point", "coordinates": [104.9331, 10.474722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 14, "size": 5200 },
+      "geometry": { "type": "Point", "coordinates": [106.616388, 11.514722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 34, "size": 5015 },
+      "geometry": { "type": "Point", "coordinates": [104.8167, 11.433333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 93, "size": 4903 },
+      "geometry": { "type": "Point", "coordinates": [104.921666, 12.676944] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 12, "size": 4630 },
+      "geometry": { "type": "Point", "coordinates": [107.401388, 15.43104628] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 128, "size": 4531 },
+      "geometry": { "type": "Point", "coordinates": [109.239444, 12.90855653] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 43, "size": 4529 },
+      "geometry": { "type": "Point", "coordinates": [106.083333, 17.188611] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 18, "size": 4522 },
+      "geometry": { "type": "Point", "coordinates": [107.142, 14.921666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 1, "size": 4154 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.5954774, 12.427740345]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "RLAF", "cluster": 10, "size": 4002 },
+      "geometry": { "type": "Point", "coordinates": [106.077222, 15.179305] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 18, "size": 3977 },
+      "geometry": { "type": "Point", "coordinates": [107.191666, 16.705555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 130, "size": 3742 },
+      "geometry": { "type": "Point", "coordinates": [105.3665, 9.651339125] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 16, "size": 3697 },
+      "geometry": { "type": "Point", "coordinates": [104.888888, 9.6125] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 69, "size": 3643 },
+      "geometry": { "type": "Point", "coordinates": [108.9807038, 11.79035897] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 28, "size": 3571 },
+      "geometry": { "type": "Point", "coordinates": [105.615, 10.007222] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "RAAF", "cluster": 0, "size": 3536 },
+      "geometry": { "type": "Point", "coordinates": [107.155277, 11.624722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 188, "size": 3475 },
+      "geometry": { "type": "Point", "coordinates": [102.619, 21.1] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 30, "size": 3409 },
+      "geometry": { "type": "Point", "coordinates": [104.768333, 10.973888] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 633, "size": 3390 },
+      "geometry": { "type": "Point", "coordinates": [103.762, 20.432] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 169, "size": 3372 },
+      "geometry": { "type": "Point", "coordinates": [104.9769121, 10.37604974] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 275, "size": 3366 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.245881900000015, 11.45706748]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 16, "size": 3365 },
+      "geometry": { "type": "Point", "coordinates": [107.331111, 14.688611] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 125, "size": 3345 },
+      "geometry": { "type": "Point", "coordinates": [106.0213768, 9.995555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 186, "size": 3334 },
+      "geometry": { "type": "Point", "coordinates": [105.1275, 11.656666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 146, "size": 3317 },
+      "geometry": { "type": "Point", "coordinates": [105.7156489, 9.7675106] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 134, "size": 3232 },
+      "geometry": { "type": "Point", "coordinates": [105.931111, 11.567222] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 43, "size": 3178 },
+      "geometry": { "type": "Point", "coordinates": [106.444962, 10.166666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 65, "size": 3155 },
+      "geometry": { "type": "Point", "coordinates": [104.721944, 11.610555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "RLAF", "cluster": 5, "size": 3115 },
+      "geometry": { "type": "Point", "coordinates": [103.006388, 19.203611] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 282, "size": 3076 },
+      "geometry": { "type": "Point", "coordinates": [105.0075, 18.223888] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 48, "size": 3059 },
+      "geometry": { "type": "Point", "coordinates": [106.948333, 16.9039768] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 19, "size": 2954 },
+      "geometry": { "type": "Point", "coordinates": [106.3217511, 10.13260246] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 75, "size": 2892 },
+      "geometry": { "type": "Point", "coordinates": [106.668333, 20.859] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 27, "size": 2611 },
+      "geometry": { "type": "Point", "coordinates": [104.723333, 12.052777] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 251, "size": 2608 },
+      "geometry": { "type": "Point", "coordinates": [108.780672, 11.51737561] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 60, "size": 2535 },
+      "geometry": { "type": "Point", "coordinates": [106.2573195, 10.008333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 39, "size": 2530 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.928450200000015, 12.128611]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 271, "size": 2521 },
+      "geometry": { "type": "Point", "coordinates": [106.210277, 15.2] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 236, "size": 2447 },
+      "geometry": { "type": "Point", "coordinates": [108.3176307, 11.07979212] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 4, "size": 2446 },
+      "geometry": { "type": "Point", "coordinates": [107.466388, 16.347222] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 161, "size": 2427 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.015985199999989, 14.00329749]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 83, "size": 2384 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.512592400000017, 9.64101901]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 87, "size": 2369 },
+      "geometry": { "type": "Point", "coordinates": [108.9574304, 11.41009471] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 25, "size": 2363 },
+      "geometry": { "type": "Point", "coordinates": [105.618, 16.643888] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 8, "size": 2284 },
+      "geometry": { "type": "Point", "coordinates": [104.9312067, 10.474722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 309, "size": 2262 },
+      "geometry": { "type": "Point", "coordinates": [105.991388, 17.917] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 455, "size": 2235 },
+      "geometry": { "type": "Point", "coordinates": [106.4, 15.700555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 61, "size": 2102 },
+      "geometry": { "type": "Point", "coordinates": [106.633333, 17.34] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 9, "size": 2097 },
+      "geometry": { "type": "Point", "coordinates": [106.611944, 11.625] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 25, "size": 2057 },
+      "geometry": { "type": "Point", "coordinates": [107.649166, 13.7925] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 351, "size": 2056 },
+      "geometry": { "type": "Point", "coordinates": [105.053888, 17.848] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 23, "size": 2031 },
+      "geometry": { "type": "Point", "coordinates": [106.0651492, 11.16465132] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 39, "size": 1988 },
+      "geometry": { "type": "Point", "coordinates": [108.167, 17.0] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 13, "size": 1961 },
+      "geometry": { "type": "Point", "coordinates": [105.126944, 12.299722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 67, "size": 1956 },
+      "geometry": { "type": "Point", "coordinates": [108.8783309, 15.21342869] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 232, "size": 1952 },
+      "geometry": { "type": "Point", "coordinates": [105.377316, 9.81592711] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 63, "size": 1948 },
+      "geometry": { "type": "Point", "coordinates": [105.836944, 10.395] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 158, "size": 1920 },
+      "geometry": { "type": "Point", "coordinates": [107.726666, 15.080246125] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 125, "size": 1856 },
+      "geometry": { "type": "Point", "coordinates": [106.767, 15.167] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 12, "size": 1799 },
+      "geometry": { "type": "Point", "coordinates": [107.968055, 14.437222] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 145, "size": 1793 },
+      "geometry": { "type": "Point", "coordinates": [105.031111, 11.771666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 53, "size": 1792 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.30344915, 12.24900166]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 78, "size": 1760 },
+      "geometry": { "type": "Point", "coordinates": [105.4475, 9.666695] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 139, "size": 1758 },
+      "geometry": { "type": "Point", "coordinates": [105.7083957, 9.77016746] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 298, "size": 1751 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.873296200000013, 9.42058074]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 91, "size": 1750 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.9443227, 12.001492285]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 208, "size": 1730 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.030470150000014, 12.37755124]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 17, "size": 1687 },
+      "geometry": { "type": "Point", "coordinates": [106.483888, 17.7] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 26, "size": 1652 },
+      "geometry": { "type": "Point", "coordinates": [103.164444, 11.755] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 106, "size": 1618 },
+      "geometry": { "type": "Point", "coordinates": [107.773333, 14.584722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 112, "size": 1583 },
+      "geometry": { "type": "Point", "coordinates": [105.252777, 12.159166] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 12, "size": 1583 },
+      "geometry": { "type": "Point", "coordinates": [106.6612584, 16.295] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 46, "size": 1573 },
+      "geometry": { "type": "Point", "coordinates": [103.164444, 11.755] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 123, "size": 1570 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.79399165, 13.91118057]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 65, "size": 1569 },
+      "geometry": { "type": "Point", "coordinates": [106.180555, 10.449722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 105, "size": 1554 },
+      "geometry": { "type": "Point", "coordinates": [106.45, 17.7] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 9, "size": 1546 },
+      "geometry": { "type": "Point", "coordinates": [105.0070676, 10.605833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 932, "size": 1543 },
+      "geometry": { "type": "Point", "coordinates": [103.516666, 19.997] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 41, "size": 1528 },
+      "geometry": { "type": "Point", "coordinates": [108.3617709, 12.51472929] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 219, "size": 1521 },
+      "geometry": { "type": "Point", "coordinates": [109.0997624, 12.69066437] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 20, "size": 1508 },
+      "geometry": { "type": "Point", "coordinates": [107.1052775, 20.951] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 485, "size": 1491 },
+      "geometry": { "type": "Point", "coordinates": [106.170555, 11.950833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 35, "size": 1477 },
+      "geometry": { "type": "Point", "coordinates": [106.648888, 11.66] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 94, "size": 1457 },
+      "geometry": { "type": "Point", "coordinates": [106.433, 16.617] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 410, "size": 1447 },
+      "geometry": { "type": "Point", "coordinates": [106.5232405, 10.31924628] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 104, "size": 1439 },
+      "geometry": { "type": "Point", "coordinates": [108.979166, 14.372777] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "RLAF", "cluster": 26, "size": 1436 },
+      "geometry": { "type": "Point", "coordinates": [105.8275, 15.615] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 252, "size": 1431 },
+      "geometry": { "type": "Point", "coordinates": [106.7213256, 14.8694222] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "RLAF", "cluster": 9, "size": 1422 },
+      "geometry": { "type": "Point", "coordinates": [102.333888, 20.1075] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 329, "size": 1417 },
+      "geometry": { "type": "Point", "coordinates": [107.0325, 11.05080733] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 229, "size": 1381 },
+      "geometry": { "type": "Point", "coordinates": [107.970555, 14.222222] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 55, "size": 1346 },
+      "geometry": { "type": "Point", "coordinates": [105.033, 17.433] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 653, "size": 1341 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.362923099999989, 9.08785582]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 475, "size": 1331 },
+      "geometry": { "type": "Point", "coordinates": [102.5975, 19.469444] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 23, "size": 1298 },
+      "geometry": { "type": "Point", "coordinates": [106.203611, 20.066833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 104, "size": 1260 },
+      "geometry": { "type": "Point", "coordinates": [105.815302, 9.91017872] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 207, "size": 1229 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.640871799999985, 13.76538529]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 78, "size": 1204 },
+      "geometry": { "type": "Point", "coordinates": [105.993333, 16.309305] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 77, "size": 1196 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.47642785, 11.120397535]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 216, "size": 1196 },
+      "geometry": { "type": "Point", "coordinates": [104.986388, 10.37424082] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 26, "size": 1172 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.9807838, 10.788175205]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 99, "size": 1168 },
+      "geometry": { "type": "Point", "coordinates": [105.741111, 11.5] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 153, "size": 1163 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.379207900000011, 9.815833]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USN", "cluster": 126, "size": 1150 },
+      "geometry": { "type": "Point", "coordinates": [106.595833, 17.493055] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 419, "size": 1141 },
+      "geometry": { "type": "Point", "coordinates": [106.6443486, 9.87539199] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 695, "size": 1114 },
+      "geometry": { "type": "Point", "coordinates": [109.418734, 12.91362957] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 76, "size": 1104 },
+      "geometry": { "type": "Point", "coordinates": [105.113888, 9.608055] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 106, "size": 1090 },
+      "geometry": { "type": "Point", "coordinates": [104.9970231, 9.132303335] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USAF", "cluster": 51, "size": 1076 },
+      "geometry": { "type": "Point", "coordinates": [104.8965852, 10.10828861] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "USMC", "cluster": 83, "size": 1058 },
+      "geometry": { "type": "Point", "coordinates": [106.605555, 17.466666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 10, "size": 1043 },
+      "geometry": { "type": "Point", "coordinates": [108.209564, 15.85639931] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 178, "size": 1034 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.06604325, 15.834457285]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 90, "size": 1023 },
+      "geometry": { "type": "Point", "coordinates": [105.570555, 11.041111] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 155, "size": 1017 },
+      "geometry": { "type": "Point", "coordinates": [104.950833, 8.985833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "MILSERVICE": "VNAF", "cluster": 36, "size": 1005 },
+      "geometry": { "type": "Point", "coordinates": [105.910555, 10.940833] }
+    }
+  ]
+}

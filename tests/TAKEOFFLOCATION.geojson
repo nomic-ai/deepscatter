@@ -1,0 +1,1992 @@
+{
+  "type": "FeatureCollection",
+  "name": "TAKEOFFLOCATION",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "DANANG",
+        "cluster": 1,
+        "size": 274196
+      },
+      "geometry": { "type": "Point", "coordinates": [107.079444, 16.445277] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CHU LAI",
+        "cluster": 1,
+        "size": 193558
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.895936400000011, 16.13295902]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 2,
+        "size": 177810
+      },
+      "geometry": { "type": "Point", "coordinates": [106.5700433, 11.298333] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 1,
+        "size": 151660
+      },
+      "geometry": { "type": "Point", "coordinates": [106.15, 16.833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 2,
+        "size": 67087
+      },
+      "geometry": { "type": "Point", "coordinates": [106.111, 17.194] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 1,
+        "size": 51844
+      },
+      "geometry": { "type": "Point", "coordinates": [105.938888, 17.120833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 3,
+        "size": 44773
+      },
+      "geometry": { "type": "Point", "coordinates": [103.449166, 19.525] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TAN SON NHUT",
+        "cluster": 0,
+        "size": 35675
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.90720420000001, 12.74655615]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 4,
+        "size": 32166
+      },
+      "geometry": { "type": "Point", "coordinates": [103.234166, 19.495] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 2,
+        "size": 30126
+      },
+      "geometry": { "type": "Point", "coordinates": [106.473611, 17.591666] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 2,
+        "size": 27322
+      },
+      "geometry": { "type": "Point", "coordinates": [106.3968559, 11.3281736] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 0,
+        "size": 26212
+      },
+      "geometry": { "type": "Point", "coordinates": [105.5, 17.55] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 18,
+        "size": 25690
+      },
+      "geometry": { "type": "Point", "coordinates": [106.471111, 16.675833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 0,
+        "size": 24340
+      },
+      "geometry": { "type": "Point", "coordinates": [107.2784907, 12.70981072] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "DANANG",
+        "cluster": 0,
+        "size": 23905
+      },
+      "geometry": { "type": "Point", "coordinates": [107.183, 16.12656043] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 0,
+        "size": 23168
+      },
+      "geometry": { "type": "Point", "coordinates": [106.074166, 16.251666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "VTBI", "cluster": 0, "size": 22398 },
+      "geometry": { "type": "Point", "coordinates": [105.567, 17.917] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 6,
+        "size": 21982
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.33812015, 10.798686235]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 0, "size": 20269 },
+      "geometry": { "type": "Point", "coordinates": [105.879, 17.2] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 0,
+        "size": 19011
+      },
+      "geometry": { "type": "Point", "coordinates": [107.5651074, 13.61885294] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 0,
+        "size": 18342
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.722571750000014, 11.6016779]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CAM RANH BAY",
+        "cluster": 0,
+        "size": 18146
+      },
+      "geometry": { "type": "Point", "coordinates": [107.3649675, 13.23543141] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 5, "size": 17979 },
+      "geometry": { "type": "Point", "coordinates": [103.354166, 19.554722] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 0,
+        "size": 16402
+      },
+      "geometry": { "type": "Point", "coordinates": [106.497222, 16.469166] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "VVPU", "cluster": 0, "size": 15291 },
+      "geometry": { "type": "Point", "coordinates": [107.5675422, 14.15950564] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "U TAPAO",
+        "cluster": 0,
+        "size": 14174
+      },
+      "geometry": { "type": "Point", "coordinates": [106.555277, 14.3499] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 1,
+        "size": 13837
+      },
+      "geometry": { "type": "Point", "coordinates": [105.939444, 10.45654896] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 38,
+        "size": 13471
+      },
+      "geometry": { "type": "Point", "coordinates": [106.244444, 16.645833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PLEIKU",
+        "cluster": 0,
+        "size": 12221
+      },
+      "geometry": { "type": "Point", "coordinates": [107.8248831, 14.3] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHU CAT",
+        "cluster": 0,
+        "size": 11836
+      },
+      "geometry": { "type": "Point", "coordinates": [107.528274, 14.614444] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TAKHLI",
+        "cluster": 0,
+        "size": 11400
+      },
+      "geometry": { "type": "Point", "coordinates": [105.776944, 17.1698605] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 2, "size": 11378 },
+      "geometry": { "type": "Point", "coordinates": [105.767, 17.596111] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CHU LAI",
+        "cluster": 0,
+        "size": 11152
+      },
+      "geometry": { "type": "Point", "coordinates": [107.216666, 16.06949562] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "ANDERSEN",
+        "cluster": 0,
+        "size": 10478
+      },
+      "geometry": { "type": "Point", "coordinates": [106.7493055, 14.25] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 8,
+        "size": 9860
+      },
+      "geometry": { "type": "Point", "coordinates": [103.4625, 19.583] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 11,
+        "size": 9740
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.380159400000011, 10.15665237]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CAM RANH BAY",
+        "cluster": 6,
+        "size": 9299
+      },
+      "geometry": { "type": "Point", "coordinates": [106.866666, 17.09] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 8,
+        "size": 9005
+      },
+      "geometry": { "type": "Point", "coordinates": [106.081666, 17.188611] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 55,
+        "size": 8766
+      },
+      "geometry": { "type": "Point", "coordinates": [106.2174184, 10.32945469] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 3,
+        "size": 8126
+      },
+      "geometry": { "type": "Point", "coordinates": [106.023611, 10.445833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 43",
+        "cluster": 0,
+        "size": 7213
+      },
+      "geometry": { "type": "Point", "coordinates": [106.433, 17.383] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NHA TRANG",
+        "cluster": 0,
+        "size": 7169
+      },
+      "geometry": { "type": "Point", "coordinates": [108.224444, 13.284722] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 64",
+        "cluster": 0,
+        "size": 7166
+      },
+      "geometry": { "type": "Point", "coordinates": [106.3172749, 18.25] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 0,
+        "size": 6942
+      },
+      "geometry": { "type": "Point", "coordinates": [105.540277, 17.2438055] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAH TRANG",
+        "cluster": 0,
+        "size": 6910
+      },
+      "geometry": { "type": "Point", "coordinates": [108.4100465, 12.65554711] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 0,
+        "size": 6691
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.602556599999986, 10.25236222]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 63",
+        "cluster": 0,
+        "size": 6674
+      },
+      "geometry": { "type": "Point", "coordinates": [106.414, 17.75] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 31",
+        "cluster": 0,
+        "size": 6523
+      },
+      "geometry": { "type": "Point", "coordinates": [106.565, 17.019] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 21,
+        "size": 6481
+      },
+      "geometry": { "type": "Point", "coordinates": [106.960833, 17.011] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "DANANG", "cluster": 8, "size": 6128 },
+      "geometry": { "type": "Point", "coordinates": [105.733333, 17.497] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "PLEIKU", "cluster": 2, "size": 6043 },
+      "geometry": { "type": "Point", "coordinates": [107.277777, 14.709] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 9, "size": 6013 },
+      "geometry": { "type": "Point", "coordinates": [106.137, 17.193055] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 34",
+        "cluster": 0,
+        "size": 5860
+      },
+      "geometry": { "type": "Point", "coordinates": [106.5, 17.566666] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 28,
+        "size": 5830
+      },
+      "geometry": { "type": "Point", "coordinates": [105.715, 18.7327775] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 17,
+        "size": 5745
+      },
+      "geometry": { "type": "Point", "coordinates": [105.735, 17.513888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 14",
+        "cluster": 0,
+        "size": 5681
+      },
+      "geometry": { "type": "Point", "coordinates": [106.425, 17.522222] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 9,
+        "size": 5675
+      },
+      "geometry": { "type": "Point", "coordinates": [106.5162567, 10.5359237] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 27,
+        "size": 5407
+      },
+      "geometry": { "type": "Point", "coordinates": [106.001666, 16.295277] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 61",
+        "cluster": 0,
+        "size": 5241
+      },
+      "geometry": { "type": "Point", "coordinates": [106.45, 17.008] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 65",
+        "cluster": 0,
+        "size": 4948
+      },
+      "geometry": { "type": "Point", "coordinates": [106.35, 18.269] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 19",
+        "cluster": 0,
+        "size": 4947
+      },
+      "geometry": { "type": "Point", "coordinates": [106.3702452, 17.2288445] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 6,
+        "size": 4896
+      },
+      "geometry": { "type": "Point", "coordinates": [105.6559715, 19.183611] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "KITTY HAWK (CVA-63)",
+        "cluster": 0,
+        "size": 4790
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.172223550000012, 17.5]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "VTBI", "cluster": 14, "size": 4648 },
+      "geometry": { "type": "Point", "coordinates": [103.623888, 19.591] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAM PHONG",
+        "cluster": 0,
+        "size": 4585
+      },
+      "geometry": { "type": "Point", "coordinates": [106.413055, 16.285] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "HANCOCK (CVA-19)",
+        "cluster": 0,
+        "size": 4513
+      },
+      "geometry": { "type": "Point", "coordinates": [106.3869419, 15.883] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "RANGER", "cluster": 0, "size": 4497 },
+      "geometry": { "type": "Point", "coordinates": [106.15, 17.783] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 14,
+        "size": 4482
+      },
+      "geometry": { "type": "Point", "coordinates": [107.160416, 16.756111] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "ENTERPRISE (CVA-65)",
+        "cluster": 0,
+        "size": 4479
+      },
+      "geometry": { "type": "Point", "coordinates": [106.25, 16.6] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 9,
+        "size": 4443
+      },
+      "geometry": { "type": "Point", "coordinates": [106.471111, 17.953611] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "U TAPAO",
+        "cluster": 16,
+        "size": 4362
+      },
+      "geometry": { "type": "Point", "coordinates": [107.148611, 16.6851385] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 18,
+        "size": 4257
+      },
+      "geometry": { "type": "Point", "coordinates": [105.831, 17.931944] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 12,
+        "size": 4142
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.627614400000013, 10.010967625]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 74,
+        "size": 4043
+      },
+      "geometry": { "type": "Point", "coordinates": [106.812222, 10.50127076] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 66",
+        "cluster": 11,
+        "size": 4022
+      },
+      "geometry": { "type": "Point", "coordinates": [105.746111, 18.408333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "PAKSE", "cluster": 3, "size": 3916 },
+      "geometry": { "type": "Point", "coordinates": [106.082777, 15.18] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TICONDEROGA (CVA-14)",
+        "cluster": 0,
+        "size": 3808
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.520399799999979, 14.50618897]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 7,
+        "size": 3794
+      },
+      "geometry": { "type": "Point", "coordinates": [104.9330352, 10.47553764] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 7,
+        "size": 3777
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.918567400000015, 11.4818418]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 15,
+        "size": 3724
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.82741115, 11.166649575]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 17,
+        "size": 3699
+      },
+      "geometry": { "type": "Point", "coordinates": [107.165, 14.970277] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "VTBI", "cluster": 26, "size": 3677 },
+      "geometry": { "type": "Point", "coordinates": [105.75, 17.576388] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "VTBI", "cluster": 12, "size": 3627 },
+      "geometry": { "type": "Point", "coordinates": [106.150833, 17.2] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "KADENA AFB",
+        "cluster": 0,
+        "size": 3613
+      },
+      "geometry": { "type": "Point", "coordinates": [106.7998, 14.7] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TAN SON NHUT",
+        "cluster": 18,
+        "size": 3477
+      },
+      "geometry": { "type": "Point", "coordinates": [106.6619386, 10.80664567] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 11",
+        "cluster": 0,
+        "size": 3426
+      },
+      "geometry": { "type": "Point", "coordinates": [106.166666, 18.724] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 15,
+        "size": 3365
+      },
+      "geometry": { "type": "Point", "coordinates": [106.2617035, 10.0009185] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 111,
+        "size": 3363
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.245881900000015, 11.45706748]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 1,
+        "size": 3341
+      },
+      "geometry": { "type": "Point", "coordinates": [104.889452599999984, 9.6] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 2,
+        "size": 3211
+      },
+      "geometry": { "type": "Point", "coordinates": [106.4850164, 11.17815271] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 46,
+        "size": 3204
+      },
+      "geometry": { "type": "Point", "coordinates": [107.1111496, 10.7205304] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 66",
+        "cluster": 0,
+        "size": 3167
+      },
+      "geometry": { "type": "Point", "coordinates": [106.367, 17.1025905] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CHU LAI",
+        "cluster": 5,
+        "size": 3158
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.878185550000012, 15.2310816]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 47,
+        "size": 3148
+      },
+      "geometry": { "type": "Point", "coordinates": [105.8318045, 10.20388521] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "ORISKANY (CVA-34)",
+        "cluster": 0,
+        "size": 3135
+      },
+      "geometry": { "type": "Point", "coordinates": [105.8, 18.583] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 141,
+        "size": 3134
+      },
+      "geometry": { "type": "Point", "coordinates": [104.167, 20.426694] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TAN SON NHUT",
+        "cluster": 21,
+        "size": 3127
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.462967099999986, 11.14268243]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 36,
+        "size": 2842
+      },
+      "geometry": { "type": "Point", "coordinates": [105.852777, 18.415277] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 13,
+        "size": 2732
+      },
+      "geometry": { "type": "Point", "coordinates": [106.0213768, 9.99724231] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "DANANG", "cluster": 2, "size": 2704 },
+      "geometry": { "type": "Point", "coordinates": [103.164444, 11.755] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 54,
+        "size": 2627
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.404272099999986, 10.79521616]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 23,
+        "size": 2615
+      },
+      "geometry": { "type": "Point", "coordinates": [107.132777, 16.754722] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 11,
+        "size": 2613
+      },
+      "geometry": { "type": "Point", "coordinates": [105.513611, 17.5375] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 3,
+        "size": 2588
+      },
+      "geometry": { "type": "Point", "coordinates": [102.89155665, 19.519] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 26,
+        "size": 2578
+      },
+      "geometry": { "type": "Point", "coordinates": [106.533333, 17.510555] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 4,
+        "size": 2548
+      },
+      "geometry": { "type": "Point", "coordinates": [103.726, 20.059] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 107,
+        "size": 2542
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.63847035, 14.66710209]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 45,
+        "size": 2409
+      },
+      "geometry": { "type": "Point", "coordinates": [105.7122084, 9.766388] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 33,
+        "size": 2388
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.86429345, 14.78257373]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 57,
+        "size": 2382
+      },
+      "geometry": { "type": "Point", "coordinates": [104.977222, 10.3760516] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TAKHLI",
+        "cluster": 36,
+        "size": 2358
+      },
+      "geometry": { "type": "Point", "coordinates": [103.513055, 19.593055] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CONSTELLATION",
+        "cluster": 0,
+        "size": 2341
+      },
+      "geometry": { "type": "Point", "coordinates": [106.0, 18.967] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "INTREPID",
+        "cluster": 0,
+        "size": 2277
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.358309900000023, 10.84454745]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 77,
+        "size": 2275
+      },
+      "geometry": { "type": "Point", "coordinates": [106.1667313, 10.45527644] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 75,
+        "size": 2236
+      },
+      "geometry": { "type": "Point", "coordinates": [105.753, 17.307916] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 19,
+        "size": 2221
+      },
+      "geometry": { "type": "Point", "coordinates": [106.5373389, 10.54044452] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BON HOMME RICHARD (CVA-31)",
+        "cluster": 0,
+        "size": 2216
+      },
+      "geometry": { "type": "Point", "coordinates": [106.25, 17.566666] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 11,
+        "size": 2197
+      },
+      "geometry": { "type": "Point", "coordinates": [106.4476351, 10.168611] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PLEIKU",
+        "cluster": 17,
+        "size": 2196
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.015985199999989, 14.00329749]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 53,
+        "size": 2157
+      },
+      "geometry": { "type": "Point", "coordinates": [105.5855786, 9.98927925] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 34,
+        "size": 2088
+      },
+      "geometry": { "type": "Point", "coordinates": [102.633, 21.11225] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 11",
+        "cluster": 22,
+        "size": 2075
+      },
+      "geometry": { "type": "Point", "coordinates": [105.853, 18.425555] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 10,
+        "size": 2057
+      },
+      "geometry": { "type": "Point", "coordinates": [106.611944, 11.625277] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 45,
+        "size": 2055
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.156721799999985, 13.1490978]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 29,
+        "size": 2041
+      },
+      "geometry": { "type": "Point", "coordinates": [107.261111, 10.437777] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 121,
+        "size": 1976
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.350041299999987, 11.07550592]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "DANANG",
+        "cluster": 18,
+        "size": 1971
+      },
+      "geometry": { "type": "Point", "coordinates": [108.167, 17.0] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 50,
+        "size": 1960
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [104.93029540000002, 10.473611]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 26,
+        "size": 1958
+      },
+      "geometry": { "type": "Point", "coordinates": [106.7076736, 11.30642906] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "ANDERSEN",
+        "cluster": 2,
+        "size": 1920
+      },
+      "geometry": { "type": "Point", "coordinates": [107.1499, 16.6831] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 6,
+        "size": 1844
+      },
+      "geometry": { "type": "Point", "coordinates": [103.31663625, 19.7345213] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 11,
+        "size": 1820
+      },
+      "geometry": { "type": "Point", "coordinates": [107.686237, 14.835555] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 42",
+        "cluster": 0,
+        "size": 1816
+      },
+      "geometry": { "type": "Point", "coordinates": [105.881, 19.242] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 50,
+        "size": 1815
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.983343099999985, 10.09771629]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 15, "size": 1809 },
+      "geometry": { "type": "Point", "coordinates": [106.317, 17.6125] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAH TRANG",
+        "cluster": 1,
+        "size": 1787
+      },
+      "geometry": { "type": "Point", "coordinates": [109.1494435, 12.19742985] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 16,
+        "size": 1780
+      },
+      "geometry": { "type": "Point", "coordinates": [106.9549995, 14.719] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "LONG TIEN",
+        "cluster": 3,
+        "size": 1778
+      },
+      "geometry": { "type": "Point", "coordinates": [102.990277, 19.184722] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 18,
+        "size": 1760
+      },
+      "geometry": { "type": "Point", "coordinates": [106.7748649, 15.84] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 19,
+        "size": 1757
+      },
+      "geometry": { "type": "Point", "coordinates": [106.256666, 10.008333] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "DANANG",
+        "cluster": 62,
+        "size": 1742
+      },
+      "geometry": { "type": "Point", "coordinates": [107.166944, 14.957777] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 93,
+        "size": 1738
+      },
+      "geometry": { "type": "Point", "coordinates": [106.5055614, 9.62905585] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 15,
+        "size": 1731
+      },
+      "geometry": { "type": "Point", "coordinates": [107.339444, 14.688055] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "PAKSE", "cluster": 0, "size": 1729 },
+      "geometry": { "type": "Point", "coordinates": [106.174722, 15.353333] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 24,
+        "size": 1721
+      },
+      "geometry": { "type": "Point", "coordinates": [105.9956779, 10.44350824] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 51,
+        "size": 1692
+      },
+      "geometry": { "type": "Point", "coordinates": [106.851098, 10.80295033] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 97,
+        "size": 1673
+      },
+      "geometry": { "type": "Point", "coordinates": [103.164444, 11.755] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 27,
+        "size": 1656
+      },
+      "geometry": { "type": "Point", "coordinates": [106.633, 17.325] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "LONG TIEN",
+        "cluster": 0,
+        "size": 1638
+      },
+      "geometry": { "type": "Point", "coordinates": [103.070694, 19.1926385] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "VTBI", "cluster": 3, "size": 1633 },
+      "geometry": { "type": "Point", "coordinates": [103.239, 19.498] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "TAKHLI", "cluster": 6, "size": 1631 },
+      "geometry": { "type": "Point", "coordinates": [103.078333, 19.224722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 24, "size": 1614 },
+      "geometry": { "type": "Point", "coordinates": [106.471388, 17.702777] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 38",
+        "cluster": 0,
+        "size": 1595
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.834227900000016, 16.3494043]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 31,
+        "size": 1589
+      },
+      "geometry": { "type": "Point", "coordinates": [107.333333, 14.688055] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 30,
+        "size": 1573
+      },
+      "geometry": { "type": "Point", "coordinates": [103.164444, 11.755] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 25, "size": 1561 },
+      "geometry": { "type": "Point", "coordinates": [106.433, 16.633] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 14,
+        "size": 1558
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.0933426, 12.085841645]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 27,
+        "size": 1536
+      },
+      "geometry": { "type": "Point", "coordinates": [104.929583, 12.658888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 171,
+        "size": 1525
+      },
+      "geometry": { "type": "Point", "coordinates": [105.3746523, 9.81868627] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 21,
+        "size": 1518
+      },
+      "geometry": { "type": "Point", "coordinates": [107.391666, 15.438888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 39,
+        "size": 1509
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.398141400000014, 9.67844985]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 30,
+        "size": 1505
+      },
+      "geometry": { "type": "Point", "coordinates": [105.171666, 17.423888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 54,
+        "size": 1502
+      },
+      "geometry": { "type": "Point", "coordinates": [108.9141166, 14.1309487] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 46,
+        "size": 1499
+      },
+      "geometry": { "type": "Point", "coordinates": [105.7111413, 9.77] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 24,
+        "size": 1496
+      },
+      "geometry": { "type": "Point", "coordinates": [106.610833, 11.6462495] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "DANANG",
+        "cluster": 13,
+        "size": 1492
+      },
+      "geometry": { "type": "Point", "coordinates": [105.817, 17.902222] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PLEIKU",
+        "cluster": 13,
+        "size": 1485
+      },
+      "geometry": { "type": "Point", "coordinates": [107.634449, 14.68458771] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "SAVANAKHET",
+        "cluster": 0,
+        "size": 1466
+      },
+      "geometry": { "type": "Point", "coordinates": [105.434444, 16.614444] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CAM RANH BAY",
+        "cluster": 36,
+        "size": 1464
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.45762520000001, 11.12668926]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TAN SON NHUT",
+        "cluster": 109,
+        "size": 1455
+      },
+      "geometry": { "type": "Point", "coordinates": [105.131111, 11.656666] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 73,
+        "size": 1441
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.185294500000012, 13.96727204]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PLEIKU",
+        "cluster": 39,
+        "size": 1431
+      },
+      "geometry": { "type": "Point", "coordinates": [107.1875, 14.925277] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 5,
+        "size": 1425
+      },
+      "geometry": { "type": "Point", "coordinates": [105.308333, 17.518611] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "PAKSE", "cluster": 10, "size": 1417 },
+      "geometry": { "type": "Point", "coordinates": [105.8275, 15.615] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 78, "size": 1416 },
+      "geometry": { "type": "Point", "coordinates": [106.9, 17.020833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "U TAPAO",
+        "cluster": 4,
+        "size": 1411
+      },
+      "geometry": { "type": "Point", "coordinates": [107.431388, 16.320833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "LOUANG PHRAB",
+        "cluster": 1,
+        "size": 1394
+      },
+      "geometry": { "type": "Point", "coordinates": [102.334583, 20.107777] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 27,
+        "size": 1389
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.448338299999989, 9.66655144]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 64",
+        "cluster": 2,
+        "size": 1388
+      },
+      "geometry": { "type": "Point", "coordinates": [105.591666, 18.545833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 61, "size": 1384 },
+      "geometry": { "type": "Point", "coordinates": [106.545555, 17.467] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 3,
+        "size": 1363
+      },
+      "geometry": { "type": "Point", "coordinates": [105.007982, 10.60579542] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 3,
+        "size": 1338
+      },
+      "geometry": { "type": "Point", "coordinates": [106.4386213, 10.16744617] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 10,
+        "size": 1325
+      },
+      "geometry": { "type": "Point", "coordinates": [106.017773, 9.93215497] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 145,
+        "size": 1307
+      },
+      "geometry": { "type": "Point", "coordinates": [106.809028, 10.50679747] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "LOUANG PHRAB",
+        "cluster": 0,
+        "size": 1268
+      },
+      "geometry": { "type": "Point", "coordinates": [102.209583, 19.9002775] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UDORN AB",
+        "cluster": 19,
+        "size": 1259
+      },
+      "geometry": { "type": "Point", "coordinates": [106.757, 15.842] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 66",
+        "cluster": 2,
+        "size": 1245
+      },
+      "geometry": { "type": "Point", "coordinates": [105.617, 18.526] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PLEIKU",
+        "cluster": 31,
+        "size": 1237
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.771847799999989, 14.595555]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 151,
+        "size": 1201
+      },
+      "geometry": { "type": "Point", "coordinates": [106.5223699, 10.32101241] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 84, "size": 1195 },
+      "geometry": { "type": "Point", "coordinates": [106.084166, 16.816666] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 25,
+        "size": 1184
+      },
+      "geometry": { "type": "Point", "coordinates": [105.253888, 11.354444] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 96,
+        "size": 1175
+      },
+      "geometry": { "type": "Point", "coordinates": [108.7963582, 11.508611] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 24,
+        "size": 1169
+      },
+      "geometry": { "type": "Point", "coordinates": [106.42, 12.078611] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 102,
+        "size": 1151
+      },
+      "geometry": { "type": "Point", "coordinates": [106.7332554, 11.8963083] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 14",
+        "cluster": 117,
+        "size": 1140
+      },
+      "geometry": { "type": "Point", "coordinates": [105.655, 18.8375] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 41,
+        "size": 1123
+      },
+      "geometry": { "type": "Point", "coordinates": [105.820555, 10.409166] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "KORAT", "cluster": 76, "size": 1122 },
+      "geometry": { "type": "Point", "coordinates": [103.164444, 11.755] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 206,
+        "size": 1118
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.63482475, 14.68458771]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 16,
+        "size": 1117
+      },
+      "geometry": { "type": "Point", "coordinates": [109.0072877, 11.77014436] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "U TAPAO",
+        "cluster": 15,
+        "size": 1112
+      },
+      "geometry": { "type": "Point", "coordinates": [106.545, 16.8833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 13,
+        "size": 1102
+      },
+      "geometry": { "type": "Point", "coordinates": [105.3123932, 9.600833] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 83,
+        "size": 1092
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.9619147, 11.405447045]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 64,
+        "size": 1088
+      },
+      "geometry": { "type": "Point", "coordinates": [108.6514538, 15.13946536] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 31",
+        "cluster": 14,
+        "size": 1075
+      },
+      "geometry": { "type": "Point", "coordinates": [105.585833, 18.973] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 21,
+        "size": 1074
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.6415981, 10.705273085]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 31",
+        "cluster": 19,
+        "size": 1064
+      },
+      "geometry": { "type": "Point", "coordinates": [105.441, 18.751388] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BINH THUY",
+        "cluster": 74,
+        "size": 1063
+      },
+      "geometry": { "type": "Point", "coordinates": [104.984444, 10.374166] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "PHAN RANG",
+        "cluster": 70,
+        "size": 1061
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.389722099999986, 14.04887636]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "PLEIKU", "cluster": 4, "size": 1047 },
+      "geometry": { "type": "Point", "coordinates": [107.970277, 14.42826128] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TUY HOA",
+        "cluster": 181,
+        "size": 1047
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.953467099999983, 14.55654464]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "BIEN HOA",
+        "cluster": 106,
+        "size": 1042
+      },
+      "geometry": { "type": "Point", "coordinates": [105.8934852, 9.40809323] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "NAKHON PHANOM",
+        "cluster": 49,
+        "size": 1041
+      },
+      "geometry": { "type": "Point", "coordinates": [105.990833, 16.547] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TONKIN GULF",
+        "cluster": 4,
+        "size": 1038
+      },
+      "geometry": { "type": "Point", "coordinates": [106.041666, 18.229166] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TAKEOFFLOCATION": "VTBI", "cluster": 20, "size": 1032 },
+      "geometry": { "type": "Point", "coordinates": [106.5, 17.5] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "WESTPAC 66",
+        "cluster": 1,
+        "size": 1032
+      },
+      "geometry": { "type": "Point", "coordinates": [105.75, 18.666666] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "DANANG",
+        "cluster": 119,
+        "size": 1020
+      },
+      "geometry": { "type": "Point", "coordinates": [106.645833, 17.01009987] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "INDEPENDANCE (CVA-62)",
+        "cluster": 0,
+        "size": 1019
+      },
+      "geometry": { "type": "Point", "coordinates": [105.983333, 18.05] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 88,
+        "size": 1019
+      },
+      "geometry": { "type": "Point", "coordinates": [104.725277, 12.061944] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "UBON AB",
+        "cluster": 49,
+        "size": 1018
+      },
+      "geometry": { "type": "Point", "coordinates": [105.966666, 17.721388] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "CAM RANH BAY",
+        "cluster": 68,
+        "size": 1006
+      },
+      "geometry": { "type": "Point", "coordinates": [106.617, 16.3] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TAKEOFFLOCATION": "TAN SON NHUT",
+        "cluster": 8,
+        "size": 1001
+      },
+      "geometry": { "type": "Point", "coordinates": [106.4472759, 11.66707023] }
+    }
+  ]
+}
