@@ -16,6 +16,7 @@ import {
   Data,
   makeData,
   Float,
+  Schema,
 } from 'apache-arrow';
 type Key = string;
 
@@ -31,7 +32,7 @@ export abstract class Dataset<T extends Tile> {
   abstract get extent(): Rectangle;
   abstract promise: Promise<void>;
   private extents: Record<string, [number, number]> = {};
-
+  public _schema?: Schema;
   constructor(plot: Scatterplot) {
     this.plot = plot;
   }
@@ -63,6 +64,14 @@ export abstract class Dataset<T extends Tile> {
   domain(dimension: string, max_ix = 1e6): [number, number] {
     if (this.extents[dimension]) {
       return this.extents[dimension];
+    }
+    if (this._schema) {
+      const dim = this._schema.fields.find(d => d.name === dimension);
+      if (dim && dim.metadata.get('extent')) {
+        console.warn({dim})
+        this.extents[dimension] = JSON.parse(dim.metadata.get('extent') as string);
+        return this.extents[dimension];
+      }
     }
     this.extents[dimension] = extent(
       this.points(undefined, max_ix),
@@ -150,6 +159,10 @@ export abstract class Dataset<T extends Tile> {
 
   async schema() {
     await this.ready;
+    if (this._schema) {
+      return this._schema;
+    }
+    this._schema = this.root_tile.record_batch.schema;
     return this.root_tile.record_batch.schema;
   }
 
@@ -257,7 +270,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
 
   constructor(base_url: string, prefs: APICall, plot: Scatterplot) {
     super(plot);
-    this.root_tile = new QuadTile(base_url, '0/0/0', null, this, {});
+    this.root_tile = new QuadTile(base_url, '0/0/0', null, this, prefs);
     this.promise = this.root_tile.promise;
   }
 

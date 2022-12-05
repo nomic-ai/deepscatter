@@ -24,11 +24,11 @@ export default class Zoom {
   public height: number;
   public renderers: Map<string, Renderer>;
   public tileSet?: QuadtreeRoot;
-  public _timer: d3.Timer;
-  public _scales: Record<string, d3.ScaleLinear<number, number>>;
-  public zoomer: d3.ZoomBehavior<Element, any>;
-  public transform: d3.ZoomTransform;
-  public _start: number;
+  public _timer?: d3.Timer;
+  public _scales?: Record<string, d3.ScaleLinear<number, number>>;
+  public zoomer?: d3.ZoomBehavior<Element, any>;
+  public transform?: d3.ZoomTransform;
+  public _start?: number;
   public scatterplot: Scatterplot;
   constructor(selector: string, prefs: APICall, plot: Scatterplot) {
     // There can be many canvases that display the zoom, but

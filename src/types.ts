@@ -147,6 +147,7 @@ type DataSpec = Record<string, never> &
     | { source_url?: never; arrow_table: Table; arrow_buffer?: never }
   );
 
+// An APICall is a JSON-serializable specification of the chart. 
 export type APICall = {
   /** The magnification coefficient for a zooming item */
   zoom_balance: number;

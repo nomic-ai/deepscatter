@@ -17573,10 +17573,24 @@ class Aesthetic {
     if (!column) {
       return [1, 1];
     }
+    console.log(column.type);
     if (column.type.dictionary) {
-      this._domains[this.field] = [0, this.aesthetic_map.texture_size - 1];
+      this._domains[this.field] = [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
     } else {
-      this._domains[this.field] = extent(column.toArray());
+      if (this.scatterplot._root._schema) {
+        const field = this.scatterplot._root._schema.fields.find(
+          (f) => f.name === this.field
+        );
+        if (field && field.metadata) {
+          const minmax = field.metadata.get("extent");
+          if (minmax) {
+            this._domains[this.field] = JSON.parse(minmax);
+          }
+        }
+      }
+      if (!this._domains[this.field]) {
+        this._domains[this.field] = extent(column.toArray());
+      }
     }
     console.log(
       "Inferring range of " + this.field + " to be " + this._domains[this.field]
@@ -29290,6 +29304,7 @@ class Dataset {
     __publicField(this, "transformations", {});
     __publicField(this, "plot");
     __publicField(this, "extents", {});
+    __publicField(this, "_schema");
     this.plot = plot;
   }
   get highest_known_ix() {
@@ -29357,6 +29372,10 @@ class Dataset {
   }
   async schema() {
     await this.ready;
+    if (this._schema) {
+      return this._schema;
+    }
+    this._schema = this.root_tile.record_batch.schema;
     return this.root_tile.record_batch.schema;
   }
   add_sparse_identifiers(field_name, ids) {
@@ -29428,7 +29447,7 @@ class QuadtileSet extends Dataset {
     __publicField(this, "_download_queue", /* @__PURE__ */ new Set());
     __publicField(this, "promise", new Promise(nothing));
     __publicField(this, "root_tile");
-    this.root_tile = new QuadTile(base_url, "0/0/0", null, this, {});
+    this.root_tile = new QuadTile(base_url, "0/0/0", null, this, prefs);
     this.promise = this.root_tile.promise;
   }
   get ready() {
