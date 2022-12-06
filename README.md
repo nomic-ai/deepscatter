@@ -183,8 +183,10 @@ jitter method is set on 'method' key of the 'jitter_radius' field. Possible valu
 
 1. This is a 2d library. No fake 3d.
 2. The central zoom state is handled by d3-zoom.
-3. That zoom state can be used to render to webgl. Don't know webgl? You
-   should be able to use the zoom state to draw to canvas or svg layers using the
-   same zoom and underlying data, so that you can draw point with webgl
-   and then build a callout using d3-annotate.
+3. Use the zoom state to render other layers on top of Deepscatter by hooking in (note `on_zoom` is directly set, *not* passed in via `prefs`):
+```js
+const scatterplot = new Scatterplot('#deepscatter');
+scatterplot.on_zoom = (transform) => {...}
+```
+   
 

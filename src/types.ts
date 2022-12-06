@@ -147,7 +147,14 @@ type DataSpec = Record<string, never> &
     | { source_url?: never; arrow_table: Table; arrow_buffer?: never }
   );
 
-// An APICall is a JSON-serializable specification of the chart. 
+/**
+ * A callback provided by the consumer, enabling them to hook into
+ * zoom events & recieve the zoom transform. For example, a consumer
+ * might update annotations on zoom events to keep them in sync.
+ */
+export type onZoomCallback = (transform: d3.ZoomTransform) => null;
+
+// An APICall is a JSON-serializable specification of the chart.
 export type APICall = {
   /** The magnification coefficient for a zooming item */
   zoom_balance: number;
