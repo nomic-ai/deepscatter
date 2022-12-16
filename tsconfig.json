@@ -11,6 +11,9 @@
     "target": "es2020",
     "isolatedModules": true
   },
+  "include": [
+    "./src/*"
+  ],
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Recommended"
 }

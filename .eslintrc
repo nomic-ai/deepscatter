@@ -18,6 +18,9 @@
         "sourceType": "module",
         "project": "tsconfig.json"
     },
+    "settings":{ 
+        "import/resolver": "typescript"
+    },
     "ignorePatterns": [
         "**/dist/**",
         "**/demo/**",
@@ -65,6 +68,12 @@
             "extends": [
                 "plugin:@typescript-eslint/recommended-requiring-type-checking"
             ]
+        },
+        {
+            "files": ["*.config.js", "*.config.cjs"],
+            "rules": {
+                "@typescript-eslint/no-var-requires": "off"
+            }
         }
     ]
 }
