@@ -321,7 +321,7 @@ class DepthTree extends RBush3D {
       // will not. And it means we can avoid unnecessary trees.
 
       const blocked_until = this.max_collision_depth(p3d.data, overlapper.data);
-     /* console.log(
+      /* console.log(
         overlapper.data.text,
         ' blocks ',
         p3d.data.text,
@@ -336,7 +336,7 @@ class DepthTree extends RBush3D {
     }
 
     if (hidden_by && hidden_until < this.maxdepth) {
-/*      console.log(
+      /*      console.log(
         hidden_by.data.text,
         ' used to blocks ',
         p3d.data.text,
@@ -353,7 +353,7 @@ class DepthTree extends RBush3D {
         // Split is only required if the thing is actually visible at the level where
         // they diverge.
         this.remove(hidden_by);
-//        console.log('SPLITTING', hid_data.text, 'at ', hidden_until);
+        //        console.log('SPLITTING', hid_data.text, 'at ', hidden_until);
         const upper_rect = this.to3d(hid_data, hid_start, hidden_until);
         this.insert(upper_rect);
         const lower_rect = this.to3d(hid_data, hidden_until, hid_end);
@@ -361,7 +361,7 @@ class DepthTree extends RBush3D {
       }
       // Insert the new point
       const current_rect = this.to3d(p3d.data, hidden_until, this.maxdepth);
-//      console.log('INSERTING', current_rect);
+      //      console.log('INSERTING', current_rect);
       this.insert(current_rect);
       //      revised_3d.visible_from = hidden_until;
     }

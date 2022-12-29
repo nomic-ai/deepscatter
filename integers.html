@@ -5,16 +5,21 @@
     <button id="b">Clear</button>
   </div>
   <div id="deepscatter"></div>
-
-  </body>
+</body>
 <script type="module">
   import Scatterplot from './src/deepscatter';
-  import { tableFromArrays, Table, RecordBatch, vectorFromArray, Utf8 } from 'apache-arrow';
+  import {
+    tableFromArrays,
+    Table,
+    RecordBatch,
+    vectorFromArray,
+    Utf8,
+  } from 'apache-arrow';
   const num_batches = 2;
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
-    return (Number(d).toString(36).padEnd(16, 0))
+    return Number(d).toString(36).padEnd(16, 0);
   }
   let batch_no = 0;
   /* Clifford attractor frame.*/
@@ -29,140 +34,146 @@
       let ix = new Float32Array(length);
       let batch_id = new Float32Array(length).fill(batch_number_here);
       for (let i = start; i < start + length; i++) {
-        ix[i - start] = i;        
+        ix[i - start] = i;
         let x_ = 0;
         let y_ = 0;
-        const binary = i.toString(2).split('').reverse()
+        const binary = i.toString(2).split('').reverse();
         for (let j = 0; j < binary.length; j++) {
-          const bit = binary[j]
+          const bit = binary[j];
           if (bit == 1) {
             if (j % 2 == 0) {
-              x_ += 2**(j / 2);
+              x_ += 2 ** (j / 2);
             } else {
-              y_ += 2**((j - 1) / 2);
+              y_ += 2 ** ((j - 1) / 2);
             }
           }
         }
-        x[i - start] = x_  / 1024 / 1024;
+        x[i - start] = x_ / 1024 / 1024;
         y[i - start] = y_ / 1024 / 1024;
         integers[i - start] = i;
       }
 
       const vs = [...ix].map(num_to_string);
-      const _id =  vectorFromArray(vs, new Utf8());
-      console.log({_id})
+      const _id = vectorFromArray(vs, new Utf8());
+      console.log({ _id });
       return new Table({
         x: vectorFromArray(x),
         y: vectorFromArray(y),
         ix: vectorFromArray(ix),
         _id,
         integers: vectorFromArray(integers),
-        batch_id: vectorFromArray(batch_id)
+        batch_id: vectorFromArray(batch_id),
       });
     }
-    const batches = []
+    const batches = [];
     for (let i = 0; i < n_batches; i++) {
       const batch = make_batch(i * 65536, 65536);
       batches.push(batch);
       window.b = batch;
-      console.log(i)
+      console.log(i);
     }
     const table = new Table([batches]);
     return table;
   }
 
-  const table = batch(num_batches)
-  const plot = new Scatterplot("#deepscatter");
-
+  const table = batch(num_batches);
+  const plot = new Scatterplot('#deepscatter');
 
   function eratosthenes(n) {
-      // improved from https://stackoverflow.com/questions/15471291/sieve-of-eratosthenes-algorithm-in-javascript-running-endless-for-large-number
-      // Eratosthenes algorithm to find all primes under n
-      var upperLimit = Math.sqrt(n), output = [2];
+    // improved from https://stackoverflow.com/questions/15471291/sieve-of-eratosthenes-algorithm-in-javascript-running-endless-for-large-number
+    // Eratosthenes algorithm to find all primes under n
+    var upperLimit = Math.sqrt(n),
+      output = [2];
 
-      // Make an array from 2 to (n - 1)
-      const array = new Uint32Array(n)
+    // Make an array from 2 to (n - 1)
+    const array = new Uint32Array(n);
 
-      // Remove multiples of primes starting from 2, 3, 5,...
-      for (var i = 3; i <= upperLimit; i += 2) {
-          if (array[i] == 0) {
-              for (var j = i * i; j < n; j += i*2)
-                  array[j] = 1;
-          }
+    // Remove multiples of primes starting from 2, 3, 5,...
+    for (var i = 3; i <= upperLimit; i += 2) {
+      if (array[i] == 0) {
+        for (var j = i * i; j < n; j += i * 2) array[j] = 1;
       }
+    }
 
-      // All array[i] set to 1 (true) are primes
-      for (var i = 3; i < n; i += 2) {
-          if(array[i] == 0) {
-              output.push(i);
-          }
+    // All array[i] set to 1 (true) are primes
+    for (var i = 3; i < n; i += 2) {
+      if (array[i] == 0) {
+        output.push(i);
       }
+    }
 
-      return output;
-  };
+    return output;
+  }
 
   const draw1 = plot.plotAPI({
     arrow_table: table,
     point_size: 3,
     max_points: 2.5e7,
     alpha: 111150,
-    background_color: "#EEEDDE",
-    zoom_balance: .75,
+    background_color: '#EEEDDE',
+    zoom_balance: 0.75,
     duration: 1200,
     encoding: {
-      'x': {
+      x: {
         field: 'x',
-        transform: 'literal'
+        transform: 'literal',
       },
-      'y': {
+      y: {
         field: 'y',
-        transform: 'literal'
+        transform: 'literal',
       },
       color: {
         field: 'batch_id',
         range: 'viridis',
-        domain: [0, 256]
-      }
-    }
-  })
-  draw1.then( () => {
+        domain: [0, 256],
+      },
+    },
+  });
+  draw1.then(() => {
     plot.plotAPI({
       duration: 10000,
-/*      zoom: {
+      /*      zoom: {
         bbox: {
           "x":[0.0019172125023188906,0.0019916103567022615],
           "y":[0.0003230314941825195,0.0003629471969556204]
         }
       }*/
     });
-//    highlightPrimes()
-  })
+    //    highlightPrimes()
+  });
   window.plot = plot;
   const functions = {
-    "prime" : (n) => eratosthenes(n),
-    "even": (n) => [...Array(n).keys()].filter(x => x % 2 == 0),
-  }
+    prime: (n) => eratosthenes(n),
+    even: (n) => [...Array(n).keys()].filter((x) => x % 2 == 0),
+  };
   function highlight(key) {
-    const vals = functions[key](num_batches * (2**16))
+    const vals = functions[key](num_batches * 2 ** 16);
     const prime_ids = vals.map(num_to_string);
-    const k2 = '' + Math.random()
-    plot.add_identifier_column(k2, prime_ids, "_id");
+    const k2 = '' + Math.random();
+    plot.add_identifier_column(k2, prime_ids, '_id');
     plot.plotAPI({
       duration: 1000,
-      encoding:    {
+      encoding: {
         filter2: {
           field: k2,
           op: 'eq',
-          a: 1
-        }
-      }
-    })
+          a: 1,
+        },
+      },
+    });
   }
-  document.getElementById("prime").addEventListener("click", () => highlight("prime"));
-  document.getElementById("even").addEventListener("click", () => highlight("even"));
-  document.getElementById("b").addEventListener("click", () => plot.plotAPI({encoding: {filter2: {}}}));
+  document
+    .getElementById('prime')
+    .addEventListener('click', () => highlight('prime'));
+  document
+    .getElementById('even')
+    .addEventListener('click', () => highlight('even'));
+  document
+    .getElementById('b')
+    .addEventListener('click', () =>
+      plot.plotAPI({ encoding: { filter2: {} } })
+    );
 </script>
-
 
 <style>
   .buttons {

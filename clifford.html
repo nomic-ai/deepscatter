@@ -7,32 +7,42 @@
 
   let batch_no = 0;
   /* Clifford attractor frame.*/
-  function attractor( constants = {
-    a : -1.24458046630025,
-    b : -1.25191834103316,
-    c : -1.81590817030519,
-    d : -1.90866735205054,
-    x0 : 0,
-    y0 : 0
-  }, center, n_batches) {
-    // this is a function to create an apache arrow table based on a 
+  function attractor(
+    constants = {
+      a: -1.24458046630025,
+      b: -1.25191834103316,
+      c: -1.81590817030519,
+      d: -1.90866735205054,
+      x0: 0,
+      y0: 0,
+    },
+    center,
+    n_batches
+  ) {
+    // this is a function to create an apache arrow table based on a
     // set of constants and a Clifford attractor. See https://observablehq.com/@mbostock/clifford-attractor.
     function make_batch(start = 0, length = 65536, constants) {
       const batch_number_here = batch_no++;
       // make a batch of clifford generator data starting at start and of length length
-      const {a, b, c, d} = constants;
+      const { a, b, c, d } = constants;
 
       let x = new Float32Array(length);
       let y = new Float32Array(length);
       let x0 = new Float32Array(length);
       let y0 = new Float32Array(length);
       let ix = new Float32Array(length);
-      let batch_id = new Float32Array(length).fill(batch_number_here)
+      let batch_id = new Float32Array(length).fill(batch_number_here);
 
       for (let i = start; i < start + length; i++) {
         ix[i - start] = i;
-        x[i - start] = Math.sin(a * constants.y0) + c * Math.cos(a * constants.x0) + center[0];
-        y[i - start] = Math.sin(b * constants.x0) + d * Math.cos(b * constants.y0) + center[1];
+        x[i - start] =
+          Math.sin(a * constants.y0) +
+          c * Math.cos(a * constants.x0) +
+          center[0];
+        y[i - start] =
+          Math.sin(b * constants.x0) +
+          d * Math.cos(b * constants.y0) +
+          center[1];
         if (i - start <= length) {
           x0[i - start + 1] = x[i - start];
           y0[i - start + 1] = y[i - start];
@@ -46,70 +56,78 @@
         x0,
         y0,
         ix: ix,
-        batch_id
+        batch_id,
       });
     }
 
-    const batches = []
+    const batches = [];
     for (let i = 0; i < n_batches; i++) {
       const batch = make_batch(i * 65536, 65536, constants);
       batches.push(batch);
     }
-    const table = new Table(...batches)
-    return table
+    const table = new Table(...batches);
+    return table;
   }
-  const t1 = attractor({
-    a : -1.24458046630025,
-    b : -1.25191834103316,
-    c : -1.81590817030519,
-    d : -1.90866735205054,
-    x0 : 0,
-    y0 : 0
-  }, [1, -1], 4);
+  const t1 = attractor(
+    {
+      a: -1.24458046630025,
+      b: -1.25191834103316,
+      c: -1.81590817030519,
+      d: -1.90866735205054,
+      x0: 0,
+      y0: 0,
+    },
+    [1, -1],
+    4
+  );
 
-  const t2 = attractor({
-    a : -1.14458046630025,
-    b : -1.25191834103316,
-    c : -1.81590817030519,
-    d : -1.90866735205054,
-    x0 : 0,
-    y0 : 0
-  }, [-1, 1], 96);
+  const t2 = attractor(
+    {
+      a: -1.14458046630025,
+      b: -1.25191834103316,
+      c: -1.81590817030519,
+      d: -1.90866735205054,
+      x0: 0,
+      y0: 0,
+    },
+    [-1, 1],
+    96
+  );
 
-  const table = t1.concat(t2)
-  const plot = new Scatterplot("#deepscatter");
+  const table = t1.concat(t2);
+  const plot = new Scatterplot('#deepscatter');
 
   plot.plotAPI({
     arrow_table: table,
     point_size: 2,
     max_points: 2.5e6,
     alpha: 50,
-    background_color: "#EEEDDE",
-    zoom_balance: .5,
+    background_color: '#EEEDDE',
+    zoom_balance: 0.5,
     duration: 12000,
     encoding: {
-      'x': {
+      x: {
         field: 'x0',
-        transform: 'literal'
+        transform: 'literal',
       },
-      'x0': {
+      x0: {
         field: 'x',
-        transform: 'literal'
+        transform: 'literal',
       },
-      'y': {
+      y: {
         field: 'y0',
-        transform: 'literal'
+        transform: 'literal',
       },
-      'y0': {
+      y0: {
         field: 'y',
-        transform: 'literal'
+        transform: 'literal',
       },
       color: {
         field: 'batch_id',
         range: 'category10',
-        domain: [0, 8]
-      }
-    }
-  })
+        domain: [0, 8],
+      },
+    },
+  });
   window.plot = plot;
 </script>

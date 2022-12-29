@@ -601,17 +601,17 @@ export default class Scatterplot {
   }
 
   sample_points(n = 10): Record<string, number | string>[] {
-    const vals : Record<string, number | string>[] = [];
+    const vals: Record<string, number | string>[] = [];
     for (const p of this._root.points(this._zoom.current_corners())) {
-      vals.push({ ... p});
+      vals.push({ ...p });
       if (vals.length >= n * 3) {
         break;
       }
     }
-    vals.sort((a, b) => Number(a.ix)- Number(b.ix));
+    vals.sort((a, b) => Number(a.ix) - Number(b.ix));
     return vals.slice(0, n);
   }
-  
+
   contours(aes) {
     const data = this._renderer.calculate_contours(aes);
     const { x, y, x_, y_ } = this._zoom.scales();

@@ -19,7 +19,7 @@ const config: PlaywrightTestConfig = {
      * Maximum time expect() should wait for the condition to be met.
      * For example in `await expect(locator).toHaveText();`
      */
-    timeout: 5000
+    timeout: 5000,
   },
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
@@ -96,10 +96,10 @@ const config: PlaywrightTestConfig = {
   // outputDir: 'test-results/',
 
   /*Run your local dev server before starting the tests */
-//  webServer: {
-//    command: 'npm run dev',
-//    port: 3000,
-//  },
+  //  webServer: {
+  //    command: 'npm run dev',
+  //    port: 3000,
+  //  },
 };
 
 export default config;

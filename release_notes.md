@@ -1,6 +1,14 @@
-# Next
+# 2.6.2
+
+# 2.6.1
+
+- Fix bug cuasing multiple positions to sometimes place points in their previous location during mouseover events.
+
+# 2.6.0
 
 - Allow labeling of maps using externally loaded data.
+- Remove webworkers to simplify code.
+- Add preliminary methods for updating data in-place using dense vectors.
 
 # 2.5.0
 

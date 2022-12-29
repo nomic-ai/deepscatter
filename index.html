@@ -122,11 +122,23 @@
       return `This is point number <span style="color:blue">${datum.ix}</span>`;
     };
   });
+  const positions = [
+    {
+      field: 'x',
+      transform: 'literal',
+    },
+    {
+      field: 'y',
+      transform: 'literal',
+    },
+  ];
   select('#flip').on('click', () => {
     cycle += 1;
     const new_coding = {
       encoding: {
         color: colors[cycle % colors.length],
+        x: positions[cycle % positions.length],
+        y: positions[(cycle + 1) % positions.length],
       },
     };
     scatterplot.plotAPI(new_coding);

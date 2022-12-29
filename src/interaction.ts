@@ -174,14 +174,13 @@ export default class Zoom {
 
   add_mouseover() {
     let last_fired = 0;
-    //@ts-ignore Not sure how to guarantee this formally.
-    const renderer: ReglRenderer = this.renderers.get('regl');
-    const x_aes = renderer.aes.dim('x').current;
-    const y_aes = renderer.aes.dim('y').current;
+    const renderer: ReglRenderer<any> = this.renderers.get(
+      'regl'
+    ) as ReglRenderer<any>;
 
     this.svg_element_selection.on('mousemove', (event) => {
       // Debouncing this is really important, it turns out.
-      if (Date.now() - last_fired < 1000 / 20) {
+      if (Date.now() - last_fired < 50) {
         return;
       }
       last_fired = Date.now();
@@ -189,6 +188,8 @@ export default class Zoom {
       const data = p ? [p] : [];
 
       const d = data[0];
+      const x_aes = renderer.aes.dim('x').current;
+      const y_aes = renderer.aes.dim('y').current;
 
       type Annotation = {
         x: number;
@@ -215,7 +216,7 @@ export default class Zoom {
 
       const labelSet = select('#deepscatter-svg')
         .selectAll('circle.label')
-        .data(data, (d_) => d_.ix)
+        .data(data, (d_) => d_.ix as number)
         .join(
           (enter) =>
             enter
@@ -247,7 +248,7 @@ export default class Zoom {
     });
   }
 
-  current_corners() : Rectangle | undefined {
+  current_corners(): Rectangle | undefined {
     // The corners of the current zoom transform, in data coordinates.
     const { width, height } = this;
 
