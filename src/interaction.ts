@@ -140,6 +140,8 @@ export default class Zoom {
         } catch (error) {}
         this.transform = event.transform;
         this.restart_timer(10 * 1000);
+        
+        this.scatterplot.on_zoom?.(event.transform)
       });
 
     canvas.call(zoomer);

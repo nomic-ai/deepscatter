@@ -5,7 +5,7 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
-import type { APICall } from './types';
+import type { APICall, onZoomCallback } from './types';
 import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
@@ -48,15 +48,11 @@ export default class Scatterplot {
   ready: Promise<void>;
   public click_handler: ClickFunction;
   public tooltip_handler: TooltipHTML;
-  private plot_queue: Promise<void> = Promise.resolve(0);
-  public prefs: APICall;
-  ready: Promise<void>;
+  // In order to preserve JSON serializable nature of prefs, the consumer directly sets this
+  public on_zoom?: onZoomCallback;
   mark_ready: () => void = function () {
     /*pass*/
   };
-  public click_handler: ClickFunction;
-  public tooltip_handler: TooltipHTML;
-
   constructor(selector: string, width: number, height: number) {
     this.bound = false;
     if (selector !== undefined) {
