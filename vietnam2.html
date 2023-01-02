@@ -65,12 +65,12 @@
         y: [7.0849741134400706, 23.626158008070647],
       },
     },
-    labels: {
+/*    labels: {
       url: '/tests/UNIT.geojson',
       name: undefined,
       label_field: 'UNIT',
       size_field: undefined,
-    },
+    },*/
     encoding: {
       jitter_radius: {
         constant: 0.001,
@@ -97,7 +97,7 @@
   window.plot = scatterplot; // For debugging
 
   first_draw.then( async (d) => {
-    await scatterplot.add_labels_from_url("tests/takeoff_locations.geojson", "takeoff", "TAKEOFFLOCATION");
+    await scatterplot.add_labels_from_url("/tests/TAKEOFFLOCATION.geojson", "takeoff", "TAKEOFFLOCATION");
   })
 
   // Simple animation demonstration.

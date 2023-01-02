@@ -171,7 +171,8 @@ export default class Scatterplot {
         this.add_labels(features, name, label_key, size_key);
       })
       .catch((error) => {
-        this.stop_labellers();
+        console.error('Broken addition of ', name);
+        //        this.stop_labellers();
         console.log(error);
       });
   }
@@ -462,6 +463,7 @@ export default class Scatterplot {
   /**
    * This is the main plot entry point: it's unsafe to fire multiple
    * times in parallel because the transition state can get all borked up.
+   * plotAPI wraps it in an await wrapper.
    *
    * @param prefs The preferences
    */
@@ -478,10 +480,15 @@ export default class Scatterplot {
 
     if (prefs.labels) {
       const { url, label_field, size_field } = prefs.labels;
-      const name = prefs.labels.name || prefs.labels.url;
+      const name = (prefs.labels.name || url) as string;
       if (!this.secondary_renderers[name]) {
         this.stop_labellers();
-        this.add_labels_from_url(url, name, label_field, size_field);
+        this.add_labels_from_url(url, name, label_field, size_field).catch(
+          (error) => {
+            console.error('Label addition failed.');
+            console.error(error);
+          }
+        );
       }
     }
     this.update_prefs(prefs);
@@ -677,7 +684,7 @@ class TooltipHTML extends SettableFunction<string> {
     // By default, this returns a
     let output = '<dl>';
     const nope = new Set(['x', 'y', 'ix', null, 'tile_key']);
-    console.log({ ...point });
+    //    console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) {
         continue;

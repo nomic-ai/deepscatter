@@ -261,8 +261,8 @@ function selection_join(onenter, onupdate, onexit) {
     onexit(exit);
   return enter && update ? enter.merge(update).order() : update;
 }
-function selection_merge(context) {
-  var selection2 = context.selection ? context.selection() : context;
+function selection_merge(context2) {
+  var selection2 = context2.selection ? context2.selection() : context2;
   for (var groups0 = this._groups, groups1 = selection2._groups, m0 = groups0.length, m1 = groups1.length, m = Math.min(m0, m1), merges = new Array(m0), j = 0; j < m; ++j) {
     for (var group0 = groups0[j], group1 = groups1[j], n = group0.length, merge2 = merges[j] = new Array(n), node, i = 0; i < n; ++i) {
       if (node = group0[i] || group1[i]) {
@@ -1611,8 +1611,8 @@ function centroidPointRing(x, y) {
   centroidPoint(x0$1 = x, y0$1 = y);
 }
 const pathCentroid = centroidStream;
-function PathContext(context) {
-  this._context = context;
+function PathContext(context2) {
+  this._context = context2;
 }
 PathContext.prototype = {
   _radius: 4.5,
@@ -1743,7 +1743,7 @@ PathString.prototype = {
 function circle(radius) {
   return "m0," + radius + "a" + radius + "," + radius + " 0 1,1 0," + -2 * radius + "a" + radius + "," + radius + " 0 1,1 0," + 2 * radius + "z";
 }
-function geoPath(projection, context) {
+function geoPath(projection, context2) {
   var pointRadius = 4.5, projectionStream, contextStream;
   function path(object2) {
     if (object2) {
@@ -1774,8 +1774,8 @@ function geoPath(projection, context) {
   };
   path.context = function(_) {
     if (!arguments.length)
-      return context;
-    contextStream = _ == null ? (context = null, new PathString()) : new PathContext(context = _);
+      return context2;
+    contextStream = _ == null ? (context2 = null, new PathString()) : new PathContext(context2 = _);
     if (typeof pointRadius !== "function")
       contextStream.pointRadius(pointRadius);
     return path;
@@ -1786,7 +1786,7 @@ function geoPath(projection, context) {
     pointRadius = typeof _ === "function" ? _ : (contextStream.pointRadius(+_), +_);
     return path;
   };
-  return path.projection(projection).context(context);
+  return path.projection(projection).context(context2);
 }
 function transformer$2(methods) {
   return function(stream) {
@@ -10560,7 +10560,7 @@ var regl = { exports: {} };
     var GL_UNSIGNED_BYTE$7 = 5121;
     var GL_PACK_ALIGNMENT = 3333;
     var GL_FLOAT$7 = 5126;
-    function wrapReadPixels(gl, framebufferState, reglPoll, context, glAttributes, extensions, limits) {
+    function wrapReadPixels(gl, framebufferState, reglPoll, context2, glAttributes, extensions, limits) {
       function readPixelsImpl(input) {
         var type;
         if (framebufferState.next === null) {
@@ -10594,8 +10594,8 @@ var regl = { exports: {} };
         }
         var x = 0;
         var y = 0;
-        var width = context.framebufferWidth;
-        var height = context.framebufferHeight;
+        var width = context2.framebufferWidth;
+        var height = context2.framebufferHeight;
         var data = null;
         if (isTypedArray(input)) {
           data = input;
@@ -10604,15 +10604,15 @@ var regl = { exports: {} };
           x = input.x | 0;
           y = input.y | 0;
           check$1(
-            x >= 0 && x < context.framebufferWidth,
+            x >= 0 && x < context2.framebufferWidth,
             "invalid x offset for regl.read"
           );
           check$1(
-            y >= 0 && y < context.framebufferHeight,
+            y >= 0 && y < context2.framebufferHeight,
             "invalid y offset for regl.read"
           );
-          width = (input.width || context.framebufferWidth - x) | 0;
-          height = (input.height || context.framebufferHeight - y) | 0;
+          width = (input.width || context2.framebufferWidth - x) | 0;
+          height = (input.height || context2.framebufferHeight - y) | 0;
           data = input.data || null;
         }
         if (data) {
@@ -10629,11 +10629,11 @@ var regl = { exports: {} };
           }
         }
         check$1(
-          width > 0 && width + x <= context.framebufferWidth,
+          width > 0 && width + x <= context2.framebufferWidth,
           "invalid width for read pixels"
         );
         check$1(
-          height > 0 && height + y <= context.framebufferHeight,
+          height > 0 && height + y <= context2.framebufferHeight,
           "invalid height for read pixels"
         );
         reglPoll();
@@ -12907,9 +12907,9 @@ var regl = { exports: {} };
         });
         return attributeDefs;
       }
-      function parseContext(context) {
-        var staticContext = context.static;
-        var dynamicContext = context.dynamic;
+      function parseContext(context2) {
+        var staticContext = context2.static;
+        var dynamicContext = context2.dynamic;
         var result = {};
         Object.keys(staticContext).forEach(function(name) {
           var value = staticContext[name];
@@ -12929,7 +12929,7 @@ var regl = { exports: {} };
         });
         return result;
       }
-      function parseArguments(options, attributes, uniforms, context, env) {
+      function parseArguments(options, attributes, uniforms, context2, env) {
         var staticOptions = options.static;
         var dynamicOptions = options.dynamic;
         check$1.optional(function() {
@@ -13009,16 +13009,16 @@ var regl = { exports: {} };
         } else {
           result.attributes = parseAttributes(attributes, env);
         }
-        result.context = parseContext(context);
+        result.context = parseContext(context2);
         return result;
       }
-      function emitContext(env, scope, context) {
+      function emitContext(env, scope, context2) {
         var shared = env.shared;
         var CONTEXT = shared.context;
         var contextEnter = env.scope();
-        Object.keys(context).forEach(function(name) {
+        Object.keys(context2).forEach(function(name) {
           scope.save(CONTEXT, "." + name);
-          var defn = context[name];
+          var defn = context2[name];
           var value = defn.append(env, scope);
           if (Array.isArray(value)) {
             contextEnter(CONTEXT, ".", name, "=[", value.join(), "];");
@@ -14566,7 +14566,7 @@ var regl = { exports: {} };
         });
         delete options.static[name];
       }
-      function compileCommand(options, attributes, uniforms, context, stats2) {
+      function compileCommand(options, attributes, uniforms, context2, stats2) {
         var env = createREGLEnvironment();
         env.stats = env.link(stats2);
         Object.keys(attributes.static).forEach(function(key) {
@@ -14575,7 +14575,7 @@ var regl = { exports: {} };
         NESTED_OPTIONS.forEach(function(name) {
           splatObject(env, options, name);
         });
-        var args = parseArguments(options, attributes, uniforms, context, env);
+        var args = parseArguments(options, attributes, uniforms, context2, env);
         emitDrawProc(env, args);
         emitScopeProc(env, args);
         emitBatchProc(env, args);
@@ -15167,7 +15167,7 @@ var regl = { exports: {} };
             static: staticItems
           };
         }
-        var context = separateDynamic(options.context || {}, true);
+        var context2 = separateDynamic(options.context || {}, true);
         var uniforms = separateDynamic(options.uniforms || {}, true);
         var attributes = separateDynamic(options.attributes || {}, false);
         var opts = separateDynamic(flattenNestedOptions(options), false);
@@ -15176,7 +15176,7 @@ var regl = { exports: {} };
           cpuTime: 0,
           count: 0
         };
-        var compiled = core.compile(opts, attributes, uniforms, context, stats$$12);
+        var compiled = core.compile(opts, attributes, uniforms, context2, stats$$12);
         var draw = compiled.draw;
         var batch = compiled.batch;
         var scope = compiled.scope;
@@ -21763,10 +21763,10 @@ function packBools(values) {
   return b;
 }
 class BitIterator {
-  constructor(bytes, begin, length, context, get2) {
+  constructor(bytes, begin, length, context2, get2) {
     this.bytes = bytes;
     this.length = length;
-    this.context = context;
+    this.context = context2;
     this.get = get2;
     this.bit = begin % 8;
     this.byteIndex = begin >> 3;
@@ -30253,6 +30253,12 @@ var quickselect = { exports: {} };
   }();
   exports.RBush3D = RBush3D;
 })(dist);
+function pixel_ratio(scatterplot) {
+  const [px1, px2] = scatterplot._zoom.scales().x.range();
+  const [dx1, dx2] = scatterplot._zoom.scales().x.domain();
+  const ratio = (px2 - px1) / (dx2 - dx1);
+  return ratio;
+}
 class LabelMaker extends Renderer {
   constructor(selector2, scatterplot) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
@@ -30262,13 +30268,17 @@ class LabelMaker extends Renderer {
     __publicField(this, "timer");
     __publicField(this, "label_key");
     this.canvas = scatterplot.elements[2].selectAll("canvas").node();
-    this.tree = new DepthTree(0.5, [1, 1e6], this.ctx);
-    this.tree.accessor = (x, y) => {
-      const f = scatterplot._zoom.scales();
-      return [f.x(x), f.y(y)];
-    };
-    this.bind_zoom(scatterplot._renderer.zoom);
+    if (this.canvas === void 0) {
+      throw new Error("WTF?");
+    }
     this.ctx = this.canvas.getContext("2d");
+    this.tree = new DepthTree(
+      this.ctx,
+      pixel_ratio(scatterplot),
+      0.5,
+      [1, 1e6]
+    );
+    this.bind_zoom(scatterplot._renderer.zoom);
   }
   start(ticks2 = 1e6) {
     if (this.timer) {
@@ -30289,23 +30299,20 @@ class LabelMaker extends Renderer {
       this.timer = void 0;
     }
   }
-  update(featureset, label_key, size_key, color_key) {
-    this.tree = new DepthTree(0.5, [0.1, 1e6], this.ctx);
+  update(featureset, label_key, size_key) {
+    var _a2;
     this.label_key = label_key;
     for (const feature of featureset.features) {
       const { properties, geometry } = feature;
       if (geometry.type === "Point") {
-        let size = 18;
+        const size = (_a2 = properties[size_key]) != null ? _a2 : 16;
         let label = "";
-        if (properties[size_key] !== void 0 && properties[size_key] !== null) {
-          size *= properties[size_key];
-        }
         if (properties[label_key] !== void 0 && properties[label_key] !== null) {
           label = properties[label_key];
         }
         const p = {
-          x: geometry.coordinates[0],
-          y: geometry.coordinates[1],
+          x: geometry.coordinates[0] + Math.random() * 0.1,
+          y: geometry.coordinates[1] + Math.random() * 0.1,
           text: label,
           height: size
         };
@@ -30314,15 +30321,15 @@ class LabelMaker extends Renderer {
     }
   }
   render() {
-    const context = this.ctx;
+    const context2 = this.ctx;
     const { x_, y_ } = this.zoom.scales();
     const { transform } = this.zoom;
     const { width, height } = this;
-    context.clearRect(0, 0, width, height);
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.globalAlpha = 1;
-    transform.k;
+    context2.clearRect(0, 0, width, height);
+    context2.textAlign = "center";
+    context2.textBaseline = "middle";
+    context2.globalAlpha = 1;
+    const size_adjust = 1;
     const corners = this.zoom.current_corners();
     const overlaps = this.tree.search({
       minX: corners.x[0],
@@ -30332,36 +30339,49 @@ class LabelMaker extends Renderer {
       maxY: corners.y[1],
       maxZ: transform.k
     });
-    context.clearRect(0, 0, 4096, 4096);
+    context2.clearRect(0, 0, 4096, 4096);
     const dim = this.scatterplot.dim("color");
     for (const d of overlaps) {
       const { data: datum2 } = d;
-      context.font = `${datum2.height}pt verdana`;
+      context2.font = `${datum2.height * size_adjust}pt verdana`;
       const x = x_(datum2.x);
       const y = y_(datum2.y);
-      context.globalAlpha = 1;
-      context.fillStyle = "white";
+      context2.globalAlpha = 1;
+      context2.fillStyle = "white";
       if (dim.field === this.label_key) {
-        context.shadowColor = dim.scale(datum2.text);
+        context2.shadowColor = dim.scale(datum2.text);
+        context2.strokeStyle = dim.scale(datum2.text);
       } else {
-        context.shadowColor = "black";
+        context2.shadowColor = "black";
       }
-      context.shadowBlur = 19;
-      context.lineWidth = 3;
-      context.strokeText(datum2.text, x, y);
-      context.shadowBlur = 0;
-      context.lineWidth = 4;
-      context.fillStyle = "white";
-      context.fillText(datum2.text, x, y);
+      context2.shadowBlur = 19;
+      context2.lineWidth = 3;
+      context2.strokeText(datum2.text, x, y);
+      context2.shadowBlur = 0;
+      context2.lineWidth = 4;
+      context2.fillStyle = "white";
+      context2.fillText(datum2.text, x, y);
     }
   }
 }
-function measure_text(d, context) {
-  context.font = `${d.height}pt verdana`;
+let context = null;
+function getContext() {
+  if (context !== null) {
+    return context;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = 500;
+  canvas.height = 400;
+  context = canvas.getContext("2d");
+  return context;
+}
+function measure_text(d, pixel_ratio2, margin = 1) {
+  const context2 = getContext();
+  context2.font = `${d.height}pt verdana`;
   if (d.text === "") {
     return null;
   }
-  const ms = context.measureText(d.text);
+  const ms = context2.measureText(d.text);
   let {
     actualBoundingBoxLeft,
     actualBoundingBoxRight,
@@ -30374,35 +30394,36 @@ function measure_text(d, context) {
     actualBoundingBoxAscent = d.height;
     actualBoundingBoxDescent = 0;
   }
-  const pixel_width = actualBoundingBoxLeft + actualBoundingBoxRight;
   return {
-    pixel_height: actualBoundingBoxAscent - actualBoundingBoxDescent,
-    pixel_width
+    pixel_height: (actualBoundingBoxAscent - actualBoundingBoxDescent) / pixel_ratio2 + margin / pixel_ratio2,
+    pixel_width: (actualBoundingBoxRight - actualBoundingBoxLeft) / pixel_ratio2 + margin / pixel_ratio2
   };
 }
 class DepthTree extends dist.RBush3D {
-  constructor(scale_factor = 0.5, zoom2 = [0.1, 1e3], context) {
+  constructor(context2, pixel_ratio2, scale_factor = 0.5, zoom2 = [0.1, 1e3], margin = 10) {
     super();
     __publicField(this, "scale_factor");
     __publicField(this, "mindepth");
     __publicField(this, "maxdepth");
     __publicField(this, "context");
-    __publicField(this, "insertion_log", []);
+    __publicField(this, "pixel_ratio");
+    __publicField(this, "rectangle_buffer");
     __publicField(this, "_accessor", (p) => [p.x, p.y]);
     this.scale_factor = scale_factor;
     this.mindepth = zoom2[0];
     this.maxdepth = zoom2[1];
-    this.context = context;
-    window.dtree = this;
+    this.context = context2;
+    this.pixel_ratio = pixel_ratio2;
+    this.margin = margin;
   }
   max_collision_depth(p1, p2) {
     const [x12, y12] = this._accessor(p1);
     const [x2, y2] = this._accessor(p2);
     const xdiff = Math.abs(x12 - x2);
-    const xoverlap = (p1.pixel_width + p2.pixel_width) / 8;
+    const xoverlap = (p1.pixel_width + p2.pixel_width) / 2;
     const width_overlap = xoverlap / xdiff;
     const ydiff = Math.abs(y12 - y2);
-    const yoverlap = (p2.pixel_height + p2.pixel_height) / 2;
+    const yoverlap = (p1.pixel_height + p2.pixel_height) / 2;
     const height_overlap = yoverlap / ydiff;
     const max_overlap = Math.min(width_overlap, height_overlap);
     return max_overlap;
@@ -30427,9 +30448,9 @@ class DepthTree extends dist.RBush3D {
         ...point
       }
     };
-    if (isNaN(x) || isNaN(y))
+    if (Number.isNaN(x) || Number.isNaN(y))
       throw "Missing position" + JSON.stringify(point);
-    if (isNaN(pixel_width))
+    if (Number.isNaN(pixel_width))
       throw "Missing Aspect Ratio" + JSON.stringify(point);
     return p;
   }
@@ -30438,7 +30459,7 @@ class DepthTree extends dist.RBush3D {
     if (point["pixel_width"] === void 0) {
       measured = {
         ...point,
-        ...measure_text(point, this.context)
+        ...measure_text(point, this.pixel_ratio, this.margin)
       };
     } else {
       measured = point;
@@ -30446,7 +30467,6 @@ class DepthTree extends dist.RBush3D {
     const p3d = this.to3d(measured, mindepth, this.maxdepth);
     if (!this.collides(p3d)) {
       if (mindepth <= this.mindepth) {
-        this.insertion_log.push(p3d.maxX, p3d.minX, p3d.minZ, p3d.data.text);
         this.insert(p3d);
       } else {
         this.insert_point(point, mindepth / 2);
@@ -30571,7 +30591,7 @@ class Scatterplot {
       const features = await data.json();
       this.add_labels(features, name, label_key, size_key);
     }).catch((error) => {
-      this.stop_labellers();
+      console.error("Broken addition of ", name);
       console.log(error);
     });
   }
@@ -30766,10 +30786,15 @@ class Scatterplot {
     }
     if (prefs.labels) {
       const { url, label_field, size_field } = prefs.labels;
-      const name = prefs.labels.name || prefs.labels.url;
+      const name = prefs.labels.name || url;
       if (!this.secondary_renderers[name]) {
         this.stop_labellers();
-        this.add_labels_from_url(url, name, label_field, size_field);
+        this.add_labels_from_url(url, name, label_field, size_field).catch(
+          (error) => {
+            console.error("Label addition failed.");
+            console.error(error);
+          }
+        );
       }
     }
     this.update_prefs(prefs);
@@ -30822,21 +30847,21 @@ class Scatterplot {
   drawContours(contours, drawTo) {
     const drawTwo = drawTo || select("body");
     const canvas = drawTwo.select("#canvas-2d");
-    const context = canvas.node().getContext("2d");
+    const context2 = canvas.node().getContext("2d");
     for (const contour of contours) {
-      context.fillStyle = "rgba(25, 25, 29, 1)";
-      context.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
-      context.strokeStyle = "#8a0303";
-      context.fillStyle = "rgba(30, 30, 34, 1)";
-      context.lineWidth = max([
+      context2.fillStyle = "rgba(25, 25, 29, 1)";
+      context2.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
+      context2.strokeStyle = "#8a0303";
+      context2.fillStyle = "rgba(30, 30, 34, 1)";
+      context2.lineWidth = max([
         0.45,
         0.25 * Math.exp(Math.log(this._zoom.transform.k / 2))
       ]);
       const path = geoPath(
         geoIdentity().scale(this._zoom.transform.k).translate([this._zoom.transform.x, this._zoom.transform.y]),
-        context
+        context2
       );
-      context.beginPath(), path(contour), context.fill();
+      context2.beginPath(), path(contour), context2.fill();
     }
   }
   sample_points(n = 10) {
@@ -30907,7 +30932,6 @@ class TooltipHTML extends SettableFunction {
   default(point) {
     let output = "<dl>";
     const nope = /* @__PURE__ */ new Set(["x", "y", "ix", null, "tile_key"]);
-    console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) {
         continue;
