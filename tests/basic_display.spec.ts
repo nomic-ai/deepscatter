@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  page.on('console', msg => console.log(msg.text()));
+  page.on('console', (msg) => console.log(msg.text()));
   await page.goto('http://localhost:3344');
   await page.waitForLoadState('networkidle');
 });
@@ -21,7 +21,7 @@ test.describe('Filters', () => {
         field: 'x',
         transform: 'lt',
         value: 0,
-      }
+      },
     };
     await page.evaluate(`window.plot.plotAPI(
       {encoding: {
@@ -31,7 +31,9 @@ test.describe('Filters', () => {
           value: 0,
         }
       }})`);
-    const n_visible_after = await page.evaluate('window.plot._renderer.n_visible()');
+    const n_visible_after = await page.evaluate(
+      'window.plot._renderer.n_visible()'
+    );
     expect(n_visible_after).toBeLessThan(n_visible * 0.75);
   });
 });

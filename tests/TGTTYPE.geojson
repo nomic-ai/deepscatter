@@ -1,0 +1,1545 @@
+{
+  "type": "FeatureCollection",
+  "name": "TGTTYPE",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 3, "size": 182714 },
+      "geometry": { "type": "Point", "coordinates": [106.617, 16.817] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 1, "size": 75003 },
+      "geometry": { "type": "Point", "coordinates": [106.0661283, 16.93] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 4, "size": 65436 },
+      "geometry": { "type": "Point", "coordinates": [108.0630501, 15.85287052] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 0, "size": 54571 },
+      "geometry": { "type": "Point", "coordinates": [106.6947137, 15.3855121] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 2,
+        "size": 41669
+      },
+      "geometry": { "type": "Point", "coordinates": [106.079, 16.933333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 11, "size": 40364 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.438217900000012, 11.31795133]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "UNKNOWN\\UNIDENTIFIED",
+        "cluster": 0,
+        "size": 39738
+      },
+      "geometry": { "type": "Point", "coordinates": [106.7619379, 15.416666] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "UNKNOWN\\UNIDENTIFIED",
+        "cluster": 7,
+        "size": 38551
+      },
+      "geometry": { "type": "Point", "coordinates": [106.9655081, 16.78076953] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 14, "size": 37321 },
+      "geometry": { "type": "Point", "coordinates": [106.4602483, 11.25997208] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "UNKNOWN\\UNIDENTIFIED",
+        "cluster": 2,
+        "size": 36438
+      },
+      "geometry": { "type": "Point", "coordinates": [108.3355023, 15.5437778] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 0, "size": 33914 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.982527299999987, 13.8057546]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 2, "size": 25646 },
+      "geometry": { "type": "Point", "coordinates": [106.860736, 16.834642405] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 0, "size": 23826 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.8930963, 14.217016445]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "CONFIRM ENEMY LOC",
+        "cluster": 0,
+        "size": 22640
+      },
+      "geometry": { "type": "Point", "coordinates": [106.785416, 12.9175] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 0, "size": 21707 },
+      "geometry": { "type": "Point", "coordinates": [106.3241547, 16.95] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 1, "size": 19962 },
+      "geometry": { "type": "Point", "coordinates": [106.983, 17.01338015] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "RADAR", "cluster": 0, "size": 19805 },
+      "geometry": { "type": "Point", "coordinates": [106.0, 17.833333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 52, "size": 19473 },
+      "geometry": { "type": "Point", "coordinates": [103.549, 19.573611] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 3, "size": 16718 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.934578800000011, 16.88334255]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 0, "size": 16567 },
+      "geometry": { "type": "Point", "coordinates": [106.5308758, 16.433] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 16, "size": 15743 },
+      "geometry": { "type": "Point", "coordinates": [105.763623, 17.63483275] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 19, "size": 15689 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.433737599999986, 10.81743921]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 5, "size": 14830 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.18953905, 15.82282106]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "CAMP", "cluster": 0, "size": 14178 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.039495400000021, 12.2106477]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 27, "size": 13787 },
+      "geometry": { "type": "Point", "coordinates": [107.6484668, 14.57041957] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 17, "size": 12506 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.901979900000015, 14.46827741]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "PERSONNEL\\ANY",
+        "cluster": 0,
+        "size": 12242
+      },
+      "geometry": { "type": "Point", "coordinates": [106.415, 14.645555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 0, "size": 12220 },
+      "geometry": { "type": "Point", "coordinates": [106.13670665, 17.233333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BASE", "cluster": 0, "size": 11780 },
+      "geometry": { "type": "Point", "coordinates": [107.4707588, 12.089272] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 4, "size": 9330 },
+      "geometry": { "type": "Point", "coordinates": [106.5, 17.596194] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BRIDGE", "cluster": 0, "size": 9254 },
+      "geometry": { "type": "Point", "coordinates": [106.117, 17.566666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 2, "size": 8798 },
+      "geometry": { "type": "Point", "coordinates": [106.137, 17.194] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 0,
+        "size": 8567
+      },
+      "geometry": { "type": "Point", "coordinates": [106.156, 17.166666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "WATER VEHICLES", "cluster": 8, "size": 8324 },
+      "geometry": { "type": "Point", "coordinates": [105.716666, 19.1263885] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "STORAGE AREA", "cluster": 0, "size": 8300 },
+      "geometry": { "type": "Point", "coordinates": [106.4331, 16.2332665] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 5, "size": 7932 },
+      "geometry": { "type": "Point", "coordinates": [105.783333, 18.25] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 15, "size": 7490 },
+      "geometry": { "type": "Point", "coordinates": [106.058, 16.833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 41, "size": 7485 },
+      "geometry": { "type": "Point", "coordinates": [106.3531739, 10.7642912] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "WATER VEHICLES", "cluster": 0, "size": 7372 },
+      "geometry": { "type": "Point", "coordinates": [106.1923287, 18.35] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "NO TARGET ACQUIRED",
+        "cluster": 0,
+        "size": 7324
+      },
+      "geometry": { "type": "Point", "coordinates": [106.68930615, 16.383333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 74, "size": 7208 },
+      "geometry": { "type": "Point", "coordinates": [106.8729014, 11.12616935] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "FOX HOLES", "cluster": 0, "size": 6481 },
+      "geometry": { "type": "Point", "coordinates": [106.333, 11.866666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TRUCKS", "cluster": 0, "size": 6400 },
+      "geometry": { "type": "Point", "coordinates": [106.3087495, 16.633194] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 9, "size": 6395 },
+      "geometry": { "type": "Point", "coordinates": [106.4841187, 11.12875661] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "SEGMENT\\TRANS ROUTE",
+        "cluster": 0,
+        "size": 5990
+      },
+      "geometry": { "type": "Point", "coordinates": [106.083333, 17.4] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 139, "size": 5822 },
+      "geometry": { "type": "Point", "coordinates": [107.2, 14.733] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 8, "size": 5780 },
+      "geometry": { "type": "Point", "coordinates": [106.114, 16.776] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 28, "size": 5729 },
+      "geometry": { "type": "Point", "coordinates": [107.0805525, 16.30596684] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "CAMP", "cluster": 12, "size": 5524 },
+      "geometry": { "type": "Point", "coordinates": [106.4969531, 11.21963155] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 5, "size": 5394 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.89098295, 14.822823835]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "VILLAGE", "cluster": 1, "size": 5388 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.16230285, 15.84214989]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 2, "size": 5017 },
+      "geometry": { "type": "Point", "coordinates": [105.9518058, 10.45055531] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BASE", "cluster": 20, "size": 4933 },
+      "geometry": { "type": "Point", "coordinates": [106.4855206, 11.20360629] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "SEGMENT\\TRANS ROUTE",
+        "cluster": 4,
+        "size": 4700
+      },
+      "geometry": { "type": "Point", "coordinates": [105.714, 17.503] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 9, "size": 4696 },
+      "geometry": { "type": "Point", "coordinates": [105.742, 17.488888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "UNKNOWN\\UNIDENTIFIED",
+        "cluster": 19,
+        "size": 4666
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.230405200000021, 16.25]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 35,
+        "size": 4546
+      },
+      "geometry": { "type": "Point", "coordinates": [103.667, 19.594] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 18, "size": 4522 },
+      "geometry": { "type": "Point", "coordinates": [105.96836655, 10.4440534] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "SUSP ENEMY LOC", "cluster": 0, "size": 4519 },
+      "geometry": { "type": "Point", "coordinates": [106.6225, 14.759444] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "WATER VEHICLES",
+        "cluster": 13,
+        "size": 4515
+      },
+      "geometry": { "type": "Point", "coordinates": [105.916666, 18.405555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 13, "size": 4029 },
+      "geometry": { "type": "Point", "coordinates": [106.2254733, 16.65] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "INTERDICTION POINT",
+        "cluster": 0,
+        "size": 3867
+      },
+      "geometry": { "type": "Point", "coordinates": [106.526111, 16.502777] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BIVOUAC", "cluster": 0, "size": 3860 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.42993725, 16.612169635]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 36, "size": 3856 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.641286800000017, 15.14438058]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "FORD", "cluster": 0, "size": 3740 },
+      "geometry": { "type": "Point", "coordinates": [106.4, 16.888944] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "ROADS\\HIGHWAYS",
+        "cluster": 0,
+        "size": 3606
+      },
+      "geometry": { "type": "Point", "coordinates": [106.436805, 16.323055] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BASE CAMP AREA", "cluster": 0, "size": 3497 },
+      "geometry": { "type": "Point", "coordinates": [106.424444, 11.8375] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 24, "size": 3494 },
+      "geometry": { "type": "Point", "coordinates": [103.419444, 19.576388] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TRENCH", "cluster": 0, "size": 3457 },
+      "geometry": { "type": "Point", "coordinates": [106.120277, 11.294722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "CAVE", "cluster": 0, "size": 3332 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.71034085, 16.39112134]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 6, "size": 3306 },
+      "geometry": { "type": "Point", "coordinates": [109.1868203, 13.96919076] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 23, "size": 3254 },
+      "geometry": { "type": "Point", "coordinates": [106.6584341, 16.62160769] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 40, "size": 3248 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.082309900000013, 12.0547395]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 29, "size": 3224 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.9693518, 14.211571995]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 22, "size": 3221 },
+      "geometry": { "type": "Point", "coordinates": [106.412541, 10.14578543] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 11, "size": 3188 },
+      "geometry": { "type": "Point", "coordinates": [103.268, 19.634] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 27, "size": 3092 },
+      "geometry": { "type": "Point", "coordinates": [106.625, 16.293] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 14, "size": 3013 },
+      "geometry": { "type": "Point", "coordinates": [106.5337825, 16.379166] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "FORD", "cluster": 1, "size": 3006 },
+      "geometry": { "type": "Point", "coordinates": [106.156, 17.202] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 128, "size": 2953 },
+      "geometry": { "type": "Point", "coordinates": [109.1519518, 13.17631086] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 23, "size": 2942 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.356752050000011, 15.84607284]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 174, "size": 2937 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.666892800000014, 10.01976981]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 30, "size": 2920 },
+      "geometry": { "type": "Point", "coordinates": [105.9619273, 10.4281273] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 49, "size": 2901 },
+      "geometry": { "type": "Point", "coordinates": [107.479166, 15.4263774] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 13, "size": 2878 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.535286700000015, 10.53954036]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 3, "size": 2784 },
+      "geometry": { "type": "Point", "coordinates": [103.775, 19.5859079] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "CONSTRUCTION SITE",
+        "cluster": 0,
+        "size": 2776
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.28259685, 13.89411609]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 171, "size": 2701 },
+      "geometry": { "type": "Point", "coordinates": [106.32271, 10.64376492] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ARTILLERY", "cluster": 0, "size": 2687 },
+      "geometry": { "type": "Point", "coordinates": [106.541666, 16.046388] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TRUCK PARK", "cluster": 0, "size": 2627 },
+      "geometry": { "type": "Point", "coordinates": [106.312777, 16.546388] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 38, "size": 2619 },
+      "geometry": { "type": "Point", "coordinates": [106.8184166, 10.97301463] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 8, "size": 2601 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.419099799999984, 10.7779182]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TROOPS IN CONTACT",
+        "cluster": 0,
+        "size": 2596
+      },
+      "geometry": { "type": "Point", "coordinates": [105.9711105, 12.566944] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 47, "size": 2539 },
+      "geometry": { "type": "Point", "coordinates": [109.1494435, 12.17966372] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 28, "size": 2528 },
+      "geometry": { "type": "Point", "coordinates": [106.151388, 17.2255] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 20, "size": 2465 },
+      "geometry": { "type": "Point", "coordinates": [106.767, 15.833333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "WATER VEHICLES", "cluster": 3, "size": 2461 },
+      "geometry": { "type": "Point", "coordinates": [105.683333, 18.613888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "INTERDICTION POINT",
+        "cluster": 5,
+        "size": 2412
+      },
+      "geometry": { "type": "Point", "coordinates": [106.139166, 17.188888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "BUNKER FACILITY (POL)",
+        "cluster": 0,
+        "size": 2408
+      },
+      "geometry": { "type": "Point", "coordinates": [107.70114255, 16.085] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRK\\PRK\\STORE AREA",
+        "cluster": 0,
+        "size": 2349
+      },
+      "geometry": { "type": "Point", "coordinates": [106.3225, 16.621388] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "WATER VEHICLES",
+        "cluster": 10,
+        "size": 2276
+      },
+      "geometry": { "type": "Point", "coordinates": [106.467, 17.705555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 23, "size": 2246 },
+      "geometry": { "type": "Point", "coordinates": [106.2235081, 10.94675443] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "NO TARGET ACQUIRED",
+        "cluster": 5,
+        "size": 2245
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.245881900000015, 11.45706748]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BRIDGE", "cluster": 9, "size": 2239 },
+      "geometry": { "type": "Point", "coordinates": [105.733888, 19.370833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 13, "size": 2189 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.665128900000013, 15.15385118]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 135, "size": 2148 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.740808199999989, 11.81865118]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 32,
+        "size": 2141
+      },
+      "geometry": { "type": "Point", "coordinates": [107.108, 14.721] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 11,
+        "size": 2135
+      },
+      "geometry": { "type": "Point", "coordinates": [105.836, 17.916666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 144, "size": 2123 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.432806900000017, 10.17120853]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "SUPPLIES\\RICE\\WEAPONS",
+        "cluster": 0,
+        "size": 2122
+      },
+      "geometry": { "type": "Point", "coordinates": [106.1734715, 16.7075] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 313, "size": 2105 },
+      "geometry": { "type": "Point", "coordinates": [108.2539165, 16.02496835] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "FERRY", "cluster": 4, "size": 2080 },
+      "geometry": { "type": "Point", "coordinates": [106.467, 17.703] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 122, "size": 2070 },
+      "geometry": { "type": "Point", "coordinates": [105.8708501, 10.16226741] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "SEGMENT\\TRANS ROUTE",
+        "cluster": 11,
+        "size": 2050
+      },
+      "geometry": { "type": "Point", "coordinates": [106.15, 17.193888] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "UNKNOWN\\UNIDENTIFIED",
+        "cluster": 25,
+        "size": 2044
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.015985199999989, 14.00329749]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 47, "size": 2017 },
+      "geometry": { "type": "Point", "coordinates": [103.018055, 19.2544157] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 15, "size": 2015 },
+      "geometry": { "type": "Point", "coordinates": [106.5391307, 10.540762] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRANSHIPMENT POINT",
+        "cluster": 0,
+        "size": 2002
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.73413665, 16.682933415]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TUNNELS", "cluster": 0, "size": 1994 },
+      "geometry": { "type": "Point", "coordinates": [106.022222, 10.915833] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AIRFIELD", "cluster": 2, "size": 1987 },
+      "geometry": { "type": "Point", "coordinates": [106.8184166, 10.97301463] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 185, "size": 1963 },
+      "geometry": { "type": "Point", "coordinates": [108.9759452, 11.78482808] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "SUPPLIES (MISCELL.)",
+        "cluster": 0,
+        "size": 1958
+      },
+      "geometry": { "type": "Point", "coordinates": [106.666666, 16.35] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TRUCKS", "cluster": 12, "size": 1953 },
+      "geometry": { "type": "Point", "coordinates": [106.200833, 16.640277] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "AAA\\37MM  CR MORE",
+        "cluster": 0,
+        "size": 1940
+      },
+      "geometry": { "type": "Point", "coordinates": [106.4451385, 16.537222] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 108, "size": 1931 },
+      "geometry": { "type": "Point", "coordinates": [108.167, 17.0] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 14,
+        "size": 1924
+      },
+      "geometry": { "type": "Point", "coordinates": [106.783333, 15.839] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 11, "size": 1911 },
+      "geometry": { "type": "Point", "coordinates": [106.830555, 17.1] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 140, "size": 1901 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.528334299999983, 10.55314328]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 5, "size": 1888 },
+      "geometry": { "type": "Point", "coordinates": [105.825, 17.916666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "PERSONNEL\\ANY", "cluster": 6, "size": 1884 },
+      "geometry": { "type": "Point", "coordinates": [107.146388, 16.703611] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 15,
+        "size": 1881
+      },
+      "geometry": { "type": "Point", "coordinates": [105.691666, 17.107] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "CONFIRM ENEMY LOC",
+        "cluster": 4,
+        "size": 1866
+      },
+      "geometry": { "type": "Point", "coordinates": [106.616666, 11.618055] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 96, "size": 1861 },
+      "geometry": { "type": "Point", "coordinates": [104.183333, 20.429] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 100, "size": 1858 },
+      "geometry": { "type": "Point", "coordinates": [107.972842, 11.065039455] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 23, "size": 1848 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.050854200000018, 11.19841048]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 21, "size": 1800 },
+      "geometry": { "type": "Point", "coordinates": [107.1075937, 10.71735916] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "CAVES", "cluster": 0, "size": 1783 },
+      "geometry": { "type": "Point", "coordinates": [106.331111, 13.043333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 50, "size": 1757 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.221022799999986, 10.33152951]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MORTAR SITE", "cluster": 0, "size": 1751 },
+      "geometry": { "type": "Point", "coordinates": [106.523611, 15.583611] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "COMMAND POST", "cluster": 0, "size": 1748 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.97993390000002, 15.15113468]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TRUCKS", "cluster": 7, "size": 1741 },
+      "geometry": { "type": "Point", "coordinates": [106.098333, 17.186944] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "LANDING ZONE PREP",
+        "cluster": 0,
+        "size": 1727
+      },
+      "geometry": { "type": "Point", "coordinates": [107.266944, 12.329444] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 13,
+        "size": 1726
+      },
+      "geometry": { "type": "Point", "coordinates": [106.283, 17.591666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 141, "size": 1715 },
+      "geometry": { "type": "Point", "coordinates": [106.2654158, 9.99474276] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 82, "size": 1700 },
+      "geometry": { "type": "Point", "coordinates": [106.417, 16.633] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 73, "size": 1696 },
+      "geometry": { "type": "Point", "coordinates": [107.067, 15.35] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 111, "size": 1689 },
+      "geometry": { "type": "Point", "coordinates": [107.1772947, 16.59271177] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "AIRCRAFT (UNIDENT)",
+        "cluster": 0,
+        "size": 1687
+      },
+      "geometry": { "type": "Point", "coordinates": [106.6117777, 16.56158277] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 132, "size": 1671 },
+      "geometry": { "type": "Point", "coordinates": [107.6349983, 14.6890186] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BRIDGE", "cluster": 90, "size": 1666 },
+      "geometry": { "type": "Point", "coordinates": [105.778611, 18.456111] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BRIDGE", "cluster": 5, "size": 1656 },
+      "geometry": { "type": "Point", "coordinates": [106.283, 18.1] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TRENCHES", "cluster": 0, "size": 1654 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.09948735, 15.66416601]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 3, "size": 1643 },
+      "geometry": { "type": "Point", "coordinates": [107.2078239, 16.27521152] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 1, "size": 1632 },
+      "geometry": { "type": "Point", "coordinates": [107.5830774, 12.41764506] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 34, "size": 1618 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.360698899999988, 10.09827438]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 42, "size": 1606 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.20745295, 10.34037455]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 139, "size": 1588 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.368258899999987, 11.57026673]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 102, "size": 1551 },
+      "geometry": { "type": "Point", "coordinates": [107.6308393, 13.6017294] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 150, "size": 1548 },
+      "geometry": { "type": "Point", "coordinates": [105.8276953, 10.20669599] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TRAILS", "cluster": 0, "size": 1545 },
+      "geometry": { "type": "Point", "coordinates": [106.424722, 11.743611] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 39, "size": 1539 },
+      "geometry": { "type": "Point", "coordinates": [107.1019435, 16.81022124] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "VILLAGE", "cluster": 0, "size": 1538 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.0006991, 15.701356645]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 105, "size": 1533 },
+      "geometry": { "type": "Point", "coordinates": [106.8438712, 10.80285214] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 484, "size": 1523 },
+      "geometry": { "type": "Point", "coordinates": [107.388888, 15.436388] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 131, "size": 1513 },
+      "geometry": { "type": "Point", "coordinates": [104.934411, 10.47391871] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 2, "size": 1506 },
+      "geometry": { "type": "Point", "coordinates": [106.3, 17.608] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 68,
+        "size": 1499
+      },
+      "geometry": { "type": "Point", "coordinates": [106.883055, 17.067] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUNKER", "cluster": 0, "size": 1491 },
+      "geometry": { "type": "Point", "coordinates": [106.75, 11.9832] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 17, "size": 1470 },
+      "geometry": { "type": "Point", "coordinates": [106.55, 16.8879037] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 42, "size": 1467 },
+      "geometry": { "type": "Point", "coordinates": [106.755, 17.15] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 44, "size": 1461 },
+      "geometry": { "type": "Point", "coordinates": [103.426, 19.575] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BRIDGE\\ANY", "cluster": 0, "size": 1424 },
+      "geometry": { "type": "Point", "coordinates": [106.279583, 15.3201385] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AIRFIELD", "cluster": 0, "size": 1421 },
+      "geometry": { "type": "Point", "coordinates": [106.4003379, 15.71750199] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 3, "size": 1418 },
+      "geometry": { "type": "Point", "coordinates": [102.88, 19.481944] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "BUNKER FACILITY (POL)",
+        "cluster": 3,
+        "size": 1415
+      },
+      "geometry": { "type": "Point", "coordinates": [106.8971688, 16.86631713] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "CONFIRM ENEMY LOC",
+        "cluster": 10,
+        "size": 1411
+      },
+      "geometry": { "type": "Point", "coordinates": [107.173055, 16.756944] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 63, "size": 1407 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.260798200000011, 9.99734554]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BASE", "cluster": 19, "size": 1404 },
+      "geometry": { "type": "Point", "coordinates": [106.8202803, 10.48483727] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "UNKNOWN\\UNIDENTIFIED",
+        "cluster": 22,
+        "size": 1374
+      },
+      "geometry": { "type": "Point", "coordinates": [106.4981752, 11.07761622] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 363, "size": 1373 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.884022699999989, 15.21406762]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 463, "size": 1371 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.073093400000019, 10.84975983]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 139, "size": 1371 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.33529080000001, 11.07395445]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BRIDGE", "cluster": 2, "size": 1341 },
+      "geometry": { "type": "Point", "coordinates": [105.6, 18.986] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 22, "size": 1332 },
+      "geometry": { "type": "Point", "coordinates": [106.896, 15.59949262] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 7, "size": 1324 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.357099399999981, 15.848933895]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "FERRY", "cluster": 3, "size": 1304 },
+      "geometry": { "type": "Point", "coordinates": [106.629, 17.322] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 31, "size": 1301 },
+      "geometry": { "type": "Point", "coordinates": [105.687, 18.666666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 10, "size": 1282 },
+      "geometry": { "type": "Point", "coordinates": [106.233333, 18.166666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 8, "size": 1277 },
+      "geometry": { "type": "Point", "coordinates": [103.452, 19.614] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TUNNEL", "cluster": 0, "size": 1271 },
+      "geometry": { "type": "Point", "coordinates": [107.8536686, 14.85365559] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 72, "size": 1263 },
+      "geometry": { "type": "Point", "coordinates": [107.423084, 14.02263373] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "WATER VEHICLES",
+        "cluster": 33,
+        "size": 1263
+      },
+      "geometry": { "type": "Point", "coordinates": [106.633333, 17.383333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 30, "size": 1254 },
+      "geometry": { "type": "Point", "coordinates": [103.717, 19.586049365] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "LIGHTS ON ROAD", "cluster": 0, "size": 1254 },
+      "geometry": { "type": "Point", "coordinates": [106.03109065, 17.4812495] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 37, "size": 1245 },
+      "geometry": { "type": "Point", "coordinates": [105.717, 17.35] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 4,
+        "size": 1240
+      },
+      "geometry": { "type": "Point", "coordinates": [106.661694, 17.219] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 378, "size": 1239 },
+      "geometry": { "type": "Point", "coordinates": [107.631822, 13.62548271] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 124, "size": 1232 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.320904900000016, 16.8804539]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 47, "size": 1231 },
+      "geometry": { "type": "Point", "coordinates": [107.302777, 14.701294] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BRIDGE", "cluster": 41, "size": 1220 },
+      "geometry": { "type": "Point", "coordinates": [106.041666, 18.23] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 537, "size": 1213 },
+      "geometry": { "type": "Point", "coordinates": [106.1685689, 10.4604735] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "FERRY", "cluster": 0, "size": 1210 },
+      "geometry": { "type": "Point", "coordinates": [106.4, 17.584] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 29, "size": 1208 },
+      "geometry": { "type": "Point", "coordinates": [106.4394612, 10.17292036] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 241, "size": 1199 },
+      "geometry": { "type": "Point", "coordinates": [105.5856629, 10.00376404] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "BIVOUAC\\STORE AREA",
+        "cluster": 0,
+        "size": 1194
+      },
+      "geometry": { "type": "Point", "coordinates": [105.693611, 14.756111] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 102, "size": 1188 },
+      "geometry": { "type": "Point", "coordinates": [106.803055, 15.500555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "CAMP", "cluster": 102, "size": 1182 },
+      "geometry": { "type": "Point", "coordinates": [104.9355475, 10.4764405] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 69, "size": 1178 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.400100900000012, 16.475]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 54, "size": 1159 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.191266400000018, 14.897222]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "LOCK", "cluster": 0, "size": 1158 },
+      "geometry": { "type": "Point", "coordinates": [106.017, 16.841220145] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 372, "size": 1155 },
+      "geometry": { "type": "Point", "coordinates": [106.8081827, 10.51555913] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 46, "size": 1141 },
+      "geometry": { "type": "Point", "coordinates": [108.9554537, 14.84115163] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ANTI-AIRCRAFT", "cluster": 26, "size": 1135 },
+      "geometry": { "type": "Point", "coordinates": [106.666666, 20.856388] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 651, "size": 1128 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [109.19914025, 13.92776135]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "RAILROAD", "cluster": 0, "size": 1126 },
+      "geometry": { "type": "Point", "coordinates": [105.85, 19.464444] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 45, "size": 1126 },
+      "geometry": { "type": "Point", "coordinates": [107.3873746, 10.7900219] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 201, "size": 1124 },
+      "geometry": { "type": "Point", "coordinates": [106.466666, 17.708333] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 93, "size": 1108 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.08855885, 10.35253366]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 23,
+        "size": 1103
+      },
+      "geometry": { "type": "Point", "coordinates": [104.148611, 19.400555] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 79, "size": 1098 },
+      "geometry": { "type": "Point", "coordinates": [106.1593176, 10.45813391] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 159, "size": 1086 },
+      "geometry": { "type": "Point", "coordinates": [105.172, 17.426] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "MOTOR VEHICLE", "cluster": 12, "size": 1081 },
+      "geometry": { "type": "Point", "coordinates": [106.883, 17.183] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 43, "size": 1081 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.284247900000011, 16.19933892]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "AAA SITE UNK CAL",
+        "cluster": 0,
+        "size": 1075
+      },
+      "geometry": { "type": "Point", "coordinates": [106.444722, 16.716666] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 419, "size": 1073 },
+      "geometry": { "type": "Point", "coordinates": [109.0856683, 14.39117716] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 111, "size": 1066 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [105.712074500000014, 9.76649682]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "TGTTYPE": "TRUCK PARK\\STOP",
+        "cluster": 16,
+        "size": 1064
+      },
+      "geometry": { "type": "Point", "coordinates": [107.193, 14.9228055] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 180, "size": 1056 },
+      "geometry": { "type": "Point", "coordinates": [108.7964285, 11.51280831] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 18, "size": 1053 },
+      "geometry": { "type": "Point", "coordinates": [108.8930575, 15.2079547] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 35, "size": 1051 },
+      "geometry": { "type": "Point", "coordinates": [106.617, 17.367] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "ROAD", "cluster": 146, "size": 1050 },
+      "geometry": { "type": "Point", "coordinates": [106.281, 17.526] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 15, "size": 1043 },
+      "geometry": { "type": "Point", "coordinates": [105.3014707, 17.529] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 211, "size": 1042 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.70945435, 11.890014145]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 133, "size": 1036 },
+      "geometry": { "type": "Point", "coordinates": [105.85, 18.05] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 207, "size": 1036 },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [107.1046581, 10.721593575]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "SAMPANS", "cluster": 0, "size": 1035 },
+      "geometry": { "type": "Point", "coordinates": [105.731944, 11.854722] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "FERRY", "cluster": 11, "size": 1024 },
+      "geometry": { "type": "Point", "coordinates": [106.311944, 17.611111] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "TROOPS", "cluster": 210, "size": 1024 },
+      "geometry": { "type": "Point", "coordinates": [107.6898502, 14.83195458] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 210, "size": 1020 },
+      "geometry": { "type": "Point", "coordinates": [106.2608435, 9.99916459] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "BUILDINGS", "cluster": 27, "size": 1010 },
+      "geometry": { "type": "Point", "coordinates": [103.217777, 19.4351385] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "TGTTYPE": "AREA\\DEPOT", "cluster": 213, "size": 1009 },
+      "geometry": { "type": "Point", "coordinates": [105.7120707, 9.7746607] }
+    }
+  ]
+}

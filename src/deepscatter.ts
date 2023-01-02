@@ -50,7 +50,9 @@ export default class Scatterplot {
   public tooltip_handler: TooltipHTML;
   // In order to preserve JSON serializable nature of prefs, the consumer directly sets this
   public on_zoom?: onZoomCallback;
-
+  mark_ready: () => void = function () {
+    /*pass*/
+  };
   constructor(selector: string, width: number, height: number) {
     this.bound = false;
     if (selector !== undefined) {
@@ -59,8 +61,8 @@ export default class Scatterplot {
     this.width = width;
     this.height = height;
     // Unresolvable.
-    this.ready = new Promise(() => {
-      /*pass*/
+    this.ready = new Promise((resolve, reject) => {
+      this.mark_ready = resolve;
     });
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
@@ -154,6 +156,25 @@ export default class Scatterplot {
       this.add_labels(features, name, label_key, size_key);
     }
   }
+
+  async add_labels_from_url(
+    url: string,
+    name: string,
+    label_key: string,
+    size_key: string | undefined
+  ): Promise<void> {
+    await this.ready;
+    await this._root.promise;
+    return fetch(url)
+      .then(async (data) => {
+        const features = await (data.json() as Promise<FeatureCollection>);
+        this.add_labels(features, name, label_key, size_key);
+      })
+      .catch((error) => {
+        this.stop_labellers();
+        console.log(error);
+      });
+  }
   /**
    *
    * @param features A geojson feature collection containing point labels
@@ -217,7 +238,7 @@ export default class Scatterplot {
 
     this._renderer.initialize();
 
-    this.ready = this._root.promise;
+    void this._root.promise.then(() => this.mark_ready());
     return this.ready;
   }
 
@@ -395,6 +416,15 @@ export default class Scatterplot {
     merge(this.prefs, prefs);
   }
 
+  public stop_labellers() {
+    for (const [k, v] of Object.entries(this.secondary_renderers)) {
+      // Stop any existing labels
+      if (v && v['label_key'] !== undefined) {
+        this.secondary_renderers[k].stop();
+        this.secondary_renderers[k] = undefined;
+      }
+    }
+  }
   /**
    *
    * @param dimension The name of the encoding dimension to access
@@ -414,6 +444,7 @@ export default class Scatterplot {
     /* PUBLIC see set tooltip_html */
     return this.tooltip_handler.f;
   }
+
   set click_function(func) {
     this.click_handler.f = func;
   }
@@ -423,13 +454,6 @@ export default class Scatterplot {
   }
 
   async plotAPI(prefs: APICall): Promise<void> {
-    if (
-      prefs.encoding &&
-      prefs.encoding.filter &&
-      prefs.encoding.filter.domain
-    ) {
-      throw new Error('Filtering is not supported in the API');
-    }
     await this.plot_queue;
     this.plot_queue = this.unsafe_plotAPI(prefs);
     return await this.plot_queue;
@@ -442,6 +466,9 @@ export default class Scatterplot {
    * @param prefs The preferences
    */
   private async unsafe_plotAPI(prefs: APICall): Promise<void> {
+    if (prefs === null) {
+      return;
+    }
     if (prefs.click_function) {
       this.click_function = Function('datum', prefs.click_function);
     }
@@ -449,6 +476,14 @@ export default class Scatterplot {
       this.tooltip_html = Function('datum', prefs.tooltip_html);
     }
 
+    if (prefs.labels) {
+      const { url, label_field, size_field } = prefs.labels;
+      const name = prefs.labels.name || prefs.labels.url;
+      if (!this.secondary_renderers[name]) {
+        this.stop_labellers();
+        this.add_labels_from_url(url, name, label_field, size_field);
+      }
+    }
     this.update_prefs(prefs);
 
     // Some things have to be done *before* we can actually run this;
@@ -561,6 +596,18 @@ export default class Scatterplot {
       );
       context.beginPath(), path(contour), context.fill();
     }
+  }
+
+  sample_points(n = 10): Record<string, number | string>[] {
+    const vals: Record<string, number | string>[] = [];
+    for (const p of this._root.points(this._zoom.current_corners())) {
+      vals.push({ ...p });
+      if (vals.length >= n * 3) {
+        break;
+      }
+    }
+    vals.sort((a, b) => Number(a.ix) - Number(b.ix));
+    return vals.slice(0, n);
   }
 
   contours(aes) {

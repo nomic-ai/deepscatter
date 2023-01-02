@@ -1,0 +1,41 @@
+{
+  "type": "FeatureCollection",
+  "name": "MFUNC_DESC",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "MFUNC_DESC": "STRIKE", "cluster": 1, "size": 603953 },
+      "geometry": { "type": "Point", "coordinates": [106.3833, 15.93] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "MFUNC_DESC": "ARMED RECCE",
+        "cluster": 2,
+        "size": 230188
+      },
+      "geometry": { "type": "Point", "coordinates": [106.032, 17.633333] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "MFUNC_DESC": "CLOSE AIR SUPPORT",
+        "cluster": 3,
+        "size": 173660
+      },
+      "geometry": { "type": "Point", "coordinates": [106.4907067, 11.447222] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "MFUNC_DESC": "DIRECT AIR SUPPORT",
+        "cluster": 1,
+        "size": 171996
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [108.39780005, 13.26647347]
+      }
+    }
+  ]
+}

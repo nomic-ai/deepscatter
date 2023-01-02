@@ -20,6 +20,7 @@ import {
   Schema,
   Data,
   Field,
+  StructRowProxy,
 } from 'apache-arrow';
 import { bind_column } from './Dataset';
 import type { Dataset, QuadtileSet } from './Dataset';
@@ -309,7 +310,7 @@ export abstract class Tile {
     };
   }
 
-  [Symbol.iterator]() {
+  [Symbol.iterator](): IterableIterator<StructRowProxy> {
     return this.yielder();
   }
 

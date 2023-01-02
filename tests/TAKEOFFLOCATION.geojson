@@ -1,6 +1,6 @@
 {
   "type": "FeatureCollection",
-  "name": "takeoff_locations",
+  "name": "TAKEOFFLOCATION",
   "features": [
     {
       "type": "Feature",

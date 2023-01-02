@@ -5443,17 +5443,19 @@ class Zoom {
   }
   add_mouseover() {
     let last_fired = 0;
-    const renderer = this.renderers.get("regl");
-    const x_aes = renderer.aes.dim("x").current;
-    const y_aes = renderer.aes.dim("y").current;
+    const renderer = this.renderers.get(
+      "regl"
+    );
     this.svg_element_selection.on("mousemove", (event) => {
-      if (Date.now() - last_fired < 1e3 / 20) {
+      if (Date.now() - last_fired < 50) {
         return;
       }
       last_fired = Date.now();
       const p = renderer.color_pick(event.layerX, event.layerY);
       const data = p ? [p] : [];
       const d = data[0];
+      const x_aes = renderer.aes.dim("x").current;
+      const y_aes = renderer.aes.dim("y").current;
       const annotations = d ? [
         {
           x: event.layerX,
@@ -29547,7 +29549,7 @@ class QuadtileSet extends Dataset {
       }
     }
     this.visit(callback);
-    scores.sort((a, b) => a[0] - b[0]);
+    scores.sort((a, b) => Number(a[0]) - Number(b[0]));
     while (scores.length > 0 && queue.size < queue_length) {
       const upnext = scores.pop();
       if (upnext === void 0) {
@@ -30310,7 +30312,6 @@ class LabelMaker extends Renderer {
         this.tree.insert_point(p);
       }
     }
-    console.log(this.tree.insertion_log);
   }
   render() {
     const context = this.ctx;
@@ -30401,7 +30402,7 @@ class DepthTree extends dist.RBush3D {
     const xoverlap = (p1.pixel_width + p2.pixel_width) / 8;
     const width_overlap = xoverlap / xdiff;
     const ydiff = Math.abs(y12 - y2);
-    const yoverlap = (p2.pixel_height + p2.pixel_height) / 8;
+    const yoverlap = (p2.pixel_height + p2.pixel_height) / 2;
     const height_overlap = yoverlap / ydiff;
     const max_overlap = Math.min(width_overlap, height_overlap);
     return max_overlap;
@@ -30435,7 +30436,6 @@ class DepthTree extends dist.RBush3D {
   insert_point(point, mindepth = 1) {
     let measured;
     if (point["pixel_width"] === void 0) {
-      console.log("Starting to insert", point.text, "from", mindepth);
       measured = {
         ...point,
         ...measure_text(point, this.context)
@@ -30446,7 +30446,6 @@ class DepthTree extends dist.RBush3D {
     const p3d = this.to3d(measured, mindepth, this.maxdepth);
     if (!this.collides(p3d)) {
       if (mindepth <= this.mindepth) {
-        console.log("inserting ", p3d);
         this.insertion_log.push(p3d.maxX, p3d.minX, p3d.minZ, p3d.data.text);
         this.insert(p3d);
       } else {
@@ -30459,42 +30458,25 @@ class DepthTree extends dist.RBush3D {
   insert_after_collisions(p3d) {
     let hidden_until = -1;
     let hidden_by;
-    console.log("Inserting", p3d.data.text);
     for (const overlapper of this.search(p3d)) {
       const blocked_until = this.max_collision_depth(p3d.data, overlapper.data);
-      console.log(
-        overlapper.data.text,
-        " blocks ",
-        p3d.data.text,
-        " until ",
-        blocked_until
-      );
       if (blocked_until > hidden_until) {
         hidden_until = blocked_until;
         hidden_by = overlapper;
       }
     }
     if (hidden_by && hidden_until < this.maxdepth) {
-      console.log(
-        hidden_by.data.text,
-        " used to blocks ",
-        p3d.data.text,
-        " until ",
-        hidden_until
-      );
       const hid_data = hidden_by.data;
       const hid_start = hidden_by.minZ;
       const hid_end = hidden_by.maxZ;
       if (hid_start < hidden_until) {
         this.remove(hidden_by);
-        console.log("SPLITTING", hid_data.text, "at ", hidden_until);
         const upper_rect = this.to3d(hid_data, hid_start, hidden_until);
         this.insert(upper_rect);
         const lower_rect = this.to3d(hid_data, hidden_until, hid_end);
         this.insert(lower_rect);
       }
       const current_rect = this.to3d(p3d.data, hidden_until, this.maxdepth);
-      console.log("INSERTING", current_rect);
       this.insert(current_rect);
     }
   }
@@ -30534,13 +30516,16 @@ class Scatterplot {
     __publicField(this, "click_handler");
     __publicField(this, "tooltip_handler");
     __publicField(this, "on_zoom");
+    __publicField(this, "mark_ready", function() {
+    });
     this.bound = false;
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
     }
     this.width = width;
     this.height = height;
-    this.ready = new Promise(() => {
+    this.ready = new Promise((resolve, reject) => {
+      this.mark_ready = resolve;
     });
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
@@ -30579,6 +30564,17 @@ class Scatterplot {
       this.add_labels(features, name, label_key, size_key);
     }
   }
+  async add_labels_from_url(url, name, label_key, size_key) {
+    await this.ready;
+    await this._root.promise;
+    return fetch(url).then(async (data) => {
+      const features = await data.json();
+      this.add_labels(features, name, label_key, size_key);
+    }).catch((error) => {
+      this.stop_labellers();
+      console.log(error);
+    });
+  }
   add_labels(features, name, label_key, size_key) {
     const labels = new LabelMaker(this.div, this);
     labels.update(features, label_key, size_key);
@@ -30609,7 +30605,7 @@ class Scatterplot {
     ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
     this._renderer.initialize();
-    this.ready = this._root.promise;
+    void this._root.promise.then(() => this.mark_ready());
     return this.ready;
   }
   visualize_tiles() {
@@ -30730,6 +30726,14 @@ class Scatterplot {
     }
     merge(this.prefs, prefs);
   }
+  stop_labellers() {
+    for (const [k, v] of Object.entries(this.secondary_renderers)) {
+      if (v && v["label_key"] !== void 0) {
+        this.secondary_renderers[k].stop();
+        this.secondary_renderers[k] = void 0;
+      }
+    }
+  }
   dim(dimension) {
     return this._renderer.aes.dim(dimension).current;
   }
@@ -30746,19 +30750,27 @@ class Scatterplot {
     return this.click_handler.f;
   }
   async plotAPI(prefs) {
-    if (prefs.encoding && prefs.encoding.filter && prefs.encoding.filter.domain) {
-      throw new Error("Filtering is not supported in the API");
-    }
     await this.plot_queue;
     this.plot_queue = this.unsafe_plotAPI(prefs);
     return await this.plot_queue;
   }
   async unsafe_plotAPI(prefs) {
+    if (prefs === null) {
+      return;
+    }
     if (prefs.click_function) {
       this.click_function = Function("datum", prefs.click_function);
     }
     if (prefs.tooltip_html) {
       this.tooltip_html = Function("datum", prefs.tooltip_html);
+    }
+    if (prefs.labels) {
+      const { url, label_field, size_field } = prefs.labels;
+      const name = prefs.labels.name || prefs.labels.url;
+      if (!this.secondary_renderers[name]) {
+        this.stop_labellers();
+        this.add_labels_from_url(url, name, label_field, size_field);
+      }
     }
     this.update_prefs(prefs);
     if (this._root === void 0) {
@@ -30826,6 +30838,17 @@ class Scatterplot {
       );
       context.beginPath(), path(contour), context.fill();
     }
+  }
+  sample_points(n = 10) {
+    const vals = [];
+    for (const p of this._root.points(this._zoom.current_corners())) {
+      vals.push({ ...p });
+      if (vals.length >= n * 3) {
+        break;
+      }
+    }
+    vals.sort((a, b) => Number(a.ix) - Number(b.ix));
+    return vals.slice(0, n);
   }
   contours(aes) {
     const data = this._renderer.calculate_contours(aes);

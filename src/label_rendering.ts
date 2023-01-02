@@ -1,7 +1,6 @@
 import { GeoJsonObject } from 'geojson';
 import { Renderer } from './rendering';
-import { BBox, RBush3D } from 'rbush-3d';
-import { QuadtileSet } from './Dataset';
+import { RBush3D } from 'rbush-3d';
 import Scatterplot from './deepscatter';
 import { Timer, timer } from 'd3-timer';
 
@@ -84,7 +83,6 @@ export class LabelMaker extends Renderer {
         this.tree.insert_point(p);
       }
     }
-    console.log(this.tree.insertion_log);
   }
 
   render() {
@@ -240,7 +238,7 @@ class DepthTree extends RBush3D {
     const width_overlap = xoverlap / xdiff;
 
     const ydiff = Math.abs(y1 - y2);
-    const yoverlap = (p2.pixel_height + p2.pixel_height) / 8;
+    const yoverlap = (p2.pixel_height + p2.pixel_height) / 2;
     const height_overlap = yoverlap / ydiff;
     //    console.log("IT's", {width_overlap, height_overlap}, p1.text, p2.text);
     // Then y
@@ -284,7 +282,6 @@ class DepthTree extends RBush3D {
   insert_point(point: RawPoint | Point, mindepth = 1) {
     let measured: Point;
     if (point['pixel_width'] === undefined) {
-      console.log('Starting to insert', point.text, 'from', mindepth);
       measured = {
         ...point,
         ...measure_text(point, this.context),
@@ -298,7 +295,6 @@ class DepthTree extends RBush3D {
       if (mindepth <= this.mindepth) {
         // It's visible from the minimum depth.
         //        p3d.visible_from = mindepth;
-        console.log('inserting ', p3d);
         this.insertion_log.push(p3d.maxX, p3d.minX, p3d.minZ, p3d.data.text);
         this.insert(p3d);
       } else {
@@ -316,7 +312,6 @@ class DepthTree extends RBush3D {
     let hidden_until = -1;
     // The node hiding this one.
     let hidden_by;
-    console.log('Inserting', p3d.data.text);
     for (const overlapper of this.search(p3d)) {
       // Find the most closely overlapping 3d block.
       // Although the other ones will retain 3d blocks'
@@ -326,13 +321,13 @@ class DepthTree extends RBush3D {
       // will not. And it means we can avoid unnecessary trees.
 
       const blocked_until = this.max_collision_depth(p3d.data, overlapper.data);
-      console.log(
+      /* console.log(
         overlapper.data.text,
         ' blocks ',
         p3d.data.text,
         ' until ',
         blocked_until
-      );
+      );*/
 
       if (blocked_until > hidden_until) {
         hidden_until = blocked_until;
@@ -341,13 +336,13 @@ class DepthTree extends RBush3D {
     }
 
     if (hidden_by && hidden_until < this.maxdepth) {
-      console.log(
+      /*      console.log(
         hidden_by.data.text,
         ' used to blocks ',
         p3d.data.text,
         ' until ',
         hidden_until
-      );
+      );*/
       // Remove the blocker and replace it by two new 3d rectangles.
       const hid_data = hidden_by.data;
       const hid_start = hidden_by.minZ;
@@ -358,7 +353,7 @@ class DepthTree extends RBush3D {
         // Split is only required if the thing is actually visible at the level where
         // they diverge.
         this.remove(hidden_by);
-        console.log('SPLITTING', hid_data.text, 'at ', hidden_until);
+        //        console.log('SPLITTING', hid_data.text, 'at ', hidden_until);
         const upper_rect = this.to3d(hid_data, hid_start, hidden_until);
         this.insert(upper_rect);
         const lower_rect = this.to3d(hid_data, hidden_until, hid_end);
@@ -366,7 +361,7 @@ class DepthTree extends RBush3D {
       }
       // Insert the new point
       const current_rect = this.to3d(p3d.data, hidden_until, this.maxdepth);
-      console.log('INSERTING', current_rect);
+      //      console.log('INSERTING', current_rect);
       this.insert(current_rect);
       //      revised_3d.visible_from = hidden_until;
     }

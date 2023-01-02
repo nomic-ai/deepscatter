@@ -4,27 +4,27 @@ This is an evolving library for displaying more points than are ordinarily possi
 
 It's fast for three reasons:
 
-1. All data is sent in the Apache Arrow `feather` format, in a 
-   custom quadtree format that makes it possible to only load 
+1. All data is sent in the Apache Arrow `feather` format, in a
+   custom quadtree format that makes it possible to only load
    data as needed on zoom. Feather takes no time to parse in the browser
    once transferred, compresses pretty well, and can be directly copied to the GPU without
    transformation in JS. This is [the way of the future.](https://benschmidt.org/post/2020-01-15/2020-01-15-webgpu/)
-2. Most rendering is done in custom layers using WebGL, with a 
-   buffer management strategy handled by REGL. This means that 
+2. Most rendering is done in custom layers using WebGL, with a
+   buffer management strategy handled by REGL. This means that
    there are no unnecessary abstractions around points or separate draw calls
    for different objects; a minimum number of buffers are attached for the
    needed points.
 3. Almost all grammar-of-graphics transforms such are handled on the GPU,
-   which allows for interpolated transitions with calculations 
+   which allows for interpolated transitions with calculations
    done in parallel.
 
 It also runs in completely static settings, so you can host a million-point scatterplot over something like Github Pages.
 
 # Examples
 
-* [1 million+ documents from arxiv.com](https://observablehq.com/@bmschmidt/arxiv) rendered inside an Observable notebook. (Ben Schmidt)
-* [Every person in the 2010 and 2020 US Censuses](https://all-of-us.benschmidt.org) displayed in an interactive svelte-kit app. (Ben Schmidt)
-* [Newspaper Articles at the Library of Congress from the Reconstruction Era](https://situating.us/explore). (By Andromeda Yelton while in residency at the Library of Congress).
+- [1 million+ documents from arxiv.com](https://observablehq.com/@bmschmidt/arxiv) rendered inside an Observable notebook. (Ben Schmidt)
+- [Every person in the 2010 and 2020 US Censuses](https://all-of-us.benschmidt.org) displayed in an interactive svelte-kit app. (Ben Schmidt)
+- [Newspaper Articles at the Library of Congress from the Reconstruction Era](https://situating.us/explore). (By Andromeda Yelton while in residency at the Library of Congress).
 
 # Get help
 
@@ -39,9 +39,8 @@ See the [arxiv example above](https://observablehq.com/@bmschmidt/arxiv) to see 
 
 ## Running locally.
 
-First, install the companion tiling library, which is written in python, 
+First, install the companion tiling library, which is written in python,
 and generate a million points of test data in tiles of 50000 apiece.
-
 
 ```sh
 python3 -V # requires Python 3.9.x or 3.10.x
@@ -58,7 +57,7 @@ npm run dev
 ```
 
 If you go to `localhost:3344`, you should see an interactive scatterplot. To dig into what you're seeing, open `index.html`.
-(In 2021, this development site works in Chrome, not Safari or Firefox, because it uses ES6 module syntax inside the webworker. The distributed version of 
+(In 2021, this development site works in Chrome, not Safari or Firefox, because it uses ES6 module syntax inside the webworker. The distributed version of
 the module should work in all browsers.)
 
 ## Your own data.
@@ -86,7 +85,6 @@ Explore `index.html`, and render it at `http://localhost:3345/index.html`, for a
 
 Note: Ideally, in a future release you'll be able to create these specs in away that doesn't require coding JSON directly.
 
-
 ## Build the module
 
 ```sh
@@ -97,7 +95,7 @@ will create an ES module at `dist/deepscatter.es.js` The mechanics of
 importing this are very slightly different than `index.html`.
 
 Note that this is an ESM module and so requires you to use `<script type="module">` in your code.
-Don't worry! We're allowed to 
+Don't worry! We're allowed to
 do this now! But do be aware that this will not work on computers running very old browsers.
 
 Snippet:
@@ -105,20 +103,18 @@ Snippet:
 ```html
 <div id="my-div"></div>
 <script type="module">
-import Scatterplot from './dist/deepscatter.umd.js'
-f = new Scatterplot("#my-div")
+  import Scatterplot from './dist/deepscatter.umd.js';
+  f = new Scatterplot('#my-div');
 </script>
-
 ```
 
- See `index_prod.html` for an example
- 
-This is currently bundled with vite and rollup. There is/will be a further interaction layer on 
-top of it, but the core plotting components are separate and should work as a standalone layer that supports 
-plot requests via an API. 
+See `index_prod.html` for an example
 
+This is currently bundled with vite and rollup. There is/will be a further interaction layer on
+top of it, but the core plotting components are separate and should work as a standalone layer that supports
+plot requests via an API.
 
-# Code strategy 
+# Code strategy
 
 Any interaction logic that changes the API call directly does not belong in this library. The only
 interaction code here is for zooming and interacting with points.
@@ -174,6 +170,7 @@ This is still subject to change and is not fully documented. The encoding portio
 Jitter is a little overloaded with features right now, but some are quite fun.
 
 jitter method is set on 'method' key of the 'jitter_radius' field. Possible values are:
+
 1. `circle`
 2. `spiral`
 3. `time`
@@ -183,10 +180,9 @@ jitter method is set on 'method' key of the 'jitter_radius' field. Possible valu
 
 1. This is a 2d library. No fake 3d.
 2. The central zoom state is handled by d3-zoom.
-3. Use the zoom state to render other layers on top of Deepscatter by hooking in (note `on_zoom` is directly set, *not* passed in via `prefs`):
+3. Use the zoom state to render other layers on top of Deepscatter by hooking in (note `on_zoom` is directly set, _not_ passed in via `prefs`):
+
 ```js
 const scatterplot = new Scatterplot('#deepscatter');
 scatterplot.on_zoom = (transform) => {...}
 ```
-   
-

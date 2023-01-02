@@ -1,46 +1,69 @@
 {
-    "extends": [
-        "plugin:@typescript-eslint/recommended",
-        "prettier"
-    ],
-    "plugins": [
-        "@typescript-eslint",
-        "import",
-        "prettier"
-    ],
-    "env": {
-        "browser": true,
-        "es6": true
-    },
-    "parser": "@typescript-eslint/parser",
-    "parserOptions": {
-        "sourceType": "module",
-        "project": "tsconfig.json"
-    },
-    "ignorePatterns": [
-        "**/dist/**",
-        "**/demo/**",
-        "**/public/**"
-    ],
-    "rules": {
-        "prettier/prettier": ["error"],
+  "extends": [
+    "plugin:@typescript-eslint/recommended",
+    "plugin:unicorn/recommended"
+  ],
+  "plugins": [
+    "@typescript-eslint",
+    "import",
+    "unicorn"
+    // TODO: add prettier
+  ],
+  "env": {
+    "browser": true,
+    "es6": true
+  },
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "sourceType": "module",
+    "project": "tsconfig.json"
+  },
+  "ignorePatterns": ["**/dist/**", "**/demo/**", "**/public/**"],
+  "rules": {
+    // Base ESLint rules that @typescript-eslint extends must be disabled
+    // for the extended rules to work. See the below link for info.
+    // https://github.com/typescript-eslint/typescript-eslint/blob/main/docs/linting/TROUBLESHOOTING.md#i-am-using-a-rule-from-eslint-core-and-it-doesnt-work-correctly-with-typescript-code
+    "indent": "off",
+    "quotes": "off",
+    "semi": "off",
+    "@typescript-eslint/indent": ["error", 2],
+    "@typescript-eslint/quotes": ["error", "single"],
+    "@typescript-eslint/semi": ["error", "always"],
+    "@typescript-eslint/object-curly-spacing": ["error", "always"],
 
-        "@typescript-eslint/await-thenable": "error",
-        "@typescript-eslint/no-floating-promises": "error",
-        "@typescript-eslint/no-for-in-array": "error",
-        "no-implied-eval": "off",
-        "@typescript-eslint/no-implied-eval": "error",
-        "@typescript-eslint/no-misused-promises": "error",
-        "@typescript-eslint/no-unnecessary-type-assertion": "error",
-        "@typescript-eslint/no-unsafe-argument": "error",
-        "@typescript-eslint/no-unsafe-assignment": "error",
-        "@typescript-eslint/no-unsafe-call": "error",
-        "@typescript-eslint/no-unsafe-member-access": "error",
-        "@typescript-eslint/no-unsafe-return": "error",
-        "require-await": "off",
-        "@typescript-eslint/require-await": "error",
-        "@typescript-eslint/restrict-plus-operands": "error",
-        "@typescript-eslint/restrict-template-expressions": "error",
-        "@typescript-eslint/unbound-method": "error"
+    // Import plugin rules
+    // https://github.com/import-js/eslint-plugin-import
+    "import/no-unresolved": "error",
+    "import/export": "warn",
+    "import/no-nodejs-modules": "warn", // Deepscatter runs on the browser
+    "import/no-default-export": "warn", // default exports are an antipattern
+
+    // Unicorn plugin rules
+    // https://github.com/sindresorhus/eslint-plugin-unicorn
+    "unicorn/filename-case": [
+      "error",
+      {
+        "cases": {
+          "pascalCase": true,
+          "snakeCase": true
+        }
+      }
+    ],
+    "unicorn/consistent-destructuring": "off",
+    "unicorn/new-for-builtins": "off",
+    "unicorn/prevent-abbreviations": "off",
+    "unicorn/no-null": "off",
+
+    // NOTE: The below rules violate best practices and allow for code
+    // debt and should be removed.
+    "camelcase": "off"
+  },
+  "overrides": [
+    {
+      "files": ["*.ts"],
+      "extends": [
+        "plugin:@typescript-eslint/recommended-requiring-type-checking"
+      ]
     }
+  ]
 }

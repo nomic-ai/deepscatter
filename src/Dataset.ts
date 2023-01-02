@@ -345,7 +345,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
 
     this.visit(callback);
 
-    scores.sort((a, b) => a[0] - b[0]);
+    scores.sort((a, b) => Number(a[0]) - Number(b[0]));
     while (scores.length > 0 && queue.size < queue_length) {
       const upnext = scores.pop();
       if (upnext === undefined) {

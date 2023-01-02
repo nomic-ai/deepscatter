@@ -1,39 +1,39 @@
 <style>
   .ttooltip {
-    z-index: 99
+    z-index: 99;
   }
 </style>
 
 <body>
   <h1>Welcome to a demo/test page.</h1>
   <div id="deepscatter"></div>
-  <div id="controls" style="z-index:99;position:fixed;">
-  <input type="range" min=0 max=.5 step=.01 id="jitter" value=.05 />
-  <button id="flip">Change encoding</button>
-  <button id="html">Change tooltip HTML</button>
-  <pre id="ident"></pre>
+  <div id="controls" style="z-index: 99; position: fixed">
+    <input type="range" min="0" max=".5" step=".01" id="jitter" value=".05" />
+    <button id="flip">Change encoding</button>
+    <button id="html">Change tooltip HTML</button>
+    <pre id="ident"></pre>
   </div>
 </body>
 
 <head>
   <style>
-      dt {
-          float: left;
-          clear: left;
-          width: 90px;
-          font-weight: bold;
-          color: rgb(128, 19, 0);
-      }
+    dt {
+      float: left;
+      clear: left;
+      width: 90px;
+      font-weight: bold;
+      color: rgb(128, 19, 0);
+    }
 
-      dt::after {
-          content: ":";
-      }
+    dt::after {
+      content: ':';
+    }
 
-      dd {
-          margin: 0 0 0 80px;
-          padding: 0 0 0.5em 0;
-          width: 180px;
-      }
+    dd {
+      margin: 0 0 0 80px;
+      padding: 0 0 0.5em 0;
+      width: 180px;
+    }
   </style>
 </head>
 
@@ -42,98 +42,108 @@
   import { select } from 'd3-selection';
   window.select = select; // For the click function below.
   const prefs = {
-    "source_url" : "/tiles",
-    "max_points" : 1000000, // a full cap.
-    "alpha" : 5, // Target saturation for the full page.
-    "zoom_balance" : 0.22, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
-    "point_size": 2, // Default point size before application of size scaling
-    "background_color": "#EEEDDE",
-    "click_function": "select('#ident').html(JSON.stringify(datum, undefined, 2))",
-    "encoding": {
-      "color": {
-        field: "x",
-//        range: "ylorrd"    
-        "field": "class",
-        "range": "category10",
-        "domain": [-2047, 2047]
+    source_url: '/tiles',
+    max_points: 1000000, // a full cap.
+    alpha: 5, // Target saturation for the full page.
+    zoom_balance: 0.22, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
+    point_size: 2, // Default point size before application of size scaling
+    background_color: '#EEEDDE',
+    click_function:
+      "select('#ident').html(JSON.stringify(datum, undefined, 2))",
+    encoding: {
+      color: {
+        field: 'x',
+        //        range: "ylorrd"
+        field: 'class',
+        range: 'category10',
+        domain: [-2047, 2047],
       },
-      "x": {
-        field: "x",
-        transform: "literal"
+      x: {
+        field: 'x',
+        transform: 'literal',
       },
-      "jitter_radius": {
-        method: "uniform",
-        constant: .01
+      jitter_radius: {
+        method: 'uniform',
+        constant: 0.01,
       },
-      "y": {
-        field: "y", 
-        transform: "literal"
+      y: {
+        field: 'y',
+        transform: 'literal',
       },
-      "size": {
-        "field": "quantity",
-        "transform": "sqrt",
-        "domain": [0, 3],
-        "range": [0, 4]
-      }
-    }
+      size: {
+        field: 'quantity',
+        transform: 'sqrt',
+        domain: [0, 3],
+        range: [0, 4],
+      },
+    },
   };
   //list of ids 1 - 100000
   var ids_1 = [];
   var ids_2 = [];
-  for(var i = 1; i < 500000; i++)
-  {
+  for (var i = 1; i < 500000; i++) {
     ids_1.push(i.toString());
   }
 
   //list of ids 1 - 20000 increment by 2
-  for(var i = 1; i < 20000; i++)
-  {
+  for (var i = 1; i < 20000; i++) {
     ids_2.push(i.toString());
   }
   const colors = [
-//    JSON.parse(JSON.stringify(prefs.encoding.color)),
+    //    JSON.parse(JSON.stringify(prefs.encoding.color)),
     {
-      "field": 'quantity',
-      "range": 'ylorrd',
-//      "domain": 'progressive',
+      field: 'quantity',
+      range: 'ylorrd',
+      //      "domain": 'progressive',
     },
-  ]
+  ];
 
-  const scatterplot = new Scatterplot("#deepscatter")
-  scatterplot.plotAPI(prefs).then(d => scatterplot.plotAPI(prefs));
+  const scatterplot = new Scatterplot('#deepscatter');
+  scatterplot.plotAPI(prefs).then((d) => scatterplot.plotAPI(prefs));
   window.plot = scatterplot; // For debugging
-  console.log(scatterplot)
-  console.log(scatterplot.database)
+  console.log(scatterplot);
+  console.log(scatterplot.database);
   // Simple animation demonstration.
 
   // In practice, you might transform an external annotations layer using this
   scatterplot.on_zoom = (transform) => console.log('zoomed:', transform)
 
   let cycle = 0;
-  select("#jitter").on("change", (event) => {
+  select('#jitter').on('change', (event) => {
     scatterplot.plotAPI({
-      'encoding': {
-        'jitter_radius': {
-          'method': 'uniform',
-          'constant': +event.target.value
-        }
-      }
-    })
-  })
+      encoding: {
+        jitter_radius: {
+          method: 'uniform',
+          constant: +event.target.value,
+        },
+      },
+    });
+  });
   let weird = false;
-  select("#html").on("click", () => {
+  select('#html').on('click', () => {
     scatterplot.tooltip_html = (datum) => {
       return `This is point number <span style="color:blue">${datum.ix}</span>`;
-    }
-  })
-  select("#flip").on("click", () => {
-    cycle += 1
+    };
+  });
+  const positions = [
+    {
+      field: 'x',
+      transform: 'literal',
+    },
+    {
+      field: 'y',
+      transform: 'literal',
+    },
+  ];
+  select('#flip').on('click', () => {
+    cycle += 1;
     const new_coding = {
-      "encoding": {
-        "color": colors[cycle % colors.length]
-      }
-    }
-    scatterplot.plotAPI(new_coding)
-  })
-
+      encoding: {
+        color: colors[cycle % colors.length],
+        x: positions[cycle % positions.length],
+        y: positions[(cycle + 1) % positions.length],
+      },
+    };
+    scatterplot.plotAPI(new_coding);
+  });
 </script>
