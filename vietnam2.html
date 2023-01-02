@@ -91,7 +91,7 @@
   window.plot = scatterplot; // For debugging
 
   first_draw.then( async (d) => {
-    await scatterplot.add_labels_from_url("tests/TAKEOFFLOCATION.geojson", "takeoff", "TAKEOFFLOCATION");
+    await scatterplot.add_labels_from_url("tests/takeoff_locations.geojson", "takeoff", "TAKEOFFLOCATION");
   })
 
   // Simple animation demonstration.

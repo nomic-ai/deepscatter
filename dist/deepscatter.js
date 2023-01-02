@@ -5415,12 +5415,14 @@ class Zoom {
       [0, 0],
       [width, height]
     ]).on("zoom", (event) => {
+      var _a2, _b2;
       try {
         document.getElementById("tooltipcircle").remove();
       } catch (error) {
       }
       this.transform = event.transform;
       this.restart_timer(10 * 1e3);
+      (_b2 = (_a2 = this.scatterplot).on_zoom) == null ? void 0 : _b2.call(_a2, event.transform);
     });
     canvas.call(zoomer);
     this.add_mouseover();
@@ -17575,7 +17577,10 @@ class Aesthetic {
     }
     console.log(column.type);
     if (column.type.dictionary) {
-      this._domains[this.field] = [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
+      this._domains[this.field] = [
+        -2047,
+        Math.floor(this.aesthetic_map.texture_size / 2) - 1
+      ];
     } else {
       if (this.scatterplot._root._schema) {
         const field = this.scatterplot._root._schema.fields.find(
@@ -17584,7 +17589,12 @@ class Aesthetic {
         if (field && field.metadata) {
           const minmax = field.metadata.get("extent");
           if (minmax) {
-            this._domains[this.field] = JSON.parse(minmax);
+            let [min2, max2] = JSON.parse(minmax);
+            if (field.typeId === 10) {
+              min2 = Number(new Date(min2));
+              max2 = Number(new Date(max2));
+            }
+            this._domains[this.field] = [min2, max2];
           }
         }
       }
@@ -17592,9 +17602,6 @@ class Aesthetic {
         this._domains[this.field] = extent(column.toArray());
       }
     }
-    console.log(
-      "Inferring range of " + this.field + " to be " + this._domains[this.field]
-    );
     return this._domains[this.field];
   }
   default_data() {
@@ -29247,14 +29254,32 @@ class QuadTile extends Tile {
   }
 }
 class ArrowTile extends Tile {
-  constructor(table2, dataset, batch_num, plot, parent = null) {
+  constructor(table, dataset, batch_num, plot, parent = null) {
     super(dataset);
     __publicField(this, "batch_num");
     __publicField(this, "full_tab");
-    this.full_tab = table2;
-    this._batch = table2.batches[batch_num];
+    this.full_tab = table;
+    this._batch = table.batches[batch_num];
     this.download_state = "Complete";
     this.batch_num = batch_num;
+    if (this._batch.getChild("ix") === null) {
+      console.log("Manually setting ix");
+      const batch = this._batch;
+      console.log({ batch, rows: batch.numRows });
+      const array2 = new Float32Array(batch.numRows);
+      console.log("SEED", this.dataset._ix_seed);
+      const seed = this.dataset._ix_seed;
+      this.dataset._ix_seed += batch.numRows;
+      for (let i = 0; i < batch.numRows; i++) {
+        array2[i] = i + seed;
+      }
+      this._min_ix = seed;
+      this._max_ix = seed + batch.numRows;
+      this.highest_known_ix = this._max_ix;
+      this._batch = bind_column(this.record_batch, "ix", array2);
+      console.log("Updated batch to", this._batch);
+    }
+    console.log(this._batch.getChild("x"));
     this._extent = {
       x: extent(this._batch.getChild("x")),
       y: extent(this._batch.getChild("y"))
@@ -29283,6 +29308,18 @@ class ArrowTile extends Tile {
         );
       }
     }
+    for (let child of this._children) {
+      for (let dim of ["x", "y"]) {
+        this._extent[dim][0] = Math.min(
+          this._extent[dim][0],
+          child._extent[dim][0]
+        );
+        this._extent[dim][1] = Math.max(
+          this._extent[dim][1],
+          child._extent[dim][1]
+        );
+      }
+    }
   }
   download() {
     return Promise.resolve(this._batch);
@@ -29304,11 +29341,17 @@ class Dataset {
     __publicField(this, "transformations", {});
     __publicField(this, "plot");
     __publicField(this, "extents", {});
+    __publicField(this, "_ix_seed", 0);
     __publicField(this, "_schema");
     this.plot = plot;
   }
   get highest_known_ix() {
     return this.root_tile.highest_known_ix;
+  }
+  get table() {
+    return new Table(
+      this.map((d) => d).filter((d) => d.ready).map((d) => d.record_batch)
+    );
   }
   static from_quadfeather(url, prefs, plot) {
     return new QuadtileSet(url, prefs, plot);
@@ -29319,6 +29362,16 @@ class Dataset {
   domain(dimension, max_ix = 1e6) {
     if (this.extents[dimension]) {
       return this.extents[dimension];
+    }
+    if (this._schema) {
+      const dim = this._schema.fields.find((d) => d.name === dimension);
+      if (dim && dim.metadata.get("extent")) {
+        console.warn({ dim });
+        this.extents[dimension] = JSON.parse(
+          dim.metadata.get("extent")
+        );
+        return this.extents[dimension];
+      }
     }
     this.extents[dimension] = extent(
       this.points(void 0, max_ix),
@@ -29377,6 +29430,25 @@ class Dataset {
     }
     this._schema = this.root_tile.record_batch.schema;
     return this.root_tile.record_batch.schema;
+  }
+  add_tiled_column(field_name, buffer) {
+    const tb = tableFromIPC(buffer);
+    const records = {};
+    window.tb = tb;
+    for (let batch of tb.batches) {
+      const offsets = batch.getChild("data").data[0].valueOffsets;
+      const values = batch.getChild("data").data[0].children[0];
+      for (let i = 0; i < batch.data.length; i++) {
+        const tilename = batch.getChild("_tile").get(i);
+        records[tilename] = values.values.slice(offsets[i], offsets[i + 1]);
+      }
+    }
+    this.transformations[field_name] = function(tile) {
+      const { key } = tile;
+      tile.record_batch.numRows;
+      const array2 = records[key];
+      return bind_column(tile.record_batch, field_name, array2);
+    };
   }
   add_sparse_identifiers(field_name, ids) {
     this.transformations[field_name] = function(tile) {
@@ -30461,6 +30533,7 @@ class Scatterplot {
     __publicField(this, "ready");
     __publicField(this, "click_handler");
     __publicField(this, "tooltip_handler");
+    __publicField(this, "on_zoom");
     this.bound = false;
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
@@ -30500,9 +30573,11 @@ class Scatterplot {
   }
   async add_labels_from_url(url, name, label_key, size_key) {
     const features = await fetch(url).then((data) => data.json()).catch((error) => {
-      console.log(error);
+      throw error;
     });
-    this.add_labels(features, name, label_key, size_key);
+    if (features !== void 0) {
+      this.add_labels(features, name, label_key, size_key);
+    }
   }
   add_labels(features, name, label_key, size_key) {
     const labels = new LabelMaker(this.div, this);
