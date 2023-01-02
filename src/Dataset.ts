@@ -1,22 +1,17 @@
 // A Dataset manages the production and manipulation of *tiles*.
 
 import { Tile, Rectangle, QuadTile, ArrowTile, p_in_rect } from './tile';
-import { range, min, max, bisectLeft, extent } from 'd3-array';
-import * as Comlink from 'comlink';
-
+import { range, min, max, bisectLeft, extent, sum } from 'd3-array';
 import { APICall, PointUpdate } from './types';
 import Scatterplot from './deepscatter';
 import {
   RecordBatch,
   StructRowProxy,
   Table,
-  Vector,
   vectorFromArray,
-  makeVector,
   Data,
-  makeData,
-  Float,
   Schema,
+  tableFromIPC,
 } from 'apache-arrow';
 type Key = string;
 
@@ -32,13 +27,24 @@ export abstract class Dataset<T extends Tile> {
   abstract get extent(): Rectangle;
   abstract promise: Promise<void>;
   private extents: Record<string, [number, number]> = {};
+  public _ix_seed: number = 0;
   public _schema?: Schema;
   constructor(plot: Scatterplot) {
     this.plot = plot;
+    // If a linear identifier does not exist in the passed data, we add the ix columns in the order that
+    // they are passed.
   }
 
   get highest_known_ix(): number {
     return this.root_tile.highest_known_ix;
+  }
+
+  get table(): Table {
+    return new Table(
+      this.map((d) => d)
+        .filter((d) => d.ready)
+        .map((d) => d.record_batch)
+    );
   }
 
   static from_quadfeather(
@@ -66,10 +72,12 @@ export abstract class Dataset<T extends Tile> {
       return this.extents[dimension];
     }
     if (this._schema) {
-      const dim = this._schema.fields.find(d => d.name === dimension);
+      const dim = this._schema.fields.find((d) => d.name === dimension);
       if (dim && dim.metadata.get('extent')) {
-        console.warn({dim})
-        this.extents[dimension] = JSON.parse(dim.metadata.get('extent') as string);
+        console.warn({ dim });
+        this.extents[dimension] = JSON.parse(
+          dim.metadata.get('extent') as string
+        );
         return this.extents[dimension];
       }
     }
@@ -164,6 +172,26 @@ export abstract class Dataset<T extends Tile> {
     }
     this._schema = this.root_tile.record_batch.schema;
     return this.root_tile.record_batch.schema;
+  }
+
+  add_tiled_column(field_name: string, buffer: Uint8Array): void {
+    const tb = tableFromIPC(buffer);
+    const records = {};
+    window.tb = tb;
+    for (let batch of tb.batches) {
+      const offsets = batch.getChild('data').data[0].valueOffsets;
+      const values = batch.getChild('data').data[0].children[0];
+      for (let i = 0; i < batch.data.length; i++) {
+        const tilename = batch.getChild('_tile').get(i);
+        records[tilename] = values.values.slice(offsets[i], offsets[i + 1]);
+      }
+    }
+    this.transformations[field_name] = function (tile) {
+      const { key } = tile;
+      const length = tile.record_batch.numRows;
+      const array = records[key];
+      return bind_column(tile.record_batch, field_name, array);
+    };
   }
 
   add_sparse_identifiers(field_name: string, ids: PointUpdate) {
@@ -376,7 +404,7 @@ function check_overlap(tile: Tile, bbox: Rectangle): number {
   return area(intersection) / area(bbox);
 }
 
-function bind_column(
+export function bind_column(
   batch: RecordBatch,
   field_name: string,
   data: Float32Array
@@ -415,7 +443,7 @@ function supplement_identifiers(
   // A quick lookup before performing a costly string decode.
   const hashtab = new Set();
   for (const item of Object.keys(ids)) {
-    const code = [0, 1, 2, 3].map((i) => (item.charCodeAt(i) || '')).join('');
+    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || '').join('');
     hashtab.add(code);
   }
   const updatedFloatArray = new Float32Array(batch.numRows);
