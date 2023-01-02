@@ -148,9 +148,11 @@ export default class Scatterplot {
     const features = await fetch(url)
       .then((data) => data.json() as Promise<FeatureCollection>)
       .catch((error) => {
-        console.log(error);
+        throw error;
       });
-    this.add_labels(features, name, label_key, size_key);
+    if (features !== undefined) {
+      this.add_labels(features, name, label_key, size_key);
+    }
   }
   /**
    *
