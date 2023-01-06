@@ -198,7 +198,9 @@ export class ReglRenderer<T extends Tile> extends Renderer {
         sprites: this.sprites,
       };
       Object.assign(this_props, props);
+      //      if (tile.key.slice(0, 1) == '3') {
       prop_list.push(this_props);
+      //      }
     }
     prop_list.reverse();
     this._renderer(prop_list);
@@ -1119,6 +1121,7 @@ class TileBufferManager {
     }
     if (tile.ready && tile._batch) {
       regl_elements.set('_count', tile.record_batch.getChild('ix').length);
+      console.log(tile.record_batch.getChild('ix').length, tile.key);
       return regl_elements.get('_count');
     }
   }

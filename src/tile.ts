@@ -417,6 +417,10 @@ export class QuadTile extends Tile {
         }
         this._min_ix = Number(ixes.get(0));
         this.max_ix = Number(ixes.get(ixes.length - 1));
+        if (this._min_ix > this.max_ix) {
+          this.max_ix = this._min_ix + 1e5;
+          this._min_ix = 0;
+        }
         this.highest_known_ix = this.max_ix;
         //        this.update_master_dictionary_lookups();
       })

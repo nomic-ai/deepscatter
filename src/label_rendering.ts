@@ -3,6 +3,7 @@ import { Renderer } from './rendering';
 import { RBush3D } from 'rbush-3d';
 import Scatterplot from './deepscatter';
 import { Timer, timer } from 'd3-timer';
+import { select } from 'd3-selection';
 //import { Data } from 'apache-arrow';
 
 function pixel_ratio(scatterplot: Scatterplot): number {
@@ -21,10 +22,12 @@ export class LabelMaker extends Renderer {
   public tree: DepthTree;
   public timer?: Timer;
   public label_key: string;
+  public svg: SVGElement;
 
   constructor(selector: string, scatterplot: Scatterplot) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
     this.canvas = scatterplot.elements[2].selectAll('canvas').node();
+    this.svg = scatterplot.elements[3].selectAll('svg').node() as SVGElement;
     if (this.canvas === undefined) {
       throw new Error('WTF?');
     }
@@ -34,7 +37,7 @@ export class LabelMaker extends Renderer {
       this.ctx,
       pixel_ratio(scatterplot),
       0.5,
-      [1, 1e6]
+      [0.5, 1e6]
     );
 
     /*    this.tree.accessor = (x, y) => {
@@ -92,6 +95,7 @@ export class LabelMaker extends Renderer {
           y: geometry.coordinates[1] + Math.random() * 0.1,
           text: label,
           height: size,
+          properties: properties,
         };
         // bulk insert not supported
         this.tree.insert_point(p);
@@ -123,6 +127,39 @@ export class LabelMaker extends Renderer {
     //    context.fillStyle = "rgba(0, 0, 0, 0)";
     context.clearRect(0, 0, 4096, 4096);
     const dim = this.scatterplot.dim('color');
+    const bboxes = select(this.svg)
+      .selectAll('rect.labelbbox')
+      .data(overlaps, (d) => '' + d.minZ + d.minX)
+      .join((enter) =>
+        enter.append('rect').attr('class', 'labellbox').style('opacity', 0)
+      );
+
+    bboxes
+      .attr('class', 'labelbbox')
+      .attr(
+        'x',
+        (d) => x_(d.data.x) - d.data.pixel_width / this.tree.scale_factor / 2
+      )
+      .attr(
+        'y',
+        (d) => y_(d.data.y) - d.data.pixel_height / this.tree.scale_factor
+      )
+      .attr('width', (d) => (d.data.pixel_width / this.tree.scale_factor) * 2)
+      .attr('stroke', 'red')
+      .attr('height', (d) => (d.data.pixel_height / this.tree.scale_factor) * 2)
+      .on('mouseover', function (event, d) {
+        select(event.target).style('opacity', 1);
+        event.stopPropagation();
+        console.log({ event, d });
+      })
+      .on('mousemove', function (event, d) {
+        event.stopPropagation();
+      })
+      .on('mouseout', function (event, d) {
+        select(event.target).style('opacity', 0);
+        console.log({ event, d });
+      });
+
     for (const d of overlaps) {
       const { data: datum } = d;
       context.font = `${datum.height * size_adjust}pt verdana`;
@@ -131,13 +168,21 @@ export class LabelMaker extends Renderer {
 
       context.globalAlpha = 1;
       context.fillStyle = 'white';
-      if (dim.field === this.label_key) {
-        context.shadowColor = dim.scale(datum.text);
-        context.strokeStyle = dim.scale(datum.text);
+
+      if (datum.properties[dim.field]) {
+        const exists =
+          dim.scale.domain().indexOf(datum.properties[dim.field]) > -1;
+        if (exists) {
+          context.shadowColor = dim.scale(datum.properties[dim.field]);
+          context.strokeStyle = dim.scale(datum.properties[dim.field]);
+        } else {
+          context.shadowColor = 'gray';
+          context.strokeStyle = 'gray';
+        }
       } else {
         context.shadowColor = 'black';
       }
-      context.shadowBlur = 19;
+      context.shadowBlur = 12;
       context.lineWidth = 3;
       context.strokeText(datum.text, x, y);
       context.shadowBlur = 0;
@@ -153,6 +198,8 @@ export class LabelMaker extends Renderer {
         datum.pixel_height * this.tree.pixel_ratio
       ); */
     }
+    context.shadowColor = 'black';
+    context.strokeStyle = 'black';
   }
 }
 
@@ -329,6 +376,9 @@ class DepthTree extends RBush3D {
   }
 
   insert_point(point: RawPoint | Point, mindepth = 1) {
+    if (point.text === undefined || point.text === '') {
+      return;
+    }
     let measured: Point;
     if (point['pixel_width'] === undefined) {
       measured = {

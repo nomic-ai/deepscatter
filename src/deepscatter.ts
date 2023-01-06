@@ -683,7 +683,7 @@ class TooltipHTML extends SettableFunction<string> {
   default(point: StructRowProxy) {
     // By default, this returns a
     let output = '<dl>';
-    const nope = new Set(['x', 'y', 'ix', null, 'tile_key']);
+    const nope = new Set(['x', 'y', 'mix', null, 'mtile_key']);
     //    console.log({ ...point });
     for (const [k, v] of point) {
       if (nope.has(k)) {

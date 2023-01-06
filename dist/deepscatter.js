@@ -19073,6 +19073,7 @@ class TileBufferManager {
     }
     if (tile.ready && tile._batch) {
       regl_elements.set("_count", tile.record_batch.getChild("ix").length);
+      console.log(tile.record_batch.getChild("ix").length, tile.key);
       return regl_elements.get("_count");
     }
   }
@@ -29216,6 +29217,10 @@ class QuadTile extends Tile {
       }
       this._min_ix = Number(ixes.get(0));
       this.max_ix = Number(ixes.get(ixes.length - 1));
+      if (this._min_ix > this.max_ix) {
+        this.max_ix = this._min_ix + 1e5;
+        this._min_ix = 0;
+      }
       this.highest_known_ix = this.max_ix;
     }).catch((error) => {
       console.log(error);
@@ -30267,7 +30272,9 @@ class LabelMaker extends Renderer {
     __publicField(this, "tree");
     __publicField(this, "timer");
     __publicField(this, "label_key");
+    __publicField(this, "svg");
     this.canvas = scatterplot.elements[2].selectAll("canvas").node();
+    this.svg = scatterplot.elements[3].selectAll("svg").node();
     if (this.canvas === void 0) {
       throw new Error("WTF?");
     }
@@ -30276,7 +30283,7 @@ class LabelMaker extends Renderer {
       this.ctx,
       pixel_ratio(scatterplot),
       0.5,
-      [1, 1e6]
+      [0.5, 1e6]
     );
     this.bind_zoom(scatterplot._renderer.zoom);
   }
@@ -30314,7 +30321,8 @@ class LabelMaker extends Renderer {
           x: geometry.coordinates[0] + Math.random() * 0.1,
           y: geometry.coordinates[1] + Math.random() * 0.1,
           text: label,
-          height: size
+          height: size,
+          properties
         };
         this.tree.insert_point(p);
       }
@@ -30341,6 +30349,25 @@ class LabelMaker extends Renderer {
     });
     context2.clearRect(0, 0, 4096, 4096);
     const dim = this.scatterplot.dim("color");
+    const bboxes = select(this.svg).selectAll("rect.labelbbox").data(overlaps, (d) => "" + d.minZ + d.minX).join(
+      (enter) => enter.append("rect").attr("class", "labellbox").style("opacity", 0)
+    );
+    bboxes.attr("class", "labelbbox").attr(
+      "x",
+      (d) => x_(d.data.x) - d.data.pixel_width / this.tree.scale_factor / 2
+    ).attr(
+      "y",
+      (d) => y_(d.data.y) - d.data.pixel_height / this.tree.scale_factor
+    ).attr("width", (d) => d.data.pixel_width / this.tree.scale_factor * 2).attr("stroke", "red").attr("height", (d) => d.data.pixel_height / this.tree.scale_factor * 2).on("mouseover", function(event, d) {
+      select(event.target).style("opacity", 1);
+      event.stopPropagation();
+      console.log({ event, d });
+    }).on("mousemove", function(event, d) {
+      event.stopPropagation();
+    }).on("mouseout", function(event, d) {
+      select(event.target).style("opacity", 0);
+      console.log({ event, d });
+    });
     for (const d of overlaps) {
       const { data: datum2 } = d;
       context2.font = `${datum2.height * size_adjust}pt verdana`;
@@ -30348,13 +30375,19 @@ class LabelMaker extends Renderer {
       const y = y_(datum2.y);
       context2.globalAlpha = 1;
       context2.fillStyle = "white";
-      if (dim.field === this.label_key) {
-        context2.shadowColor = dim.scale(datum2.text);
-        context2.strokeStyle = dim.scale(datum2.text);
+      if (datum2.properties[dim.field]) {
+        const exists = dim.scale.domain().indexOf(datum2.properties[dim.field]) > -1;
+        if (exists) {
+          context2.shadowColor = dim.scale(datum2.properties[dim.field]);
+          context2.strokeStyle = dim.scale(datum2.properties[dim.field]);
+        } else {
+          context2.shadowColor = "gray";
+          context2.strokeStyle = "gray";
+        }
       } else {
         context2.shadowColor = "black";
       }
-      context2.shadowBlur = 19;
+      context2.shadowBlur = 12;
       context2.lineWidth = 3;
       context2.strokeText(datum2.text, x, y);
       context2.shadowBlur = 0;
@@ -30362,6 +30395,8 @@ class LabelMaker extends Renderer {
       context2.fillStyle = "white";
       context2.fillText(datum2.text, x, y);
     }
+    context2.shadowColor = "black";
+    context2.strokeStyle = "black";
   }
 }
 let context = null;
@@ -30455,6 +30490,9 @@ class DepthTree extends dist.RBush3D {
     return p;
   }
   insert_point(point, mindepth = 1) {
+    if (point.text === void 0 || point.text === "") {
+      return;
+    }
     let measured;
     if (point["pixel_width"] === void 0) {
       measured = {
@@ -30931,7 +30969,7 @@ class ClickFunction extends SettableFunction {
 class TooltipHTML extends SettableFunction {
   default(point) {
     let output = "<dl>";
-    const nope = /* @__PURE__ */ new Set(["x", "y", "ix", null, "tile_key"]);
+    const nope = /* @__PURE__ */ new Set(["x", "y", "mix", null, "mtile_key"]);
     for (const [k, v] of point) {
       if (nope.has(k)) {
         continue;
