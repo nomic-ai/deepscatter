@@ -19073,7 +19073,6 @@ class TileBufferManager {
     }
     if (tile.ready && tile._batch) {
       regl_elements.set("_count", tile.record_batch.getChild("ix").length);
-      console.log(tile.record_batch.getChild("ix").length, tile.key);
       return regl_elements.get("_count");
     }
   }
@@ -29373,7 +29372,7 @@ class Dataset {
     if (this._schema) {
       const dim = this._schema.fields.find((d) => d.name === dimension);
       if (dim && dim.metadata.get("extent")) {
-        console.warn({ dim });
+        console.warn({ dim }, "lacks extent");
         this.extents[dimension] = JSON.parse(
           dim.metadata.get("extent")
         );
@@ -29599,6 +29598,9 @@ function check_overlap(tile, bbox) {
   return area(intersection) / area(bbox);
 }
 function bind_column(batch, field_name, data) {
+  if (data === void 0) {
+    throw new Error("Must pass data to bind_column");
+  }
   const current_keys = new Set(
     [...batch.schema.fields].map((d) => d.name)
   );
@@ -30265,16 +30267,25 @@ function pixel_ratio(scatterplot) {
   return ratio;
 }
 class LabelMaker extends Renderer {
-  constructor(selector2, scatterplot) {
+  constructor(scatterplot, id_raw) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
     __publicField(this, "layers", []);
     __publicField(this, "ctx");
     __publicField(this, "tree");
     __publicField(this, "timer");
     __publicField(this, "label_key");
-    __publicField(this, "svg");
+    __publicField(this, "labelgroup");
+    __publicField(this, "hovered");
     this.canvas = scatterplot.elements[2].selectAll("canvas").node();
-    this.svg = scatterplot.elements[3].selectAll("svg").node();
+    const svg = scatterplot.elements[3].selectAll("svg").node();
+    const id2 = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, "---");
+    const labgroup = svg.querySelectorAll(`#${id2}`);
+    console.log({ id: id2 });
+    if (labgroup.length === 0) {
+      this.labelgroup = select(svg).append("g").attr("id", id2).node();
+    } else {
+      this.labelgroup = labgroup[1];
+    }
     if (this.canvas === void 0) {
       throw new Error("WTF?");
     }
@@ -30291,6 +30302,7 @@ class LabelMaker extends Renderer {
     if (this.timer) {
       this.timer.stop();
     }
+    select(this.labelgroup).attr("display", "inline");
     this.timer = timer(() => {
       this.render();
       ticks2 -= 1;
@@ -30299,9 +30311,13 @@ class LabelMaker extends Renderer {
       }
     });
   }
+  delete() {
+    select(this.labelgroup).remove();
+  }
   stop() {
     if (this.timer) {
       this.timer.stop();
+      select(this.labelgroup).attr("display", "none");
       this.ctx.clearRect(0, 0, 4096, 4096);
       this.timer = void 0;
     }
@@ -30349,28 +30365,48 @@ class LabelMaker extends Renderer {
     });
     context2.clearRect(0, 0, 4096, 4096);
     const dim = this.scatterplot.dim("color");
-    const bboxes = select(this.svg).selectAll("rect.labelbbox").data(overlaps, (d) => "" + d.minZ + d.minX).join(
+    const bboxes = select(this.labelgroup).selectAll("rect.labelbbox").data(overlaps, (d) => "" + d.minZ + d.minX).join(
       (enter) => enter.append("rect").attr("class", "labellbox").style("opacity", 0)
     );
+    const { scatterplot, label_key } = this;
     bboxes.attr("class", "labelbbox").attr(
       "x",
       (d) => x_(d.data.x) - d.data.pixel_width / this.tree.scale_factor / 2
     ).attr(
       "y",
       (d) => y_(d.data.y) - d.data.pixel_height / this.tree.scale_factor
-    ).attr("width", (d) => d.data.pixel_width / this.tree.scale_factor * 2).attr("stroke", "red").attr("height", (d) => d.data.pixel_height / this.tree.scale_factor * 2).on("mouseover", function(event, d) {
-      select(event.target).style("opacity", 1);
+    ).attr("width", (d) => d.data.pixel_width / this.tree.scale_factor * 2).attr("stroke", "red").attr("height", (d) => d.data.pixel_height / this.tree.scale_factor * 2).on("mouseover", (event, d) => {
+      console.log({ d });
+      select(event.target).style("opacity", 0);
+      this.hovered = "" + d.minZ + d.minX;
+      const command = {
+        duration: 350,
+        encoding: {
+          filter: {
+            field: label_key,
+            lambda: `d => d === "${d.data.text}"`
+          }
+        }
+      };
+      void scatterplot.plotAPI(command);
       event.stopPropagation();
       console.log({ event, d });
     }).on("mousemove", function(event, d) {
       event.stopPropagation();
-    }).on("mouseout", function(event, d) {
+    }).on("mouseout", (event, d) => {
+      this.hovered = void 0;
+      const command = {
+        duration: 350,
+        encoding: {
+          filter: {}
+        }
+      };
+      this.scatterplot.plotAPI(command);
       select(event.target).style("opacity", 0);
       console.log({ event, d });
     });
     for (const d of overlaps) {
       const { data: datum2 } = d;
-      context2.font = `${datum2.height * size_adjust}pt verdana`;
       const x = x_(datum2.x);
       const y = y_(datum2.y);
       context2.globalAlpha = 1;
@@ -30387,11 +30423,16 @@ class LabelMaker extends Renderer {
       } else {
         context2.shadowColor = "black";
       }
-      context2.shadowBlur = 12;
-      context2.lineWidth = 3;
+      let emphasize = 0;
+      if (this.hovered === "" + d.minZ + d.minX) {
+        emphasize += 2;
+      }
+      context2.font = `${datum2.height * size_adjust + emphasize}pt verdana`;
+      context2.shadowBlur = 12 + emphasize * 3;
+      context2.lineWidth = 3 + emphasize;
       context2.strokeText(datum2.text, x, y);
       context2.shadowBlur = 0;
-      context2.lineWidth = 4;
+      context2.lineWidth = 4 + emphasize;
       context2.fillStyle = "white";
       context2.fillText(datum2.text, x, y);
     }
@@ -30615,14 +30656,6 @@ class Scatterplot {
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
   async add_labels_from_url(url, name, label_key, size_key) {
-    const features = await fetch(url).then((data) => data.json()).catch((error) => {
-      throw error;
-    });
-    if (features !== void 0) {
-      this.add_labels(features, name, label_key, size_key);
-    }
-  }
-  async add_labels_from_url(url, name, label_key, size_key) {
     await this.ready;
     await this._root.promise;
     return fetch(url).then(async (data) => {
@@ -30634,7 +30667,7 @@ class Scatterplot {
     });
   }
   add_labels(features, name, label_key, size_key) {
-    const labels = new LabelMaker(this.div, this);
+    const labels = new LabelMaker(this, name);
     labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
@@ -30788,6 +30821,7 @@ class Scatterplot {
     for (const [k, v] of Object.entries(this.secondary_renderers)) {
       if (v && v["label_key"] !== void 0) {
         this.secondary_renderers[k].stop();
+        this.secondary_renderers[k].delete();
         this.secondary_renderers[k] = void 0;
       }
     }

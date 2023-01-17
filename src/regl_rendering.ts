@@ -1121,7 +1121,6 @@ class TileBufferManager {
     }
     if (tile.ready && tile._batch) {
       regl_elements.set('_count', tile.record_batch.getChild('ix').length);
-      console.log(tile.record_batch.getChild('ix').length, tile.key);
       return regl_elements.get('_count');
     }
   }

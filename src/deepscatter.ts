@@ -140,23 +140,6 @@ export default class Scatterplot {
       : codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
-
-  async add_labels_from_url(
-    url: string,
-    name: string,
-    label_key: string,
-    size_key: string | undefined
-  ) {
-    const features = await fetch(url)
-      .then((data) => data.json() as Promise<FeatureCollection>)
-      .catch((error) => {
-        throw error;
-      });
-    if (features !== undefined) {
-      this.add_labels(features, name, label_key, size_key);
-    }
-  }
-
   async add_labels_from_url(
     url: string,
     name: string,
@@ -201,7 +184,7 @@ export default class Scatterplot {
     label_key: string,
     size_key: string | undefined
   ) {
-    const labels = new LabelMaker(this.div, this);
+    const labels = new LabelMaker(this, name);
     labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
@@ -422,6 +405,7 @@ export default class Scatterplot {
       // Stop any existing labels
       if (v && v['label_key'] !== undefined) {
         this.secondary_renderers[k].stop();
+        this.secondary_renderers[k].delete();
         this.secondary_renderers[k] = undefined;
       }
     }

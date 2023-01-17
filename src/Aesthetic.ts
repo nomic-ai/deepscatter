@@ -1040,6 +1040,7 @@ class StatefulSize extends StatefulAesthetic<Size> {
     return Size;
   }
 }
+
 class StatefulJitter_speed extends StatefulAesthetic<Jitter_speed> {
   get Factory() {
     return Jitter_speed;
@@ -1080,7 +1081,7 @@ export const stateful_aesthetics: Record<
   color: StatefulColor,
   filter: StatefulFilter,
   filter2: StatefulFilter2,
-};
+} as const;
 
 function parseLambdaString(lambdastring: string) {
   // Materialize an arrow function from its string.

@@ -74,7 +74,7 @@ export abstract class Dataset<T extends Tile> {
     if (this._schema) {
       const dim = this._schema.fields.find((d) => d.name === dimension);
       if (dim && dim.metadata.get('extent')) {
-        console.warn({ dim });
+        console.warn({ dim }, 'lacks extent');
         this.extents[dimension] = JSON.parse(
           dim.metadata.get('extent') as string
         );
@@ -409,6 +409,9 @@ export function bind_column(
   field_name: string,
   data: Float32Array
 ): RecordBatch {
+  if (data === undefined) {
+    throw new Error('Must pass data to bind_column');
+  }
   const current_keys: Set<string> = new Set(
     [...batch.schema.fields].map((d) => d.name)
   );

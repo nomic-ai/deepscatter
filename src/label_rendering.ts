@@ -22,12 +22,27 @@ export class LabelMaker extends Renderer {
   public tree: DepthTree;
   public timer?: Timer;
   public label_key: string;
-  public svg: SVGElement;
+  //  public svg: SVGElement;
+  public labelgroup: SVGGElement;
+  private hovered: undefined | string;
 
-  constructor(selector: string, scatterplot: Scatterplot) {
+  constructor(scatterplot: Scatterplot, id_raw: string) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
-    this.canvas = scatterplot.elements[2].selectAll('canvas').node();
-    this.svg = scatterplot.elements[3].selectAll('svg').node() as SVGElement;
+    this.canvas = scatterplot.elements![2].selectAll('canvas').node();
+    const svg = scatterplot.elements![3].selectAll('svg').node() as SVGElement;
+    const id = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, '---');
+    const labgroup = svg.querySelectorAll(`#${id}`);
+    console.log({ id });
+    // eslint-disable-next-line unicorn/prefer-ternary
+    if (labgroup.length === 0) {
+      this.labelgroup = select(svg)
+        .append('g')
+        .attr('id', id)
+        .node() as SVGGElement;
+    } else {
+      this.labelgroup = labgroup[1] as SVGGElement;
+    }
+
     if (this.canvas === undefined) {
       throw new Error('WTF?');
     }
@@ -52,6 +67,7 @@ export class LabelMaker extends Renderer {
     if (this.timer) {
       this.timer.stop();
     }
+    select(this.labelgroup).attr('display', 'inline');
 
     this.timer = timer(() => {
       this.render();
@@ -62,9 +78,14 @@ export class LabelMaker extends Renderer {
     });
   }
 
+  delete() {
+    select(this.labelgroup).remove();
+  }
+
   stop() {
     if (this.timer) {
       this.timer.stop();
+      select(this.labelgroup).attr('display', 'none');
       this.ctx.clearRect(0, 0, 4096, 4096);
       this.timer = undefined;
     }
@@ -108,7 +129,6 @@ export class LabelMaker extends Renderer {
     const { x_, y_ } = this.zoom.scales();
     const { transform } = this.zoom;
     const { width, height } = this;
-
     context.clearRect(0, 0, width, height);
     context.textAlign = 'center';
     context.textBaseline = 'middle';
@@ -127,13 +147,15 @@ export class LabelMaker extends Renderer {
     //    context.fillStyle = "rgba(0, 0, 0, 0)";
     context.clearRect(0, 0, 4096, 4096);
     const dim = this.scatterplot.dim('color');
-    const bboxes = select(this.svg)
+    const bboxes = select(this.labelgroup)
       .selectAll('rect.labelbbox')
       .data(overlaps, (d) => '' + d.minZ + d.minX)
       .join((enter) =>
         enter.append('rect').attr('class', 'labellbox').style('opacity', 0)
       );
 
+    const { scatterplot, label_key } = this;
+    const labeler = this;
     bboxes
       .attr('class', 'labelbbox')
       .attr(
@@ -147,22 +169,41 @@ export class LabelMaker extends Renderer {
       .attr('width', (d) => (d.data.pixel_width / this.tree.scale_factor) * 2)
       .attr('stroke', 'red')
       .attr('height', (d) => (d.data.pixel_height / this.tree.scale_factor) * 2)
-      .on('mouseover', function (event, d) {
-        select(event.target).style('opacity', 1);
+      .on('mouseover', (event, d) => {
+        console.log({ d });
+        select(event.target).style('opacity', 0);
+        this.hovered = '' + d.minZ + d.minX;
+        const command = {
+          duration: 350,
+          encoding: {
+            filter: {
+              field: label_key,
+              lambda: `d => d === "${d.data.text}"`,
+            },
+          },
+        };
+        void scatterplot.plotAPI(command);
         event.stopPropagation();
         console.log({ event, d });
       })
       .on('mousemove', function (event, d) {
         event.stopPropagation();
       })
-      .on('mouseout', function (event, d) {
+      .on('mouseout', (event, d) => {
+        this.hovered = undefined;
+        const command = {
+          duration: 350,
+          encoding: {
+            filter: {},
+          },
+        };
+        this.scatterplot.plotAPI(command);
         select(event.target).style('opacity', 0);
         console.log({ event, d });
       });
 
     for (const d of overlaps) {
       const { data: datum } = d;
-      context.font = `${datum.height * size_adjust}pt verdana`;
       const x = x_(datum.x) as number;
       const y = y_(datum.y) as number;
 
@@ -182,12 +223,18 @@ export class LabelMaker extends Renderer {
       } else {
         context.shadowColor = 'black';
       }
-      context.shadowBlur = 12;
-      context.lineWidth = 3;
+      let emphasize = 0;
+      if (this.hovered === '' + d.minZ + d.minX) {
+        emphasize += 2;
+      }
+      context.font = `${datum.height * size_adjust + emphasize}pt verdana`;
+
+      context.shadowBlur = 12 + emphasize * 3;
+      context.lineWidth = 3 + emphasize;
       context.strokeText(datum.text, x, y);
       context.shadowBlur = 0;
 
-      context.lineWidth = 4;
+      context.lineWidth = 4 + emphasize;
       context.fillStyle = 'white';
       context.fillText(datum.text, x, y);
       /*      context.strokeStyle = 'red';
