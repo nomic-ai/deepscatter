@@ -835,6 +835,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
           viewportWidth / viewportHeight,
         //@ts-ignore
         u_zoom_balance: regl.prop('zoom_balance'),
+        // global vs computed size (I think Ben said)
         u_base_size: (_, { point_size }) => point_size,
         u_maxix: (_, { max_ix }) => max_ix,
         u_alpha: (_, { alpha }) => alpha,
@@ -887,6 +888,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       'x0',
       'y0',
       'jitter_speed',
+      'opacity',
       'size',
       'filter',
       'filter2',
@@ -956,6 +958,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       'x0',
       'y0',
       'size',
+      'opacity',
       'jitter_radius',
       'jitter_speed',
       'filter',

@@ -609,6 +609,24 @@ abstract class OneDAesthetic extends Aesthetic {
 
 abstract class BooleanAesthetic extends Aesthetic {}
 
+
+class Opacity extends OneDAesthetic {
+  static get default_constant() {
+    return 1;
+  }
+  static get_default_domain() {
+    return [0, 10];
+  }
+  get default_domain() {
+    return [0, 10];
+  }
+  default_constant = 1;
+  get default_range(): [number, number] {
+    return [0, 1];
+  }
+  default_transform: Transform = 'linear';
+}
+
 class Size extends OneDAesthetic {
   static get default_constant() {
     return 1.5;
@@ -1035,6 +1053,11 @@ class StatefulY0 extends StatefulAesthetic<Y0> {
     return Y0;
   }
 }
+class Opacity extends StatefulAesthetic<Opacity> {
+  get Factory() {
+    return Opacity;
+  }
+}
 class StatefulSize extends StatefulAesthetic<Size> {
   get Factory() {
     return Size;
@@ -1075,6 +1098,7 @@ export const stateful_aesthetics: Record<
   y: StatefulY,
   y0: StatefulY0,
   size: StatefulSize,
+  opacity: StatefulOpacity,
   jitter_speed: StatefulJitter_speed,
   jitter_radius: StatefulJitter_radius,
   color: StatefulColor,
