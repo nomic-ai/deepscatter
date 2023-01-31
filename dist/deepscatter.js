@@ -35812,7 +35812,7 @@ function pixel_ratio(scatterplot) {
 }
 const RECT_DEFAULT_OPACITY = 0;
 class LabelMaker extends Renderer {
-  constructor(scatterplot, id_raw) {
+  constructor(scatterplot, id_raw, options = {}) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
     __publicField(this, "layers", []);
     __publicField(this, "ctx");
@@ -35821,6 +35821,8 @@ class LabelMaker extends Renderer {
     __publicField(this, "label_key");
     __publicField(this, "labelgroup");
     __publicField(this, "hovered");
+    __publicField(this, "options", {});
+    this.options = options;
     this.canvas = scatterplot.elements[2].selectAll("canvas").node();
     const svg = scatterplot.elements[3].selectAll("svg").node();
     const id2 = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, "---");
@@ -35930,7 +35932,7 @@ class LabelMaker extends Renderer {
     }).on("mousemove", function(event, d) {
       event.stopPropagation();
     }).on("click", (event, d) => {
-      this.scatterplot.label_click.f(d.data, this.scatterplot, this);
+      this.scatterplot.label_click(d.data, this.scatterplot, this);
     }).on("mouseout", (event, d) => {
       this.hovered = void 0;
       event.stopPropagation();
@@ -35948,13 +35950,17 @@ class LabelMaker extends Renderer {
         this.scatterplot.dim("filter2")
       ]) {
         if (!filter2.apply(datum2.properties)) {
-          mark_broken = true;
+          if (datum2.properties[filter2.field])
+            mark_broken = true;
         }
       }
       if (mark_broken) {
         continue;
       }
-      if (datum2.properties[dim.field]) {
+      if (this.options.useColorScale === false || this.options.useColorScale === void 0) {
+        context2.shadowColor = "#71797E";
+        context2.strokeStyle = "#71797E";
+      } else if (datum2.properties[dim.field]) {
         const exists = dim.scale.domain().indexOf(datum2.properties[dim.field]) > -1;
         if (exists) {
           context2.shadowColor = dim.scale(datum2.properties[dim.field]);
@@ -36157,7 +36163,7 @@ class Scatterplot {
     __publicField(this, "ready");
     __publicField(this, "click_handler");
     __publicField(this, "tooltip_handler");
-    __publicField(this, "label_click");
+    __publicField(this, "label_click_handler");
     __publicField(this, "on_zoom");
     __publicField(this, "mark_ready", function() {
     });
@@ -36170,9 +36176,9 @@ class Scatterplot {
     this.ready = new Promise((resolve, reject) => {
       this.mark_ready = resolve;
     });
-    this.label_click = new LabelClick(this);
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
+    this.label_click_handler = new LabelClick(this);
     this.prefs = {
       zoom_balance: 0.35,
       duration: 2e3,
@@ -36384,6 +36390,12 @@ class Scatterplot {
   get tooltip_html() {
     return this.tooltip_handler.f;
   }
+  set label_click(func) {
+    this.label_click_handler.f = func;
+  }
+  get label_click() {
+    return this.label_click_handler.f.bind(this.label_click_handler);
+  }
   set click_function(func) {
     this.click_handler.f = func;
   }
@@ -36560,6 +36572,8 @@ class LabelClick extends SettableFunction {
         lambda: `d => d === '${feature.properties[labelset.label_key]}'`
       };
     }
+    const thisis = this;
+    console.log({ thisis, p: this.plot });
     void this.plot.plotAPI({
       encoding: { filter: filter2 }
     });

@@ -53,7 +53,7 @@ export default class Scatterplot {
   ready: Promise<void>;
   public click_handler: ClickFunction;
   public tooltip_handler: TooltipHTML;
-  public label_click: LabelClick;
+  public label_click_handler: LabelClick;
   // In order to preserve JSON serializable nature of prefs, the consumer directly sets this
   public on_zoom?: onZoomCallback;
   mark_ready: () => void = function () {
@@ -70,9 +70,9 @@ export default class Scatterplot {
     this.ready = new Promise((resolve, reject) => {
       this.mark_ready = resolve;
     });
-    this.label_click = new LabelClick(this);
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
+    this.label_click_handler = new LabelClick(this);
     this.prefs = {
       zoom_balance: 0.35,
       duration: 2000,
@@ -444,6 +444,14 @@ export default class Scatterplot {
     return this.tooltip_handler.f;
   }
 
+  set label_click(func) {
+    this.label_click_handler.f = func;
+  }
+
+  get label_click() {
+    return this.label_click_handler.f.bind(this.label_click_handler);
+  }
+
   set click_function(func) {
     this.click_handler.f = func;
   }
@@ -690,6 +698,8 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
         lambda: `d => d === '${feature.properties[labelset.label_key]}'`,
       };
     }
+    const thisis = this;
+    console.log({ thisis, p: this.plot });
     void this.plot.plotAPI({
       encoding: { filter },
     });
