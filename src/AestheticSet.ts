@@ -1,20 +1,20 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
-import { stateful_aesthetics } from './Aesthetic';
+import { stateful_aesthetics } from './StatefulAesthetic';
 import type Scatterplot from './deepscatter';
-import type QuadtreeRoot from './tile';
+import type { QuadtileSet } from './Dataset';
 import type { Encoding } from './types';
-import type { StatefulAesthetic } from './Aesthetic';
+import type { StatefulAesthetic } from './StatefulAesthetic';
 
 export class AestheticSet {
-  public tileSet: QuadtreeRoot;
+  public tileSet: QuadtileSet;
   public scatterplot: Scatterplot;
   public regl: Regl;
-  public encoding: Encoding;
+  public encoding: Encoding = {};
   public position_interpolation: boolean;
   private store: Record<string, StatefulAesthetic<any>>;
   public aesthetic_map: TextureSet;
-  constructor(scatterplot: Scatterplot, regl: Regl, tileSet: QuadtreeRoot) {
+  constructor(scatterplot: Scatterplot, regl: Regl, tileSet: QuadtileSet) {
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl;
@@ -24,7 +24,7 @@ export class AestheticSet {
     return this;
   }
 
-  public dim(aesthetic: string) {
+  public dim(aesthetic: stateful_aesthetics) {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
     if (this.store[aesthetic]) {
       return this.store[aesthetic];
@@ -96,7 +96,7 @@ export class AestheticSet {
     delete encoding.position0;
   }
 
-  apply_encoding(encoding) {
+  apply_encoding(encoding: Encoding) {
     if (encoding === undefined) {
       // pass with nothing--this will clear out the old saved states
       // to avoid regenerating transitions if you keep replotting
@@ -115,8 +115,8 @@ export class AestheticSet {
 }
 
 export class TextureSet {
-  private _one_d_texture: Texture2D;
-  private _color_texture: Texture2D;
+  private _one_d_texture?: Texture2D;
+  private _color_texture?: Texture2D;
   public texture_size: number;
   public regl: Regl;
   public id_locs: Record<string, number> = {};
@@ -124,9 +124,9 @@ export class TextureSet {
   private offsets: Record<string, number> = {};
   private _one_d_position: number;
   private _color_position: number;
-  constructor(regl: Regl, texture_size = 4096, texture_widths = 32) {
+  constructor(regl: Regl, texture_size = 4096) {
     this.texture_size = texture_size;
-    this.texture_widths = texture_widths;
+    this.texture_widths = 32; // Relied on general.vert for offsets
     this.regl = regl;
     this._one_d_position = 1;
     this._color_position = -1;
@@ -149,13 +149,14 @@ export class TextureSet {
     }
     // Draw a stripe with the data of a single pixel width,
     // going down.
+    console.log('SETTING OFFSET', offset);
     this.one_d_texture.subimage(
       {
         data: value,
         width: 1,
         height: this.texture_size,
       },
-      offset - 1,
+      offset,
       0
     );
   }
