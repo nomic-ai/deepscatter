@@ -243,7 +243,6 @@ export abstract class Aesthetic<
   }
 
   post_to_regl_buffer() {
-    console.log('POSTING');
     this.aesthetic_map.set_one_d(this.id, this.texture_buffer);
   }
 
@@ -341,7 +340,6 @@ export abstract class Aesthetic<
     if (isLambdaChannel(encoding)) {
       const { lambda, field } = encoding;
       if (lambda) {
-        console.log(JSON.stringify(field, this.domain, lambda));
         this.apply_function_for_textures(field, this.domain, lambda);
         this.post_to_regl_buffer();
       } /*else if (encoding.range) {
@@ -426,7 +424,6 @@ export abstract class Aesthetic<
   ) {
     const { texture_size } = this.aesthetic_map;
     const func = this.materialize_function(raw_func);
-    console.log({ func });
     const scale = scaleLinear()
       .range(range)
       .domain([0, texture_size - 1]);
@@ -458,7 +455,6 @@ export abstract class Aesthetic<
 
       input.fill('');
       const dvals = column.data[0].dictionary!.toArray() as string[];
-      console.log(dvals);
       for (const [i, d] of dvals.entries()) {
         input[i] = d;
       }
@@ -466,9 +462,7 @@ export abstract class Aesthetic<
       input = input.map((d) => this.scale(d));
     }
     //    console.log({ func });
-    console.log(func('genetics'));
     const values = input.map((i) => func(i));
-    console.log(values);
     this.texture_buffer.set(values);
   }
 }

@@ -6,7 +6,7 @@ import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 //import { Data } from 'apache-arrow';
 
-type LabelOptions = {
+export type LabelOptions = {
   useColorScale?: boolean;
 };
 function pixel_ratio(scatterplot: Scatterplot): number {

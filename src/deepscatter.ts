@@ -13,7 +13,7 @@ import type {
 } from './types';
 import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
-import { LabelMaker } from './label_rendering';
+import { LabelMaker, LabelOptions } from './label_rendering';
 import { Renderer } from './rendering';
 
 // DOM elements that deepscatter uses.
@@ -196,10 +196,11 @@ export default class Scatterplot {
     features: FeatureCollection,
     name: string,
     label_key: string,
-    size_key: string | undefined
+    size_key: string | undefined,
+    options: LabelOptions
   ) {
     const labels = new LabelMaker(this, name);
-    labels.update(features, label_key, size_key);
+    labels.update(features, label_key, size_key, options);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }

@@ -36221,9 +36221,9 @@ class Scatterplot {
       console.log(error);
     });
   }
-  add_labels(features, name, label_key, size_key) {
+  add_labels(features, name, label_key, size_key, options) {
     const labels = new LabelMaker(this, name);
-    labels.update(features, label_key, size_key);
+    labels.update(features, label_key, size_key, options);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }
