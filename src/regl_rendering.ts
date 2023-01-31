@@ -892,17 +892,21 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       'size',
       'filter',
       'filter2',
-      'character',
-    ]) {
+      //      'character',
+    ] as const) {
       for (const time of ['current', 'last']) {
         const temporal = time === 'current' ? '' : 'last_';
-        parameters.uniforms[`u_${temporal}${k}_map`] = () => {
+        /*        parameters.uniforms[`u_${temporal}${k}_map`] = () => {
           const aes_holder = this.aes.dim(k)[time];
+          console.log(aes_holder.textures.one_d);
           return aes_holder.textures.one_d;
+        }; */
+        parameters.uniforms[`u_${temporal}${k}_map_position`] = () => {
+          if (temporal == '' && k == 'filter') {
+            //            console.log(this.aes.dim(k)[time].map_position);
+          }
+          return this.aes.dim(k)[time].map_position;
         };
-        parameters.uniforms[`u_${temporal}${k}_map_position`] = () =>
-          this.aes.dim(k)[time].map_position;
-
         parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (
           _,
           { aes_to_buffer_num }
@@ -915,7 +919,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
         };
 
         parameters.uniforms[`u_${temporal}${k}_domain`] = () =>
-          this.aes.dim(k)[time].domain;
+          this.aes.dim(k)[time].webGLDomain;
         parameters.uniforms[`u_${temporal}${k}_range`] = () =>
           this.aes.dim(k)[time].range;
         parameters.uniforms[`u_${temporal}${k}_transform`] = () => {

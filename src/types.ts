@@ -21,7 +21,6 @@ type TwoArgumentOp = {
 };
 
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
-
 // Functions that are defined as strings and executed in JS.
 export type LambdaChannel = {
   lambda: string;
@@ -32,10 +31,17 @@ export type LambdaChannel = {
 
 export type FunctionalChannel = LambdaChannel | OpChannel;
 
+export type ConstantBool = {
+  constant: boolean;
+};
+
 export type ConstantChannel = {
   constant: number;
 };
 
+export type ConstantColorChannel = {
+  constant: string;
+};
 /**
  * A channel represents the information necessary to map a single dimension
  * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
@@ -62,7 +68,45 @@ export interface BasicChannel {
   range?: [number, number];
 }
 
-export type JitterChannel = {
+export type JitterRadiusMethod =
+  | 'None'
+  | 'spiral'
+  | 'uniform'
+  | 'normal'
+  | 'circle'
+  | 'time';
+
+export interface CategoricalChannel {
+  field: string;
+}
+
+export type BasicColorChannel = BasicChannel & {
+  range?: string[] | string;
+  domain?: [number, number];
+};
+
+export type CategoricalColorChannel = CategoricalChannel & {
+  range?: string | string[];
+  domain?: string[];
+};
+
+export type ColorChannel =
+  | BasicColorChannel
+  | CategoricalColorChannel
+  | ConstantColorChannel;
+
+export type BooleanChannel = FunctionalChannel | ConstantBool;
+
+export type Channel =
+  | BooleanChannel
+  | BasicChannel
+  | string
+  | OpChannel
+  | ConstantColorChannel
+  | ConstantChannel
+  | LambdaChannel;
+
+export type JitterChannel = Channel & {
   /**
    * Jitter channels have a method.
    * 'spiral' animates along a log spiral.
@@ -71,57 +115,27 @@ export type JitterChannel = {
    * 'circle' animates a circle around the point.
    * 'time' lapses the point in and out of view.
    */
-  method: null | 'spiral' | 'uniform' | 'normal' | 'circle' | 'time';
+  method: JitterRadiusMethod;
 };
 
-export interface CategoricalChannel {
-  field: string;
-}
-
-export type BasicColorChannel = BasicChannel & {
-  range?: [[number, number, number], [number, number, number]] | string;
-  domain?: [number, number];
-};
-
-export type CategoricalColorChannel = CategoricalChannel & {
-  range?: [number, number, number][] | string;
-  domain?: string[];
-};
-
-export type ConstantColorChannel = ConstantChannel & {
-  constant?: [number, number, number];
-};
-
-export type ColorChannel =
-  | BasicColorChannel
-  | CategoricalColorChannel
-  | ConstantColorChannel;
-export type Channel =
-  | BasicChannel
-  | string
-  | ConstantChannel
-  | OpChannel
-  | LambdaChannel;
-
-export type OpArray = [number, number, number]; // A description of a functional operation to be passsed to the shader.
-
+// A description of a functional operation to be passsed to the shader.
+export type OpArray = [op: number, a: number, b: number];
 /**
  * And encoding.
  */
 export type Encoding = {
-  x?: null | Channel;
-  y?: null | Channel;
+  x?: Channel;
+  y?: Channel;
   color?: null | ColorChannel;
   size?: null | Channel;
   shape?: null | Channel;
   alpha?: null | Channel;
   filter?: null | FunctionalChannel;
-  //  filter1?: null | FunctionalChannel;
   filter2?: null | FunctionalChannel;
-  jitter_radius?: Channel;
-  jitter_speed?: Channel;
-  x0?: Channel;
-  y0?: Channel;
+  jitter_radius?: null | JitterChannel;
+  jitter_speed?: null | Channel;
+  x0?: null | Channel;
+  y0?: null | Channel;
   position?: string;
   position0?: string;
 };
@@ -184,6 +198,8 @@ export function isLambdaChannel(input: Channel): input is LambdaChannel {
   return (input as LambdaChannel).lambda !== undefined;
 }
 
-export function isConstantChannel(input: Channel): input is ConstantChannel {
+export function isConstantChannel(
+  input: Channel | ColorChannel
+): input is ConstantChannel {
   return (input as ConstantChannel).constant !== undefined;
 }

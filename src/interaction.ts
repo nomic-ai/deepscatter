@@ -163,8 +163,9 @@ export default class Zoom {
     } catch (e) {
       console.log('no circle');
     }
-
-    select('#deepscatter-svg')
+    window.x = this.svg_element_selection;
+    this.svg_element_selection
+      .select('#mousepoints')
       .append('circle')
       .attr('id', 'tooltipcircle')
       .attr('class', 'label')
@@ -215,8 +216,11 @@ export default class Zoom {
       const { x_, y_ } = this.scales();
 
       this.html_annotation(annotations);
+      window.x = this.svg_element_selection;
 
-      const labelSet = select('#deepscatter-svg')
+      const sel = this.svg_element_selection.select('#mousepoints');
+      sel
+        //        .append('circle')
         .selectAll('circle.label')
         .data(data, (d_) => d_.ix as number)
         .join(

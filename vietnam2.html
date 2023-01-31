@@ -77,9 +77,11 @@
         method: 'normal',
       },
       color: {
-        field: 'UNIT',
-        range: 'category10',
-        domain: [-2047, 2047],
+        field: 'MILSERVICE',
+        domain: ["VNAF",      "USAF",   "USN",  "USMC",  "RLAF",   "RAAF","KAF",  "USA"],
+        range:  ["steelblue", "green",  "navy", "green", "orange", "gray","blue", "red"]      
+//        range: 'okabe',
+//        domain: [-2047, 2047],
       },
       x: {
         field: 'x',
@@ -154,7 +156,7 @@
             encoding: {
               color: {
                 field: field,
-                range: 'category10',
+                range: 'okabe',
                 domain: [-2047, 2047],
               },
             },

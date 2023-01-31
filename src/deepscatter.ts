@@ -5,7 +5,12 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
-import type { APICall, onZoomCallback } from './types';
+import type {
+  APICall,
+  LambdaChannel,
+  onZoomCallback,
+  OpChannel,
+} from './types';
 import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
@@ -48,6 +53,7 @@ export default class Scatterplot {
   ready: Promise<void>;
   public click_handler: ClickFunction;
   public tooltip_handler: TooltipHTML;
+  public label_click: LabelClick;
   // In order to preserve JSON serializable nature of prefs, the consumer directly sets this
   public on_zoom?: onZoomCallback;
   mark_ready: () => void = function () {
@@ -64,6 +70,7 @@ export default class Scatterplot {
     this.ready = new Promise((resolve, reject) => {
       this.mark_ready = resolve;
     });
+    this.label_click = new LabelClick(this);
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.prefs = {
@@ -112,12 +119,19 @@ export default class Scatterplot {
         .style('left', 0)
         .style('pointer-events', d.id === 'deepscatter-svg' ? 'auto' : 'none');
 
-      container
+      const el = container
         .append(d.nodetype)
         .attr('id', d.id)
         .attr('width', width || window.innerWidth)
         .attr('height', height || window.innerHeight);
 
+      if (d.nodetype === 'svg') {
+        // SVG z-order can't be changed on the fly, so we
+        // preset the order to make label rects show up on top
+        // of mouseover points.
+        el.append('g').attr('id', 'mousepoints');
+        el.append('g').attr('id', 'labelrects');
+      }
       this.elements.push(container);
     }
     this.bound = true;
@@ -625,29 +639,28 @@ export default class Scatterplot {
   }
 }
 
-abstract class SettableFunction<FuncType> {
+abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
   // A function that can be set by a string or directly with a function,
   // Used for handling interaction
-  public _f: undefined | ((arg0: StructRowProxy) => FuncType);
+  public _f: undefined | ((datum: ArgType, plot: Scatterplot) => FuncType);
   public string_rep: string;
-  abstract default: (arg0: StructRowProxy) => FuncType;
+  abstract default: (datum: ArgType, plot: Scatterplot | undefined) => FuncType;
   public plot: Scatterplot;
   constructor(plot: Scatterplot) {
     this.string_rep = '';
     this.plot = plot;
   }
-  get f(): (arg0: StructRowProxy) => FuncType {
+  get f(): (datum: ArgType, plot: Scatterplot) => FuncType {
     if (this._f === undefined) {
       return this.default;
     }
     return this._f;
   }
-  set f(f: string | ((arg0: StructRowProxy) => FuncType)) {
+  set f(f: string | ((datum: ArgType, plot: Scatterplot) => FuncType)) {
     if (typeof f === 'string') {
       if (this.string_rep !== f) {
         this.string_rep = f;
-        //@ts-ignore
-        this._f = Function('datum', f);
+        this._f = Function('datum', 'plot', f);
       }
     } else {
       this._f = f;
@@ -655,16 +668,45 @@ abstract class SettableFunction<FuncType> {
   }
 }
 
+import type { GeoJsonProperties } from 'geojson';
+
+class LabelClick extends SettableFunction<void, GeoJsonProperties> {
+  default(
+    feature: GeoJsonProperties,
+    plot = undefined,
+    labelset: LabelMaker = undefined
+  ) {
+    let filter: LambdaChannel | null | OpChannel;
+    if (feature === null) {
+      return;
+    }
+    if (feature.__activated == true) {
+      filter = null;
+      feature.__activated = undefined;
+    } else {
+      feature.__activated = true;
+      filter = {
+        field: labelset.label_key,
+        lambda: `d => d === '${feature.properties[labelset.label_key]}'`,
+      };
+    }
+    void this.plot.plotAPI({
+      encoding: { filter },
+    });
+  }
+}
+
 class ClickFunction extends SettableFunction<void> {
   //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
-  default(datum: StructRowProxy) {
+  default(datum: StructRowProxy, plot = undefined) {
     console.log({ ...datum });
+    return;
   }
 }
 
 class TooltipHTML extends SettableFunction<string> {
   //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
-  default(point: StructRowProxy) {
+  default(point: StructRowProxy, plot = undefined) {
     // By default, this returns a
     let output = '<dl>';
     const nope = new Set(['x', 'y', 'mix', null, 'mtile_key']);

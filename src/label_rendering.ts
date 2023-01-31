@@ -1,4 +1,4 @@
-import { GeoJsonObject } from 'geojson';
+import type { GeoJsonObject, GeoJsonProperties } from 'geojson';
 import { Renderer } from './rendering';
 import { RBush3D } from 'rbush-3d';
 import Scatterplot from './deepscatter';
@@ -15,7 +15,8 @@ function pixel_ratio(scatterplot: Scatterplot): number {
   const ratio = (px2 - px1) / (dx2 - dx1);
   return ratio;
 }
-
+// Should be 0 except in testing.
+const RECT_DEFAULT_OPACITY = 0;
 export class LabelMaker extends Renderer {
   public layers: GeoJsonObject[] = [];
   public ctx: CanvasRenderingContext2D;
@@ -32,10 +33,10 @@ export class LabelMaker extends Renderer {
     const svg = scatterplot.elements![3].selectAll('svg').node() as SVGElement;
     const id = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, '---');
     const labgroup = svg.querySelectorAll(`#${id}`);
-    console.log({ id });
     // eslint-disable-next-line unicorn/prefer-ternary
     if (labgroup.length === 0) {
       this.labelgroup = select(svg)
+        .select('#labelrects')
         .append('g')
         .attr('id', id)
         .node() as SVGGElement;
@@ -134,7 +135,7 @@ export class LabelMaker extends Renderer {
     context.textBaseline = 'middle';
     context.globalAlpha = 1;
 
-    const size_adjust = 1; //transform!.k; //Math.exp(Math.log(transform.k) * .5)
+    const size_adjust = 1; //Math.exp(Math.log(transform.k) * 0.25);
     const corners = this.zoom.current_corners()!;
     const overlaps = this.tree.search({
       minX: corners.x[0],
@@ -151,28 +152,39 @@ export class LabelMaker extends Renderer {
       .selectAll('rect.labelbbox')
       .data(overlaps, (d) => '' + d.minZ + d.minX)
       .join((enter) =>
-        enter.append('rect').attr('class', 'labellbox').style('opacity', 0)
+        enter
+          .append('rect')
+          .attr('class', 'labellbox')
+          .style('opacity', RECT_DEFAULT_OPACITY)
       );
 
     const { scatterplot, label_key } = this;
     const labeler = this;
+    const Y_BUFFER = 5;
     bboxes
       .attr('class', 'labelbbox')
       .attr(
         'x',
-        (d) => x_(d.data.x) - d.data.pixel_width / this.tree.scale_factor / 2
+        (d) => x_(d.data.x) - (d.data.pixel_width * this.tree.pixel_ratio) / 2
       )
       .attr(
         'y',
-        (d) => y_(d.data.y) - d.data.pixel_height / this.tree.scale_factor
+        (d) =>
+          y_(d.data.y) -
+          (d.data.pixel_height * this.tree.pixel_ratio) / 2 -
+          Y_BUFFER
       )
-      .attr('width', (d) => (d.data.pixel_width / this.tree.scale_factor) * 2)
+      .attr('width', (d) => d.data.pixel_width * this.tree.pixel_ratio)
       .attr('stroke', 'red')
-      .attr('height', (d) => (d.data.pixel_height / this.tree.scale_factor) * 2)
+      .attr(
+        'height',
+        (d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
+      )
       .on('mouseover', (event, d) => {
-        console.log({ d });
-        select(event.target).style('opacity', 0);
+        select(event.target).style('opacity', RECT_DEFAULT_OPACITY);
         this.hovered = '' + d.minZ + d.minX;
+        event.stopPropagation();
+        return;
         const command = {
           duration: 350,
           encoding: {
@@ -183,14 +195,17 @@ export class LabelMaker extends Renderer {
           },
         };
         void scatterplot.plotAPI(command);
-        event.stopPropagation();
-        console.log({ event, d });
       })
       .on('mousemove', function (event, d) {
         event.stopPropagation();
       })
+      .on('click', (event, d) => {
+        this.scatterplot.label_click.f(d.data, this.scatterplot, this);
+      })
       .on('mouseout', (event, d) => {
         this.hovered = undefined;
+        event.stopPropagation();
+        return;
         const command = {
           duration: 350,
           encoding: {
@@ -203,13 +218,26 @@ export class LabelMaker extends Renderer {
       });
 
     for (const d of overlaps) {
-      const { data: datum } = d;
+      const datum = d.data as RawPoint;
       const x = x_(datum.x) as number;
       const y = y_(datum.y) as number;
 
       context.globalAlpha = 1;
       context.fillStyle = 'white';
-
+      let mark_broken = false;
+      for (const filter of [
+        this.scatterplot.dim('filter'),
+        this.scatterplot.dim('filter2'),
+      ]) {
+        if (!filter.apply(datum.properties)) {
+          // If the datum contains information about the
+          // field being used for filtering, filter it.
+          if (datum.properties[filter.field]) mark_broken = true;
+        }
+      }
+      if (mark_broken) {
+        continue;
+      }
       if (datum.properties[dim.field]) {
         const exists =
           dim.scale.domain().indexOf(datum.properties[dim.field]) > -1;
@@ -257,16 +285,17 @@ type RawPoint = {
   text: string;
   // The pixel heights of the point.
   height: number; // pixel space
+  properties?: GeoJsonProperties;
 };
 
 // Stuff we calculate
-type Point = RawPoint & {
+export type Point = RawPoint & {
   pixel_width: number;
   pixel_height: number;
 };
 
 // Cast into 3d space as a rectangle.
-type P3d = {
+export type P3d = {
   minX: number; // in data space
   maxX: number; // in data space
   minY: number; // in data space
