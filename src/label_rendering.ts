@@ -6,6 +6,9 @@ import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 //import { Data } from 'apache-arrow';
 
+type LabelOptions = {
+  useColorScale?: boolean;
+};
 function pixel_ratio(scatterplot: Scatterplot): number {
   // pixelspace
   const [px1, px2] = scatterplot._zoom.scales().x.range();
@@ -26,9 +29,14 @@ export class LabelMaker extends Renderer {
   //  public svg: SVGElement;
   public labelgroup: SVGGElement;
   private hovered: undefined | string;
-
-  constructor(scatterplot: Scatterplot, id_raw: string) {
+  public options: LabelOptions = {};
+  constructor(
+    scatterplot: Scatterplot,
+    id_raw: string,
+    options: LabelOptions = {}
+  ) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
+    this.options = options;
     this.canvas = scatterplot.elements![2].selectAll('canvas').node();
     const svg = scatterplot.elements![3].selectAll('svg').node() as SVGElement;
     const id = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, '---');
@@ -200,7 +208,7 @@ export class LabelMaker extends Renderer {
         event.stopPropagation();
       })
       .on('click', (event, d) => {
-        this.scatterplot.label_click.f(d.data, this.scatterplot, this);
+        this.scatterplot.label_click(d.data, this.scatterplot, this);
       })
       .on('mouseout', (event, d) => {
         this.hovered = undefined;
@@ -238,7 +246,13 @@ export class LabelMaker extends Renderer {
       if (mark_broken) {
         continue;
       }
-      if (datum.properties[dim.field]) {
+      if (
+        this.options.useColorScale === false ||
+        this.options.useColorScale === undefined
+      ) {
+        context.shadowColor = '#71797E';
+        context.strokeStyle = '#71797E';
+      } else if (datum.properties[dim.field]) {
         const exists =
           dim.scale.domain().indexOf(datum.properties[dim.field]) > -1;
         if (exists) {
