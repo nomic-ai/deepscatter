@@ -489,7 +489,7 @@ float choose_and_run_filter(
     if (u_filter_numeric.r < 0.5) {
       // Must be on a dictionary. Unreasonable assumption, maybe?
       float frac_filter = linstep(vec2(-2047., 2047), a_filter);
-      float map_coords = (map_location - .5) / 32.;
+      float map_coords = (map_location + .5) / 32.;
       return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
     } else {
       return run_numeric_filter(a_filter,
