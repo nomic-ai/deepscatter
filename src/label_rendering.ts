@@ -7,8 +7,10 @@ import { select } from 'd3-selection';
 //import { Data } from 'apache-arrow';
 
 export type LabelOptions = {
-  useColorScale?: boolean;
+  useColorScale?: boolean; // Whether the colors of text should inherit from the active color scale.
+  margin?: number; // The number of pixels around each box. Default 30.
 };
+
 function pixel_ratio(scatterplot: Scatterplot): number {
   // pixelspace
   const [px1, px2] = scatterplot._zoom.scales().x.range();
@@ -61,7 +63,8 @@ export class LabelMaker extends Renderer {
       this.ctx,
       pixel_ratio(scatterplot),
       0.5,
-      [0.5, 1e6]
+      [0.5, 1e6],
+      options.margin === undefined ? 30 : options.margin
     );
 
     /*    this.tree.accessor = (x, y) => {
@@ -344,10 +347,9 @@ function getContext(): CanvasRenderingContext2D {
   return context;
 }
 
-function measure_text(d: RawPoint, pixel_ratio: number, margin = 1) {
+function measure_text(d: RawPoint, pixel_ratio: number, margin: number) {
   // Uses a global context that it calls into existence for measuring; using the deepscatter
   // canvas gets too confused with state information.
-
   const context = getContext();
   // Called for the side-effect of setting `d.aspect_ratio` on the passed item.
   context.font = `${d.height}pt verdana`;
@@ -390,6 +392,7 @@ class DepthTree extends RBush3D {
   public context: CanvasRenderingContext2D;
   public pixel_ratio: number;
   public rectangle_buffer: number;
+  public margin: number;
   //  public insertion_log = [];
   private _accessor: (p: Point) => [number, number] = (p) => [p.x, p.y];
 
