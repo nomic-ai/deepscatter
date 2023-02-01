@@ -22566,7 +22566,6 @@ class Aesthetic {
     return this._texture_buffer;
   }
   post_to_regl_buffer() {
-    console.log("POSTING");
     this.aesthetic_map.set_one_d(this.id, this.texture_buffer);
   }
   convert_string_encoding(channel) {
@@ -22633,7 +22632,6 @@ class Aesthetic {
     if (isLambdaChannel(encoding)) {
       const { lambda, field } = encoding;
       if (lambda) {
-        console.log(JSON.stringify(field, this.domain, lambda));
         this.apply_function_for_textures(field, this.domain, lambda);
         this.post_to_regl_buffer();
       }
@@ -22693,7 +22691,6 @@ class Aesthetic {
     var _a2;
     const { texture_size } = this.aesthetic_map;
     const func = this.materialize_function(raw_func);
-    console.log({ func });
     linear().range(range$1).domain([0, texture_size - 1]);
     let input = range(texture_size);
     if (field === void 0 || this.dataset.root_tile.record_batch === void 0) {
@@ -22713,16 +22710,13 @@ class Aesthetic {
     if ((_a2 = column == null ? void 0 : column.type) == null ? void 0 : _a2.dictionary) {
       input.fill("");
       const dvals = column.data[0].dictionary.toArray();
-      console.log(dvals);
       for (const [i, d] of dvals.entries()) {
         input[i] = d;
       }
     } else {
       input = input.map((d) => this.scale(d));
     }
-    console.log(func("genetics"));
     const values = input.map((i) => func(i));
-    console.log(values);
     this.texture_buffer.set(values);
   }
 }
@@ -35915,47 +35909,28 @@ class LabelMaker extends Renderer {
       (enter) => enter.append("rect").attr("class", "labellbox").style("opacity", RECT_DEFAULT_OPACITY)
     );
     const Y_BUFFER = 5;
-    bboxes.attr("class", "labelbbox").attr(
-      "x",
-      (d) => x_(d.data.x) - d.data.pixel_width * this.tree.pixel_ratio / 2
-    ).attr(
-      "y",
-      (d) => y_(d.data.y) - d.data.pixel_height * this.tree.pixel_ratio / 2 - Y_BUFFER
-    ).attr("width", (d) => d.data.pixel_width * this.tree.pixel_ratio).attr("stroke", "red").attr(
-      "height",
-      (d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
-    ).on("mouseover", (event, d) => {
-      select(event.target).style("opacity", RECT_DEFAULT_OPACITY);
-      this.hovered = "" + d.minZ + d.minX;
-      event.stopPropagation();
-      return;
-    }).on("mousemove", function(event, d) {
-      event.stopPropagation();
-    }).on("click", (event, d) => {
-      this.scatterplot.label_click(d.data, this.scatterplot, this);
-    }).on("mouseout", (event, d) => {
-      this.hovered = void 0;
-      event.stopPropagation();
-      return;
-    });
     for (const d of overlaps) {
       const datum2 = d.data;
       const x = x_(datum2.x);
       const y = y_(datum2.y);
       context2.globalAlpha = 1;
       context2.fillStyle = "white";
-      let mark_broken = false;
+      let mark_hidden = false;
       for (const filter2 of [
         this.scatterplot.dim("filter"),
         this.scatterplot.dim("filter2")
       ]) {
-        if (!filter2.apply(datum2.properties)) {
-          if (datum2.properties[filter2.field])
-            mark_broken = true;
+        if (datum2.properties[filter2.field]) {
+          if (!filter2.apply(datum2.properties)) {
+            mark_hidden = true;
+          }
         }
       }
-      if (mark_broken) {
+      if (mark_hidden) {
+        datum2.properties.__display = "none";
         continue;
+      } else {
+        datum2.properties.__display = "inline";
       }
       if (this.options.useColorScale === false || this.options.useColorScale === void 0) {
         context2.shadowColor = "#71797E";
@@ -35985,6 +35960,31 @@ class LabelMaker extends Renderer {
       context2.fillStyle = "white";
       context2.fillText(datum2.text, x, y);
     }
+    bboxes.attr("class", "labelbbox").attr(
+      "x",
+      (d) => x_(d.data.x) - d.data.pixel_width * this.tree.pixel_ratio / 2
+    ).attr(
+      "y",
+      (d) => y_(d.data.y) - d.data.pixel_height * this.tree.pixel_ratio / 2 - Y_BUFFER
+    ).attr("width", (d) => d.data.pixel_width * this.tree.pixel_ratio).attr("stroke", "red").attr(
+      "height",
+      (d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
+    ).attr("display", (d) => {
+      return d.data.properties.__display || "inline";
+    }).on("mouseover", (event, d) => {
+      select(event.target).style("opacity", RECT_DEFAULT_OPACITY);
+      this.hovered = "" + d.minZ + d.minX;
+      event.stopPropagation();
+      return;
+    }).on("mousemove", function(event, d) {
+      event.stopPropagation();
+    }).on("click", (event, d) => {
+      this.scatterplot.label_click(d.data, this.scatterplot, this);
+    }).on("mouseout", (event, d) => {
+      this.hovered = void 0;
+      event.stopPropagation();
+      return;
+    });
     context2.shadowColor = "black";
     context2.strokeStyle = "black";
   }

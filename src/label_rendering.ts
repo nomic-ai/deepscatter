@@ -169,61 +169,6 @@ export class LabelMaker extends Renderer {
     const { scatterplot, label_key } = this;
     const labeler = this;
     const Y_BUFFER = 5;
-    bboxes
-      .attr('class', 'labelbbox')
-      .attr(
-        'x',
-        (d) => x_(d.data.x) - (d.data.pixel_width * this.tree.pixel_ratio) / 2
-      )
-      .attr(
-        'y',
-        (d) =>
-          y_(d.data.y) -
-          (d.data.pixel_height * this.tree.pixel_ratio) / 2 -
-          Y_BUFFER
-      )
-      .attr('width', (d) => d.data.pixel_width * this.tree.pixel_ratio)
-      .attr('stroke', 'red')
-      .attr(
-        'height',
-        (d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
-      )
-      .on('mouseover', (event, d) => {
-        select(event.target).style('opacity', RECT_DEFAULT_OPACITY);
-        this.hovered = '' + d.minZ + d.minX;
-        event.stopPropagation();
-        return;
-        const command = {
-          duration: 350,
-          encoding: {
-            filter: {
-              field: label_key,
-              lambda: `d => d === "${d.data.text}"`,
-            },
-          },
-        };
-        void scatterplot.plotAPI(command);
-      })
-      .on('mousemove', function (event, d) {
-        event.stopPropagation();
-      })
-      .on('click', (event, d) => {
-        this.scatterplot.label_click(d.data, this.scatterplot, this);
-      })
-      .on('mouseout', (event, d) => {
-        this.hovered = undefined;
-        event.stopPropagation();
-        return;
-        const command = {
-          duration: 350,
-          encoding: {
-            filter: {},
-          },
-        };
-        this.scatterplot.plotAPI(command);
-        select(event.target).style('opacity', 0);
-        console.log({ event, d });
-      });
 
     for (const d of overlaps) {
       const datum = d.data as RawPoint;
@@ -232,19 +177,24 @@ export class LabelMaker extends Renderer {
 
       context.globalAlpha = 1;
       context.fillStyle = 'white';
-      let mark_broken = false;
+      let mark_hidden = false;
       for (const filter of [
         this.scatterplot.dim('filter'),
         this.scatterplot.dim('filter2'),
       ]) {
-        if (!filter.apply(datum.properties)) {
-          // If the datum contains information about the
-          // field being used for filtering, filter it.
-          if (datum.properties[filter.field]) mark_broken = true;
+        // If the datum contains information about the
+        // field being used for filtering, filter it.
+        if (datum.properties[filter.field]) {
+          if (!filter.apply(datum.properties)) {
+            mark_hidden = true;
+          }
         }
       }
-      if (mark_broken) {
+      if (mark_hidden) {
+        datum.properties.__display = 'none';
         continue;
+      } else {
+        datum.properties.__display = 'inline';
       }
       if (
         this.options.useColorScale === false ||
@@ -287,6 +237,66 @@ export class LabelMaker extends Renderer {
         datum.pixel_height * this.tree.pixel_ratio
       ); */
     }
+
+    bboxes
+      .attr('class', 'labelbbox')
+      .attr(
+        'x',
+        (d) => x_(d.data.x) - (d.data.pixel_width * this.tree.pixel_ratio) / 2
+      )
+      .attr(
+        'y',
+        (d) =>
+          y_(d.data.y) -
+          (d.data.pixel_height * this.tree.pixel_ratio) / 2 -
+          Y_BUFFER
+      )
+      .attr('width', (d) => d.data.pixel_width * this.tree.pixel_ratio)
+      .attr('stroke', 'red')
+      .attr(
+        'height',
+        (d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
+      )
+      .attr('display', (d) => {
+        return d.data.properties.__display || 'inline';
+      })
+      .on('mouseover', (event, d) => {
+        select(event.target).style('opacity', RECT_DEFAULT_OPACITY);
+        this.hovered = '' + d.minZ + d.minX;
+        event.stopPropagation();
+        return;
+        const command = {
+          duration: 350,
+          encoding: {
+            filter: {
+              field: label_key,
+              lambda: `d => d === "${d.data.text}"`,
+            },
+          },
+        };
+        void scatterplot.plotAPI(command);
+      })
+      .on('mousemove', function (event, d) {
+        event.stopPropagation();
+      })
+      .on('click', (event, d) => {
+        this.scatterplot.label_click(d.data, this.scatterplot, this);
+      })
+      .on('mouseout', (event, d) => {
+        this.hovered = undefined;
+        event.stopPropagation();
+        return;
+        const command = {
+          duration: 350,
+          encoding: {
+            filter: {},
+          },
+        };
+        this.scatterplot.plotAPI(command);
+        select(event.target).style('opacity', 0);
+        console.log({ event, d });
+      });
+
     context.shadowColor = 'black';
     context.strokeStyle = 'black';
   }
