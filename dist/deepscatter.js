@@ -36157,14 +36157,16 @@ class LabelMaker extends Renderer {
       event.stopPropagation();
       return;
     });
-    handler.on("drag", (event, d) => {
-      d.data.x = x_.invert(event.x);
-      d.data.y = y_.invert(event.y);
-    });
-    handler.on("end", (event, d) => {
-      console.log(`${d.data.x}	${d.data.y}	${d.data.text}`);
-    });
-    bboxes.call(handler);
+    if (this.options.draggable_labels) {
+      handler.on("drag", (event, d) => {
+        d.data.x = x_.invert(event.x);
+        d.data.y = y_.invert(event.y);
+      });
+      handler.on("end", (event, d) => {
+        console.log(`${d.data.x}	${d.data.y}	${d.data.text}`);
+      });
+      bboxes.call(handler);
+    }
     context2.shadowColor = "black";
     context2.strokeStyle = "black";
   }

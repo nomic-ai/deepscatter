@@ -4,11 +4,14 @@ import { RBush3D } from 'rbush-3d';
 import Scatterplot from './deepscatter';
 import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
-//import { Data } from 'apache-arrow';
+import { drag } from 'd3-drag';
+
+const handler = drag();
 
 export type LabelOptions = {
   useColorScale?: boolean; // Whether the colors of text should inherit from the active color scale.
   margin?: number; // The number of pixels around each box. Default 30.
+  draggable_labels?: boolean; // Should labels be draggable in place?
 };
 
 function pixel_ratio(scatterplot: Scatterplot): number {
@@ -79,6 +82,7 @@ export class LabelMaker extends Renderer {
     if (this.timer) {
       this.timer.stop();
     }
+
     select(this.labelgroup).attr('display', 'inline');
 
     this.timer = timer(() => {
@@ -156,11 +160,13 @@ export class LabelMaker extends Renderer {
       maxY: corners.y[1],
       maxZ: transform.k,
     });
+
     //    context.fillStyle = "rgba(0, 0, 0, 0)";
     context.clearRect(0, 0, 4096, 4096);
     const dim = this.scatterplot.dim('color');
     const bboxes = select(this.labelgroup)
       .selectAll('rect.labelbbox')
+      // Keyed by the coordinates.
       .data(overlaps, (d) => '' + d.minZ + d.minX)
       .join((enter) =>
         enter
@@ -173,6 +179,7 @@ export class LabelMaker extends Renderer {
     const labeler = this;
     const Y_BUFFER = 5;
 
+    // Go through and draw the canvas events.
     for (const d of overlaps) {
       const datum = d.data as RawPoint;
       const x = x_(datum.x) as number;
@@ -300,6 +307,16 @@ export class LabelMaker extends Renderer {
         console.log({ event, d });
       });
 
+    if (this.options.draggable_labels) {
+      handler.on('drag', (event, d) => {
+        d.data.x = x_.invert(event.x);
+        d.data.y = y_.invert(event.y);
+      });
+      handler.on('end', (event, d) => {
+        console.log(`${d.data.x}\t${d.data.y}\t${d.data.text}`);
+      });
+      bboxes.call(handler);
+    }
     context.shadowColor = 'black';
     context.strokeStyle = 'black';
   }
@@ -465,9 +482,9 @@ class DepthTree extends RBush3D {
       maxY: y + pixel_height / zoom / 2,
       minZ: zoom,
       maxZ: maxZ || this.maxdepth,
-      data: {
+      data: point /*{
         ...point,
-      },
+      },*/,
     };
 
     if (Number.isNaN(x) || Number.isNaN(y))
