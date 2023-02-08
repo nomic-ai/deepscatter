@@ -1,4 +1,3 @@
-
 precision mediump float;
 varying vec4 fill;
 uniform vec4 u_color;

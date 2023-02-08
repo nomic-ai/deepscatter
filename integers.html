@@ -23,9 +23,9 @@
   }
   let batch_no = 0;
   /* Clifford attractor frame.*/
-  function batch(n_batches) {    
+  function batch(n_batches) {
     function make_batch(start = 0, length = 65536) {
-      console.log("Making", start)
+      console.log('Making', start);
       const batch_number_here = batch_no++;
       // make a batch of clifford generator data starting at start and of length length
 
@@ -60,7 +60,7 @@
       return new Table({
         x: vectorFromArray(x),
         y: vectorFromArray(y),
-//        ix: vectorFromArray(ix),
+        //        ix: vectorFromArray(ix),
         _id,
         integers: vectorFromArray(integers),
         batch_id: vectorFromArray(batch_id),

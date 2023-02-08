@@ -1,11 +1,10 @@
 {
-  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
-  "plugins": [
-    "@typescript-eslint",
-    "import",
-    "unicorn",
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
     "prettier"
   ],
+  "plugins": ["@typescript-eslint", "import", "unicorn", "prettier"],
   "env": {
     "browser": true,
     "es6": true
@@ -24,7 +23,6 @@
   },
   "ignorePatterns": ["**/dist/**", "**/demo/**", "**/public/**"],
   "rules": {
-
     // Import plugin rules
     // https://github.com/import-js/eslint-plugin-import
     "import/no-unresolved": "error",

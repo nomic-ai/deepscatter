@@ -65,7 +65,7 @@
         y: [7.0849741134400706, 23.626158008070647],
       },
     },
-/*    labels: {
+    /*    labels: {
       url: '/tests/UNIT.geojson',
       name: undefined,
       label_field: 'UNIT',
@@ -78,10 +78,19 @@
       },
       color: {
         field: 'MILSERVICE',
-        domain: ["VNAF",      "USAF",   "USN",  "USMC",  "RLAF",   "RAAF","KAF",  "USA"],
-        range:  ["steelblue", "green",  "navy", "green", "orange", "gray","blue", "red"]      
-//        range: 'okabe',
-//        domain: [-2047, 2047],
+        domain: ['VNAF', 'USAF', 'USN', 'USMC', 'RLAF', 'RAAF', 'KAF', 'USA'],
+        range: [
+          'steelblue',
+          'green',
+          'navy',
+          'green',
+          'orange',
+          'gray',
+          'blue',
+          'red',
+        ],
+        //        range: 'okabe',
+        //        domain: [-2047, 2047],
       },
       x: {
         field: 'x',
@@ -98,9 +107,13 @@
   const first_draw = scatterplot.plotAPI(prefs);
   window.plot = scatterplot; // For debugging
 
-  first_draw.then( async (d) => {
-    await scatterplot.add_labels_from_url("/tests/TAKEOFFLOCATION.geojson", "takeoff", "TAKEOFFLOCATION");
-  })
+  first_draw.then(async (d) => {
+    await scatterplot.add_labels_from_url(
+      '/tests/TAKEOFFLOCATION.geojson',
+      'takeoff',
+      'TAKEOFFLOCATION'
+    );
+  });
 
   // Simple animation demonstration.
 
