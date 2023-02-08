@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "vite --port 3344 --host",
     "build": "vite build",
-    "prepublish": "vite build && npx typedoc --ignoreCompilerErrors src/deepscatter.ts",
+    "prepublishOnly": "vite build && typedoc --skipErrorChecking src/deepscatter.ts",
     "test": "playwright test",
     "lint": "eslint src"
   },

@@ -4,7 +4,6 @@ import { timer } from 'd3-timer';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
-import { APICall, Encoding } from './types';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type { Renderer } from './rendering';
 import type QuadtreeRoot from './tile';

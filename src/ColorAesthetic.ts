@@ -15,10 +15,8 @@ import {
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
-import type { ColorChannel } from './types';
 const palette_size = 4096;
 import { randomLcg } from 'd3-random';
-import { isOpChannel, isLambdaChannel, isConstantChannel } from './types';
 
 /*function to_buffer(data: number[] | number[][]) {
   output.set(data.flat());
@@ -244,7 +242,6 @@ export class Color extends Aesthetic<
   }
 
   update(encoding: ColorChannel) {
-    console.log('UPDATING COLOR');
     if (isConstantChannel(encoding)) {
       encoding.constant = Color.convert_color(encoding.constant);
     }
@@ -252,7 +249,6 @@ export class Color extends Aesthetic<
     this.current_encoding = encoding;
     if (!isConstantChannel(encoding)) {
       if (encoding.range && typeof encoding.range[0] === 'string') {
-        console.log('encoding to buffer');
         this.encode_for_textures(encoding.range);
         this.post_to_regl_buffer();
       } else if (encoding.range) {

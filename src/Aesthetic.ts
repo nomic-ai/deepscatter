@@ -10,14 +10,14 @@ import {
 import type Scatterplot from './deepscatter';
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
-import {
+/*import {
   isOpChannel,
   isLambdaChannel,
   isConstantChannel,
   FunctionalChannel,
   ConstantBool,
   BooleanChannel,
-} from './types';
+} from './';*/
 import type {
   Channel,
   OpChannel,
@@ -27,7 +27,7 @@ import type {
   OpArray,
   JitterChannel,
   JitterRadiusMethod,
-} from './types';
+} from './';
 import type { QuadtileSet } from './Dataset';
 import { Vector, tableToIPC, makeVector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';

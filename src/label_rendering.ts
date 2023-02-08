@@ -25,7 +25,6 @@ function pixel_ratio(scatterplot: Scatterplot): number {
 }
 // Should be 0 except in testing.
 const RECT_DEFAULT_OPACITY = 0;
-import { TileType } from './types';
 export class LabelMaker extends Renderer {
   /**
    * A LabelMaker

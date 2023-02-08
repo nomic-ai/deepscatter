@@ -23,7 +23,7 @@ export const dimensions = {
   y0: Y0,
 } as const;
 
-type concrete_aesthetics =
+export type ConcreteAesthetic =
   | X
   | Y
   | Size
@@ -37,7 +37,7 @@ import type { QuadtileSet } from './Dataset';
 import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
 
-export abstract class StatefulAesthetic<T extends concrete_aesthetics> {
+export abstract class StatefulAesthetic<T extends ConcreteAesthetic> {
   // An aesthetic that tracks two states--current and last.
   // The point is to handle transitions.
   // It might make sense to handle more than two states, but there are

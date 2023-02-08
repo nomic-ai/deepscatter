@@ -3,7 +3,6 @@ import { select } from 'd3-selection';
 import { min } from 'd3-array';
 import type Scatterplot from './deepscatter';
 import type { Tileset } from './tile';
-import type { APICall } from './types';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 import { timer, Timer } from 'd3-timer';

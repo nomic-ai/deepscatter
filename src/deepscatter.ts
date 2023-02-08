@@ -5,18 +5,12 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
-import type {
-  APICall,
-  LambdaChannel,
-  onZoomCallback,
-  OpChannel,
-} from './types';
 import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker, LabelOptions } from './label_rendering';
 import { Renderer } from './rendering';
 import type { Tile } from './tile';
-
+import type { ConcreteAesthetic } from './StatefulAesthetic';
 // DOM elements that deepscatter uses.
 const base_elements = [
   {
@@ -51,6 +45,7 @@ export default class Scatterplot<T extends Tile> {
   // The queue of draw calls are a chain of promises.
   private plot_queue: Promise<void> = Promise.resolve(0);
   public prefs: APICall;
+  // Whether the scatterplot has finished loading.
   ready: Promise<void>;
   public click_handler: ClickFunction;
   public tooltip_handler: TooltipHTML;
@@ -147,7 +142,7 @@ export default class Scatterplot<T extends Tile> {
    *
    * @param name The name of the new column to be created. If it already exists, this will throw an error in invocation
    * @param codes The codes to be assigned labels. This can be either a list of ids (in which case all ids will have the value 1.0 assigned)
-   *   **or** a keyed of values like {'Rome': 3, 'Vienna': 13} in which case the numeric values will be used.
+   *   **or** a keyed of values like `{'Rome': 3, 'Vienna': 13}` in which case the numeric values will be used.
    * @param key_field The field in which to look for the identifiers.
    */
   add_identifier_column(
@@ -185,6 +180,7 @@ export default class Scatterplot<T extends Tile> {
    * @param name A unique key to associate with this labelset. Labels can be enabled or disabled using this key.
    * @param label_key The text field in which the labels are stored in the geojson object.
    * @param size_key A field in the dataset to associate with the *size* of the labels.
+   * @param label_options Additional custom passed to the labeller.
    *
    * Usage:
    *
@@ -447,7 +443,7 @@ export default class Scatterplot<T extends Tile> {
    * @returns
    */
 
-  public dim(dimension: string) : <T extends Aesthetic> {
+  public dim(dimension: string): ConcreteAesthetic {
     return this._renderer.aes.dim(dimension).current as T;
   }
 

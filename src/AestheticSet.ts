@@ -3,7 +3,6 @@ import type { Regl, Texture2D } from 'regl';
 import { stateful_aesthetics } from './StatefulAesthetic';
 import type Scatterplot from './deepscatter';
 import type { QuadtileSet } from './Dataset';
-import type { Encoding } from './types';
 import type { StatefulAesthetic } from './StatefulAesthetic';
 
 export class AestheticSet {

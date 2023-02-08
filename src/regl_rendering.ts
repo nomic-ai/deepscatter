@@ -11,7 +11,6 @@ import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './AestheticSet';
 
 import type { Tile } from './tile';
-import { APICall, Encoding, Dimension } from './types';
 import REGL from 'regl';
 import { Dataset } from './Dataset';
 import { Frame } from '@playwright/test';

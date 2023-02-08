@@ -2,7 +2,6 @@
 
 import { Tile, Rectangle, QuadTile, ArrowTile, p_in_rect } from './tile';
 import { range, min, max, bisectLeft, extent, sum } from 'd3-array';
-import { APICall, PointUpdate } from './types';
 import Scatterplot from './deepscatter';
 import {
   RecordBatch,
