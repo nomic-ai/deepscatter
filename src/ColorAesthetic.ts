@@ -1,7 +1,7 @@
 import { Aesthetic, scales } from './Aesthetic';
 import type { Regl, Texture2D } from 'regl';
 import { range as arange, extent, shuffler } from 'd3-array';
-
+import { isConstantChannel, isOpChannel } from './typing';
 import {
   scaleLinear,
   scaleSqrt,

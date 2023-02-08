@@ -10,26 +10,9 @@ import {
 import type Scatterplot from './deepscatter';
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
-/*import {
-  isOpChannel,
-  isLambdaChannel,
-  isConstantChannel,
-  FunctionalChannel,
-  ConstantBool,
-  BooleanChannel,
-} from './';*/
-import type {
-  Channel,
-  OpChannel,
-  LambdaChannel,
-  BasicChannel,
-  ConstantChannel,
-  OpArray,
-  JitterChannel,
-  JitterRadiusMethod,
-} from './';
+import { isOpChannel, isLambdaChannel, isConstantChannel } from './typing';
 import type { QuadtileSet } from './Dataset';
-import { Vector, tableToIPC, makeVector } from 'apache-arrow';
+import { Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
 // import { Color } from './ColorAesthetic';
@@ -50,8 +33,6 @@ type DefaultChannel =
   | OpChannel
   | LambdaChannel
   | ConstantChannel;
-
-type AllowedTypes = 'linear' | 'boolean' | 'categorical';
 
 export abstract class Aesthetic<
   GlValueType = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
