@@ -4,7 +4,7 @@
   "version": "2.7.0",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
-    "dist"
+  "dist"
   ],
   "module": "./dist/deepscatter.js",
   "main": "./dist/deepscatter.umd.cjs",
@@ -16,8 +16,9 @@
   },
   "scripts": {
     "dev": "vite --port 3344 --host",
+    "format": "prettier --write .",
     "build": "vite build",
-    "prepublishOnly": "vite build && typedoc --skipErrorChecking src/deepscatter.ts",
+    "prepublishOnly": "vite build && && typedoc --skipErrorChecking src/deepscatter.ts",
     "test": "playwright test",
     "lint": "eslint src"
   },
