@@ -71,21 +71,39 @@ export abstract class Dataset<T extends Tile> {
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
-    if (this._schema) {
-      const dim = this._schema.fields.find((d) => d.name === dimension);
-      if (dim && dim.metadata.get('extent')) {
-        console.warn({ dim }, 'lacks extent');
-        this.extents[dimension] = JSON.parse(
-          dim.metadata.get('extent') as string
-        );
-        return this.extents[dimension];
+    const dim = this._schema?.fields.find((d) => d.name === dimension);
+    if (dim !== undefined) {
+      let min: number | string | undefined = undefined;
+      let max: number | string | undefined = undefined;
+      const extent1 = dim.metadata.get('extent');
+      if (extent1) {
+        [min, max] = JSON.parse(extent1) as [number | string, number | string];
+      }
+      const mmin = dim.metadata.get('min');
+      if (mmin) {
+        min = JSON.parse(mmin) as number | string;
+      }
+      const mmax = dim.metadata.get('max');
+      if (mmax) {
+        max = JSON.parse(mmax) as number | string;
+      }
+      // Can pass min, max as strings for dates.
+      if (dim.type.typeId == 10 && typeof min === 'string') {
+        min = Number(new Date(min));
+      }
+      if (dim.type.typeId == 10 && typeof max === 'string') {
+        max = Number(new Date(max));
+      }
+      if (typeof max === 'string') {
+        throw new Error('Failed to parse min-max as numbers');
+      }
+      if (min !== undefined) {
+        return (this.extents[dimension] = [min as number, max as number]);
       }
     }
-    this.extents[dimension] = extent(
-      this.points(undefined, max_ix),
-      (d) => d[dimension]
-    );
-    return this.extents[dimension];
+    return (this.extents[dimension] = extent([
+      ...this.table.getChild(dimension),
+    ]));
   }
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {

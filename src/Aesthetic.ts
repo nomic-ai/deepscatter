@@ -95,7 +95,6 @@ export abstract class Aesthetic<
     this._range = [0, 1];
     this.dataset = dataset;
     // A flag that will be turned on and off in AestheticSet.
-    this._domains = {};
     this.id = Math.random().toString();
   }
 
@@ -146,20 +145,13 @@ export abstract class Aesthetic<
     throw new Error('Table is null');
   }
 
-  _domains: {
-    [key: string]: [number, number];
-  };
-
   get default_domain(): [number, number] {
     // Look at the data to determine a reasonable default domain.
     // Cached to _domains.
     if (this.field == undefined) {
       return [1, 1];
     }
-    if (this._domains[this.field]) {
-      return this._domains[this.field];
-    }
-    // Maybe the table is checked out
+    // Maybe the table is checked out right now.
     if (!this.scatterplot._root._schema) {
       return [1, 1];
     }
@@ -167,32 +159,11 @@ export abstract class Aesthetic<
     if (!column) {
       return [1, 1];
     }
-    if (column.type.dictionary) {
-      this._domains[this.field] = [
-        -2047,
-        Math.floor(this.aesthetic_map.texture_size / 2) - 1,
-      ];
-    } else {
-      const field = this.scatterplot._root._schema.fields.find(
-        (f) => f.name === this.field
-      );
-      if (field && field.metadata) {
-        const minmax = field.metadata.get('extent');
-        if (minmax) {
-          let [min, max] = JSON.parse(minmax) as [number, number];
-          if (field.typeId === 10) {
-            // Dates must be parsed as ms from epoch.
-            min = Number(new Date(min));
-            max = Number(new Date(max));
-          }
-          this._domains[this.field] = [min, max];
-        }
-      }
-      if (!this._domains[this.field]) {
-        this._domains[this.field] = extent(column.toArray());
-      }
+    if (column.type?.dictionary !== undefined) {
+      return [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
     }
-    return this._domains[this.field];
+    const domain = this.dataset.domain(this.field);
+    return this.dataset.domain(this.field);
   }
 
   default_data(): Uint8Array | Float32Array | Array<number> {
@@ -492,12 +463,6 @@ export class Size extends OneDAesthetic {
   static get default_constant() {
     return 1.5;
   }
-  static get_default_domain() {
-    return [0, 10] as [number, number];
-  }
-  get default_domain() {
-    return [0, 10] as [number, number];
-  }
   default_constant = 1;
   get default_range() {
     return [0, 1] as [number, number];
@@ -645,9 +610,6 @@ export class Filter extends BooleanAesthetic {
 
 export class Jitter_speed extends Aesthetic {
   default_transform: Transform = 'linear';
-  get default_domain() {
-    return [0, 1];
-  }
   default_range: [number, number] = [0, 1];
   public default_constant = 0.5;
 }
@@ -682,10 +644,6 @@ export class Jitter_radius extends Aesthetic<number, number, JitterChannel> {
     return 0;
   }
   default_transform: Transform = 'linear';
-
-  get default_domain() {
-    return [0, 1] as [number, number];
-  }
 
   get default_range() {
     return [0, 1] as [number, number];

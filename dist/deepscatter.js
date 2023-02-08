@@ -159,7 +159,7 @@ EnterNode.prototype = {
     return this._parent.querySelectorAll(selector2);
   }
 };
-function constant$2(x) {
+function constant$3(x) {
   return function() {
     return x;
   };
@@ -216,7 +216,7 @@ function selection_data(value, key) {
     return Array.from(this, datum);
   var bind = key ? bindKey : bindIndex, parents = this._parents, groups = this._groups;
   if (typeof value !== "function")
-    value = constant$2(value);
+    value = constant$3(value);
   for (var m = groups.length, update = new Array(m), enter = new Array(m), exit = new Array(m), j = 0; j < m; ++j) {
     var parent = parents[j], group = groups[j], groupLength = group.length, data = arraylike(value.call(parent, parent && parent.__data__, j, parents)), dataLength = data.length, enterGroup = enter[j] = new Array(dataLength), updateGroup = update[j] = new Array(dataLength), exitGroup = exit[j] = new Array(groupLength);
     bind(parent, group, enterGroup, updateGroup, exitGroup, data, key);
@@ -2791,7 +2791,11 @@ function set$1(type, name, callback) {
     type.push({ name, value: callback });
   return type;
 }
+const nonpassive = { passive: false };
 const nonpassivecapture = { capture: true, passive: false };
+function nopropagation$1(event) {
+  event.stopImmediatePropagation();
+}
 function noevent$1(event) {
   event.preventDefault();
   event.stopImmediatePropagation();
@@ -2819,6 +2823,184 @@ function yesdrag(view, noclick) {
     root2.style.MozUserSelect = root2.__noselect;
     delete root2.__noselect;
   }
+}
+const constant$2 = (x) => () => x;
+function DragEvent(type, {
+  sourceEvent: sourceEvent2,
+  subject,
+  target,
+  identifier,
+  active,
+  x,
+  y,
+  dx,
+  dy,
+  dispatch: dispatch2
+}) {
+  Object.defineProperties(this, {
+    type: { value: type, enumerable: true, configurable: true },
+    sourceEvent: { value: sourceEvent2, enumerable: true, configurable: true },
+    subject: { value: subject, enumerable: true, configurable: true },
+    target: { value: target, enumerable: true, configurable: true },
+    identifier: { value: identifier, enumerable: true, configurable: true },
+    active: { value: active, enumerable: true, configurable: true },
+    x: { value: x, enumerable: true, configurable: true },
+    y: { value: y, enumerable: true, configurable: true },
+    dx: { value: dx, enumerable: true, configurable: true },
+    dy: { value: dy, enumerable: true, configurable: true },
+    _: { value: dispatch2 }
+  });
+}
+DragEvent.prototype.on = function() {
+  var value = this._.on.apply(this._, arguments);
+  return value === this._ ? this : value;
+};
+function defaultFilter$1(event) {
+  return !event.ctrlKey && !event.button;
+}
+function defaultContainer() {
+  return this.parentNode;
+}
+function defaultSubject(event, d) {
+  return d == null ? { x: event.x, y: event.y } : d;
+}
+function defaultTouchable$1() {
+  return navigator.maxTouchPoints || "ontouchstart" in this;
+}
+function drag() {
+  var filter2 = defaultFilter$1, container = defaultContainer, subject = defaultSubject, touchable = defaultTouchable$1, gestures = {}, listeners = dispatch("start", "drag", "end"), active = 0, mousedownx, mousedowny, mousemoving, touchending, clickDistance2 = 0;
+  function drag2(selection2) {
+    selection2.on("mousedown.drag", mousedowned).filter(touchable).on("touchstart.drag", touchstarted).on("touchmove.drag", touchmoved, nonpassive).on("touchend.drag touchcancel.drag", touchended).style("touch-action", "none").style("-webkit-tap-highlight-color", "rgba(0,0,0,0)");
+  }
+  function mousedowned(event, d) {
+    if (touchending || !filter2.call(this, event, d))
+      return;
+    var gesture = beforestart(this, container.call(this, event, d), event, d, "mouse");
+    if (!gesture)
+      return;
+    select(event.view).on("mousemove.drag", mousemoved, nonpassivecapture).on("mouseup.drag", mouseupped, nonpassivecapture);
+    dragDisable(event.view);
+    nopropagation$1(event);
+    mousemoving = false;
+    mousedownx = event.clientX;
+    mousedowny = event.clientY;
+    gesture("start", event);
+  }
+  function mousemoved(event) {
+    noevent$1(event);
+    if (!mousemoving) {
+      var dx = event.clientX - mousedownx, dy = event.clientY - mousedowny;
+      mousemoving = dx * dx + dy * dy > clickDistance2;
+    }
+    gestures.mouse("drag", event);
+  }
+  function mouseupped(event) {
+    select(event.view).on("mousemove.drag mouseup.drag", null);
+    yesdrag(event.view, mousemoving);
+    noevent$1(event);
+    gestures.mouse("end", event);
+  }
+  function touchstarted(event, d) {
+    if (!filter2.call(this, event, d))
+      return;
+    var touches = event.changedTouches, c2 = container.call(this, event, d), n = touches.length, i, gesture;
+    for (i = 0; i < n; ++i) {
+      if (gesture = beforestart(this, c2, event, d, touches[i].identifier, touches[i])) {
+        nopropagation$1(event);
+        gesture("start", event, touches[i]);
+      }
+    }
+  }
+  function touchmoved(event) {
+    var touches = event.changedTouches, n = touches.length, i, gesture;
+    for (i = 0; i < n; ++i) {
+      if (gesture = gestures[touches[i].identifier]) {
+        noevent$1(event);
+        gesture("drag", event, touches[i]);
+      }
+    }
+  }
+  function touchended(event) {
+    var touches = event.changedTouches, n = touches.length, i, gesture;
+    if (touchending)
+      clearTimeout(touchending);
+    touchending = setTimeout(function() {
+      touchending = null;
+    }, 500);
+    for (i = 0; i < n; ++i) {
+      if (gesture = gestures[touches[i].identifier]) {
+        nopropagation$1(event);
+        gesture("end", event, touches[i]);
+      }
+    }
+  }
+  function beforestart(that, container2, event, d, identifier, touch) {
+    var dispatch2 = listeners.copy(), p = pointer(touch || event, container2), dx, dy, s;
+    if ((s = subject.call(that, new DragEvent("beforestart", {
+      sourceEvent: event,
+      target: drag2,
+      identifier,
+      active,
+      x: p[0],
+      y: p[1],
+      dx: 0,
+      dy: 0,
+      dispatch: dispatch2
+    }), d)) == null)
+      return;
+    dx = s.x - p[0] || 0;
+    dy = s.y - p[1] || 0;
+    return function gesture(type, event2, touch2) {
+      var p0 = p, n;
+      switch (type) {
+        case "start":
+          gestures[identifier] = gesture, n = active++;
+          break;
+        case "end":
+          delete gestures[identifier], --active;
+        case "drag":
+          p = pointer(touch2 || event2, container2), n = active;
+          break;
+      }
+      dispatch2.call(
+        type,
+        that,
+        new DragEvent(type, {
+          sourceEvent: event2,
+          subject: s,
+          target: drag2,
+          identifier,
+          active: n,
+          x: p[0] + dx,
+          y: p[1] + dy,
+          dx: p[0] - p0[0],
+          dy: p[1] - p0[1],
+          dispatch: dispatch2
+        }),
+        d
+      );
+    };
+  }
+  drag2.filter = function(_) {
+    return arguments.length ? (filter2 = typeof _ === "function" ? _ : constant$2(!!_), drag2) : filter2;
+  };
+  drag2.container = function(_) {
+    return arguments.length ? (container = typeof _ === "function" ? _ : constant$2(_), drag2) : container;
+  };
+  drag2.subject = function(_) {
+    return arguments.length ? (subject = typeof _ === "function" ? _ : constant$2(_), drag2) : subject;
+  };
+  drag2.touchable = function(_) {
+    return arguments.length ? (touchable = typeof _ === "function" ? _ : constant$2(!!_), drag2) : touchable;
+  };
+  drag2.on = function() {
+    var value = listeners.on.apply(listeners, arguments);
+    return value === listeners ? drag2 : value;
+  };
+  drag2.clickDistance = function(_) {
+    return arguments.length ? (clickDistance2 = (_ = +_) * _, drag2) : Math.sqrt(clickDistance2);
+  };
+  return drag2;
 }
 function define(constructor, factory, prototype) {
   constructor.prototype = factory.prototype = prototype;
@@ -15449,17 +15631,17 @@ class MaxPoints extends PlotSetting {
 class TargetOpacity extends PlotSetting {
   constructor() {
     super(...arguments);
-    __publicField(this, "value", 10);
-    __publicField(this, "start", 10);
-    __publicField(this, "target", 10);
+    __publicField(this, "value", 50);
+    __publicField(this, "start", 50);
+    __publicField(this, "target", 50);
   }
 }
 class PointSize extends PlotSetting {
   constructor() {
     super();
-    __publicField(this, "value", 2);
-    __publicField(this, "start", 2);
-    __publicField(this, "target", 2);
+    __publicField(this, "value", 1);
+    __publicField(this, "start", 1);
+    __publicField(this, "target", 1);
     this.transform = "geometric";
   }
 }
@@ -15505,7 +15687,9 @@ class Renderer {
     __publicField(this, "render_props");
     this.scatterplot = scatterplot;
     this.holder = select(selector2);
-    this.canvas = select(this.holder.node().firstElementChild).node();
+    this.canvas = select(
+      this.holder.node().firstElementChild
+    ).node();
     this.tileSet = tileSet;
     this.width = +select(this.canvas).attr("width");
     this.height = +select(this.canvas).attr("height");
@@ -15526,18 +15710,21 @@ class Renderer {
     return this.render_props.alpha;
   }
   get optimal_alpha() {
+    var _a2;
     const { zoom_balance } = this.prefs;
     const { alpha, point_size, max_ix, width, discard_share, height } = this;
-    const { k } = this.zoom.transform;
-    const target_share = alpha;
+    const k = ((_a2 = this.zoom.transform) == null ? void 0 : _a2.k) || 1;
+    const target_share = alpha / 100;
     const fraction_of_total_visible = 1 / k ** 2;
-    const pixel_area = width * height;
+    const pixelRatio = window.devicePixelRatio || 1;
+    const pixel_area = width * height / pixelRatio;
     const total_intended_points = min([
       max_ix,
       this.tileSet.highest_known_ix || 1e10
     ]);
     const total_points = total_intended_points * (1 - discard_share);
-    const area_of_point = (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2;
+    const size_adjust = Math.exp(Math.log(k) * zoom_balance);
+    const area_of_point = Math.PI * (size_adjust * point_size / pixelRatio / 2) ** 2;
     const target = target_share * pixel_area / (total_points * fraction_of_total_visible * area_of_point);
     return target > 1 ? 1 : target < 1 / 255 ? 1 / 255 : target;
   }
@@ -22440,7 +22627,6 @@ class Aesthetic {
     __publicField(this, "current_encoding", null);
     __publicField(this, "aesthetic_map");
     __publicField(this, "id");
-    __publicField(this, "_domains");
     this.aesthetic_map = aesthetic_map;
     if (this.aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined");
@@ -22450,7 +22636,6 @@ class Aesthetic {
     this._domain = this.default_domain;
     this._range = [0, 1];
     this.dataset = dataset;
-    this._domains = {};
     this.id = Math.random().toString();
   }
   apply(point) {
@@ -22491,11 +22676,9 @@ class Aesthetic {
     throw new Error("Table is null");
   }
   get default_domain() {
+    var _a2;
     if (this.field == void 0) {
       return [1, 1];
-    }
-    if (this._domains[this.field]) {
-      return this._domains[this.field];
     }
     if (!this.scatterplot._root._schema) {
       return [1, 1];
@@ -22504,31 +22687,11 @@ class Aesthetic {
     if (!column) {
       return [1, 1];
     }
-    if (column.type.dictionary) {
-      this._domains[this.field] = [
-        -2047,
-        Math.floor(this.aesthetic_map.texture_size / 2) - 1
-      ];
-    } else {
-      const field = this.scatterplot._root._schema.fields.find(
-        (f) => f.name === this.field
-      );
-      if (field && field.metadata) {
-        const minmax = field.metadata.get("extent");
-        if (minmax) {
-          let [min2, max2] = JSON.parse(minmax);
-          if (field.typeId === 10) {
-            min2 = Number(new Date(min2));
-            max2 = Number(new Date(max2));
-          }
-          this._domains[this.field] = [min2, max2];
-        }
-      }
-      if (!this._domains[this.field]) {
-        this._domains[this.field] = extent(column.toArray());
-      }
+    if (((_a2 = column.type) == null ? void 0 : _a2.dictionary) !== void 0) {
+      return [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
     }
-    return this._domains[this.field];
+    this.dataset.domain(this.field);
+    return this.dataset.domain(this.field);
   }
   default_data() {
     return Array(this.aesthetic_map.texture_size).fill(this.default_constant);
@@ -22744,12 +22907,6 @@ class Size extends OneDAesthetic {
   static get default_constant() {
     return 1.5;
   }
-  static get_default_domain() {
-    return [0, 10];
-  }
-  get default_domain() {
-    return [0, 10];
-  }
   get default_range() {
     return [0, 1];
   }
@@ -22886,9 +23043,6 @@ class Jitter_speed extends Aesthetic {
     __publicField(this, "default_range", [0, 1]);
     __publicField(this, "default_constant", 0.5);
   }
-  get default_domain() {
-    return [0, 1];
-  }
 }
 function encode_jitter_to_int(jitter) {
   if (jitter === "spiral") {
@@ -22917,9 +23071,6 @@ class Jitter_radius extends Aesthetic {
   }
   get default_constant() {
     return 0;
-  }
-  get default_domain() {
-    return [0, 1];
   }
   get default_range() {
     return [0, 1];
@@ -24647,6 +24798,7 @@ class TileBufferManager {
         const copy2 = new Int32Array(source_buffer.values).buffer;
         const view64 = new BigInt64Array(copy2);
         const timetype = column.type.unit;
+        console.log({ timetype });
         const divisor = timetype === 0 ? 1e-3 : timetype === 1 ? 1 : timetype === 2 ? 1e3 : timetype === 3 ? 1e6 : 42;
         if (divisor === 42) {
           throw new Error(`Unknown time type ${timetype}`);
@@ -25241,9 +25393,9 @@ class AdaptiveByteReader {
   }
 }
 const onEvent = (stream, event) => {
-  const handler = (_) => resolve([event, _]);
+  const handler2 = (_) => resolve([event, _]);
   let resolve;
-  return [event, handler, new Promise((r) => (resolve = r) && stream["once"](event, handler))];
+  return [event, handler2, new Promise((r) => (resolve = r) && stream["once"](event, handler2))];
 };
 function fromNodeStream(stream) {
   return __asyncGenerator(this, arguments, function* fromNodeStream_1() {
@@ -34904,24 +35056,42 @@ class Dataset {
     return new ArrowDataset(table, prefs, plot);
   }
   domain(dimension, max_ix = 1e6) {
+    var _a2;
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
-    if (this._schema) {
-      const dim = this._schema.fields.find((d) => d.name === dimension);
-      if (dim && dim.metadata.get("extent")) {
-        console.warn({ dim }, "lacks extent");
-        this.extents[dimension] = JSON.parse(
-          dim.metadata.get("extent")
-        );
-        return this.extents[dimension];
+    const dim = (_a2 = this._schema) == null ? void 0 : _a2.fields.find((d) => d.name === dimension);
+    if (dim !== void 0) {
+      let min2 = void 0;
+      let max2 = void 0;
+      const extent1 = dim.metadata.get("extent");
+      if (extent1) {
+        [min2, max2] = JSON.parse(extent1);
+      }
+      const mmin = dim.metadata.get("min");
+      if (mmin) {
+        min2 = JSON.parse(mmin);
+      }
+      const mmax = dim.metadata.get("max");
+      if (mmax) {
+        max2 = JSON.parse(mmax);
+      }
+      if (dim.type.typeId == 10 && typeof min2 === "string") {
+        min2 = Number(new Date(min2));
+      }
+      if (dim.type.typeId == 10 && typeof max2 === "string") {
+        max2 = Number(new Date(max2));
+      }
+      if (typeof max2 === "string") {
+        throw new Error("Failed to parse min-max as numbers");
+      }
+      if (min2 !== void 0) {
+        return this.extents[dimension] = [min2, max2];
       }
     }
-    this.extents[dimension] = extent(
-      this.points(void 0, max_ix),
-      (d) => d[dimension]
-    );
-    return this.extents[dimension];
+    return this.extents[dimension] = extent([
+      ...this.table.getChild(dimension)
+    ]);
   }
   *points(bbox, max_ix = 1e99) {
     const stack = [this.root_tile];
@@ -35798,6 +35968,7 @@ var quickselect = { exports: {} };
   }();
   exports.RBush3D = RBush3D;
 })(dist);
+const handler = drag();
 function pixel_ratio(scatterplot) {
   const [px1, px2] = scatterplot._zoom.scales().x.range();
   const [dx1, dx2] = scatterplot._zoom.scales().x.domain();
@@ -35834,7 +36005,8 @@ class LabelMaker extends Renderer {
       this.ctx,
       pixel_ratio(scatterplot),
       0.5,
-      [0.5, 1e6]
+      [0.5, 1e6],
+      options.margin === void 0 ? 30 : options.margin
     );
     this.bind_zoom(scatterplot._renderer.zoom);
   }
@@ -35985,6 +36157,14 @@ class LabelMaker extends Renderer {
       event.stopPropagation();
       return;
     });
+    handler.on("drag", (event, d) => {
+      d.data.x = x_.invert(event.x);
+      d.data.y = y_.invert(event.y);
+    });
+    handler.on("end", (event, d) => {
+      console.log(`${d.data.x}	${d.data.y}	${d.data.text}`);
+    });
+    bboxes.call(handler);
     context2.shadowColor = "black";
     context2.strokeStyle = "black";
   }
@@ -36000,7 +36180,7 @@ function getContext() {
   context = canvas.getContext("2d");
   return context;
 }
-function measure_text(d, pixel_ratio2, margin = 1) {
+function measure_text(d, pixel_ratio2, margin) {
   const context2 = getContext();
   context2.font = `${d.height}pt verdana`;
   if (d.text === "") {
@@ -36033,6 +36213,7 @@ class DepthTree extends dist.RBush3D {
     __publicField(this, "context");
     __publicField(this, "pixel_ratio");
     __publicField(this, "rectangle_buffer");
+    __publicField(this, "margin");
     __publicField(this, "_accessor", (p) => [p.x, p.y]);
     this.scale_factor = scale_factor;
     this.mindepth = zoom2[0];
@@ -36069,9 +36250,7 @@ class DepthTree extends dist.RBush3D {
       maxY: y + pixel_height / zoom2 / 2,
       minZ: zoom2,
       maxZ: maxZ || this.maxdepth,
-      data: {
-        ...point
-      }
+      data: point
     };
     if (Number.isNaN(x) || Number.isNaN(y))
       throw "Missing position" + JSON.stringify(point);

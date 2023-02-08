@@ -63,15 +63,15 @@ class MaxPoints extends PlotSetting {
 }
 
 class TargetOpacity extends PlotSetting {
-  value = 10;
-  start = 10;
-  target = 10;
+  value = 50;
+  start = 50;
+  target = 50;
 }
 
 class PointSize extends PlotSetting {
-  value = 2;
-  start = 2;
-  target = 2;
+  value = 1;
+  start = 1;
+  target = 1;
   constructor() {
     super();
     this.transform = 'geometric';
@@ -129,7 +129,9 @@ export class Renderer {
   ) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
-    this.canvas = select(this.holder.node().firstElementChild).node();
+    this.canvas = select(
+      this.holder.node().firstElementChild
+    ).node() as HTMLCanvasElement;
     this.tileSet = tileSet;
     this.width = +select(this.canvas).attr('width');
     this.height = +select(this.canvas).attr('height');
@@ -152,29 +154,32 @@ export class Renderer {
     return p;
   }
 
-  //color_pick() {
-  //  return 1;
-  //}
-
   get alpha() {
     return this.render_props.alpha;
   }
+
   get optimal_alpha() {
-    // This is extends a formula suggested by Ricky Reusser.
+    // This extends a formula suggested by Ricky Reusser to include
+    // discard share.
 
     const { zoom_balance } = this.prefs;
     const { alpha, point_size, max_ix, width, discard_share, height } = this;
-    const { k } = this.zoom.transform;
-    const target_share = alpha;
+    const k = this.zoom.transform?.k || 1;
+    const target_share = alpha / 100;
     const fraction_of_total_visible = 1 / k ** 2;
-    const pixel_area = width * height;
+    const pixelRatio = window.devicePixelRatio || 1;
+
+    const pixel_area = (width * height) / pixelRatio;
     const total_intended_points = min([
       max_ix,
-      this.tileSet.highest_known_ix || 1e10,
-    ]);
+      (this.tileSet.highest_known_ix as number | undefined) || 1e10,
+    ]) as number;
+
     const total_points = total_intended_points * (1 - discard_share);
+
+    const size_adjust = Math.exp(Math.log(k) * zoom_balance);
     const area_of_point =
-      (Math.PI * Math.exp(Math.log(1 * k) * zoom_balance) * point_size) ** 2;
+      Math.PI * ((size_adjust * point_size) / pixelRatio / 2) ** 2;
     const target =
       (target_share * pixel_area) /
       (total_points * fraction_of_total_visible * area_of_point);
@@ -186,6 +191,7 @@ export class Renderer {
   get point_size() {
     return this.render_props.point_size;
   }
+
   get max_ix() {
     // By default, prefer dropping points to dropping alpha.
     const { prefs } = this;

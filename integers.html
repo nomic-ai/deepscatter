@@ -15,7 +15,7 @@
     vectorFromArray,
     Utf8,
   } from 'apache-arrow';
-  const num_batches = 2;
+  const num_batches = 1;
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
@@ -23,8 +23,9 @@
   }
   let batch_no = 0;
   /* Clifford attractor frame.*/
-  function batch(n_batches) {
+  function batch(n_batches) {    
     function make_batch(start = 0, length = 65536) {
+      console.log("Making", start)
       const batch_number_here = batch_no++;
       // make a batch of clifford generator data starting at start and of length length
 
@@ -107,12 +108,12 @@
 
   const draw1 = plot.plotAPI({
     arrow_table: table,
-    point_size: 3,
-    max_points: 2.5e7,
-    alpha: 111150,
+    point_size: 4,
+    max_points: num_batches * 65536,
+    alpha: 100,
     background_color: '#EEEDDE',
     zoom_balance: 0.75,
-    duration: 1200,
+    duration: 500,
     encoding: {
       x: {
         field: 'x',
@@ -131,7 +132,7 @@
   });
   draw1.then(() => {
     plot.plotAPI({
-      duration: 10000,
+      duration: 500,
       /*      zoom: {
         bbox: {
           "x":[0.0019172125023188906,0.0019916103567022615],

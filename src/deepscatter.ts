@@ -306,6 +306,9 @@ export default class Scatterplot {
   }
 
   async make_big_png(xtimes = 3, points = 1e7, timeper = 100) {
+    // Run starting at no zoom.
+    // xtimes: the width/height will be this multiplier of screen width.
+    // points: pre-download to this depth.
     await this._root.download_to_depth(points);
     const { width, height } = this._renderer;
     this.plotAPI({ duration: 0 });

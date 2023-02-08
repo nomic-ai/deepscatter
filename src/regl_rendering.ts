@@ -1155,12 +1155,12 @@ class TileBufferManager {
         );
       }
     }
-    // Anything that isn't a single-precision float must be coerced.
+    // Anything that isn't a single-precision float must be coerced to one.
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
       let source_buffer = column.data[0];
       if (column.type.dictionary) {
-        // We set the dictionary values down by 2047 so that we can use the
+        // We set the dictionary values down by 2047 so that we can use
         // even half-precision floats for direct indexing.
         for (let i = 0; i < tile.record_batch.numRows; i++) {
           buffer[i] = source_buffer.values[i] - 2047;
@@ -1172,7 +1172,7 @@ class TileBufferManager {
         const copy = new Int32Array(source_buffer.values).buffer;
         const view64 = new BigInt64Array(copy);
         const timetype = column.type.unit;
-
+        console.log({ timetype });
         // All times are represented as milliseconds on the
         // GPU to align with the Javascript numbers. More or less,
         // at least.
@@ -1186,8 +1186,7 @@ class TileBufferManager {
             ? 1e3 // microsecond
             : timetype === 3
             ? 1e6 // nanosecond
-            : 42; // default to milliseconds
-
+            : 42;
         if (divisor === 42) {
           throw new Error(`Unknown time type ${timetype}`);
         }
