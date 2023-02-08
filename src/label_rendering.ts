@@ -5,6 +5,7 @@ import Scatterplot from './deepscatter';
 import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
+import type { Tile } from './tile';
 
 const handler = drag();
 
@@ -16,27 +17,36 @@ export type LabelOptions = {
 
 function pixel_ratio(scatterplot: Scatterplot): number {
   // pixelspace
-  const [px1, px2] = scatterplot._zoom.scales().x.range();
+  const [px1, px2] = scatterplot._zoom.scales().x.range() as [number, number];
   // dataspace
-  const [dx1, dx2] = scatterplot._zoom.scales().x.domain();
-
+  const [dx1, dx2] = scatterplot._zoom.scales().x.domain() as [number, number];
   const ratio = (px2 - px1) / (dx2 - dx1);
   return ratio;
 }
 // Should be 0 except in testing.
 const RECT_DEFAULT_OPACITY = 0;
+import { TileType } from './types';
 export class LabelMaker extends Renderer {
+  /**
+   * A LabelMaker
+   */
   public layers: GeoJsonObject[] = [];
   public ctx: CanvasRenderingContext2D;
   public tree: DepthTree;
   public timer?: Timer;
-  public label_key: string;
+  public label_key?: string;
   //  public svg: SVGElement;
   public labelgroup: SVGGElement;
   private hovered: undefined | string;
   public options: LabelOptions = {};
+  /**
+   *
+   * @param scatterplot
+   * @param id_raw
+   * @param options
+   */
   constructor(
-    scatterplot: Scatterplot,
+    scatterplot: Scatterplot<TileType>,
     id_raw: string,
     options: LabelOptions = {}
   ) {
@@ -77,7 +87,12 @@ export class LabelMaker extends Renderer {
     this.bind_zoom(scatterplot._renderer.zoom);
   }
 
-  start(ticks: number = 1e6) {
+  /**
+   * Start rendering a set of labels.
+   *
+   * @param ticks How many milliseconds until the renderer should be stopped.
+   */
+  start(ticks = 1e9) {
     // Render for a set number of ticks. Probably overkill.
     if (this.timer) {
       this.timer.stop();
@@ -98,6 +113,9 @@ export class LabelMaker extends Renderer {
     select(this.labelgroup).remove();
   }
 
+  /**
+   * Stop the rendering of this set.
+   */
   stop() {
     if (this.timer) {
       this.timer.stop();
@@ -106,7 +124,12 @@ export class LabelMaker extends Renderer {
       this.timer = undefined;
     }
   }
-
+  /**
+   *
+   * @param featureset A feature collection of labels to display. Currently each feature must be a Point.
+   * @param label_key The field in each geojson feature that includes the label for the object.
+   * @param size_key The field in each geojson feature that includes the size
+   */
   public update(
     featureset: GeoJSON.FeatureCollection,
     label_key: string,
@@ -117,9 +140,12 @@ export class LabelMaker extends Renderer {
     this.label_key = label_key;
     for (const feature of featureset.features) {
       const { properties, geometry } = feature;
+      if (properties === null) {
+        continue;
+      }
       if (geometry.type === 'Point') {
         // The size can be specified; if not, it defaults to 16pt.
-        const size = (properties![size_key] as number) ?? 16;
+        const size = (properties[size_key] as number) ?? 16;
         let label = '';
         if (
           properties[label_key] !== undefined &&

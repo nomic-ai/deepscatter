@@ -15,6 +15,7 @@ import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker, LabelOptions } from './label_rendering';
 import { Renderer } from './rendering';
+import type { Tile } from './tile';
 
 // DOM elements that deepscatter uses.
 const base_elements = [
@@ -36,8 +37,8 @@ const base_elements = [
   },
 ];
 
-export default class Scatterplot {
-  public _renderer: ReglRenderer;
+export default class Scatterplot<T extends Tile> {
+  public _renderer: ReglRenderer<T>;
   public width: number;
   public height: number;
   public _root: Dataset<any>;
@@ -60,6 +61,11 @@ export default class Scatterplot {
     /*pass*/
   };
   constructor(selector: string, width: number, height: number) {
+    /**
+     * @param selector A DOM selector for the div in which the scatterplot will live.
+     * @param width The width of the scatterplot (in pixels)
+     * @param height The height of the scatterplot (in pixels)
+     */
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
@@ -273,6 +279,10 @@ export default class Scatterplot {
   */
 
   visualize_tiles() {
+    /**
+     * Draws a set of rectangles to the screen to illustrate the currently
+     * loaded tiles. Useful for debugging and illustration.
+     */
     const map = this;
     const ctx = map.elements[2].selectAll('canvas').node().getContext('2d');
 
@@ -428,15 +438,17 @@ export default class Scatterplot {
       }
     }
   }
+
   /**
    *
+   *
    * @param dimension The name of the encoding dimension to access
-   * information about
+   * information about. E.g. ("color", "x", etc.)
    * @returns
    */
 
-  public dim(dimension: string) {
-    return this._renderer.aes.dim(dimension).current;
+  public dim(dimension: string) : <T extends Aesthetic> {
+    return this._renderer.aes.dim(dimension).current as T;
   }
 
   set tooltip_html(func) {
@@ -681,6 +693,7 @@ abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
 }
 
 import type { GeoJsonProperties } from 'geojson';
+import { Aesthetic } from './Aesthetic';
 
 class LabelClick extends SettableFunction<void, GeoJsonProperties> {
   default(

@@ -1,7 +1,7 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
     "dist"
@@ -17,12 +17,13 @@
   "scripts": {
     "dev": "vite --port 3344 --host",
     "build": "vite build",
+    "prepublish": "vite build && npx typedoc --ignoreCompilerErrors src/deepscatter.ts",
     "test": "playwright test",
     "lint": "eslint src"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CreatingData/deepscatter.git"
+    "url": "git+https://github.com/nomic-ai/deepscatter.git"
   },
   "keywords": [
     "Data",
@@ -33,9 +34,9 @@
   "author": "Ben Schmidt",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/CreaacktingData/deepscatter/issues"
+    "url": "https://github.com/nomic-ai/deepscatter/issues"
   },
-  "homepage": "https://github.com/CreatingData/deepscatter#readme",
+  "homepage": "https://github.com/nomic-ai/deepscatter#readme",
   "dependencies": {
     "apache-arrow": "^10.0.1",
     "d3-array": "^3.2.0",
@@ -80,6 +81,7 @@
     "glslify-loader": "^2.0.0",
     "rollup-plugin-glslify": "^1.3.1",
     "terser": "^5.16.0",
+    "typedoc": "^0.23.24",
     "vite": "^3.2.4"
   }
 }

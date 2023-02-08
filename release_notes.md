@@ -1,8 +1,13 @@
-# 2.6.2
+# 2.7.0
+
+- Revamp a number of bad choices in the 'point_size' and 'alpha' parameters so that the units better correspond to screen pixels (for size) and alpha (on a scale of 1 to 100.) This unfortunately will requiring tweaking existing maps.
+- Add auto-generated documentation.
+- Allow dragging of labels around the screen for editing label collections.
+- Make labels by default filter the underlying data if the geojson property name is in the
 
 # 2.6.1
 
-- Fix bug cuasing multiple positions to sometimes place points in their previous location during mouseover events.
+- Fix bug causing multiple positions to sometimes place points in their previous location during mouseover events.
 
 # 2.6.0
 

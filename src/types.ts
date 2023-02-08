@@ -1,4 +1,5 @@
 import { Table } from 'apache-arrow';
+import { QuadTile } from './tile';
 
 /**
  * Operations to be performed on the GPU taking a single argument.
@@ -203,3 +204,5 @@ export function isConstantChannel(
 ): input is ConstantChannel {
   return (input as ConstantChannel).constant !== undefined;
 }
+
+export type TileType = QuadTile | ArrowTile;
