@@ -4,6 +4,8 @@
 - Add auto-generated documentation.
 - Allow dragging of labels around the screen for editing label collections.
 - Make labels by default filter the underlying data if the geojson property name is in the
+- Allow/restore custom color schemes for categorical data.
+- Improve behavior of scales for temporal fields. (Note--deepscatter supports only Arrow timestamp fields, not Date32, Datetime64, or any of the other date/time implementations in Arrow.)
 
 # 2.6.1
 
