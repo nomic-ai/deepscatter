@@ -17157,6 +17157,15 @@ void main() {
 }
 `;
 const frag_shader = "#ifdef GL_OES_standard_derivatives\n#extension GL_OES_standard_derivatives : enable\n#endif\n\nprecision mediump float;\n#define GLSLIFY 1\n\nvarying vec4 fill;\nvarying vec2 letter_pos;\nvarying float point_size;\n\nuniform float u_only_color;\nuniform float u_color_picker_mode;\n//uniform float u_use_glyphset;\n//uniform sampler2D u_glyphset;\n\nfloat delta = 0.0, alpha = 1.0;\n\nbool out_of_circle(in vec2 coord) {\n  vec2 cxy = 2.0 * coord - 1.0;\n  float r_sq = dot(cxy, cxy);\n  if (r_sq > 1.03) {return true;}\n  return false;\n}\n\nbool out_of_hollow_circle(in vec2 coord) {\n  vec2 cxy = 2.0 * coord - 1.0;\n  float r_sq = dot(cxy, cxy);\n  if (r_sq > 1.01) {return true;}\n  float distance_from_edge = (1.0 - r_sq) * point_size;\n  if (distance_from_edge > 4.0) {return true;}\n  return false;\n}\n\nbool out_of_triangle(in vec2 coord) {\n  if (coord.y > (2. * abs(coord.x - .5))) {\n    return false;\n  }\n  return true;\n}\n\nvoid main() {\n  if (u_only_color >= -1.5) {\n    gl_FragColor = vec4(0., 0., 0., 1./255.);\n    return;\n  }\n\n  float alpha = fill.a;\n//  if (u_use_glyphset == 0. || point_size < 5.0) {\n    if (out_of_circle(gl_PointCoord)) {\n      discard;\n      return;\n    }\n    vec2 cxy = 2.0 * gl_PointCoord - 1.0;\n    float r = dot(cxy, cxy);\n    #ifdef GL_OES_standard_derivatives\n      delta = fwidth(r);\n      alpha *= (1.0 - smoothstep(1.0 - delta, 1.0 + delta, r));\n    #endif\n/*  } else {\n    vec2 coords = letter_pos + gl_PointCoord/8.;\n//    vec2 coords = vec2(.2, .2);\n    vec4 sprite = texture2D(u_glyphset, coords);\n    alpha *= (sprite.a);  \n//    fill = vec4(1.0, 1.0, 1.0, alpha);  \n    if (alpha <= 0.03) discard;\n  }*/\n  // Pre-blend the alpha channel.\n  if (u_color_picker_mode >= 1.) {\n    // no alpha when color picking; we use all four channels for that.\n    gl_FragColor = fill;\n  } else {\n    gl_FragColor = vec4(fill.rgb * alpha, alpha);\n  }\n\n}\n";
+function isOpChannel(input) {
+  return input.op !== void 0;
+}
+function isLambdaChannel(input) {
+  return input.lambda !== void 0;
+}
+function isConstantChannel(input) {
+  return input.constant !== void 0;
+}
 var lodash = { exports: {} };
 /**
  * @license
