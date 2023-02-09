@@ -36392,20 +36392,20 @@ class Scatterplot {
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
-  async add_labels_from_url(url, name, label_key, size_key) {
+  async add_labels_from_url(url, name, label_key, size_key, options) {
     await this.ready;
     await this._root.promise;
     return fetch(url).then(async (data) => {
       const features = await data.json();
-      this.add_labels(features, name, label_key, size_key);
+      this.add_labels(features, name, label_key, size_key, options);
     }).catch((error) => {
       console.error("Broken addition of ", name);
       console.log(error);
     });
   }
-  add_labels(features, name, label_key, size_key, options) {
-    const labels = new LabelMaker(this, name);
-    labels.update(features, label_key, size_key, options);
+  add_labels(features, name, label_key, size_key, options = {}) {
+    const labels = new LabelMaker(this, name, options);
+    labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }
