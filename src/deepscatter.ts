@@ -202,8 +202,8 @@ export default class Scatterplot<T extends Tile> {
     size_key: string | undefined,
     options: LabelOptions = {}
   ) {
-    const labels = new LabelMaker(this, name);
-    labels.update(features, label_key, size_key, options);
+    const labels = new LabelMaker(this, name, options);
+    labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }
