@@ -141,6 +141,8 @@ export default class Zoom {
         this.restart_timer(10 * 1000);
 
         this.scatterplot.on_zoom?.(event.transform);
+        event?.sourceEvent?.stopPropagation();
+        //        console.log({ event });
       });
 
     canvas.call(zoomer);

@@ -1,3 +1,8 @@
+# 2.8.0
+
+- Add new 'foreground' aesthetic; when enabled, this moves points to the front of the screen and makes points behind it not clickable.
+- Removed event listener that significantly slowed down map when clicking to drag locations.
+
 # 2.7.0
 
 - Revamp a number of bad choices in the 'point_size' and 'alpha' parameters so that the units better correspond to screen pixels (for size) and alpha (on a scale of 1 to 100.) This unfortunately will requiring tweaking existing maps.

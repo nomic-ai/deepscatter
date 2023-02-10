@@ -44,7 +44,7 @@
   const prefs = {
     source_url: '/tiles',
     max_points: 1000000, // a full cap.
-    alpha: 5, // Target saturation for the full page.
+    alpha: 35, // Target saturation for the full page.
     zoom_balance: 0.22, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
     point_size: 2, // Default point size before application of size scaling
     background_color: '#EEEDDE',
@@ -101,8 +101,6 @@
   const scatterplot = new Scatterplot('#deepscatter');
   scatterplot.plotAPI(prefs).then((d) => scatterplot.plotAPI(prefs));
   window.plot = scatterplot; // For debugging
-  console.log(scatterplot);
-  console.log(scatterplot.database);
   // Simple animation demonstration.
 
   // In practice, you might transform an external annotations layer using this

@@ -9,6 +9,7 @@ import gaussian_blur from './glsl/gaussian_blur.frag';
 import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './AestheticSet';
+import { rgb } from 'd3-color';
 
 import type { Tile } from './tile';
 import REGL from 'regl';
@@ -24,8 +25,8 @@ export class ReglRenderer<T extends Tile> extends Renderer {
   private _buffers: MultipurposeBufferSet;
   public _initializations: Promise<void>[];
   public tileSet: Dataset<T>;
-  public zoom: Zoom;
-  public _zoom: Zoom;
+  public zoom?: Zoom;
+  public _zoom?: Zoom;
   public _start: number;
   public most_recent_restart?: number;
   public _default_webgl_scale?: number[];
@@ -134,18 +135,18 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       buffer_num_to_variable,
       variable_to_buffer_num,
     } = this;
-    const { transform } = this.zoom;
+    const { transform } = this.zoom as Zoom;
     const props = {
       // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
-      corners: this.zoom.current_corners(),
+      corners: this.zoom!.current_corners(),
       zoom_balance: prefs.zoom_balance,
       transform,
       max_ix: this.max_ix,
       point_size: this.point_size,
       alpha: this.optimal_alpha,
-      time: Date.now() - this.zoom._start,
+      time: Date.now() - this.zoom!._start,
       update_time: Date.now() - this.most_recent_restart,
       relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
       string_index: 0,
@@ -182,6 +183,11 @@ export class ReglRenderer<T extends Tile> extends Renderer {
   render_points(props) {
     // Regl is faster if it can render a large number of draw calls together.
     const prop_list = [];
+
+    let call_no = 0;
+    const needs_background_pass =
+      (this.aes.store.foreground.states[0].active as boolean) ||
+      (this.aes.store.foreground.states[1].active as boolean);
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
       const manager = new TileBufferManager(this.regl, tile, this);
@@ -192,16 +198,27 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       }
       const this_props = {
         manager,
+        number: call_no++,
+        foreground: needs_background_pass ? 1 : -1,
         tile_id: tile.numeric_id,
-        //        image_locations: manager.image_locations,
         sprites: this.sprites,
       };
       Object.assign(this_props, props);
-      //      if (tile.key.slice(0, 1) == '3') {
       prop_list.push(this_props);
-      //      }
+      if (needs_background_pass) {
+        const background_props = { ...this_props, foreground: 0 };
+        prop_list.push(background_props);
+      }
     }
-    prop_list.reverse();
+    // Plot background first, and lower tiles before higher tiles.
+    prop_list.sort((a, b) => {
+      return (
+        (3 + a.foreground) * 1000 -
+        (3 + b.foreground) * 1000 +
+        b.number -
+        a.number
+      );
+    });
     this._renderer(prop_list);
   }
 
@@ -216,21 +233,23 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     if (this._use_scale_to_download_tiles) {
       tileSet.download_most_needed_tiles(
         this.zoom.current_corners(),
-        this.props.max_ix
+        this.props.max_ix,
+        5
       );
     } else {
-      tileSet.download_most_needed_tiles(prefs.max_points);
+      tileSet.download_most_needed_tiles(prefs.max_points, this.max_ix, 5);
     }
-
     regl.clear({
       color: [0.9, 0.9, 0.93, 0],
       depth: 1,
     });
     const start = Date.now();
-    let current = () => {};
     while (Date.now() - start < 10 && this.deferred_functions.length > 0) {
       // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
-      current = this.deferred_functions.shift();
+      const current = this.deferred_functions.shift();
+      if (current === undefined) {
+        continue;
+      }
       try {
         current();
       } catch (error) {
@@ -642,9 +661,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       }
     }
     //    const p = this.tileSet.findPoint(point_as_int);
-
     //    if (p.length === 0) { return; }
-
     //    return p[0];
   }
   color_pick_single(
@@ -839,6 +856,20 @@ export class ReglRenderer<T extends Tile> extends Renderer {
         u_base_size: (_, { point_size }) => point_size,
         u_maxix: (_, { max_ix }) => max_ix,
         u_alpha: (_, { alpha }) => alpha,
+        u_foreground_number: (_, { foreground }) => foreground,
+        u_background_rgba: () => {
+          const color = this.prefs.background_options.color;
+          const { r, g, b } = rgb(color);
+          return [
+            r / 255,
+            g / 255,
+            b / 255,
+            this.prefs.background_options.opacity,
+          ] as [number, number, number, number];
+        },
+        u_background_mouseover: () =>
+          this.prefs.background_options.mouseover ? 1 : 0,
+        u_background_size: () => this.prefs.background_options.size,
         u_k: (_, props) => {
           return props.transform.k;
         },
@@ -859,6 +890,12 @@ export class ReglRenderer<T extends Tile> extends Renderer {
         },
         u_last_filter2_numeric() {
           return this.aes.dim('filter2').last.ops_to_array();
+        },
+        u_foreground_numeric() {
+          return this.aes.dim('foreground').current.ops_to_array();
+        },
+        u_last_foreground_numeric() {
+          return this.aes.dim('foreground').last.ops_to_array();
         },
         u_jitter: () => this.aes.dim('jitter_radius').current.jitter_int_format,
         u_last_jitter: () =>
@@ -891,6 +928,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       'size',
       'filter',
       'filter2',
+      'foreground',
       //      'character',
     ] as const) {
       for (const time of ['current', 'last']) {
@@ -955,6 +993,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     };
     const buffers: BufferSummary[] = [];
     const priorities = [
+      // How important is safe interpolation?
       'x',
       'y',
       'color',
@@ -965,9 +1004,10 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       'jitter_speed',
       'filter',
       'filter2',
-    ];
+      'foreground',
+    ] as const;
     for (const aesthetic of priorities) {
-      const times: time[] = ['current', 'last'];
+      const times = ['current', 'last'] as const;
       for (const time of times) {
         try {
           if (this.aes.dim(aesthetic)[time].field) {
@@ -1171,7 +1211,6 @@ class TileBufferManager {
         const copy = new Int32Array(source_buffer.values).buffer;
         const view64 = new BigInt64Array(copy);
         const timetype = column.type.unit;
-        console.log({ timetype });
         // All times are represented as milliseconds on the
         // GPU to align with the Javascript numbers. More or less,
         // at least.

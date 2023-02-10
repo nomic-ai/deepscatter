@@ -1,19 +1,20 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
-import { stateful_aesthetics } from './StatefulAesthetic';
+import { dimensions } from './StatefulAesthetic';
 import type Scatterplot from './deepscatter';
 import type { QuadtileSet } from './Dataset';
-import type { StatefulAesthetic } from './StatefulAesthetic';
+import { StatefulAesthetic } from './StatefulAesthetic';
+import { Aesthetic } from './Aesthetic';
 
 export class AestheticSet {
   public tileSet: QuadtileSet;
-  public scatterplot: Scatterplot;
+  public scatterplot: Plot;
   public regl: Regl;
   public encoding: Encoding = {};
   public position_interpolation: boolean;
-  private store: Record<string, StatefulAesthetic<any>>;
+  private store: Record<string, StatefulAesthetic>;
   public aesthetic_map: TextureSet;
-  constructor(scatterplot: Scatterplot, regl: Regl, tileSet: QuadtileSet) {
+  constructor(scatterplot: Plot, regl: Regl, tileSet: QuadtileSet) {
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl;
@@ -23,21 +24,27 @@ export class AestheticSet {
     return this;
   }
 
-  public dim(aesthetic: stateful_aesthetics) {
+  public dim(aesthetic: keyof typeof dimensions) {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
     if (this.store[aesthetic]) {
       return this.store[aesthetic];
     }
-    if (stateful_aesthetics[aesthetic] !== undefined) {
-      this.store[aesthetic] = new stateful_aesthetics[aesthetic](
-        this.scatterplot,
-        this.regl,
-        this.tileSet,
-        this.aesthetic_map
-      );
-      return this.store[aesthetic];
+    if (!dimensions[aesthetic]) {
+      throw new Error(`Unknown aesthetic ${aesthetic}`);
     }
-    throw new Error(`Unknown aesthetic ${aesthetic}`);
+    const Maker = dimensions[aesthetic];
+    const p = this.scatterplot;
+    const regl = this.regl;
+    const map = this.aesthetic_map;
+    const my_dim = new StatefulAesthetic<typeof Maker>(
+      p,
+      regl,
+      this.tileSet,
+      map,
+      Maker
+    );
+    this.store[aesthetic] = my_dim;
+    return my_dim;
   }
 
   *[Symbol.iterator](): Iterator<[string, StatefulAesthetic<any>]> {
@@ -107,7 +114,7 @@ export class AestheticSet {
     }
     // Overwrite position fields.
     this.interpret_position(encoding);
-    for (const k of Object.keys(stateful_aesthetics)) {
+    for (const k of Object.keys(dimensions)) {
       this.dim(k).update(encoding[k]);
     }
   }
@@ -148,7 +155,6 @@ export class TextureSet {
     }
     // Draw a stripe with the data of a single pixel width,
     // going down.
-    console.log('SETTING OFFSET', offset);
     this.one_d_texture.subimage(
       {
         data: value,

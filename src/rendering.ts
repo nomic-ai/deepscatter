@@ -184,7 +184,7 @@ export class Renderer {
       (total_points * fraction_of_total_visible * area_of_point);
     // constrain within realistic bounds.
     // would also be possible to adjust size to meet the goal.
-    return target > 1 ? 1 : target < 1 / 255 ? 1 / 255 : target;
+    return target < 1 / 255 ? 1 / 255 : target;
   }
 
   get point_size() {

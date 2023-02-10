@@ -1,9 +1,20 @@
 import type { Table } from 'apache-arrow';
-import type { QuadTile } from './tile';
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
 import type { ArrowDataset } from './Dataset';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
+import type { Tile, QuadTile, ArrowTile } from './tile';
+import Scatterplot from './deepscatter';
+
+export type {
+  Renderer,
+  ArrowDataset,
+  Dataset,
+  ConcreteAesthetic,
+  Tile,
+  QuadTile,
+};
+
 /**
  * Operations to be performed on the GPU taking a single argument.
  */
@@ -24,8 +35,9 @@ type TwoArgumentOp = {
   b: number;
 };
 
-export { Renderer, ArrowDataset, Dataset, ConcreteAesthetic };
 declare global {
+  type Newable<T> = { new (...args: any[]): T };
+  type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
   type OpChannel = OneArgumentOp | TwoArgumentOp;
   // Functions that are defined as strings and executed in JS.
   type LambdaChannel = {
@@ -37,17 +49,37 @@ declare global {
 
   type FunctionalChannel = LambdaChannel | OpChannel;
 
+  type BackgroundOptions = {
+    // The color of background points. Hex codes or HTML
+    // colors are accepted.
+    color?: string;
+
+    // A multiplier against the point's opacity otherwise.
+    opacity?: number;
+
+    // A multiplier against the point's size otherwise,
+    size?: number;
+
+    // Whether the points should respond on mouseover.
+    mouseover?: boolean;
+  };
+
   type ConstantBool = {
     constant: boolean;
   };
 
-  export type ConstantChannel = {
+  export type ConstantNumber = {
     constant: number;
   };
 
   export type ConstantColorChannel = {
     constant: string;
   };
+
+  export type ConstantChannel =
+    | ConstantBool
+    | ConstantNumber
+    | ConstantColorChannel;
   /**
    * A channel represents the information necessary to map a single dimension
    * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
@@ -177,38 +209,32 @@ declare global {
   // An APICall is a JSON-serializable specification of the chart.
   export type APICall = {
     /** The magnification coefficient for a zooming item */
-    zoom_balance: number;
+    zoom_balance?: number;
 
     /** The length of time to take for the transition to this state. */
-    duration: number;
+    duration?: number;
 
     /** The base point size for aes is modified */
-    point_size: number;
+    point_size?: number;
 
     /** The maximum number of points to load */
-    max_points: number;
+    max_points?: number;
+
     /** Overall screen saturation target at average point density */
-    alpha: number;
+    alpha?: number;
 
     /** A function defind as a string that takes implied argument 'datum' */
-    click_function: string;
+    click_function?: string;
 
+    //
+    encoding?: Encoding;
+
+    background_options?: BackgroundOptions;
+  };
+
+  type InitialAPICall = APICall & {
     encoding: Encoding;
   } & DataSpec;
-
-  export function isOpChannel(input: Channel): input is OpChannel {
-    return (input as OpChannel).op !== undefined;
-  }
-
-  export function isLambdaChannel(input: Channel): input is LambdaChannel {
-    return (input as LambdaChannel).lambda !== undefined;
-  }
-
-  export function isConstantChannel(
-    input: Channel | ColorChannel
-  ): input is ConstantChannel {
-    return (input as ConstantChannel).constant !== undefined;
-  }
 
   export type TileType = QuadTile | ArrowTile;
 }

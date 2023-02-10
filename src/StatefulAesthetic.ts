@@ -1,4 +1,5 @@
 import {
+  Aesthetic,
   X,
   Y,
   Size,
@@ -7,6 +8,7 @@ import {
   Filter,
   X0,
   Y0,
+  Foreground,
 } from './Aesthetic';
 import { Color } from './ColorAesthetic';
 
@@ -21,6 +23,7 @@ export const dimensions = {
   y: Y,
   x0: X0,
   y0: Y0,
+  foreground: Foreground,
 } as const;
 
 export type ConcreteAesthetic =
@@ -30,31 +33,29 @@ export type ConcreteAesthetic =
   | Jitter_speed
   | Jitter_radius
   | Color
+  | X0
+  | Y0
+  | Foreground
   | Filter;
 
-import type Scatterplot from './deepscatter';
 import type { QuadtileSet } from './Dataset';
 import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
 
-export abstract class StatefulAesthetic<T extends ConcreteAesthetic> {
-  // An aesthetic that tracks two states--current and last.
-  // The point is to handle transitions.
-  // It might make sense to handle more than two states, but there are
-  // diminishing returns.
-  abstract Factory: new (a, b, c, d) => T;
-  public _states: [T, T] | undefined;
+export class StatefulAesthetic<T extends Aesthetic> {
+  public states: [T, T];
   public dataset: QuadtileSet;
   public regl: Regl;
-  public scatterplot: Scatterplot;
+  public scatterplot: Plot;
   //  public current_encoding : Channel;
   public needs_transitions = false;
   public aesthetic_map: TextureSet;
   constructor(
-    scatterplot: Scatterplot,
+    scatterplot: Plot,
     regl: Regl,
     dataset: QuadtileSet,
-    aesthetic_map: TextureSet
+    aesthetic_map: TextureSet,
+    Factory: Newable<T>
   ) {
     if (aesthetic_map === undefined) {
       throw new Error('Aesthetic map is undefined.');
@@ -63,7 +64,20 @@ export abstract class StatefulAesthetic<T extends ConcreteAesthetic> {
     this.regl = regl;
     this.dataset = dataset;
     this.aesthetic_map = aesthetic_map;
-    this.aesthetic_map = aesthetic_map;
+    this.states = [
+      new Factory(
+        this.scatterplot,
+        this.regl,
+        this.dataset,
+        this.aesthetic_map
+      ),
+      new Factory(
+        this.scatterplot,
+        this.regl,
+        this.dataset,
+        this.aesthetic_map
+      ),
+    ] as [T, T];
   }
 
   get current() {
@@ -72,30 +86,6 @@ export abstract class StatefulAesthetic<T extends ConcreteAesthetic> {
 
   get last() {
     return this.states[1];
-  }
-
-  get states(): [T, T] {
-    // The two states of this--current and last.
-    // Reused to save buffers.
-
-    if (this._states !== undefined) {
-      return this._states;
-    }
-    this._states = [
-      new this.Factory(
-        this.scatterplot,
-        this.regl,
-        this.dataset,
-        this.aesthetic_map
-      ),
-      new this.Factory(
-        this.scatterplot,
-        this.regl,
-        this.dataset,
-        this.aesthetic_map
-      ),
-    ];
-    return this._states;
   }
 
   update(encoding: BasicChannel | ConstantChannel) {
@@ -122,71 +112,3 @@ export abstract class StatefulAesthetic<T extends ConcreteAesthetic> {
     }
   }
 }
-
-// Clearly something is wrong here. There must be a way
-// to just defin this.
-
-class StatefulX extends StatefulAesthetic<X> {
-  get Factory() {
-    return X;
-  }
-}
-class StatefulX0 extends StatefulAesthetic<X0> {
-  get Factory() {
-    return X0;
-  }
-}
-class StatefulY extends StatefulAesthetic<Y> {
-  get Factory() {
-    return Y;
-  }
-}
-class StatefulY0 extends StatefulAesthetic<Y0> {
-  get Factory() {
-    return Y0;
-  }
-}
-class StatefulSize extends StatefulAesthetic<Size> {
-  get Factory() {
-    return Size;
-  }
-}
-
-class StatefulJitter_speed extends StatefulAesthetic<Jitter_speed> {
-  get Factory() {
-    return Jitter_speed;
-  }
-}
-class StatefulJitter_radius extends StatefulAesthetic<Jitter_radius> {
-  get Factory() {
-    return Jitter_radius;
-  }
-}
-class StatefulColor extends StatefulAesthetic<Color> {
-  get Factory() {
-    return Color;
-  }
-}
-class StatefulFilter extends StatefulAesthetic<Filter> {
-  get Factory() {
-    return Filter;
-  }
-}
-class StatefulFilter2 extends StatefulAesthetic<Filter> {
-  get Factory() {
-    return Filter;
-  }
-}
-
-export const stateful_aesthetics = {
-  x: StatefulX,
-  x0: StatefulX0,
-  y: StatefulY,
-  y0: StatefulY0,
-  size: StatefulSize,
-  jitter_speed: StatefulJitter_speed,
-  jitter_radius: StatefulJitter_radius,
-  color: StatefulColor,
-  filter: StatefulFilter,
-  filter2: StatefulFilter2,
-} as const;

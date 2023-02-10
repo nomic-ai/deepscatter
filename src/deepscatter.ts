@@ -4,13 +4,14 @@ import { max, range, sum } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
-import { Dataset } from './Dataset';
+import { Dataset, QuadtileSet } from './Dataset';
 import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker, LabelOptions } from './label_rendering';
 import { Renderer } from './rendering';
-import type { Tile } from './tile';
+import { ArrowTile, QuadTile, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
+
 // DOM elements that deepscatter uses.
 const base_elements = [
   {
@@ -31,6 +32,10 @@ const base_elements = [
   },
 ];
 
+/**
+ * The core type of the module is a single scatterplot that manages
+ * all data and renderering.
+ */
 export default class Scatterplot<T extends Tile> {
   public _renderer: ReglRenderer<T>;
   public width: number;
@@ -52,38 +57,31 @@ export default class Scatterplot<T extends Tile> {
   public label_click_handler: LabelClick;
   // In order to preserve JSON serializable nature of prefs, the consumer directly sets this
   public on_zoom?: onZoomCallback;
-  mark_ready: () => void = function () {
+  private mark_ready: () => void = function () {
     /*pass*/
   };
+  /**
+   * @param selector A DOM selector for the div in which the scatterplot will live.
+   * @param width The width of the scatterplot (in pixels)
+   * @param height The height of the scatterplot (in pixels)
+   */
   constructor(selector: string, width: number, height: number) {
-    /**
-     * @param selector A DOM selector for the div in which the scatterplot will live.
-     * @param width The width of the scatterplot (in pixels)
-     * @param height The height of the scatterplot (in pixels)
-     */
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
     }
     this.width = width;
     this.height = height;
-    // Unresolvable.
+    // mark_ready is called when the scatterplot can start drawing..
     this.ready = new Promise((resolve, reject) => {
       this.mark_ready = resolve;
     });
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.label_click_handler = new LabelClick(this);
-    this.prefs = {
-      zoom_balance: 0.35,
-      duration: 2000,
-      max_points: 100,
-      encoding: {},
-      point_size: 1, // base size before aes modifications.
-      alpha: 40, // Overall screen saturation target.
-    };
-    //    this.d3 = { select };
+    this.prefs = { ...default_API_call };
   }
+
   /**
    * @param selector A selector for the root element of the deepscatter; must already exist.
    * @param width Width of the plot, in pixels.
@@ -544,11 +542,6 @@ export default class Scatterplot<T extends Tile> {
 
     this._renderer.render_props.apply_prefs(this.prefs);
 
-    // Doesn't block.
-    if (prefs.mutate) {
-      this._root.apply_mutations(prefs.mutate);
-    }
-
     const { width, height } = this;
     this.update_prefs(prefs);
 
@@ -659,10 +652,17 @@ export default class Scatterplot<T extends Tile> {
   }
 }
 
-abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
-  // A function that can be set by a string or directly with a function,
-  // Used for handling interaction
-  public _f: undefined | ((datum: ArgType, plot: Scatterplot) => FuncType);
+/**
+ A function that can be set by a string or directly with a function
+*/
+abstract class SettableFunction<
+  FuncType,
+  ArgType = StructRowProxy,
+  Tiletype extends Tile = QuadTile
+> {
+  public _f:
+    | undefined
+    | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType);
   public string_rep: string;
   abstract default: (datum: ArgType, plot: Scatterplot | undefined) => FuncType;
   public plot: Scatterplot;
@@ -690,6 +690,7 @@ abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
 
 import type { GeoJsonProperties } from 'geojson';
 import { Aesthetic } from './Aesthetic';
+import { default_API_call } from './defaults';
 
 class LabelClick extends SettableFunction<void, GeoJsonProperties> {
   default(
@@ -732,22 +733,28 @@ class TooltipHTML extends SettableFunction<string> {
   default(point: StructRowProxy, plot = undefined) {
     // By default, this returns a
     let output = '<dl>';
-    const nope = new Set(['x', 'y', 'mix', null, 'mtile_key']);
+    const nope: Set<string | null | number | symbol> = new Set([
+      'x',
+      'y',
+      'ix',
+      null,
+      'tile_key',
+    ]);
     //    console.log({ ...point });
     for (const [k, v] of point) {
-      if (nope.has(k)) {
-        continue;
-      }
       // Don't show missing data.
       if (v === null) {
+        continue;
+      }
+      if (nope.has(k)) {
         continue;
       }
       // Don't show empty data.
       if (v === '') {
         continue;
       }
-      output += ` <dt>${k}</dt>\n`;
-      output += `   <dd>${v}<dd>\n`;
+      output += ` <dt>${String(k)}</dt>\n`;
+      output += `   <dd>${String(v)}<dd>\n`;
     }
     return `${output}</dl>\n`;
   }

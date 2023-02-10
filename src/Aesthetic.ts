@@ -15,8 +15,6 @@ import type { QuadtileSet } from './Dataset';
 import { Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
-// import { Color } from './ColorAesthetic';
-
 export const scales = {
   sqrt: scaleSqrt,
   log: scaleLog,
@@ -44,7 +42,7 @@ export abstract class Aesthetic<
   public abstract _constant: GlValueType;
   public abstract default_transform: 'log' | 'sqrt' | 'linear' | 'literal';
   public _transform: 'log' | 'sqrt' | 'linear' | 'literal' | undefined;
-  public scatterplot: Scatterplot;
+  public scatterplot: Plot;
   public field: string | null = null;
   public regl: Regl;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
@@ -61,7 +59,7 @@ export abstract class Aesthetic<
   public id: string;
 
   constructor(
-    scatterplot: Scatterplot,
+    scatterplot: Plot,
     regl: Regl,
     dataset: QuadtileSet,
     aesthetic_map: TextureSet
@@ -84,6 +82,7 @@ export abstract class Aesthetic<
     // Used for generating points in SVG over the scatterplot.
     return this.scale(this.value_for(point)) as JSValueType;
   }
+  abstract toGLType(val: JSValueType): GlValueType;
 
   get transform() {
     if (this._transform) return this._transform;
@@ -105,7 +104,7 @@ export abstract class Aesthetic<
       const scale = scaleOrdinal().domain(this.domain);
       return (this._scale = scale.range(this.range));
     }
-    let scale = scales[this.transform]();
+    const scale = scales[this.transform]();
 
     scale.domain(this.domain).range(this.range);
 
@@ -212,23 +211,6 @@ export abstract class Aesthetic<
     return encoding;
   }
 
-  /*
-  custom(values) {
-    console.log('Custom color values code');
-    // Custom color values
-    const custom_palette = values;
-    const colors = new Array(palette_size);
-    const scheme = custom_palette.map((v) => {
-      const col = rgb(v);
-      return [col.r, col.g, col.b, 255];
-    });
-    for (const i of arange(palette_size)) {
-      colors[i] = scheme[i % custom_palette.length];
-    }
-    color_palettes.custom = to_buffer(colors);
-    schemes['custom'] = custom_palette;
-  } */
-
   reset_to_defaults() {
     this._domain = this.default_domain;
     this._range = [0, 1];
@@ -244,7 +226,7 @@ export abstract class Aesthetic<
   update(encoding: string | null | ChannelType) {
     // null handling.
     if (encoding === undefined) {
-      console.warning('Should never be calling update with undefined.');
+      console.warn('Should never be calling update with undefined.');
       return;
     }
 
@@ -289,16 +271,13 @@ export abstract class Aesthetic<
     if (isOpChannel(encoding)) {
       return;
     }
+
     if (isLambdaChannel(encoding)) {
       const { lambda, field } = encoding;
       if (lambda) {
         this.apply_function_for_textures(field, this.domain, lambda);
         this.post_to_regl_buffer();
-      } /*else if (encoding.range) {
-
-        this.encode_for_textures(this.range);
-        this.post_to_regl_buffer();
-      }*/
+      }
       return;
     }
     if (encoding['domain'] === undefined) {
@@ -341,12 +320,12 @@ export abstract class Aesthetic<
     return this.arrow_column().type.dictionary !== undefined;
   }
 
-  get constant(): number | [number, number, number] {
+  get constant(): GlValueType {
     if (
       this.current_encoding !== null &&
       isConstantChannel(this.current_encoding)
     ) {
-      return this.current_encoding.constant;
+      return this.toGLType(this.current_encoding.constant);
     }
     return this.default_constant;
   }
@@ -376,9 +355,6 @@ export abstract class Aesthetic<
   ) {
     const { texture_size } = this.aesthetic_map;
     const func = this.materialize_function(raw_func);
-    const scale = scaleLinear()
-      .range(range)
-      .domain([0, texture_size - 1]);
 
     let input: (string | number)[] = arange(texture_size);
 
@@ -421,13 +397,17 @@ export abstract class Aesthetic<
 
 abstract class OneDAesthetic extends Aesthetic {
   constructor(
-    scatterplot: Scatterplot,
+    scatterplot: Plot,
     regl: Regl,
     dataset: QuadtileSet,
     aesthetic_map: TextureSet
   ) {
     super(scatterplot, regl, dataset, aesthetic_map);
     this.current_encoding = { constant: 1 };
+  }
+
+  toGLType(a: number) {
+    return a;
   }
   static get default_constant() {
     return 1.5;
@@ -444,6 +424,7 @@ export class Size extends OneDAesthetic {
   static get default_constant() {
     return 1.5;
   }
+  _constant = 1;
   default_constant = 1;
   get default_range() {
     return [0, 1] as [number, number];
@@ -497,13 +478,42 @@ abstract class BooleanAesthetic extends Aesthetic<
   BooleanChannel
 > {
   constructor(
-    scatterplot: Scatterplot,
+    scatterplot: Plot,
     regl: Regl,
     tile: QuadtileSet,
     map: TextureSet
   ) {
     super(scatterplot, regl, tile, map);
-    this.current_encoding = { constant: true };
+    //    this.current_encoding = { constant: true };
+  }
+  toGLType(a: boolean) {
+    return a ? 1 : 0;
+  }
+
+  update(encoding: BooleanChannel | null) {
+    super.update(encoding);
+    if (Object.keys(this.current_encoding).length === 0) {
+      this.current_encoding = { constant: true };
+    }
+  }
+
+  ops_to_array(): OpArray {
+    const input = this.current_encoding;
+    if (input === null) return [0, 0, 0];
+    if (input === undefined) return [0, 0, 0];
+    if (!isOpChannel(input)) {
+      return [0, 0, 0];
+    }
+    if (input.op === 'within') {
+      return [4, input.a, input.b];
+    }
+    const val: OpArray = [
+      // Encoding of op as number.
+      [null, 'lt', 'gt', 'eq'].indexOf(input.op),
+      input.a,
+      0,
+    ];
+    return val;
   }
 
   apply(point: Datum): boolean {
@@ -535,7 +545,7 @@ abstract class BooleanAesthetic extends Aesthetic<
 
   apply_op(point: Datum, channel: OpChannel): boolean {
     const { op, a } = channel;
-    const p = this.value_for(point);
+    const p = this.value_for(point) as number;
     if (p === null) {
       return false;
     }
@@ -547,52 +557,55 @@ abstract class BooleanAesthetic extends Aesthetic<
       return p < a;
     } else if (op === 'within') {
       return Math.abs(p - channel.b) < a;
+    } else if (op === 'between') {
+      const mid = (channel.a + channel.b) / 2;
+      const diff = Math.abs(channel.a - channel.b) / 2;
+      return Math.abs(p - mid) < diff;
     }
+    return false;
+  }
+  get default_domain(): [number, number] {
+    return [0, 1];
+  }
+}
+
+/**
+ * "Foreground" defines whether a field should be
+ * plotted in the front of the screen: by default
+ * background points will be plotted with much less resolution.
+ */
+export class Foreground extends BooleanAesthetic {
+  //  public current_encoding = null;
+  _constant = 1;
+  default_constant = 1;
+  default_range = [0, 1] as [number, number];
+  default_transform: Transform = 'literal';
+  get active(): boolean {
+    if (
+      this.current_encoding === null ||
+      isConstantChannel(this.current_encoding)
+    ) {
+      return false;
+    }
+    return true;
   }
 }
 
 export class Filter extends BooleanAesthetic {
-  public current_encoding: LambdaChannel | OpChannel | ConstantBool | null = {
+  public current_encoding = {
     constant: true,
   };
   _constant = 1;
-  default_transform: Transform = 'literal';
   default_constant = 1;
-  get default_domain(): [number, number] {
-    return [0, 1];
-  }
+  default_transform: Transform = 'literal';
   default_range: [number, number] = [0, 1];
-
-  update(encoding: LambdaChannel | OpChannel | ConstantChannel) {
-    super.update(encoding);
-    if (Object.keys(this.current_encoding).length === 0) {
-      this.current_encoding = { constant: 1 };
-    }
-  }
-  ops_to_array(): OpArray {
-    const input = this.current_encoding;
-    if (input === null) return [0, 0, 0];
-    if (input === undefined) return [0, 0, 0];
-    if (!isOpChannel(input)) {
-      return [0, 0, 0];
-    }
-    if (input.op === 'within') {
-      return [4, input.a, input.b];
-    }
-    const val: OpArray = [
-      // Encoding of op as number.
-      [null, 'lt', 'gt', 'eq'].indexOf(input.op),
-      input.a,
-      0,
-    ];
-    return val;
-  }
 }
 
-export class Jitter_speed extends Aesthetic {
+export class Jitter_speed extends OneDAesthetic {
   default_transform: Transform = 'linear';
   default_range: [number, number] = [0, 1];
   public default_constant = 0.5;
+  _constant = 0;
 }
 
 function encode_jitter_to_int(jitter: string) {
@@ -620,6 +633,11 @@ function encode_jitter_to_int(jitter: string) {
 }
 
 export class Jitter_radius extends Aesthetic<number, number, JitterChannel> {
+  _constant = 0;
+
+  toGLType(a: number) {
+    return a;
+  }
   public jitter_int_formatted: 0 | 1 | 2 | 3 | 4 | 5 = 0;
   get default_constant() {
     return 0;
@@ -661,41 +679,6 @@ function parseLambdaString(lambdastring: string) {
     lambda: func,
   };
 }
-/*
-function safe_expand(range) {
-  // the range of a scale can sensibly take several different forms.
-
-  // If it's a number, put it at both ends of the scale.
-  if (typeof(range) === 'number') {
-    return [range, range];
-  }
-  if (range === undefined) {
-    // Sketchy.
-    return [1, 1];
-  }
-  // Copy the elements by spreading because a copy-by-reference will
-  //
-  try {
-    return [...range];
-  } catch (err) {
-    console.warn('No list for range', range);
-    return [1, 1];
-  }
-}
-*/
-
-function op_to_function(input: OpChannel): (d: number) => boolean {
-  if (input.op == 'gt') {
-    return (d: number) => d > input.a;
-  } else if (input.op == 'lt') {
-    return (d: number) => d < input.a;
-  } else if (input.op == 'eq') {
-    return (d: number) => d == input.a;
-  } else if (input.op == 'within') {
-    return (d: number) => Math.abs(d - input.a) <= input.b;
-  }
-  throw new Error(`Unknown op ${input.op}`);
-}
 
 function lambda_to_function(input: LambdaChannel): (d: any) => number {
   if (typeof input.lambda === 'function') {
@@ -711,4 +694,4 @@ function lambda_to_function(input: LambdaChannel): (d: any) => number {
   return func;
 }
 
-type Datum = StructRowProxy | Record<string, any>;
+type Datum = StructRowProxy | Record<string, string | number | boolean>;

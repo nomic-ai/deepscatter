@@ -23,8 +23,6 @@ import { randomLcg } from 'd3-random';
   return output;
 }*/
 
-const default_color: [number, number, number] = [0.7, 0, 0.5];
-
 function materialize_color_interplator(
   interpolator: (t: number) => string
 ): Uint8Array {
@@ -149,17 +147,17 @@ export class Color extends Aesthetic<
   string,
   ColorChannel
 > {
-  _constant = [128, 128, 128] as [number, number, number];
+  _constant = [0.5, 0.5, 0.5] as [number, number, number];
+
   public texture_type = 'uint8';
-  public default_constant: [number, number, number] = [0.7, 0, 0.5];
+  public default_constant = [0.5, 0.5, 0.5] as [number, number, number];
   default_transform: Transform = 'linear';
   get default_range(): [number, number] {
     return [0, 1];
   }
   current_encoding: ColorChannel = {
-    constant: default_color,
+    constant: 'gray',
   };
-
   default_data(): Uint8Array {
     return color_palettes.viridis;
   }
@@ -231,20 +229,11 @@ export class Color extends Aesthetic<
     return this._texture_buffer;
   }
 
-  static convert_color(color: string) {
-    // Convert from string to RGB space (0-1).
-    const { r, g, b } = rgb(color);
-    return [r / 255, g / 255, b / 255] as [number, number, number];
-  }
-
   post_to_regl_buffer() {
     this.aesthetic_map.set_color(this.id, this.texture_buffer);
   }
 
   update(encoding: ColorChannel) {
-    if (isConstantChannel(encoding)) {
-      encoding.constant = Color.convert_color(encoding.constant);
-    }
     super.update(encoding);
     this.current_encoding = encoding;
     if (!isConstantChannel(encoding)) {
@@ -255,6 +244,11 @@ export class Color extends Aesthetic<
         this.post_to_regl_buffer();
       }
     }
+  }
+
+  toGLType(color: string) {
+    const { r, g, b } = rgb(color);
+    return [r / 255, g / 255, b / 255] as [number, number, number];
   }
 
   encode_for_textures(range: string | string[]): void {
