@@ -157,14 +157,15 @@ export default class Scatterplot<T extends Tile> {
     url: string,
     name: string,
     label_key: string,
-    size_key: string | undefined
+    size_key: string | undefined,
+    options: LabelOptions
   ): Promise<void> {
     await this.ready;
     await this._root.promise;
     return fetch(url)
       .then(async (data) => {
         const features = await (data.json() as Promise<FeatureCollection>);
-        this.add_labels(features, name, label_key, size_key);
+        this.add_labels(features, name, label_key, size_key, options);
       })
       .catch((error) => {
         console.error('Broken addition of ', name);
@@ -197,10 +198,10 @@ export default class Scatterplot<T extends Tile> {
     name: string,
     label_key: string,
     size_key: string | undefined,
-    options: LabelOptions
+    options: LabelOptions = {}
   ) {
-    const labels = new LabelMaker(this, name);
-    labels.update(features, label_key, size_key, options);
+    const labels = new LabelMaker(this, name, options);
+    labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }

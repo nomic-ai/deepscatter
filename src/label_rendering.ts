@@ -132,7 +132,7 @@ export class LabelMaker extends Renderer {
   public update(
     featureset: GeoJSON.FeatureCollection,
     label_key: string,
-    size_key: string
+    size_key: string | undefined
     //    color_key
   ) {
     // Insert an entire feature collection all at once.
