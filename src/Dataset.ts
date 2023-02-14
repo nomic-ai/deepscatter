@@ -228,7 +228,7 @@ export abstract class Dataset<T extends Tile> {
    *
    * @param ids A list of ids to get, keyed to the value to set them to.
    * @param field_name The name of the new field to create
-   * @param key_field
+   * @param key_field The column in the dataset to match them against.
    */
   add_label_identifiers(
     ids: Record<string, number>,

@@ -6,11 +6,11 @@ import { mean } from 'd3-array';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type { Renderer } from './rendering';
-import type QuadtreeRoot from './tile';
+import type { QuadtreeRoot } from './tile';
 import { ReglRenderer } from './regl_rendering';
-import Scatterplot from './deepscatter';
-import { StructRow } from 'apache-arrow';
+import { StructRow, StructRowProxy } from 'apache-arrow';
 import { Rectangle } from './tile';
+import { PositionalAesthetic } from './Aesthetic';
 
 export default class Zoom {
   public prefs: APICall;
@@ -29,8 +29,8 @@ export default class Zoom {
   public zoomer?: d3.ZoomBehavior<Element, any>;
   public transform?: d3.ZoomTransform;
   public _start?: number;
-  public scatterplot: Scatterplot;
-  constructor(selector: string, prefs: APICall, plot: Scatterplot) {
+  public scatterplot: Plot;
+  constructor(selector: string, prefs: APICall, plot: Plot) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
     // also registers events.
@@ -152,28 +152,60 @@ export default class Zoom {
     this.zoomer = zoomer;
   }
 
-  synthetic_mouseover(feather_datum) {
-    const datum = feather_datum;
-    const renderer: ReglRenderer = this.renderers.get('regl');
-    const x_aes = renderer.aes.dim('x').current;
-    const y_aes = renderer.aes.dim('y').current;
+  set_highlit_points(data: StructRowProxy[]) {
     const { x_, y_ } = this.scales();
+    const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
+    const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
 
-    try {
-      select('#tooltipcircle').remove();
-    } catch (e) {
-      console.log('no circle');
-    }
-    window.x = this.svg_element_selection;
-    this.svg_element_selection
-      .select('#mousepoints')
-      .append('circle')
-      .attr('id', 'tooltipcircle')
-      .attr('class', 'label')
-      .attr('stroke', '#110022')
-      .attr('r', 12)
-      .attr('cx', x_(x_aes.value_for(datum)))
-      .attr('cy', y_(y_aes.value_for(datum)));
+    type Annotation = {
+      x: number;
+      y: number;
+      dx: number;
+      dy: number;
+      data: StructRowProxy;
+    };
+    const annotations: Annotation[] = data.map((d) => ({
+      x: x_(xdim.apply(d)) as number,
+      y: y_(ydim.apply(d)) as number,
+      data: d,
+      dx: 0,
+      dy: 30,
+    }));
+
+    this.html_annotation(annotations);
+
+    const sel = this.svg_element_selection.select('#mousepoints');
+    sel
+      .selectAll('circle.label')
+      .data(data, (d_) => d_.ix as number) // Unique identifier to not remove existing.
+      .join(
+        (enter) =>
+          enter
+            .append('circle')
+            .attr('id', 'tooltipcircle')
+            .attr('class', 'label')
+            .attr('stroke', '#110022')
+            .attr('r', 12)
+            .attr('fill', (dd) => this.scatterplot.dim('color').apply(dd))
+            .attr('cx', (datum) => x_(xdim.apply(datum)))
+            .attr('cy', (datum) => y_(ydim.apply(datum))),
+        (update) =>
+          update.attr('fill', (dd) => this.scatterplot.dim('color').apply(dd)),
+        (exit) =>
+          exit.call((e) => {
+            e.remove();
+            if (this.prefs.exit_function) {
+              this.prefs.exit_function();
+            }
+          })
+      )
+      .on('click', (ev, dd) => {
+        this.scatterplot.click_function(dd);
+      });
+  }
+
+  set_highlit_point(point: StructRowProxy) {
+    this.set_highlit_points([point]);
   }
 
   add_mouseover() {
@@ -182,76 +214,18 @@ export default class Zoom {
       'regl'
     ) as ReglRenderer<any>;
 
-    this.svg_element_selection.on('mousemove', (event) => {
+    this.svg_element_selection.on('mousemove', (event: MouseEvent) => {
       // Debouncing this is really important, it turns out.
-      if (Date.now() - last_fired < 50) {
+      if (Date.now() - last_fired < 75) {
         return;
       }
       last_fired = Date.now();
-      const p = renderer.color_pick(event.layerX, event.layerY);
-      const data = p ? [p] : [];
-
-      const d = data[0];
-      const x_aes = renderer.aes.dim('x').current;
-      const y_aes = renderer.aes.dim('y').current;
-
-      type Annotation = {
-        x: number;
-        y: number;
-        dx: number;
-        dy: number;
-        data: any;
-      };
-      const annotations: Annotation[] = d
-        ? [
-            {
-              x: event.layerX,
-              y: event.layerY,
-              data: d,
-              dx: 0,
-              dy: 30,
-            },
-          ]
-        : [];
-
-      const { x_, y_ } = this.scales();
-
-      this.html_annotation(annotations);
-      window.x = this.svg_element_selection;
-
-      const sel = this.svg_element_selection.select('#mousepoints');
-      sel
-        //        .append('circle')
-        .selectAll('circle.label')
-        .data(data, (d_) => d_.ix as number)
-        .join(
-          (enter) =>
-            enter
-              .append('circle')
-              .attr('id', 'tooltipcircle')
-              .attr('class', 'label')
-              .attr('stroke', '#110022')
-              .attr('r', 12)
-              .attr('fill', (dd) =>
-                this.renderers.get('regl').aes.dim('color').current.apply(dd)
-              )
-              .attr('cx', (datum) => x_(x_aes.value_for(datum)))
-              .attr('cy', (datum) => y_(y_aes.value_for(datum))),
-          (update) =>
-            update.attr('fill', (dd) =>
-              this.renderers.get('regl').aes.dim('color').current.apply(dd)
-            ),
-          (exit) =>
-            exit.call((e) => {
-              e.remove();
-              if (this.prefs.exit_function) {
-                this.prefs.exit_function();
-              }
-            })
-        )
-        .on('click', (ev, dd) => {
-          this.scatterplot.click_function(dd);
-        });
+      const p = renderer.color_pick(event.offsetX, event.offsetY);
+      if (p === null) {
+        this.set_highlit_points([]);
+      } else {
+        this.set_highlit_points([p]);
+      }
     });
   }
 
@@ -308,7 +282,7 @@ export default class Zoom {
     return this;
   }
 
-  scales(equal_units = true): Record<string, d3.ScaleLinear> {
+  scales(equal_units = true): Record<string, ScaleLinear<number, number>> {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.
@@ -328,7 +302,7 @@ export default class Zoom {
       throw new Error('Error--scales created before tileSet present.');
     }
     const { extent } = this.tileSet;
-    const scales: Record<string, any> = {};
+    const scales: Record<string, ScaleLinear<number, number>> = {};
     if (extent === undefined) {
       throw new Error('Error--scales created before extent present.');
       return {};
@@ -378,8 +352,8 @@ export default class Zoom {
       .domain(scale_dat.y.limits)
       .range([y_buffer_size, height - y_buffer_size]);
 
-    scales.x_ = this.transform.rescaleX(scales.x);
-    scales.y_ = this.transform.rescaleY(scales.y);
+    scales.x_ = this.transform!.rescaleX(scales.x);
+    scales.y_ = this.transform!.rescaleY(scales.y);
 
     this._scales = scales;
     return scales;

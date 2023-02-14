@@ -16,6 +16,7 @@ import REGL from 'regl';
 import { Dataset } from './Dataset';
 import { Frame } from '@playwright/test';
 import Scatterplot from './deepscatter';
+import { StructRowProxy } from 'apache-arrow';
 
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer<T extends Tile> extends Renderer {
@@ -652,18 +653,24 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     return this._integer_buffer;
   }
 
-  color_pick(x: number, y: number) {
+  color_pick(x: number, y: number): null | StructRowProxy {
+    if (y === 0) {
+      // Not sure why, but this makes things complainy.
+      return null;
+    }
     const tile_number = this.color_pick_single(x, y, 'tile_id');
     const row_number = this.color_pick_single(x, y, 'ix_in_tile');
     for (const tile of this.visible_tiles()) {
       if (tile.numeric_id === tile_number) {
-        return tile.record_batch.get(row_number);
+        return tile.record_batch.get(row_number) as StructRowProxy;
       }
     }
+    return null;
     //    const p = this.tileSet.findPoint(point_as_int);
     //    if (p.length === 0) { return; }
     //    return p[0];
   }
+
   color_pick_single(
     x: number,
     y: number,
@@ -685,7 +692,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
           y: height - y,
           width: 1,
           height: 1,
-        });
+        }) as unknown as [number, number, number, number];
       } catch {
         console.warn('Read bad data from', {
           x,

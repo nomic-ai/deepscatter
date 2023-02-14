@@ -432,9 +432,9 @@ export class Size extends OneDAesthetic {
   default_transform: Transform = 'sqrt';
 }
 
-abstract class PositionalAesthetic extends OneDAesthetic {
+export abstract class PositionalAesthetic extends OneDAesthetic {
   constructor(
-    scatterplot: Scatterplot,
+    scatterplot: Plot,
     regl: Regl,
     tile: QuadtileSet,
     map: TextureSet

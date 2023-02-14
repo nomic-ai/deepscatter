@@ -17244,6 +17244,7 @@ void main() {
     }
     // If we're in background mode, got to change the points a bit.
     if (u_foreground_number == 0.) { 
+      gl_PointSize *= u_background_size;
       // Should the color piker run?
       if (u_color_picker_mode == 1.) {
         if (u_background_mouseover == 1.) {
