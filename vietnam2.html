@@ -65,12 +65,6 @@
         y: [7.0849741134400706, 23.626158008070647],
       },
     },
-    /*    labels: {
-      url: '/tests/UNIT.geojson',
-      name: undefined,
-      label_field: 'UNIT',
-      size_field: undefined,
-    },*/
     encoding: {
       jitter_radius: {
         constant: 0.001,
@@ -111,7 +105,9 @@
     await scatterplot.add_labels_from_url(
       '/tests/TAKEOFFLOCATION.geojson',
       'takeoff',
-      'TAKEOFFLOCATION'
+      'TAKEOFFLOCATION',
+      undefined, // no size field
+      {draggable_labels: true}
     );
   });
 
