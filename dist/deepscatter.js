@@ -5611,19 +5611,34 @@ class Zoom {
     this.add_mouseover();
     this.zoomer = zoomer;
   }
-  synthetic_mouseover(feather_datum) {
-    const datum2 = feather_datum;
-    const renderer = this.renderers.get("regl");
-    const x_aes = renderer.aes.dim("x").current;
-    const y_aes = renderer.aes.dim("y").current;
+  set_highlit_points(data) {
     const { x_, y_ } = this.scales();
-    try {
-      select("#tooltipcircle").remove();
-    } catch (e) {
-      console.log("no circle");
-    }
-    window.x = this.svg_element_selection;
-    this.svg_element_selection.select("#mousepoints").append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("cx", x_(x_aes.value_for(datum2))).attr("cy", y_(y_aes.value_for(datum2)));
+    const xdim = this.scatterplot.dim("x");
+    const ydim = this.scatterplot.dim("y");
+    const annotations = data.map((d) => ({
+      x: x_(xdim.apply(d)),
+      y: y_(ydim.apply(d)),
+      data: d,
+      dx: 0,
+      dy: 30
+    }));
+    this.html_annotation(annotations);
+    const sel = this.svg_element_selection.select("#mousepoints");
+    sel.selectAll("circle.label").data(data, (d_) => d_.ix).join(
+      (enter) => enter.append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr("fill", (dd) => this.scatterplot.dim("color").apply(dd)).attr("cx", (datum2) => x_(xdim.apply(datum2))).attr("cy", (datum2) => y_(ydim.apply(datum2))),
+      (update) => update.attr("fill", (dd) => this.scatterplot.dim("color").apply(dd)),
+      (exit) => exit.call((e) => {
+        e.remove();
+        if (this.prefs.exit_function) {
+          this.prefs.exit_function();
+        }
+      })
+    ).on("click", (ev, dd) => {
+      this.scatterplot.click_function(dd);
+    });
+  }
+  set_highlit_point(point) {
+    this.set_highlit_points([point]);
   }
   add_mouseover() {
     let last_fired = 0;
@@ -5631,46 +5646,16 @@ class Zoom {
       "regl"
     );
     this.svg_element_selection.on("mousemove", (event) => {
-      if (Date.now() - last_fired < 50) {
+      if (Date.now() - last_fired < 75) {
         return;
       }
       last_fired = Date.now();
-      const p = renderer.color_pick(event.layerX, event.layerY);
-      const data = p ? [p] : [];
-      const d = data[0];
-      const x_aes = renderer.aes.dim("x").current;
-      const y_aes = renderer.aes.dim("y").current;
-      const annotations = d ? [
-        {
-          x: event.layerX,
-          y: event.layerY,
-          data: d,
-          dx: 0,
-          dy: 30
-        }
-      ] : [];
-      const { x_, y_ } = this.scales();
-      this.html_annotation(annotations);
-      window.x = this.svg_element_selection;
-      const sel = this.svg_element_selection.select("#mousepoints");
-      sel.selectAll("circle.label").data(data, (d_) => d_.ix).join(
-        (enter) => enter.append("circle").attr("id", "tooltipcircle").attr("class", "label").attr("stroke", "#110022").attr("r", 12).attr(
-          "fill",
-          (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)
-        ).attr("cx", (datum2) => x_(x_aes.value_for(datum2))).attr("cy", (datum2) => y_(y_aes.value_for(datum2))),
-        (update) => update.attr(
-          "fill",
-          (dd) => this.renderers.get("regl").aes.dim("color").current.apply(dd)
-        ),
-        (exit) => exit.call((e) => {
-          e.remove();
-          if (this.prefs.exit_function) {
-            this.prefs.exit_function();
-          }
-        })
-      ).on("click", (ev, dd) => {
-        this.scatterplot.click_function(dd);
-      });
+      const p = renderer.color_pick(event.offsetX, event.offsetY);
+      if (p === null) {
+        this.set_highlit_points([]);
+      } else {
+        this.set_highlit_points([p]);
+      }
     });
   }
   current_corners() {
@@ -24537,6 +24522,9 @@ class ReglRenderer extends Renderer {
     return this._integer_buffer;
   }
   color_pick(x, y) {
+    if (y === 0) {
+      return null;
+    }
     const tile_number = this.color_pick_single(x, y, "tile_id");
     const row_number = this.color_pick_single(x, y, "ix_in_tile");
     for (const tile of this.visible_tiles()) {
@@ -24544,6 +24532,7 @@ class ReglRenderer extends Renderer {
         return tile.record_batch.get(row_number);
       }
     }
+    return null;
   }
   color_pick_single(x, y, field = "tile_id") {
     const { props, height } = this;
