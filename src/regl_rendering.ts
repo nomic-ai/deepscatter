@@ -14,15 +14,14 @@ import { rgb } from 'd3-color';
 import type { Tile } from './tile';
 import REGL from 'regl';
 import { Dataset } from './Dataset';
-import { Frame } from '@playwright/test';
 import Scatterplot from './deepscatter';
 import { StructRowProxy } from 'apache-arrow';
 
 // eslint-disable-next-line import/prefer-default-export
-export class ReglRenderer<T extends Tile> extends Renderer {
+export class ReglRenderer<T extends Tile> extends Renderer<T> {
   public regl: Regl;
   public aes: AestheticSet;
-  public buffer_size = 1024 * 1024 * 64;
+  public buffer_size = 1024 * 1024 * 64; // Use GPU memory in blocks of 64 MB buffers by default.
   private _buffers: MultipurposeBufferSet;
   public _initializations: Promise<void>[];
   public tileSet: Dataset<T>;
@@ -45,7 +44,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
   public reglframe?: REGL.FrameCallback;
   //  public _renderer :  Renderer;
 
-  constructor(selector, tileSet: Dataset<T>, scatterplot: Scatterplot) {
+  constructor(selector, tileSet: Dataset<T>, scatterplot: Scatterplot<T>) {
     super(selector, tileSet, scatterplot);
     const c = this.canvas;
     if (this.canvas === undefined) {
@@ -90,7 +89,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     return this._buffers;
   }
 
-  data(dataset) {
+  data(dataset: Dataset<T>) {
     if (dataset === undefined) {
       // throw
       return this.tileSet;
@@ -151,7 +150,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       update_time: Date.now() - this.most_recent_restart,
       relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
       string_index: 0,
-      prefs: JSON.parse(JSON.stringify(prefs)),
+      prefs: JSON.parse(JSON.stringify(prefs)) as APICall,
       color_type: undefined,
       start_time: this.most_recent_restart,
       webgl_scale: this._webgl_scale_history[0],
@@ -191,14 +190,16 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       (this.aes.store.foreground.states[1].active as boolean);
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
-      const manager = new TileBufferManager(this.regl, tile, this);
-      if (!manager.ready(props.prefs, props.block_for_buffers)) {
+      tile._buffer_manager =
+        tile._buffer_manager || new TileBufferManager(this.regl, tile, this);
+
+      if (!tile._buffer_manager.ready(props.block_for_buffers)) {
         // The 'ready' call also pushes a creation request into
         // the deferred_functions queue.
         continue;
       }
       const this_props = {
-        manager,
+        manager: tile._buffer_manager,
         number: call_no++,
         foreground: needs_background_pass ? 1 : -1,
         tile_id: tile.numeric_id,
@@ -275,7 +276,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
     fbo2.use(() => {
       regl.clear({ color: [0, 0, 0, 0] });
       regl({
-        frag: gaussian_blur,
+        frag: gaussian_blur as string,
         uniforms: {
           iResolution: ({ viewportWidth, viewportHeight }) => [
             viewportWidth,
@@ -792,7 +793,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       stencil: { enable: false },
       blend: {
         enable(_, { color_picker_mode }) {
-          return color_picker_mode < 0.5;
+          return (color_picker_mode as number) < 0.5;
         },
         func: {
           srcRGB: 'one',
@@ -802,8 +803,8 @@ export class ReglRenderer<T extends Tile> extends Renderer {
         },
       },
       primitive: 'points',
-      frag: frag_shader,
-      vert: vertex_shader,
+      frag: frag_shader as string,
+      vert: vertex_shader as string,
       count(_, props) {
         return props.manager.count;
       },
@@ -1025,7 +1026,7 @@ export class ReglRenderer<T extends Tile> extends Renderer {
             });
           }
         } catch (error) {
-          this.reglframe.cancel();
+          // this.reglframe.cancel();
           this.reglframe = undefined;
           throw error;
         }
@@ -1043,8 +1044,8 @@ export class ReglRenderer<T extends Tile> extends Renderer {
       return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
     });
     type encodingkey = keyof Encoding;
-    //todo not all encoding keys.
-    const aes_to_buffer_num: Record<encodingkey, number> = {}; // eg 'x' => 3
+
+    const aes_to_buffer_num: Record<string, number> = {}; // eg 'x' => 3
 
     // Pre-allocate the 'ix' buffer.
     const variable_to_buffer_num: Record<string, number> = {
@@ -1087,53 +1088,56 @@ export class ReglRenderer<T extends Tile> extends Renderer {
   }
 }
 
-class TileBufferManager {
+export class TileBufferManager<T extends Tile> {
   // Handle the interactions of a tile with a regl state.
 
   // binds elements directly to the tile, so it's safe
   // to re-run this multiple times on the same tile.
-  public tile: Tile;
-  public regl: Regl;
-  public renderer: ReglRenderer;
-  public regl_elements: Map<string, any>;
-  //  public image;
 
-  constructor(regl: Regl, tile: Tile, renderer: ReglRenderer) {
+  // In an ideal world, these might all be methods directly on tile, but since they relate to Regl,
+  // I want them in this file instead.
+
+  public tile: T;
+  public regl: Regl;
+  public renderer: ReglRenderer<T>;
+  public regl_elements: Map<string, BufferLocation | null> = new Map();
+
+  constructor(regl: Regl, tile: T, renderer: ReglRenderer<T>) {
     this.tile = tile;
     this.regl = regl;
     this.renderer = renderer;
-    tile._regl_elements =
-      tile._regl_elements ||
-      new Map([
-        [
-          'ix_in_tile',
-          {
-            offset: 0,
-            stride: 4,
-            buffer: renderer.integer_buffer,
-          },
-        ],
-      ]);
-    this.regl_elements = tile._regl_elements;
+    // Reuse the same buffer for all `ix_in_tile` keys, because
+    // it's just a set of integers going up.
   }
 
-  ready(_, block_for_buffers = true) {
+  /**
+   *
+   * @param block_for_buffers Whether to
+   * @returns
+   */
+  ready(block_for_buffers = true) {
     // Is the buffer ready with all the aesthetics for the current plot?
     //Block for buffers:
     const { renderer, regl_elements } = this;
     // Don't allocate buffers for dimensions until they're needed.
     const needed_dimensions: Set<Dimension> = new Set();
     for (const [k, v] of renderer.aes) {
-      for (const aesthetic of [v.current, v.last]) {
+      for (const aesthetic of v.states) {
         if (aesthetic.field) {
           needed_dimensions.add(aesthetic.field);
         }
       }
     }
-    for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
+
+    for (const key of ['ix', ...needed_dimensions]) {
       const current =
         key === 'ix_in_tile'
-          ? this.renderer.integer_buffer
+          ? {
+              offset: 0,
+              stride: 4,
+              buffer: renderer.integer_buffer,
+              byte_size: this.tile.record_batch.numRows * 4,
+            }
           : this.regl_elements.get(key);
 
       if (current === null) {
@@ -1161,24 +1165,22 @@ class TileBufferManager {
     return true;
   }
 
-  get count() {
-    // Returns the number of points in this table.
-    const { regl_elements, tile } = this;
-    // return this.tile.record_batch.numRows; // Would probably be fine, but no need to lose the optimized version below.
-
-    if (regl_elements.has('_count')) {
-      return regl_elements.get('_count');
-    }
-    if (tile.ready && tile._batch) {
-      regl_elements.set('_count', tile.record_batch.getChild('ix').length);
-      return regl_elements.get('_count');
+  release(colname: string) {
+    let current;
+    if ((current = this.regl_elements.get(colname))) {
+      this.renderer.buffers.free_block(current);
     }
   }
+  get count() {
+    // Returns the number of points in this table.
+    //    console.log('ROWS', this.tile.record_batch.numRows);
+    return this.tile.record_batch.numRows;
+  }
 
-  create_buffer_data(key: string) {
+  create_buffer_data(key: string): Float32Array {
     const { tile } = this;
     if (!tile.ready) {
-      throw 'Tile table not present.';
+      throw new Error('Tile table not present.');
     }
 
     let column = tile.record_batch.getChild(key);
@@ -1195,16 +1197,16 @@ class TileBufferManager {
       } else {
         const col_names = tile.record_batch.schema.fields.map((d) => d.name);
         throw new Error(
-          `Requested ${key} but table lacks that; the present columns are "${col_names.join(
+          `Requested ${key} but table only has columns ["${col_names.join(
             '", "'
-          )}"`
+          )}]"`
         );
       }
     }
     // Anything that isn't a single-precision float must be coerced to one.
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
-      let source_buffer = column.data[0];
+      const source_buffer = column.data[0];
       if (column.type.dictionary) {
         // We set the dictionary values down by 2047 so that we can use
         // even half-precision floats for direct indexing.
@@ -1217,7 +1219,7 @@ class TileBufferManager {
         // This problem may creep up in other 64-bit types as we go, so keep an eye out.
         const copy = new Int32Array(source_buffer.values).buffer;
         const view64 = new BigInt64Array(copy);
-        const timetype = column.type.unit;
+        const timetype = column?.type?.unit as number;
         // All times are represented as milliseconds on the
         // GPU to align with the Javascript numbers. More or less,
         // at least.
@@ -1250,11 +1252,11 @@ class TileBufferManager {
     if (column.data[0].values.constructor === Float64Array) {
       return new Float32Array(column.data[0].values);
     }
-    return column.data[0].values;
+    return column.data[0].values as Float32Array;
   }
 
   create_regl_buffer(key: string) {
-    const { regl_elements } = this;
+    const { regl_elements, renderer } = this;
     const data = this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {
       console.warn(typeof data, data);
@@ -1263,10 +1265,7 @@ class TileBufferManager {
     const item_size = 4;
     const data_length = data.length;
 
-    const buffer_desc = this.renderer.buffers.allocate_block(
-      data_length,
-      item_size
-    );
+    const buffer_desc = renderer.buffers.allocate_block(data_length, item_size);
 
     regl_elements.set(key, buffer_desc);
 
@@ -1304,28 +1303,39 @@ class MultipurposeBufferSet {
 
   // The general purpose here is to call 'allocate_block' that releases a block of memory
   // to use in creating a new array to be passed to regl.
-  public regl: Regl;
-  public buffers: Buffer[];
+
+  private regl: Regl;
+  private buffers: Buffer[];
   public buffer_size: number;
-  public buffer_offsets: number[];
-  public pointer: number;
+  private pointer: number; // the byte offset to start the next allocation from.
+  private freed_buffers: BufferLocation[] = [];
+  /**
+   *
+   * @param regl the Regl context we're using.
+   * @param buffer_size The number of bytes on each strip of memory that we'll ask for.
+   */
 
   constructor(regl: Regl, buffer_size: number) {
     this.regl = regl;
     this.buffer_size = buffer_size;
     this.buffers = [];
     // Track the ends in case we want to allocate smaller items.
-    this.buffer_offsets = [];
     this.pointer = 0;
     this.generate_new_buffer();
   }
 
   generate_new_buffer() {
-    // Adds to beginning of list.
-    if (this.pointer) {
-      this.buffer_offsets.unshift(this.pointer);
+    if (this.buffers.length && this.buffer_size - this.pointer > 128) {
+      // mark any remaining space longer than 128 bytes as available.
+      this.freed_buffers.push({
+        buffer: this.buffers[0],
+        offset: this.pointer,
+        stride: 4, // meaningless here.
+        byte_size: this.buffer_size - this.pointer,
+      });
     }
     this.pointer = 0;
+    // Adds to beginning of list.
     this.buffers.unshift(
       this.regl.buffer({
         type: 'float',
@@ -1333,6 +1343,15 @@ class MultipurposeBufferSet {
         usage: 'dynamic',
       })
     );
+  }
+  /**
+   * Freeing a block means just adding its space back into the list of open blocks.
+   * There's no need to actually zero out the memory or anything.
+   *
+   * @param buff The location of the buffer we're done with.
+   */
+  free_block(buff: BufferLocation) {
+    this.freed_buffers.push(buff);
   }
 
   /**
@@ -1342,21 +1361,43 @@ class MultipurposeBufferSet {
    * @returns
    */
 
-  allocate_block(items: number, bytes_per_item: number) {
+  allocate_block(items: number, bytes_per_item: number): BufferLocation {
     // Call dibs on a block of this buffer.
     // NB size is in **bytes**
+
+    const bytes_needed = items * bytes_per_item;
+    let i = 0;
+    for (const buffer_loc of this.freed_buffers) {
+      // In practice, there should probably be a buffer of precisely the right size from
+      // the same recordbatch--so only reuse those so as not to slowly leak out memory
+      // by creating small unallocated strips at the end.
+      if (buffer_loc.byte_size === bytes_needed) {
+        console.log('Reusing', buffer_loc);
+        // Delete this element from the list of free buffers.
+        this.freed_buffers.splice(i, 1);
+        return {
+          buffer: buffer_loc.buffer,
+          offset: buffer_loc.offset,
+          stride: bytes_per_item,
+          byte_size: bytes_needed,
+        };
+      }
+      i += 1;
+    }
+
     if (this.pointer + items * bytes_per_item > this.buffer_size) {
       // May lead to ragged ends. Could be smarter about reallocation here,
       // too.
       this.generate_new_buffer();
     }
 
-    const value = {
+    const value: BufferLocation = {
       // First slot stores the active buffer.
       buffer: this.buffers[0],
       offset: this.pointer,
       stride: bytes_per_item,
-    };
+      byte_size: items * bytes_per_item,
+    } as BufferLocation;
     this.pointer += items * bytes_per_item;
     return value;
   }

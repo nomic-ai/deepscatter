@@ -4,7 +4,8 @@ import type { Dataset } from './Dataset';
 import type { ArrowDataset } from './Dataset';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import type { Tile, QuadTile, ArrowTile } from './tile';
-import Scatterplot from './deepscatter';
+import type Scatterplot from './deepscatter';
+import type { Regl, Buffer } from 'regl';
 
 export type {
   Renderer,
@@ -45,6 +46,12 @@ declare global {
     field: string;
     domain?: [number, number];
     range?: [number, number];
+  };
+  type BufferLocation = {
+    buffer: Buffer;
+    offset: number;
+    stride: number;
+    byte_size: number; // in bytes;
   };
 
   type FunctionalChannel = LambdaChannel | OpChannel;
@@ -167,7 +174,6 @@ declare global {
     color?: null | ColorChannel;
     size?: null | Channel;
     shape?: null | Channel;
-    alpha?: null | Channel;
     filter?: null | FunctionalChannel;
     filter2?: null | FunctionalChannel;
     jitter_radius?: null | JitterChannel;
@@ -230,6 +236,8 @@ declare global {
     encoding?: Encoding;
 
     background_options?: BackgroundOptions;
+
+    bearer_token?: string;
   };
 
   type InitialAPICall = APICall & {

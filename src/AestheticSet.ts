@@ -1,20 +1,25 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
-import { dimensions } from './StatefulAesthetic';
+import { ConcreteAesthetic, dimensions } from './StatefulAesthetic';
 import type Scatterplot from './deepscatter';
-import type { QuadtileSet } from './Dataset';
+import type { Dataset, QuadtileSet } from './Dataset';
 import { StatefulAesthetic } from './StatefulAesthetic';
 import { Aesthetic } from './Aesthetic';
+import type { Tile } from './tile';
 
-export class AestheticSet {
-  public tileSet: QuadtileSet;
-  public scatterplot: Plot;
+export class AestheticSet<TileType extends Tile> {
+  public tileSet: Dataset<TileType>;
+  public scatterplot: Scatterplot<TileType>;
   public regl: Regl;
   public encoding: Encoding = {};
   public position_interpolation: boolean;
   private store: Record<string, StatefulAesthetic>;
   public aesthetic_map: TextureSet;
-  constructor(scatterplot: Plot, regl: Regl, tileSet: QuadtileSet) {
+  constructor(
+    scatterplot: Scatterplot<TileType>,
+    regl: Regl,
+    tileSet: Dataset<TileType>
+  ) {
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl;

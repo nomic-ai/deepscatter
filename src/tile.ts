@@ -22,7 +22,7 @@ import {
   Field,
   StructRowProxy,
 } from 'apache-arrow';
-import { bind_column } from './Dataset';
+import { bind_column, delete_column_if_exists } from './Dataset';
 import type { Dataset, QuadtileSet } from './Dataset';
 import Scatterplot from './deepscatter';
 type MinMax = [number, number];
@@ -39,9 +39,15 @@ interface schema_entry {
   keys?: Array<any>;
 }
 
+import type { TileBufferManager } from './regl_rendering';
 // Keep a global index of tile numbers. These are used to identify points.
 let tile_identifier = 0;
 
+/**
+ * A Tile is, essentially, code to create an Arrow RecordBatch
+ * and to associate metadata with it, in the context of a larger dataset.
+ *
+ */
 export abstract class Tile {
   public max_ix = -1;
   readonly key: string; // A unique identifier for this tile.
@@ -54,13 +60,15 @@ export abstract class Tile {
   public _highest_known_ix?: number;
   public _min_ix?: number;
   public _max_ix?: number;
-  public dataset: QuadtileSet;
+  public dataset: Dataset<this>;
   public _download?: Promise<void>;
   __schema?: schema_entry[];
   local_dictionary_lookups?: Map<string, any>;
   public _extent?: { x: MinMax; y: MinMax };
   public numeric_id: number;
-  constructor(dataset: QuadtileSet) {
+  // bindings to regl buffers holdings shadows of the RecordBatch.
+  public _buffer_manager?: TileBufferManager<this>;
+  constructor(dataset: this) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
@@ -85,6 +93,11 @@ export abstract class Tile {
 
   download() {
     throw new Error('Not implemented');
+  }
+
+  delete_column_if_exists(colname: string) {
+    this._buffer_manager?.release(colname);
+    this._batch = delete_column_if_exists(this.record_batch, colname);
   }
 
   is_visible(max_ix: number, viewport_limits: Rectangle | undefined): boolean {
@@ -121,7 +134,7 @@ export abstract class Tile {
     //  return;
     //}
     for (const p of this) {
-      if (p_in_rect([p.x, p.y], bounding)) {
+      if (p_in_rect([p.x as number, p.y as number], bounding)) {
         yield p;
       }
     }
@@ -135,7 +148,7 @@ export abstract class Tile {
           continue;
         }
         for (const p of child.points(bounding, sorted)) {
-          if (p_in_rect([p.x, p.y], bounding)) {
+          if (p_in_rect([p.x as number, p.y as number], bounding)) {
             yield p;
           }
         }
@@ -168,7 +181,7 @@ export abstract class Tile {
   }
 
   forEach(callback: (p: StructRowProxy) => void) {
-    for (const p of this.points()) {
+    for (const p of this.points(undefined, false)) {
       if (p === undefined) {
         continue;
       }
@@ -209,7 +222,7 @@ export abstract class Tile {
     if (this.parent) {
       return this.parent.max_ix + 1;
     }
-    return;
+    return 0;
   }
 
   async schema() {
@@ -337,21 +350,18 @@ export class QuadTile extends Tile {
   constructor(
     base_url: string,
     key: string,
-    parent: null | this,
+    parent: QuadTile | null,
     dataset: QuadtileSet,
-    prefs
+    prefs: APICall
   ) {
     super(dataset);
     this.url = base_url;
-    if (prefs != undefined && 'bearer_token' in prefs) {
-      this.bearer_token = prefs['bearer_token'];
-    }
+    this.bearer_token = prefs?.bearer_token ?? '';
 
-    this.parent = parent;
+    this.parent = parent as this;
     this.key = key;
     const [z, x, y] = key.split('/').map((d) => Number.parseInt(d));
     this.codes = [z, x, y];
-    this.class = new.target;
   }
 
   get extent(): Rectangle {
@@ -371,7 +381,7 @@ export class QuadTile extends Tile {
     if (this.max_ix < max_ix) {
       promises = this.children.map((child) => child.download_to_depth(max_ix));
     }
-    return Promise.all(promises);
+    await Promise.all(promises);
   }
 
   async download(): Promise<void> {
@@ -383,12 +393,15 @@ export class QuadTile extends Tile {
     if (this._already_called) {
       throw 'Illegally attempting to download twice';
     }
+
     this._already_called = true;
-    var url = `${this.url}/${this.key}.feather`;
+    let url = `${this.url}/${this.key}.feather`;
     this.download_state = 'In progress';
+
     if (this.bearer_token) {
       url = url.replace('/public', '');
     }
+
     const request: RequestInit | undefined = this.bearer_token
       ? {
           method: 'GET',
@@ -397,7 +410,7 @@ export class QuadTile extends Tile {
       : undefined;
 
     this._download = fetch(url, request)
-      .then(async (response): Table<any> => {
+      .then(async (response): Promise<void> => {
         const buffer = await response.arrayBuffer();
         this.download_state = 'Complete';
         this._table_buffer = buffer;
@@ -422,14 +435,12 @@ export class QuadTile extends Tile {
           this._min_ix = 0;
         }
         this.highest_known_ix = this.max_ix;
-        //        this.update_master_dictionary_lookups();
       })
       .catch((error) => {
-        console.log(error);
         this.download_state = 'Failed';
         console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
-
         `);
+        console.log(error);
         throw error;
       });
     return this._download;
@@ -441,18 +452,21 @@ export class QuadTile extends Tile {
     if (this.download_state !== 'Complete') {
       return [];
     }
+    const constructor = this.constructor as new (
+      k: string,
+      l: string,
+      m: this,
+      data: typeof this.dataset,
+      prefs: APICall
+    ) => this;
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
-        //this._children.push(key)
-        this._children.push(
-          new this.class(this.url, key, this, this.dataset, {
-            bearer_token: this.bearer_token,
-          })
-        );
+        const child = new constructor(this.url, key, this, this.dataset, {
+          bearer_token: this.bearer_token,
+        });
+        this._children.push(child);
       }
     }
-    // }
-    // }
     return this._children;
   }
 
@@ -481,7 +495,6 @@ export class ArrowTile extends Tile {
     table: Table,
     dataset: Dataset<ArrowTile>,
     batch_num: number,
-    plot: Scatterplot,
     parent = null
   ) {
     super(dataset);
@@ -534,26 +547,28 @@ export class ArrowTile extends Tile {
     while (++ix <= this.batch_num * 4 + 4) {
       if (ix < this.full_tab.batches.length) {
         this._children.push(
-          new ArrowTile(this.full_tab, this.dataset, ix, this.plot, this)
+          new ArrowTile(this.full_tab, this.dataset, ix, this)
         );
       }
     }
-    for (let child of this._children) {
-      for (let dim of ['x', 'y'] as const) {
-        this._extent![dim][0] = Math.min(
-          this._extent![dim][0],
-          child._extent![dim][0]
+    for (const child of this._children) {
+      for (const dim of ['x', 'y'] as const) {
+        this._extent[dim][0] = Math.min(
+          this._extent[dim][0],
+          child._extent[dim][0]
         );
-        this._extent![dim][1] = Math.max(
-          this._extent![dim][1],
-          child._extent![dim][1]
+        this._extent[dim][1] = Math.max(
+          this._extent[dim][1],
+          child._extent[dim][1]
         );
       }
     }
   }
+
   download(): Promise<RecordBatch> {
     return Promise.resolve(this._batch);
   }
+
   get ready(): boolean {
     // Arrow tables are always ready.
     return true;

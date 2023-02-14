@@ -12,6 +12,7 @@ import {
   Schema,
   tableFromIPC,
 } from 'apache-arrow';
+
 type Key = string;
 
 function nothing() {
@@ -21,14 +22,14 @@ function nothing() {
 export abstract class Dataset<T extends Tile> {
   public transformations: Record<string, (arg0: T) => RecordBatch> = {};
   abstract root_tile: T;
-  protected plot: Scatterplot;
+  protected plot: Plot;
   abstract ready: Promise<void>;
   abstract get extent(): Rectangle;
   abstract promise: Promise<void>;
   private extents: Record<string, [number, number]> = {};
-  public _ix_seed: number = 0;
+  public _ix_seed = 0;
   public _schema?: Schema;
-  constructor(plot: Scatterplot) {
+  constructor(plot: Plot) {
     this.plot = plot;
     // If a linear identifier does not exist in the passed data, we add the ix columns in the order that
     // they are passed.
@@ -49,14 +50,14 @@ export abstract class Dataset<T extends Tile> {
   static from_quadfeather(
     url: string,
     prefs: APICall,
-    plot: Scatterplot
+    plot: Plot
   ): QuadtileSet {
     return new QuadtileSet(url, prefs, plot);
   }
   static from_arrow_table(
     table: Table,
     prefs: APICall,
-    plot: Scatterplot
+    plot: Plot
   ): ArrowDataset {
     return new ArrowDataset(table, prefs, plot);
   }
@@ -136,7 +137,7 @@ export abstract class Dataset<T extends Tile> {
     const results: U[] = [];
     this.visit((d: T) => {
       results.push(callback(d));
-    }, (after = after));
+    }, after);
     return results;
   }
 
@@ -194,8 +195,7 @@ export abstract class Dataset<T extends Tile> {
   add_tiled_column(field_name: string, buffer: Uint8Array): void {
     const tb = tableFromIPC(buffer);
     const records = {};
-    window.tb = tb;
-    for (let batch of tb.batches) {
+    for (const batch of tb.batches) {
       const offsets = batch.getChild('data').data[0].valueOffsets;
       const values = batch.getChild('data').data[0].children[0];
       for (let i = 0; i < batch.data.length; i++) {
@@ -205,7 +205,6 @@ export abstract class Dataset<T extends Tile> {
     }
     this.transformations[field_name] = function (tile) {
       const { key } = tile;
-      const length = tile.record_batch.numRows;
       const array = records[key];
       return bind_column(tile.record_batch, field_name, array);
     };
@@ -230,6 +229,7 @@ export abstract class Dataset<T extends Tile> {
    * @param field_name The name of the new field to create
    * @param key_field The column in the dataset to match them against.
    */
+
   add_label_identifiers(
     ids: Record<string, number>,
     field_name: string,
@@ -285,7 +285,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   public promise: Promise<void> = Promise.resolve();
   public root_tile: ArrowTile;
 
-  constructor(table: Table, prefs: APICall, plot: Scatterplot) {
+  constructor(table: Table, prefs: APICall, plot: Plot) {
     super(plot);
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
@@ -313,7 +313,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
   public promise: Promise<void> = new Promise(nothing);
   root_tile: QuadTile;
 
-  constructor(base_url: string, prefs: APICall, plot: Scatterplot) {
+  constructor(base_url: string, prefs: APICall, plot: Plot) {
     super(plot);
     this.root_tile = new QuadTile(base_url, '0/0/0', null, this, prefs);
     this.promise = this.root_tile.promise;
@@ -435,12 +435,37 @@ export function bind_column(
   if (current_keys.has(field_name)) {
     throw new Error(`Field ${field_name} already exists in batch`);
   }
-  const tb: Record<string, Data> = {};
+  const tb: Record<string, Data<any>> = {};
   for (const key of current_keys) {
-    tb[key] = batch.getChild(key).data[0];
+    tb[key] = batch.getChild(key)!.data[0];
   }
   tb[field_name] = vectorFromArray(data).data[0];
   const new_batch = new RecordBatch(tb);
+  for (const [k, v] of batch.schema.metadata) {
+    console.log({ k, v });
+    new_batch.schema.metadata.set(k, v);
+  }
+  return new_batch;
+}
+
+export function delete_column_if_exists(
+  batch: RecordBatch,
+  field_name: string
+): RecordBatch {
+  const current_keys: Set<string> = new Set(
+    [...batch.schema.fields].map((d) => d.name)
+  );
+  const tb: Record<string, Data<any>> = {};
+  for (const key of current_keys) {
+    if (key !== field_name) {
+      tb[key] = batch.getChild(key)!.data[0];
+    }
+  }
+  const new_batch = new RecordBatch(tb);
+  for (const [k, v] of batch.schema.metadata) {
+    console.log({ k, v });
+    new_batch.schema.metadata.set(k, v);
+  }
   return new_batch;
 }
 
