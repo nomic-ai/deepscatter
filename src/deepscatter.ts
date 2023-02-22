@@ -148,9 +148,11 @@ export default class Scatterplot<T extends Tile> {
     codes: string[] | Record<string, number>,
     key_field: string
   ) {
+    console.log({codes})
     const true_codes: Record<string, number> = Array.isArray(codes)
       ? Object.fromEntries(codes.map((next) => [next, 1]))
       : codes;
+    
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
   async add_labels_from_url(

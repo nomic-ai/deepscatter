@@ -161,9 +161,9 @@ export class Renderer<TileType extends Tile> {
     // This extends a formula suggested by Ricky Reusser to include
     // discard share.
 
-    const { zoom_balance } = this.prefs;
+    const zoom_balance = this.prefs.zoom_balance ?? 1;
     const { alpha, point_size, max_ix, width, discard_share, height } = this;
-    const k = this.zoom.transform?.k || 1;
+    const k = this.zoom?.transform?.k ?? 1;
     const target_share = alpha / 100;
     const fraction_of_total_visible = 1 / k ** 2;
     const pixelRatio = window.devicePixelRatio || 1;

@@ -11,3 +11,8 @@ export function isConstantChannel(
 ): input is ConstantChannel {
   return (input as ConstantChannel).constant !== undefined;
 }
+
+const isTypedArray = (function () {
+  const TypedArray = Object.getPrototypeOf(Uint8Array);
+  return (obj) => obj instanceof TypedArray;
+})();

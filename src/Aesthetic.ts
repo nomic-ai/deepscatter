@@ -1,5 +1,5 @@
 /* eslint-disable no-underscore-dangle */
-import { range as arange, extent } from 'd3-array';
+import { range as arange } from 'd3-array';
 import {
   scaleLinear,
   scaleSqrt,
@@ -7,7 +7,6 @@ import {
   scaleIdentity,
   scaleOrdinal,
 } from 'd3-scale';
-import type Scatterplot from './deepscatter';
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
 import { isOpChannel, isLambdaChannel, isConstantChannel } from './typing';
@@ -32,21 +31,23 @@ type DefaultChannel =
   | LambdaChannel
   | ConstantChannel;
 
+type PossibleGLVals = number | [number, number, number]
+
 export abstract class Aesthetic<
-  GlValueType = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
+  GlValueType extends PossibleGLVals = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
   JSValueType = number, // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red
   ChannelType extends Channel = DefaultChannel
 > {
   public abstract default_range: [number, number];
-  public abstract default_constant: GlValueType;
-  public abstract _constant: GlValueType;
+  public abstract default_constant: JSValueType;
+  public _constant?: JSValueType;
   public abstract default_transform: 'log' | 'sqrt' | 'linear' | 'literal';
   public _transform: 'log' | 'sqrt' | 'linear' | 'literal' | undefined;
   public scatterplot: Plot;
   public field: string | null = null;
   public regl: Regl;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
-  public _domain: [number, number];
+  public _domain?: [number, number];
   public _range: [number, number] | Uint8Array;
   public _func?: (d: string | number) => GlValueType;
   public dataset: QuadtileSet;
@@ -70,7 +71,6 @@ export abstract class Aesthetic<
     }
     this.scatterplot = scatterplot;
     this.regl = regl;
-    this._domain = this.default_domain;
     this._range = [0, 1];
     this.dataset = dataset;
     // A flag that will be turned on and off in AestheticSet.
@@ -79,10 +79,14 @@ export abstract class Aesthetic<
 
   apply(point: Datum): JSValueType {
     // Takes an arrow point and returns the aesthetic value.
-    // Used for generating points in SVG over the scatterplot.
-    return this.scale(this.value_for(point)) as JSValueType;
+    // Used, e.g., for generating points in SVG over the scatterplot.
+    if (this.scale === undefined) {
+      return this.default_constant;
+    }
+    return this.scale(this.value_for(point));
   }
-  abstract toGLType(val: JSValueType): GlValueType;
+
+  abstract toGLType(val: JSValueType) : GlValueType;
 
   get transform() {
     if (this._transform) return this._transform;
@@ -93,7 +97,7 @@ export abstract class Aesthetic<
     this._transform = transform;
   }
 
-  get scale() {
+  get scale() : (arg0: any) => JSValueType {
     if (this._scale) {
       return this._scale;
     }
@@ -146,8 +150,9 @@ export abstract class Aesthetic<
     return this.dataset.domain(this.field);
   }
 
-  default_data(): Uint8Array | Float32Array | Array<number> {
-    return Array(this.aesthetic_map.texture_size).fill(this.default_constant);
+  default_data(): Uint8Array | Float32Array | Array<GlValueType> {
+    const def = this.toGLType(this.default_constant);
+    return Array(this.aesthetic_map.texture_size).fill(def) as Array<GlValueType>;
   }
 
   get webGLDomain() {
@@ -158,6 +163,9 @@ export abstract class Aesthetic<
   }
 
   get domain() {
+    if (this._domain === undefined) {
+      this._domain = this.default_domain;
+    }
     return this._domain || this.default_domain;
   }
 
@@ -217,9 +225,7 @@ export abstract class Aesthetic<
     this._transform = undefined;
     this._constant = this.default_constant;
     this.field = null;
-    this.current_encoding = {
-      constant: this.default_constant,
-    };
+    this.current_encoding = null;
     this._scale = undefined;
   }
 
@@ -231,9 +237,7 @@ export abstract class Aesthetic<
     }
 
     if (encoding === null || encoding === 'null') {
-      this.current_encoding = {
-        constant: this.default_constant,
-      };
+      this.current_encoding = null;
       this.reset_to_defaults();
       return;
     }
@@ -243,7 +247,7 @@ export abstract class Aesthetic<
     if (typeof encoding === 'string') {
       encoding = this.convert_string_encoding(encoding) as ChannelType;
     }
-
+    
     if (isNumber(encoding)) {
       const x: ConstantChannel = {
         constant: encoding,
@@ -317,7 +321,8 @@ export abstract class Aesthetic<
     if (this.field === null || this.field === undefined) {
       return false;
     }
-    return this.arrow_column().type.dictionary !== undefined;
+    if (this.arrow_column()?.type?.dictionary !== undefined) return true
+    return false
   }
 
   get constant(): GlValueType {
@@ -327,7 +332,7 @@ export abstract class Aesthetic<
     ) {
       return this.toGLType(this.current_encoding.constant);
     }
-    return this.default_constant;
+    return this.toGLType(this.default_constant);
   }
 
   get use_map_on_regl(): 1 | 0 {
@@ -403,15 +408,13 @@ abstract class OneDAesthetic extends Aesthetic {
     aesthetic_map: TextureSet
   ) {
     super(scatterplot, regl, dataset, aesthetic_map);
-    this.current_encoding = { constant: 1 };
+    this.current_encoding = null;
   }
 
   toGLType(a: number) {
     return a;
   }
-  static get default_constant() {
-    return 1.5;
-  }
+  
   static get_default_domain() {
     return [0, 1] as [number, number];
   }
@@ -484,7 +487,6 @@ abstract class BooleanAesthetic extends Aesthetic<
     map: TextureSet
   ) {
     super(scatterplot, regl, tile, map);
-    //    this.current_encoding = { constant: true };
   }
   toGLType(a: boolean) {
     return a ? 1 : 0;
@@ -492,8 +494,9 @@ abstract class BooleanAesthetic extends Aesthetic<
 
   update(encoding: BooleanChannel | null) {
     super.update(encoding);
-    if (Object.keys(this.current_encoding).length === 0) {
-      this.current_encoding = { constant: true };
+
+    if (this.current_encoding !== null && Object.keys(this.current_encoding).length === 0) {
+      this.current_encoding = null
     }
   }
 
@@ -575,7 +578,7 @@ abstract class BooleanAesthetic extends Aesthetic<
  * background points will be plotted with much less resolution.
  */
 export class Foreground extends BooleanAesthetic {
-  //  public current_encoding = null;
+  public current_encoding = null;
   _constant = 1;
   default_constant = 1;
   default_range = [0, 1] as [number, number];
@@ -592,9 +595,7 @@ export class Foreground extends BooleanAesthetic {
 }
 
 export class Filter extends BooleanAesthetic {
-  public current_encoding = {
-    constant: true,
-  };
+  public current_encoding = null;
   _constant = 1;
   default_constant = 1;
   default_transform: Transform = 'literal';

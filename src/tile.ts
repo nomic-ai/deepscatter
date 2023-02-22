@@ -22,7 +22,7 @@ import {
   Field,
   StructRowProxy,
 } from 'apache-arrow';
-import { bind_column, delete_column_if_exists } from './Dataset';
+import { add_or_delete_column } from './Dataset';
 import type { Dataset, QuadtileSet } from './Dataset';
 import Scatterplot from './deepscatter';
 type MinMax = [number, number];
@@ -96,8 +96,26 @@ export abstract class Tile {
   }
 
   delete_column_if_exists(colname: string) {
-    this._buffer_manager?.release(colname);
-    this._batch = delete_column_if_exists(this.record_batch, colname);
+    console.log(colname, this.key);
+    if (this._batch) {
+      this._buffer_manager?.release(colname);
+      this._batch = add_or_delete_column(this.record_batch, colname, null);
+    }
+  }
+
+  apply_transformation(name: string): Vector {
+    const transform = this.dataset.transformations[name];
+    if (transform === undefined) {
+      throw new Error(`Transformation ${name} is not defined`);
+    }
+    const transformed = transform(this);
+    this._batch = add_or_delete_column(this.record_batch, name, transformed);
+  }
+
+  add_column(name: string, data: Float32Array) {
+    console.log({ name, data });
+    this._batch = add_or_delete_column(this.record_batch, name, data);
+    return this._batch;
   }
 
   is_visible(max_ix: number, viewport_limits: Rectangle | undefined): boolean {
@@ -518,7 +536,7 @@ export class ArrowTile extends Tile {
       this._max_ix = seed + batch.numRows;
       // This bubbles up to parents.
       this.highest_known_ix = this._max_ix;
-      this._batch = bind_column(this.record_batch, 'ix', array);
+      this._batch = add_or_delete_column(this.record_batch, 'ix', array);
       console.log('Updated batch to', this._batch);
     }
     console.log(this._batch.getChild('x'));

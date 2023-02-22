@@ -15661,7 +15661,7 @@ class Renderer {
     __publicField(this, "scatterplot");
     __publicField(this, "holder");
     __publicField(this, "canvas");
-    __publicField(this, "tileSet");
+    __publicField(this, "dataset");
     __publicField(this, "width");
     __publicField(this, "height");
     __publicField(this, "deferred_functions");
@@ -15669,14 +15669,14 @@ class Renderer {
     __publicField(this, "zoom");
     __publicField(this, "aes");
     __publicField(this, "_zoom");
-    __publicField(this, "_initializations");
+    __publicField(this, "_initializations", []);
     __publicField(this, "render_props");
     this.scatterplot = scatterplot;
     this.holder = select(selector2);
     this.canvas = select(
       this.holder.node().firstElementChild
     ).node();
-    this.tileSet = tileSet;
+    this.dataset = tileSet;
     this.width = +select(this.canvas).attr("width");
     this.height = +select(this.canvas).attr("height");
     this.deferred_functions = [];
@@ -15696,17 +15696,17 @@ class Renderer {
     return this.render_props.alpha;
   }
   get optimal_alpha() {
-    var _a2;
-    const { zoom_balance } = this.prefs;
+    var _a2, _b2, _c2, _d2;
+    const zoom_balance = (_a2 = this.prefs.zoom_balance) != null ? _a2 : 1;
     const { alpha, point_size, max_ix, width, discard_share, height } = this;
-    const k = ((_a2 = this.zoom.transform) == null ? void 0 : _a2.k) || 1;
+    const k = (_d2 = (_c2 = (_b2 = this.zoom) == null ? void 0 : _b2.transform) == null ? void 0 : _c2.k) != null ? _d2 : 1;
     const target_share = alpha / 100;
     const fraction_of_total_visible = 1 / k ** 2;
     const pixelRatio = window.devicePixelRatio || 1;
     const pixel_area = width * height / pixelRatio;
     const total_intended_points = min([
       max_ix,
-      this.tileSet.highest_known_ix || 1e10
+      this.dataset.highest_known_ix || 1e10
     ]);
     const total_points = total_intended_points * (1 - discard_share);
     const size_adjust = Math.exp(Math.log(k) * zoom_balance);
@@ -15729,10 +15729,9 @@ class Renderer {
   }
   visible_tiles() {
     const { max_ix } = this;
-    const { tileSet } = this;
-    let all_tiles;
+    const { dataset: tileSet } = this;
     const natural_display = this.aes.dim("x").current.field == "x" && this.aes.dim("y").current.field == "y" && this.aes.dim("x").last.field == "x" && this.aes.dim("y").last.field == "y";
-    all_tiles = natural_display ? tileSet.map((d) => d).filter((tile) => {
+    const all_tiles = natural_display ? tileSet.map((d) => d).filter((tile) => {
       const visible = tile.is_visible(
         max_ix,
         this.zoom.current_corners()
@@ -22724,6 +22723,7 @@ const scales = {
 };
 class Aesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
+    __publicField(this, "_constant");
     __publicField(this, "_transform");
     __publicField(this, "scatterplot");
     __publicField(this, "field", null);
@@ -22745,12 +22745,14 @@ class Aesthetic {
     }
     this.scatterplot = scatterplot;
     this.regl = regl2;
-    this._domain = this.default_domain;
     this._range = [0, 1];
     this.dataset = dataset;
     this.id = Math.random().toString();
   }
   apply(point) {
+    if (this.scale === void 0) {
+      return this.default_constant;
+    }
     return this.scale(this.value_for(point));
   }
   get transform() {
@@ -22806,7 +22808,8 @@ class Aesthetic {
     return this.dataset.domain(this.field);
   }
   default_data() {
-    return Array(this.aesthetic_map.texture_size).fill(this.default_constant);
+    const def = this.toGLType(this.default_constant);
+    return Array(this.aesthetic_map.texture_size).fill(def);
   }
   get webGLDomain() {
     if (this.is_dictionary()) {
@@ -22815,6 +22818,9 @@ class Aesthetic {
     return this.domain;
   }
   get domain() {
+    if (this._domain === void 0) {
+      this._domain = this.default_domain;
+    }
     return this._domain || this.default_domain;
   }
   get range() {
@@ -22861,9 +22867,7 @@ class Aesthetic {
     this._transform = void 0;
     this._constant = this.default_constant;
     this.field = null;
-    this.current_encoding = {
-      constant: this.default_constant
-    };
+    this.current_encoding = null;
     this._scale = void 0;
   }
   update(encoding) {
@@ -22872,9 +22876,7 @@ class Aesthetic {
       return;
     }
     if (encoding === null || encoding === "null") {
-      this.current_encoding = {
-        constant: this.default_constant
-      };
+      this.current_encoding = null;
       this.reset_to_defaults();
       return;
     }
@@ -22940,16 +22942,19 @@ class Aesthetic {
     return c2;
   }
   is_dictionary() {
+    var _a2, _b2;
     if (this.field === null || this.field === void 0) {
       return false;
     }
-    return this.arrow_column().type.dictionary !== void 0;
+    if (((_b2 = (_a2 = this.arrow_column()) == null ? void 0 : _a2.type) == null ? void 0 : _b2.dictionary) !== void 0)
+      return true;
+    return false;
   }
   get constant() {
     if (this.current_encoding !== null && isConstantChannel(this.current_encoding)) {
       return this.toGLType(this.current_encoding.constant);
     }
-    return this.default_constant;
+    return this.toGLType(this.default_constant);
   }
   get use_map_on_regl() {
     if (this.is_dictionary()) {
@@ -22997,13 +23002,10 @@ class Aesthetic {
 class OneDAesthetic extends Aesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
     super(scatterplot, regl2, dataset, aesthetic_map);
-    this.current_encoding = { constant: 1 };
+    this.current_encoding = null;
   }
   toGLType(a) {
     return a;
-  }
-  static get default_constant() {
-    return 1.5;
   }
   static get_default_domain() {
     return [0, 1];
@@ -23072,8 +23074,8 @@ class BooleanAesthetic extends Aesthetic {
   }
   update(encoding) {
     super.update(encoding);
-    if (Object.keys(this.current_encoding).length === 0) {
-      this.current_encoding = { constant: true };
+    if (this.current_encoding !== null && Object.keys(this.current_encoding).length === 0) {
+      this.current_encoding = null;
     }
   }
   ops_to_array() {
@@ -23149,6 +23151,7 @@ class BooleanAesthetic extends Aesthetic {
 class Foreground extends BooleanAesthetic {
   constructor() {
     super(...arguments);
+    __publicField(this, "current_encoding", null);
     __publicField(this, "_constant", 1);
     __publicField(this, "default_constant", 1);
     __publicField(this, "default_range", [0, 1]);
@@ -23164,9 +23167,7 @@ class Foreground extends BooleanAesthetic {
 class Filter extends BooleanAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "current_encoding", {
-      constant: true
-    });
+    __publicField(this, "current_encoding", null);
     __publicField(this, "_constant", 1);
     __publicField(this, "default_constant", 1);
     __publicField(this, "default_transform", "literal");
@@ -23791,13 +23792,11 @@ okabe();
 class Color extends Aesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "_constant", [0.5, 0.5, 0.5]);
+    __publicField(this, "_constant", "#CC5500");
     __publicField(this, "texture_type", "uint8");
-    __publicField(this, "default_constant", [0.5, 0.5, 0.5]);
+    __publicField(this, "default_constant", "#CC5500");
     __publicField(this, "default_transform", "linear");
-    __publicField(this, "current_encoding", {
-      constant: "gray"
-    });
+    __publicField(this, "current_encoding", null);
   }
   get default_range() {
     return [0, 1];
@@ -23971,6 +23970,7 @@ class StatefulAesthetic {
       }
       this.needs_transitions = false;
     } else {
+      console.log(this.states[0].current_encoding, stringy);
       this.states.reverse();
       this.states[0].update(encoding);
       this.needs_transitions = true;
@@ -24180,6 +24180,7 @@ class ReglRenderer extends Renderer {
     __publicField(this, "contour_vals");
     __publicField(this, "tick_num");
     __publicField(this, "reglframe");
+    __publicField(this, "_integer_buffer");
     __publicField(this, "aes_to_buffer_num");
     __publicField(this, "variable_to_buffer_num");
     __publicField(this, "buffer_num_to_variable");
@@ -24275,12 +24276,12 @@ class ReglRenderer extends Renderer {
     let call_no = 0;
     const needs_background_pass = this.aes.store.foreground.states[0].active || this.aes.store.foreground.states[1].active;
     for (const tile of this.visible_tiles()) {
-      const manager = new TileBufferManager(this.regl, tile, this);
-      if (!manager.ready(props.prefs, props.block_for_buffers)) {
+      tile._buffer_manager = tile._buffer_manager || new TileBufferManager(this.regl, tile, this);
+      if (!tile._buffer_manager.ready(props.block_for_buffers)) {
         continue;
       }
       const this_props = {
-        manager,
+        manager: tile._buffer_manager,
         number: call_no++,
         foreground: needs_background_pass ? 1 : -1,
         tile_id: tile.numeric_id,
@@ -24526,7 +24527,13 @@ class ReglRenderer extends Renderer {
       return null;
     }
     const tile_number = this.color_pick_single(x, y, "tile_id");
+    if (tile_number == -1) {
+      return null;
+    }
     const row_number = this.color_pick_single(x, y, "ix_in_tile");
+    if (row_number === -1) {
+      return null;
+    }
     for (const tile of this.visible_tiles()) {
       if (tile.numeric_id === tile_number) {
         return tile.record_batch.get(row_number);
@@ -24779,7 +24786,6 @@ class ReglRenderer extends Renderer {
             });
           }
         } catch (error) {
-          this.reglframe.cancel();
           this.reglframe = void 0;
           throw error;
         }
@@ -24832,30 +24838,30 @@ class TileBufferManager {
     this.tile = tile;
     this.regl = regl2;
     this.renderer = renderer;
-    tile._regl_elements = tile._regl_elements || /* @__PURE__ */ new Map([
+    this.regl_elements = /* @__PURE__ */ new Map([
       [
         "ix_in_tile",
         {
           offset: 0,
           stride: 4,
-          buffer: renderer.integer_buffer
+          buffer: renderer.integer_buffer,
+          byte_size: 4 * 2 ** 16
         }
       ]
     ]);
-    this.regl_elements = tile._regl_elements;
   }
-  ready(_, block_for_buffers = true) {
+  ready(block_for_buffers = true) {
     const { renderer, regl_elements } = this;
     const needed_dimensions = /* @__PURE__ */ new Set();
     for (const [k, v] of renderer.aes) {
-      for (const aesthetic of [v.current, v.last]) {
+      for (const aesthetic of v.states) {
         if (aesthetic.field) {
           needed_dimensions.add(aesthetic.field);
         }
       }
     }
     for (const key of ["ix", "ix_in_tile", ...needed_dimensions]) {
-      const current = key === "ix_in_tile" ? this.renderer.integer_buffer : this.regl_elements.get(key);
+      const current = this.regl_elements.get(key);
       if (current === null) {
         return false;
       }
@@ -24877,25 +24883,26 @@ class TileBufferManager {
     }
     return true;
   }
-  get count() {
-    const { regl_elements, tile } = this;
-    if (regl_elements.has("_count")) {
-      return regl_elements.get("_count");
-    }
-    if (tile.ready && tile._batch) {
-      regl_elements.set("_count", tile.record_batch.getChild("ix").length);
-      return regl_elements.get("_count");
+  release(colname) {
+    let current;
+    if (current = this.regl_elements.get(colname)) {
+      this.renderer.buffers.free_block(current);
     }
   }
+  get count() {
+    return this.tile.record_batch.numRows;
+  }
   create_buffer_data(key) {
+    var _a2;
     const { tile } = this;
     if (!tile.ready) {
-      throw "Tile table not present.";
+      throw new Error("Tile table not present.");
     }
     let column = tile.record_batch.getChild(key);
     if (!column) {
-      if (tile.dataset.transformations[key]) {
-        tile._batch = tile.dataset.transformations[key](tile);
+      const transformation = tile.dataset.transformations[key];
+      if (transformation !== void 0) {
+        tile.apply_transformation(key);
         column = tile.record_batch.getChild(key);
         if (!column) {
           throw new Error(`${key} was not created.`);
@@ -24903,15 +24910,15 @@ class TileBufferManager {
       } else {
         const col_names = tile.record_batch.schema.fields.map((d) => d.name);
         throw new Error(
-          `Requested ${key} but table lacks that; the present columns are "${col_names.join(
+          `Requested ${key} but table only has columns ["${col_names.join(
             '", "'
-          )}"`
+          )}]"`
         );
       }
     }
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
-      let source_buffer = column.data[0];
+      const source_buffer = column.data[0];
       if (column.type.dictionary) {
         for (let i = 0; i < tile.record_batch.numRows; i++) {
           buffer[i] = source_buffer.values[i] - 2047;
@@ -24919,7 +24926,7 @@ class TileBufferManager {
       } else if (source_buffer.stride === 2 && column.type.typeId === 10) {
         const copy2 = new Int32Array(source_buffer.values).buffer;
         const view64 = new BigInt64Array(copy2);
-        const timetype = column.type.unit;
+        const timetype = (_a2 = column == null ? void 0 : column.type) == null ? void 0 : _a2.unit;
         const divisor = timetype === 0 ? 1e-3 : timetype === 1 ? 1 : timetype === 2 ? 1e3 : timetype === 3 ? 1e6 : 42;
         if (divisor === 42) {
           throw new Error(`Unknown time type ${timetype}`);
@@ -24940,7 +24947,7 @@ class TileBufferManager {
     return column.data[0].values;
   }
   create_regl_buffer(key) {
-    const { regl_elements } = this;
+    const { regl_elements, renderer } = this;
     const data = this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {
       console.warn(typeof data, data);
@@ -24948,10 +24955,7 @@ class TileBufferManager {
     }
     const item_size = 4;
     const data_length = data.length;
-    const buffer_desc = this.renderer.buffers.allocate_block(
-      data_length,
-      item_size
-    );
+    const buffer_desc = renderer.buffers.allocate_block(data_length, item_size);
     regl_elements.set(key, buffer_desc);
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
   }
@@ -24961,18 +24965,22 @@ class MultipurposeBufferSet {
     __publicField(this, "regl");
     __publicField(this, "buffers");
     __publicField(this, "buffer_size");
-    __publicField(this, "buffer_offsets");
     __publicField(this, "pointer");
+    __publicField(this, "freed_buffers", []);
     this.regl = regl2;
     this.buffer_size = buffer_size;
     this.buffers = [];
-    this.buffer_offsets = [];
     this.pointer = 0;
     this.generate_new_buffer();
   }
   generate_new_buffer() {
-    if (this.pointer) {
-      this.buffer_offsets.unshift(this.pointer);
+    if (this.buffers.length && this.buffer_size - this.pointer > 128) {
+      this.freed_buffers.push({
+        buffer: this.buffers[0],
+        offset: this.pointer,
+        stride: 4,
+        byte_size: this.buffer_size - this.pointer
+      });
     }
     this.pointer = 0;
     this.buffers.unshift(
@@ -24983,14 +24991,33 @@ class MultipurposeBufferSet {
       })
     );
   }
+  free_block(buff) {
+    this.freed_buffers.push(buff);
+  }
   allocate_block(items, bytes_per_item) {
+    const bytes_needed = items * bytes_per_item;
+    let i = 0;
+    for (const buffer_loc of this.freed_buffers) {
+      if (buffer_loc.byte_size === bytes_needed) {
+        console.log("Reusing", buffer_loc);
+        this.freed_buffers.splice(i, 1);
+        return {
+          buffer: buffer_loc.buffer,
+          offset: buffer_loc.offset,
+          stride: bytes_per_item,
+          byte_size: bytes_needed
+        };
+      }
+      i += 1;
+    }
     if (this.pointer + items * bytes_per_item > this.buffer_size) {
       this.generate_new_buffer();
     }
     const value = {
       buffer: this.buffers[0],
       offset: this.pointer,
-      stride: bytes_per_item
+      stride: bytes_per_item,
+      byte_size: items * bytes_per_item
     };
     this.pointer += items * bytes_per_item;
     return value;
@@ -26150,11 +26177,6 @@ Date_[_j] = ((proto) => {
   proto.ArrayType = Int32Array;
   return proto[Symbol.toStringTag] = "Date";
 })(Date_.prototype);
-class DateMillisecond extends Date_ {
-  constructor() {
-    super(DateUnit$1.MILLISECOND);
-  }
-}
 class Time_ extends DataType {
   constructor(unit2, bitWidth) {
     super();
@@ -26912,7 +26934,7 @@ const setDecimal = ({ values, stride }, index, value) => {
 const setList = (data, index, value) => {
   const values = data.children[0];
   const valueOffsets = data.valueOffsets;
-  const set2 = instance$7.getVisitFn(values);
+  const set2 = instance$6.getVisitFn(values);
   if (Array.isArray(value)) {
     for (let idx = -1, itr = valueOffsets[index], end = valueOffsets[index + 1]; itr < end; ) {
       set2(values, itr++, value[++idx]);
@@ -26926,7 +26948,7 @@ const setList = (data, index, value) => {
 const setMap = (data, index, value) => {
   const values = data.children[0];
   const { valueOffsets } = data;
-  const set2 = instance$7.getVisitFn(values);
+  const set2 = instance$6.getVisitFn(values);
   let { [index]: idx, [index + 1]: end } = valueOffsets;
   const entries = value instanceof Map ? value.entries() : Object.entries(value);
   for (const val of entries) {
@@ -26940,7 +26962,7 @@ const _setStructVectorValue = (o, v) => (set2, c2, _, i) => c2 && set2(c2, o, v.
 const _setStructMapValue = (o, v) => (set2, c2, f, _) => c2 && set2(c2, o, v.get(f.name));
 const _setStructObjectValue = (o, v) => (set2, c2, f, _) => c2 && set2(c2, o, v[f.name]);
 const setStruct = (data, index, value) => {
-  const childSetters = data.type.children.map((f) => instance$7.getVisitFn(f.type));
+  const childSetters = data.type.children.map((f) => instance$6.getVisitFn(f.type));
   const set2 = value instanceof Map ? _setStructMapValue(index, value) : value instanceof Vector ? _setStructVectorValue(index, value) : Array.isArray(value) ? _setStructArrayValue(index, value) : _setStructObjectValue(index, value);
   data.type.children.forEach((f, i) => set2(childSetters[i], data.children[i], f, i));
 };
@@ -26950,12 +26972,12 @@ const setUnion = (data, index, value) => {
 const setDenseUnion = (data, index, value) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  instance$7.visit(child, data.valueOffsets[index], value);
+  instance$6.visit(child, data.valueOffsets[index], value);
 };
 const setSparseUnion = (data, index, value) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  instance$7.visit(child, index, value);
+  instance$6.visit(child, index, value);
 };
 const setDictionary = (data, index, value) => {
   var _a2;
@@ -26973,7 +26995,7 @@ const setIntervalYearMonth = ({ values }, index, value) => {
 const setFixedSizeList = (data, index, value) => {
   const { stride } = data;
   const child = data.children[0];
-  const set2 = instance$7.getVisitFn(child);
+  const set2 = instance$6.getVisitFn(child);
   if (Array.isArray(value)) {
     for (let idx = -1, offset = index * stride; ++idx < stride; ) {
       set2(child, offset + idx, value[idx]);
@@ -27026,7 +27048,7 @@ SetVisitor.prototype.visitIntervalDayTime = wrapSet(setIntervalDayTime);
 SetVisitor.prototype.visitIntervalYearMonth = wrapSet(setIntervalYearMonth);
 SetVisitor.prototype.visitFixedSizeList = wrapSet(setFixedSizeList);
 SetVisitor.prototype.visitMap = wrapSet(setMap);
-const instance$7 = new SetVisitor();
+const instance$6 = new SetVisitor();
 const kParent = Symbol.for("parent");
 const kRowIndex = Symbol.for("rowIndex");
 class StructRow {
@@ -27044,7 +27066,7 @@ class StructRow {
     const keys = parent.type.children;
     const json = {};
     for (let j = -1, n = keys.length; ++j < n; ) {
-      json[keys[j].name] = instance$6.visit(parent.children[j], i);
+      json[keys[j].name] = instance$5.visit(parent.children[j], i);
     }
     return json;
   }
@@ -27077,7 +27099,7 @@ class StructRowIterator {
         done: false,
         value: [
           this.childFields[i].name,
-          instance$6.visit(this.children[i], this.rowIndex)
+          instance$5.visit(this.children[i], this.rowIndex)
         ]
       };
     }
@@ -27117,7 +27139,7 @@ class StructRowProxyHandler {
     }
     const idx = row[kParent].type.children.findIndex((f) => f.name === key);
     if (idx !== -1) {
-      const val = instance$6.visit(row[kParent].children[idx], row[kRowIndex]);
+      const val = instance$5.visit(row[kParent].children[idx], row[kRowIndex]);
       Reflect.set(row, key, val);
       return val;
     }
@@ -27125,7 +27147,7 @@ class StructRowProxyHandler {
   set(row, key, val) {
     const idx = row[kParent].type.children.findIndex((f) => f.name === key);
     if (idx !== -1) {
-      instance$7.visit(row[kParent].children[idx], row[kRowIndex], val);
+      instance$6.visit(row[kParent].children[idx], row[kRowIndex], val);
       return Reflect.set(row, key, val);
     } else if (Reflect.has(row, key) || typeof key === "symbol") {
       return Reflect.set(row, key, val);
@@ -27228,12 +27250,12 @@ const getUnion = (data, index) => {
 const getDenseUnion = (data, index) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  return instance$6.visit(child, data.valueOffsets[index]);
+  return instance$5.visit(child, data.valueOffsets[index]);
 };
 const getSparseUnion = (data, index) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  return instance$6.visit(child, index);
+  return instance$5.visit(child, index);
 };
 const getDictionary = (data, index) => {
   var _a2;
@@ -27297,7 +27319,7 @@ GetVisitor.prototype.visitIntervalDayTime = wrapGet(getIntervalDayTime);
 GetVisitor.prototype.visitIntervalYearMonth = wrapGet(getIntervalYearMonth);
 GetVisitor.prototype.visitFixedSizeList = wrapGet(getFixedSizeList);
 GetVisitor.prototype.visitMap = wrapGet(getMap);
-const instance$6 = new GetVisitor();
+const instance$5 = new GetVisitor();
 const kKeys = Symbol.for("keys");
 const kVals = Symbol.for("vals");
 class MapRow {
@@ -27320,7 +27342,7 @@ class MapRow {
     const vals = this[kVals];
     const json = {};
     for (let i = -1, n = keys.length; ++i < n; ) {
-      json[keys.get(i)] = instance$6.visit(vals, i);
+      json[keys.get(i)] = instance$5.visit(vals, i);
     }
     return json;
   }
@@ -27351,7 +27373,7 @@ class MapRowIterator {
       done: false,
       value: [
         this.keys.get(i),
-        instance$6.visit(this.vals, i)
+        instance$5.visit(this.vals, i)
       ]
     };
   }
@@ -27385,7 +27407,7 @@ class MapRowProxyHandler {
     }
     const idx = row[kKeys].indexOf(key);
     if (idx !== -1) {
-      const val = instance$6.visit(Reflect.get(row, kVals), idx);
+      const val = instance$5.visit(Reflect.get(row, kVals), idx);
       Reflect.set(row, key, val);
       return val;
     }
@@ -27393,7 +27415,7 @@ class MapRowProxyHandler {
   set(row, key, val) {
     const idx = row[kKeys].indexOf(key);
     if (idx !== -1) {
-      instance$7.visit(Reflect.get(row, kVals), idx, val);
+      instance$6.visit(Reflect.get(row, kVals), idx, val);
       return Reflect.set(row, key, val);
     } else if (Reflect.has(row, key)) {
       return Reflect.set(row, key, val);
@@ -28034,7 +28056,7 @@ function indexOfValue(data, searchElement, fromIndex) {
   if (searchElement === null) {
     return indexOfNull(data, fromIndex);
   }
-  const get2 = instance$6.getVisitFn(data);
+  const get2 = instance$5.getVisitFn(data);
   const compare = createElementComparator(searchElement);
   for (let i = (fromIndex || 0) - 1, n = data.length; ++i < n; ) {
     if (compare(get2(data, i))) {
@@ -28044,7 +28066,7 @@ function indexOfValue(data, searchElement, fromIndex) {
   return -1;
 }
 function indexOfUnion(data, searchElement, fromIndex) {
-  const get2 = instance$6.getVisitFn(data);
+  const get2 = instance$5.getVisitFn(data);
   const compare = createElementComparator(searchElement);
   for (let i = (fromIndex || 0) - 1, n = data.length; ++i < n; ) {
     if (compare(get2(data, i))) {
@@ -28096,7 +28118,7 @@ IndexOfVisitor.prototype.visitIntervalDayTime = indexOfValue;
 IndexOfVisitor.prototype.visitIntervalYearMonth = indexOfValue;
 IndexOfVisitor.prototype.visitFixedSizeList = indexOfValue;
 IndexOfVisitor.prototype.visitMap = indexOfValue;
-const instance$5 = new IndexOfVisitor();
+const instance$4 = new IndexOfVisitor();
 class IteratorVisitor extends Visitor {
 }
 function vectorIterator(vector) {
@@ -28176,7 +28198,7 @@ IteratorVisitor.prototype.visitIntervalDayTime = vectorIterator;
 IteratorVisitor.prototype.visitIntervalYearMonth = vectorIterator;
 IteratorVisitor.prototype.visitFixedSizeList = vectorIterator;
 IteratorVisitor.prototype.visitMap = vectorIterator;
-const instance$4 = new IteratorVisitor();
+const instance$3 = new IteratorVisitor();
 const sum = (x, y) => x + y;
 class GetByteLengthVisitor extends Visitor {
   visitNull(____, _) {
@@ -28207,13 +28229,13 @@ class GetByteLengthVisitor extends Visitor {
     return (data.type.unit + 1) * 4;
   }
   visitStruct(data, i) {
-    return data.children.reduce((total, child) => total + instance$3.visit(child, i), 0);
+    return data.children.reduce((total, child) => total + instance$2.visit(child, i), 0);
   }
   visitFixedSizeBinary(data, _) {
     return data.type.byteWidth;
   }
   visitMap(data, i) {
-    return 8 + data.children.reduce((total, child) => total + instance$3.visit(child, i), 0);
+    return 8 + data.children.reduce((total, child) => total + instance$2.visit(child, i), 0);
   }
   visitDictionary(data, i) {
     var _a2;
@@ -28230,7 +28252,7 @@ const getListByteLength = ({ valueOffsets, stride, children: children2 }, index)
   const child = children2[0];
   const { [index * stride]: start2 } = valueOffsets;
   const { [index * stride + 1]: end } = valueOffsets;
-  const visit = instance$3.getVisitFn(child.type);
+  const visit = instance$2.getVisitFn(child.type);
   const slice = child.slice(start2, end - start2);
   let size = 8;
   for (let idx = -1, len = end - start2; ++idx < len; ) {
@@ -28241,7 +28263,7 @@ const getListByteLength = ({ valueOffsets, stride, children: children2 }, index)
 const getFixedSizeListByteLength = ({ stride, children: children2 }, index) => {
   const child = children2[0];
   const slice = child.slice(index * stride, stride);
-  const visit = instance$3.getVisitFn(child.type);
+  const visit = instance$2.getVisitFn(child.type);
   let size = 0;
   for (let idx = -1, len = slice.length; ++idx < len; ) {
     size += visit(slice, idx);
@@ -28253,10 +28275,10 @@ const getUnionByteLength = (data, index) => {
 };
 const getDenseUnionByteLength = ({ type, children: children2, typeIds, valueOffsets }, index) => {
   const childIndex = type.typeIdToChildIndex[typeIds[index]];
-  return 8 + instance$3.visit(children2[childIndex], valueOffsets[index]);
+  return 8 + instance$2.visit(children2[childIndex], valueOffsets[index]);
 };
 const getSparseUnionByteLength = ({ children: children2 }, index) => {
-  return 4 + instance$3.visitMany(children2, children2.map(() => index)).reduce(sum, 0);
+  return 4 + instance$2.visitMany(children2, children2.map(() => index)).reduce(sum, 0);
 };
 GetByteLengthVisitor.prototype.visitUtf8 = getUtf8ByteLength;
 GetByteLengthVisitor.prototype.visitBinary = getBinaryByteLength;
@@ -28265,7 +28287,7 @@ GetByteLengthVisitor.prototype.visitFixedSizeList = getFixedSizeListByteLength;
 GetByteLengthVisitor.prototype.visitUnion = getUnionByteLength;
 GetByteLengthVisitor.prototype.visitDenseUnion = getDenseUnionByteLength;
 GetByteLengthVisitor.prototype.visitSparseUnion = getSparseUnionByteLength;
-const instance$3 = new GetByteLengthVisitor();
+const instance$2 = new GetByteLengthVisitor();
 var _a$2;
 const visitorsByTypeId = {};
 const vectorPrototypesByTypeId = {};
@@ -28343,7 +28365,7 @@ class Vector {
     return 0;
   }
   [Symbol.iterator]() {
-    return instance$4.visit(this);
+    return instance$3.visit(this);
   }
   concat(...others) {
     return new Vector(this.data.concat(others.flatMap((x) => x.data).flat(Number.POSITIVE_INFINITY)));
@@ -28434,17 +28456,17 @@ Vector[_a$2] = ((proto) => {
   proto[Symbol.isConcatSpreadable] = true;
   const typeIds = Object.keys(Type$1).map((T) => Type$1[T]).filter((T) => typeof T === "number" && T !== Type$1.NONE);
   for (const typeId of typeIds) {
-    const get2 = instance$6.getVisitFnByTypeId(typeId);
-    const set2 = instance$7.getVisitFnByTypeId(typeId);
-    const indexOf = instance$5.getVisitFnByTypeId(typeId);
-    const byteLength = instance$3.getVisitFnByTypeId(typeId);
+    const get2 = instance$5.getVisitFnByTypeId(typeId);
+    const set2 = instance$6.getVisitFnByTypeId(typeId);
+    const indexOf = instance$4.getVisitFnByTypeId(typeId);
+    const byteLength = instance$2.getVisitFnByTypeId(typeId);
     visitorsByTypeId[typeId] = { get: get2, set: set2, indexOf, byteLength };
     vectorPrototypesByTypeId[typeId] = Object.create(proto, {
       ["isValid"]: { value: wrapChunkedCall1(isChunkedValid) },
-      ["get"]: { value: wrapChunkedCall1(instance$6.getVisitFnByTypeId(typeId)) },
-      ["set"]: { value: wrapChunkedCall2(instance$7.getVisitFnByTypeId(typeId)) },
-      ["indexOf"]: { value: wrapChunkedIndexOf(instance$5.getVisitFnByTypeId(typeId)) },
-      ["getByteLength"]: { value: wrapChunkedCall1(instance$3.getVisitFnByTypeId(typeId)) }
+      ["get"]: { value: wrapChunkedCall1(instance$5.getVisitFnByTypeId(typeId)) },
+      ["set"]: { value: wrapChunkedCall2(instance$6.getVisitFnByTypeId(typeId)) },
+      ["indexOf"]: { value: wrapChunkedIndexOf(instance$4.getVisitFnByTypeId(typeId)) },
+      ["getByteLength"]: { value: wrapChunkedCall1(instance$2.getVisitFnByTypeId(typeId)) }
     });
   }
   return "Vector";
@@ -28541,344 +28563,6 @@ function makeVector(init2) {
 }
 function unwrapInputs(x) {
   return x instanceof Data ? [x] : x instanceof Vector ? x.data : makeVector(x).data;
-}
-function createIsValidFunction(nullValues) {
-  if (!nullValues || nullValues.length <= 0) {
-    return function isValid(value) {
-      return true;
-    };
-  }
-  let fnBody = "";
-  const noNaNs = nullValues.filter((x) => x === x);
-  if (noNaNs.length > 0) {
-    fnBody = `
-    switch (x) {${noNaNs.map((x) => `
-        case ${valueToCase(x)}:`).join("")}
-            return false;
-    }`;
-  }
-  if (nullValues.length !== noNaNs.length) {
-    fnBody = `if (x !== x) return false;
-${fnBody}`;
-  }
-  return new Function(`x`, `${fnBody}
-return true;`);
-}
-function valueToCase(x) {
-  if (typeof x !== "bigint") {
-    return valueToString(x);
-  } else if (BigIntAvailable) {
-    return `${valueToString(x)}n`;
-  }
-  return `"${valueToString(x)}"`;
-}
-const roundLengthUpToNearest64Bytes = (len, BPE) => (len * BPE + 63 & ~63 || 64) / BPE;
-const sliceOrExtendArray = (arr, len = 0) => arr.length >= len ? arr.subarray(0, len) : memcpy(new arr.constructor(len), arr, 0);
-class BufferBuilder {
-  constructor(buffer, stride = 1) {
-    this.buffer = buffer;
-    this.stride = stride;
-    this.BYTES_PER_ELEMENT = buffer.BYTES_PER_ELEMENT;
-    this.ArrayType = buffer.constructor;
-    this._resize(this.length = Math.trunc(buffer.length / stride));
-  }
-  get byteLength() {
-    return Math.trunc(this.length * this.stride * this.BYTES_PER_ELEMENT);
-  }
-  get reservedLength() {
-    return this.buffer.length / this.stride;
-  }
-  get reservedByteLength() {
-    return this.buffer.byteLength;
-  }
-  set(index, value) {
-    return this;
-  }
-  append(value) {
-    return this.set(this.length, value);
-  }
-  reserve(extra) {
-    if (extra > 0) {
-      this.length += extra;
-      const stride = this.stride;
-      const length = this.length * stride;
-      const reserved = this.buffer.length;
-      if (length >= reserved) {
-        this._resize(reserved === 0 ? roundLengthUpToNearest64Bytes(length * 1, this.BYTES_PER_ELEMENT) : roundLengthUpToNearest64Bytes(length * 2, this.BYTES_PER_ELEMENT));
-      }
-    }
-    return this;
-  }
-  flush(length = this.length) {
-    length = roundLengthUpToNearest64Bytes(length * this.stride, this.BYTES_PER_ELEMENT);
-    const array2 = sliceOrExtendArray(this.buffer, length);
-    this.clear();
-    return array2;
-  }
-  clear() {
-    this.length = 0;
-    this._resize(0);
-    return this;
-  }
-  _resize(newLength) {
-    return this.buffer = memcpy(new this.ArrayType(newLength), this.buffer);
-  }
-}
-BufferBuilder.prototype.offset = 0;
-class DataBufferBuilder extends BufferBuilder {
-  last() {
-    return this.get(this.length - 1);
-  }
-  get(index) {
-    return this.buffer[index];
-  }
-  set(index, value) {
-    this.reserve(index - this.length + 1);
-    this.buffer[index * this.stride] = value;
-    return this;
-  }
-}
-class BitmapBufferBuilder extends DataBufferBuilder {
-  constructor(data = new Uint8Array(0)) {
-    super(data, 1 / 8);
-    this.numValid = 0;
-  }
-  get numInvalid() {
-    return this.length - this.numValid;
-  }
-  get(idx) {
-    return this.buffer[idx >> 3] >> idx % 8 & 1;
-  }
-  set(idx, val) {
-    const { buffer } = this.reserve(idx - this.length + 1);
-    const byte = idx >> 3, bit = idx % 8, cur = buffer[byte] >> bit & 1;
-    val ? cur === 0 && (buffer[byte] |= 1 << bit, ++this.numValid) : cur === 1 && (buffer[byte] &= ~(1 << bit), --this.numValid);
-    return this;
-  }
-  clear() {
-    this.numValid = 0;
-    return super.clear();
-  }
-}
-class OffsetsBufferBuilder extends DataBufferBuilder {
-  constructor(data = new Int32Array(1)) {
-    super(data, 1);
-  }
-  append(value) {
-    return this.set(this.length - 1, value);
-  }
-  set(index, value) {
-    const offset = this.length - 1;
-    const buffer = this.reserve(index - offset + 1).buffer;
-    if (offset < index++) {
-      buffer.fill(buffer[offset], offset, index);
-    }
-    buffer[index] = buffer[index - 1] + value;
-    return this;
-  }
-  flush(length = this.length - 1) {
-    if (length > this.length) {
-      this.set(length - 1, 0);
-    }
-    return super.flush(length + 1);
-  }
-}
-class Builder$3 {
-  constructor({ "type": type, "nullValues": nulls }) {
-    this.length = 0;
-    this.finished = false;
-    this.type = type;
-    this.children = [];
-    this.nullValues = nulls;
-    this.stride = strideForType(type);
-    this._nulls = new BitmapBufferBuilder();
-    if (nulls && nulls.length > 0) {
-      this._isValid = createIsValidFunction(nulls);
-    }
-  }
-  static throughNode(options) {
-    throw new Error(`"throughNode" not available in this environment`);
-  }
-  static throughDOM(options) {
-    throw new Error(`"throughDOM" not available in this environment`);
-  }
-  toVector() {
-    return new Vector([this.flush()]);
-  }
-  get ArrayType() {
-    return this.type.ArrayType;
-  }
-  get nullCount() {
-    return this._nulls.numInvalid;
-  }
-  get numChildren() {
-    return this.children.length;
-  }
-  get byteLength() {
-    let size = 0;
-    const { _offsets, _values, _nulls, _typeIds, children: children2 } = this;
-    _offsets && (size += _offsets.byteLength);
-    _values && (size += _values.byteLength);
-    _nulls && (size += _nulls.byteLength);
-    _typeIds && (size += _typeIds.byteLength);
-    return children2.reduce((size2, child) => size2 + child.byteLength, size);
-  }
-  get reservedLength() {
-    return this._nulls.reservedLength;
-  }
-  get reservedByteLength() {
-    let size = 0;
-    this._offsets && (size += this._offsets.reservedByteLength);
-    this._values && (size += this._values.reservedByteLength);
-    this._nulls && (size += this._nulls.reservedByteLength);
-    this._typeIds && (size += this._typeIds.reservedByteLength);
-    return this.children.reduce((size2, child) => size2 + child.reservedByteLength, size);
-  }
-  get valueOffsets() {
-    return this._offsets ? this._offsets.buffer : null;
-  }
-  get values() {
-    return this._values ? this._values.buffer : null;
-  }
-  get nullBitmap() {
-    return this._nulls ? this._nulls.buffer : null;
-  }
-  get typeIds() {
-    return this._typeIds ? this._typeIds.buffer : null;
-  }
-  append(value) {
-    return this.set(this.length, value);
-  }
-  isValid(value) {
-    return this._isValid(value);
-  }
-  set(index, value) {
-    if (this.setValid(index, this.isValid(value))) {
-      this.setValue(index, value);
-    }
-    return this;
-  }
-  setValue(index, value) {
-    this._setValue(this, index, value);
-  }
-  setValid(index, valid) {
-    this.length = this._nulls.set(index, +valid).length;
-    return valid;
-  }
-  addChild(child, name = `${this.numChildren}`) {
-    throw new Error(`Cannot append children to non-nested type "${this.type}"`);
-  }
-  getChildAt(index) {
-    return this.children[index] || null;
-  }
-  flush() {
-    let data;
-    let typeIds;
-    let nullBitmap;
-    let valueOffsets;
-    const { type, length, nullCount, _typeIds, _offsets, _values, _nulls } = this;
-    if (typeIds = _typeIds === null || _typeIds === void 0 ? void 0 : _typeIds.flush(length)) {
-      valueOffsets = _offsets === null || _offsets === void 0 ? void 0 : _offsets.flush(length);
-    } else if (valueOffsets = _offsets === null || _offsets === void 0 ? void 0 : _offsets.flush(length)) {
-      data = _values === null || _values === void 0 ? void 0 : _values.flush(_offsets.last());
-    } else {
-      data = _values === null || _values === void 0 ? void 0 : _values.flush(length);
-    }
-    if (nullCount > 0) {
-      nullBitmap = _nulls === null || _nulls === void 0 ? void 0 : _nulls.flush(length);
-    }
-    const children2 = this.children.map((child) => child.flush());
-    this.clear();
-    return makeData({
-      type,
-      length,
-      nullCount,
-      children: children2,
-      "child": children2[0],
-      data,
-      typeIds,
-      nullBitmap,
-      valueOffsets
-    });
-  }
-  finish() {
-    this.finished = true;
-    for (const child of this.children)
-      child.finish();
-    return this;
-  }
-  clear() {
-    var _a2, _b2, _c2, _d2;
-    this.length = 0;
-    (_a2 = this._nulls) === null || _a2 === void 0 ? void 0 : _a2.clear();
-    (_b2 = this._values) === null || _b2 === void 0 ? void 0 : _b2.clear();
-    (_c2 = this._offsets) === null || _c2 === void 0 ? void 0 : _c2.clear();
-    (_d2 = this._typeIds) === null || _d2 === void 0 ? void 0 : _d2.clear();
-    for (const child of this.children)
-      child.clear();
-    return this;
-  }
-}
-Builder$3.prototype.length = 1;
-Builder$3.prototype.stride = 1;
-Builder$3.prototype.children = null;
-Builder$3.prototype.finished = false;
-Builder$3.prototype.nullValues = null;
-Builder$3.prototype._isValid = () => true;
-class FixedWidthBuilder extends Builder$3 {
-  constructor(opts) {
-    super(opts);
-    this._values = new DataBufferBuilder(new this.ArrayType(0), this.stride);
-  }
-  setValue(index, value) {
-    const values = this._values;
-    values.reserve(index - values.length + 1);
-    return super.setValue(index, value);
-  }
-}
-class VariableWidthBuilder extends Builder$3 {
-  constructor(opts) {
-    super(opts);
-    this._pendingLength = 0;
-    this._offsets = new OffsetsBufferBuilder();
-  }
-  setValue(index, value) {
-    const pending = this._pending || (this._pending = /* @__PURE__ */ new Map());
-    const current = pending.get(index);
-    current && (this._pendingLength -= current.length);
-    this._pendingLength += value instanceof MapRow ? value[kKeys].length : value.length;
-    pending.set(index, value);
-  }
-  setValid(index, isValid) {
-    if (!super.setValid(index, isValid)) {
-      (this._pending || (this._pending = /* @__PURE__ */ new Map())).set(index, void 0);
-      return false;
-    }
-    return true;
-  }
-  clear() {
-    this._pendingLength = 0;
-    this._pending = void 0;
-    return super.clear();
-  }
-  flush() {
-    this._flush();
-    return super.flush();
-  }
-  finish() {
-    this._flush();
-    return super.finish();
-  }
-  _flush() {
-    const pending = this._pending;
-    const pendingLength = this._pendingLength;
-    this._pendingLength = 0;
-    this._pending = void 0;
-    if (pending && pending.size > 0) {
-      this._flushPending(pending, pendingLength);
-    }
-    return this;
-  }
 }
 class Block {
   constructor() {
@@ -31680,530 +31364,6 @@ function binaryDataFromJSON(values) {
   }
   return data;
 }
-class BinaryBuilder extends VariableWidthBuilder {
-  constructor(opts) {
-    super(opts);
-    this._values = new BufferBuilder(new Uint8Array(0));
-  }
-  get byteLength() {
-    let size = this._pendingLength + this.length * 4;
-    this._offsets && (size += this._offsets.byteLength);
-    this._values && (size += this._values.byteLength);
-    this._nulls && (size += this._nulls.byteLength);
-    return size;
-  }
-  setValue(index, value) {
-    return super.setValue(index, toUint8Array(value));
-  }
-  _flushPending(pending, pendingLength) {
-    const offsets = this._offsets;
-    const data = this._values.reserve(pendingLength).buffer;
-    let offset = 0;
-    for (const [index, value] of pending) {
-      if (value === void 0) {
-        offsets.set(index, 0);
-      } else {
-        const length = value.length;
-        data.set(value, offset);
-        offsets.set(index, length);
-        offset += length;
-      }
-    }
-  }
-}
-class BoolBuilder extends Builder$3 {
-  constructor(options) {
-    super(options);
-    this._values = new BitmapBufferBuilder();
-  }
-  setValue(index, value) {
-    this._values.set(index, +value);
-  }
-}
-class DateBuilder extends FixedWidthBuilder {
-}
-DateBuilder.prototype._setValue = setDate;
-class DateDayBuilder extends DateBuilder {
-}
-DateDayBuilder.prototype._setValue = setDateDay;
-class DateMillisecondBuilder extends DateBuilder {
-}
-DateMillisecondBuilder.prototype._setValue = setDateMillisecond;
-class DecimalBuilder extends FixedWidthBuilder {
-}
-DecimalBuilder.prototype._setValue = setDecimal;
-class DictionaryBuilder extends Builder$3 {
-  constructor({ "type": type, "nullValues": nulls, "dictionaryHashFunction": hashFn }) {
-    super({ type: new Dictionary(type.dictionary, type.indices, type.id, type.isOrdered) });
-    this._nulls = null;
-    this._dictionaryOffset = 0;
-    this._keysToIndices = /* @__PURE__ */ Object.create(null);
-    this.indices = makeBuilder({ "type": this.type.indices, "nullValues": nulls });
-    this.dictionary = makeBuilder({ "type": this.type.dictionary, "nullValues": null });
-    if (typeof hashFn === "function") {
-      this.valueToKey = hashFn;
-    }
-  }
-  get values() {
-    return this.indices.values;
-  }
-  get nullCount() {
-    return this.indices.nullCount;
-  }
-  get nullBitmap() {
-    return this.indices.nullBitmap;
-  }
-  get byteLength() {
-    return this.indices.byteLength + this.dictionary.byteLength;
-  }
-  get reservedLength() {
-    return this.indices.reservedLength + this.dictionary.reservedLength;
-  }
-  get reservedByteLength() {
-    return this.indices.reservedByteLength + this.dictionary.reservedByteLength;
-  }
-  isValid(value) {
-    return this.indices.isValid(value);
-  }
-  setValid(index, valid) {
-    const indices = this.indices;
-    valid = indices.setValid(index, valid);
-    this.length = indices.length;
-    return valid;
-  }
-  setValue(index, value) {
-    const keysToIndices = this._keysToIndices;
-    const key = this.valueToKey(value);
-    let idx = keysToIndices[key];
-    if (idx === void 0) {
-      keysToIndices[key] = idx = this._dictionaryOffset + this.dictionary.append(value).length - 1;
-    }
-    return this.indices.setValue(index, idx);
-  }
-  flush() {
-    const type = this.type;
-    const prev = this._dictionary;
-    const curr = this.dictionary.toVector();
-    const data = this.indices.flush().clone(type);
-    data.dictionary = prev ? prev.concat(curr) : curr;
-    this.finished || (this._dictionaryOffset += curr.length);
-    this._dictionary = data.dictionary;
-    this.clear();
-    return data;
-  }
-  finish() {
-    this.indices.finish();
-    this.dictionary.finish();
-    this._dictionaryOffset = 0;
-    this._keysToIndices = /* @__PURE__ */ Object.create(null);
-    return super.finish();
-  }
-  clear() {
-    this.indices.clear();
-    this.dictionary.clear();
-    return super.clear();
-  }
-  valueToKey(val) {
-    return typeof val === "string" ? val : `${val}`;
-  }
-}
-class FixedSizeBinaryBuilder extends FixedWidthBuilder {
-}
-FixedSizeBinaryBuilder.prototype._setValue = setFixedSizeBinary;
-class FixedSizeListBuilder extends Builder$3 {
-  setValue(index, value) {
-    const [child] = this.children;
-    const start2 = index * this.stride;
-    for (let i = -1, n = value.length; ++i < n; ) {
-      child.set(start2 + i, value[i]);
-    }
-  }
-  addChild(child, name = "0") {
-    if (this.numChildren > 0) {
-      throw new Error("FixedSizeListBuilder can only have one child.");
-    }
-    const childIndex = this.children.push(child);
-    this.type = new FixedSizeList$1(this.type.listSize, new Field(name, child.type, true));
-    return childIndex;
-  }
-}
-class FloatBuilder extends FixedWidthBuilder {
-  setValue(index, value) {
-    this._values.set(index, value);
-  }
-}
-class Float16Builder extends FloatBuilder {
-  setValue(index, value) {
-    super.setValue(index, float64ToUint16(value));
-  }
-}
-class Float32Builder extends FloatBuilder {
-}
-class Float64Builder extends FloatBuilder {
-}
-class IntervalBuilder extends FixedWidthBuilder {
-}
-IntervalBuilder.prototype._setValue = setIntervalValue;
-class IntervalDayTimeBuilder extends IntervalBuilder {
-}
-IntervalDayTimeBuilder.prototype._setValue = setIntervalDayTime;
-class IntervalYearMonthBuilder extends IntervalBuilder {
-}
-IntervalYearMonthBuilder.prototype._setValue = setIntervalYearMonth;
-class IntBuilder extends FixedWidthBuilder {
-  setValue(index, value) {
-    this._values.set(index, value);
-  }
-}
-class Int8Builder extends IntBuilder {
-}
-class Int16Builder extends IntBuilder {
-}
-class Int32Builder extends IntBuilder {
-}
-class Int64Builder extends IntBuilder {
-}
-class Uint8Builder extends IntBuilder {
-}
-class Uint16Builder extends IntBuilder {
-}
-class Uint32Builder extends IntBuilder {
-}
-class Uint64Builder extends IntBuilder {
-}
-class ListBuilder extends VariableWidthBuilder {
-  constructor(opts) {
-    super(opts);
-    this._offsets = new OffsetsBufferBuilder();
-  }
-  addChild(child, name = "0") {
-    if (this.numChildren > 0) {
-      throw new Error("ListBuilder can only have one child.");
-    }
-    this.children[this.numChildren] = child;
-    this.type = new List$1(new Field(name, child.type, true));
-    return this.numChildren - 1;
-  }
-  _flushPending(pending) {
-    const offsets = this._offsets;
-    const [child] = this.children;
-    for (const [index, value] of pending) {
-      if (typeof value === "undefined") {
-        offsets.set(index, 0);
-      } else {
-        const n = value.length;
-        const start2 = offsets.set(index, n).buffer[index];
-        for (let i = -1; ++i < n; ) {
-          child.set(start2 + i, value[i]);
-        }
-      }
-    }
-  }
-}
-class MapBuilder extends VariableWidthBuilder {
-  set(index, value) {
-    return super.set(index, value);
-  }
-  setValue(index, value) {
-    const row = value instanceof Map ? value : new Map(Object.entries(value));
-    const pending = this._pending || (this._pending = /* @__PURE__ */ new Map());
-    const current = pending.get(index);
-    current && (this._pendingLength -= current.size);
-    this._pendingLength += row.size;
-    pending.set(index, row);
-  }
-  addChild(child, name = `${this.numChildren}`) {
-    if (this.numChildren > 0) {
-      throw new Error("ListBuilder can only have one child.");
-    }
-    this.children[this.numChildren] = child;
-    this.type = new Map_(new Field(name, child.type, true), this.type.keysSorted);
-    return this.numChildren - 1;
-  }
-  _flushPending(pending) {
-    const offsets = this._offsets;
-    const [child] = this.children;
-    for (const [index, value] of pending) {
-      if (value === void 0) {
-        offsets.set(index, 0);
-      } else {
-        let { [index]: idx, [index + 1]: end } = offsets.set(index, value.size).buffer;
-        for (const val of value.entries()) {
-          child.set(idx, val);
-          if (++idx >= end)
-            break;
-        }
-      }
-    }
-  }
-}
-class NullBuilder extends Builder$3 {
-  setValue(index, value) {
-  }
-  setValid(index, valid) {
-    this.length = Math.max(index + 1, this.length);
-    return valid;
-  }
-}
-class StructBuilder extends Builder$3 {
-  setValue(index, value) {
-    const { children: children2, type } = this;
-    switch (Array.isArray(value) || value.constructor) {
-      case true:
-        return type.children.forEach((_, i) => children2[i].set(index, value[i]));
-      case Map:
-        return type.children.forEach((f, i) => children2[i].set(index, value.get(f.name)));
-      default:
-        return type.children.forEach((f, i) => children2[i].set(index, value[f.name]));
-    }
-  }
-  setValid(index, valid) {
-    if (!super.setValid(index, valid)) {
-      this.children.forEach((child) => child.setValid(index, valid));
-    }
-    return valid;
-  }
-  addChild(child, name = `${this.numChildren}`) {
-    const childIndex = this.children.push(child);
-    this.type = new Struct([...this.type.children, new Field(name, child.type, true)]);
-    return childIndex;
-  }
-}
-class TimestampBuilder extends FixedWidthBuilder {
-}
-TimestampBuilder.prototype._setValue = setTimestamp;
-class TimestampSecondBuilder extends TimestampBuilder {
-}
-TimestampSecondBuilder.prototype._setValue = setTimestampSecond;
-class TimestampMillisecondBuilder extends TimestampBuilder {
-}
-TimestampMillisecondBuilder.prototype._setValue = setTimestampMillisecond;
-class TimestampMicrosecondBuilder extends TimestampBuilder {
-}
-TimestampMicrosecondBuilder.prototype._setValue = setTimestampMicrosecond;
-class TimestampNanosecondBuilder extends TimestampBuilder {
-}
-TimestampNanosecondBuilder.prototype._setValue = setTimestampNanosecond;
-class TimeBuilder extends FixedWidthBuilder {
-}
-TimeBuilder.prototype._setValue = setTime;
-class TimeSecondBuilder extends TimeBuilder {
-}
-TimeSecondBuilder.prototype._setValue = setTimeSecond;
-class TimeMillisecondBuilder extends TimeBuilder {
-}
-TimeMillisecondBuilder.prototype._setValue = setTimeMillisecond;
-class TimeMicrosecondBuilder extends TimeBuilder {
-}
-TimeMicrosecondBuilder.prototype._setValue = setTimeMicrosecond;
-class TimeNanosecondBuilder extends TimeBuilder {
-}
-TimeNanosecondBuilder.prototype._setValue = setTimeNanosecond;
-class UnionBuilder extends Builder$3 {
-  constructor(options) {
-    super(options);
-    this._typeIds = new DataBufferBuilder(new Int8Array(0), 1);
-    if (typeof options["valueToChildTypeId"] === "function") {
-      this._valueToChildTypeId = options["valueToChildTypeId"];
-    }
-  }
-  get typeIdToChildIndex() {
-    return this.type.typeIdToChildIndex;
-  }
-  append(value, childTypeId) {
-    return this.set(this.length, value, childTypeId);
-  }
-  set(index, value, childTypeId) {
-    if (childTypeId === void 0) {
-      childTypeId = this._valueToChildTypeId(this, value, index);
-    }
-    if (this.setValid(index, this.isValid(value))) {
-      this.setValue(index, value, childTypeId);
-    }
-    return this;
-  }
-  setValue(index, value, childTypeId) {
-    this._typeIds.set(index, childTypeId);
-    const childIndex = this.type.typeIdToChildIndex[childTypeId];
-    const child = this.children[childIndex];
-    child === null || child === void 0 ? void 0 : child.set(index, value);
-  }
-  addChild(child, name = `${this.children.length}`) {
-    const childTypeId = this.children.push(child);
-    const { type: { children: children2, mode, typeIds } } = this;
-    const fields = [...children2, new Field(name, child.type)];
-    this.type = new Union_(mode, [...typeIds, childTypeId], fields);
-    return childTypeId;
-  }
-  _valueToChildTypeId(builder, value, offset) {
-    throw new Error(`Cannot map UnionBuilder value to child typeId. Pass the \`childTypeId\` as the second argument to unionBuilder.append(), or supply a \`valueToChildTypeId\` function as part of the UnionBuilder constructor options.`);
-  }
-}
-class SparseUnionBuilder extends UnionBuilder {
-}
-class DenseUnionBuilder extends UnionBuilder {
-  constructor(options) {
-    super(options);
-    this._offsets = new DataBufferBuilder(new Int32Array(0));
-  }
-  setValue(index, value, childTypeId) {
-    const id2 = this._typeIds.set(index, childTypeId).buffer[index];
-    const child = this.getChildAt(this.type.typeIdToChildIndex[id2]);
-    const denseIndex = this._offsets.set(index, child.length).buffer[index];
-    child === null || child === void 0 ? void 0 : child.set(denseIndex, value);
-  }
-}
-class Utf8Builder extends VariableWidthBuilder {
-  constructor(opts) {
-    super(opts);
-    this._values = new BufferBuilder(new Uint8Array(0));
-  }
-  get byteLength() {
-    let size = this._pendingLength + this.length * 4;
-    this._offsets && (size += this._offsets.byteLength);
-    this._values && (size += this._values.byteLength);
-    this._nulls && (size += this._nulls.byteLength);
-    return size;
-  }
-  setValue(index, value) {
-    return super.setValue(index, encodeUtf8(value));
-  }
-  _flushPending(pending, pendingLength) {
-  }
-}
-Utf8Builder.prototype._flushPending = BinaryBuilder.prototype._flushPending;
-class GetBuilderCtor extends Visitor {
-  visitNull() {
-    return NullBuilder;
-  }
-  visitBool() {
-    return BoolBuilder;
-  }
-  visitInt() {
-    return IntBuilder;
-  }
-  visitInt8() {
-    return Int8Builder;
-  }
-  visitInt16() {
-    return Int16Builder;
-  }
-  visitInt32() {
-    return Int32Builder;
-  }
-  visitInt64() {
-    return Int64Builder;
-  }
-  visitUint8() {
-    return Uint8Builder;
-  }
-  visitUint16() {
-    return Uint16Builder;
-  }
-  visitUint32() {
-    return Uint32Builder;
-  }
-  visitUint64() {
-    return Uint64Builder;
-  }
-  visitFloat() {
-    return FloatBuilder;
-  }
-  visitFloat16() {
-    return Float16Builder;
-  }
-  visitFloat32() {
-    return Float32Builder;
-  }
-  visitFloat64() {
-    return Float64Builder;
-  }
-  visitUtf8() {
-    return Utf8Builder;
-  }
-  visitBinary() {
-    return BinaryBuilder;
-  }
-  visitFixedSizeBinary() {
-    return FixedSizeBinaryBuilder;
-  }
-  visitDate() {
-    return DateBuilder;
-  }
-  visitDateDay() {
-    return DateDayBuilder;
-  }
-  visitDateMillisecond() {
-    return DateMillisecondBuilder;
-  }
-  visitTimestamp() {
-    return TimestampBuilder;
-  }
-  visitTimestampSecond() {
-    return TimestampSecondBuilder;
-  }
-  visitTimestampMillisecond() {
-    return TimestampMillisecondBuilder;
-  }
-  visitTimestampMicrosecond() {
-    return TimestampMicrosecondBuilder;
-  }
-  visitTimestampNanosecond() {
-    return TimestampNanosecondBuilder;
-  }
-  visitTime() {
-    return TimeBuilder;
-  }
-  visitTimeSecond() {
-    return TimeSecondBuilder;
-  }
-  visitTimeMillisecond() {
-    return TimeMillisecondBuilder;
-  }
-  visitTimeMicrosecond() {
-    return TimeMicrosecondBuilder;
-  }
-  visitTimeNanosecond() {
-    return TimeNanosecondBuilder;
-  }
-  visitDecimal() {
-    return DecimalBuilder;
-  }
-  visitList() {
-    return ListBuilder;
-  }
-  visitStruct() {
-    return StructBuilder;
-  }
-  visitUnion() {
-    return UnionBuilder;
-  }
-  visitDenseUnion() {
-    return DenseUnionBuilder;
-  }
-  visitSparseUnion() {
-    return SparseUnionBuilder;
-  }
-  visitDictionary() {
-    return DictionaryBuilder;
-  }
-  visitInterval() {
-    return IntervalBuilder;
-  }
-  visitIntervalDayTime() {
-    return IntervalDayTimeBuilder;
-  }
-  visitIntervalYearMonth() {
-    return IntervalYearMonthBuilder;
-  }
-  visitFixedSizeList() {
-    return FixedSizeListBuilder;
-  }
-  visitMap() {
-    return MapBuilder;
-  }
-}
-const instance$2 = new GetBuilderCtor();
 class TypeComparator extends Visitor {
   compareSchemas(schema, other) {
     return schema === other || other instanceof schema.constructor && this.compareManyFields(schema.fields, other.fields);
@@ -32306,124 +31466,6 @@ TypeComparator.prototype.visitMap = compareMap;
 const instance$1 = new TypeComparator();
 function compareSchemas(schema, other) {
   return instance$1.compareSchemas(schema, other);
-}
-function compareTypes(type, other) {
-  return instance$1.visit(type, other);
-}
-function makeBuilder(options) {
-  const type = options.type;
-  const builder = new (instance$2.getVisitFn(type)())(options);
-  if (type.children && type.children.length > 0) {
-    const children2 = options["children"] || [];
-    const defaultOptions = { "nullValues": options["nullValues"] };
-    const getChildOptions = Array.isArray(children2) ? (_, i) => children2[i] || defaultOptions : ({ name }) => children2[name] || defaultOptions;
-    for (const [index, field] of type.children.entries()) {
-      const { type: type2 } = field;
-      const opts = getChildOptions(field, index);
-      builder.children.push(makeBuilder(Object.assign(Object.assign({}, opts), { type: type2 })));
-    }
-  }
-  return builder;
-}
-function vectorFromArray(init2, type) {
-  if (init2 instanceof Data || init2 instanceof Vector || init2.type instanceof DataType || ArrayBuffer.isView(init2)) {
-    return makeVector(init2);
-  }
-  const options = { type: type !== null && type !== void 0 ? type : inferType(init2), nullValues: [null] };
-  const chunks = [...builderThroughIterable(options)(init2)];
-  const vector = chunks.length === 1 ? chunks[0] : chunks.reduce((a, b) => a.concat(b));
-  if (DataType.isDictionary(vector.type)) {
-    return vector.memoize();
-  }
-  return vector;
-}
-function inferType(value) {
-  if (value.length === 0) {
-    return new Null$1();
-  }
-  let nullsCount = 0;
-  let arraysCount = 0;
-  let objectsCount = 0;
-  let numbersCount = 0;
-  let stringsCount = 0;
-  let bigintsCount = 0;
-  let booleansCount = 0;
-  let datesCount = 0;
-  for (const val of value) {
-    if (val == null) {
-      ++nullsCount;
-      continue;
-    }
-    switch (typeof val) {
-      case "bigint":
-        ++bigintsCount;
-        continue;
-      case "boolean":
-        ++booleansCount;
-        continue;
-      case "number":
-        ++numbersCount;
-        continue;
-      case "string":
-        ++stringsCount;
-        continue;
-      case "object":
-        if (Array.isArray(val)) {
-          ++arraysCount;
-        } else if (Object.prototype.toString.call(val) === "[object Date]") {
-          ++datesCount;
-        } else {
-          ++objectsCount;
-        }
-        continue;
-    }
-    throw new TypeError("Unable to infer Vector type from input values, explicit type declaration expected");
-  }
-  if (numbersCount + nullsCount === value.length) {
-    return new Float64();
-  } else if (stringsCount + nullsCount === value.length) {
-    return new Dictionary(new Utf8$1(), new Int32());
-  } else if (bigintsCount + nullsCount === value.length) {
-    return new Int64$1();
-  } else if (booleansCount + nullsCount === value.length) {
-    return new Bool$1();
-  } else if (datesCount + nullsCount === value.length) {
-    return new DateMillisecond();
-  } else if (arraysCount + nullsCount === value.length) {
-    const array2 = value;
-    const childType = inferType(array2[array2.findIndex((ary) => ary != null)]);
-    if (array2.every((ary) => ary == null || compareTypes(childType, inferType(ary)))) {
-      return new List$1(new Field("", childType, true));
-    }
-  } else if (objectsCount + nullsCount === value.length) {
-    const fields = /* @__PURE__ */ new Map();
-    for (const row of value) {
-      for (const key of Object.keys(row)) {
-        if (!fields.has(key) && row[key] != null) {
-          fields.set(key, new Field(key, inferType([row[key]]), true));
-        }
-      }
-    }
-    return new Struct([...fields.values()]);
-  }
-  throw new TypeError("Unable to infer Vector type from input values, explicit type declaration expected");
-}
-function builderThroughIterable(options) {
-  const { ["queueingStrategy"]: queueingStrategy = "count" } = options;
-  const { ["highWaterMark"]: highWaterMark = queueingStrategy !== "bytes" ? Number.POSITIVE_INFINITY : Math.pow(2, 14) } = options;
-  const sizeProperty = queueingStrategy !== "bytes" ? "length" : "byteLength";
-  return function* (source) {
-    let numChunks = 0;
-    const builder = makeBuilder(options);
-    for (const value of source) {
-      if (builder.append(value)[sizeProperty] >= highWaterMark) {
-        ++numChunks && (yield builder.toVector());
-      }
-    }
-    if (builder.finish().length > 0 || numChunks === 0) {
-      yield builder.toVector();
-    }
-  };
 }
 function distributeVectorsIntoRecordBatches(schema, vecs) {
   return uniformlyDistributeChunksAcrossRecordBatches(schema, vecs.map((v) => v.data.concat()));
@@ -32575,7 +31617,7 @@ class Table {
   }
   [Symbol.iterator]() {
     if (this.batches.length > 0) {
-      return instance$4.visit(new Vector(this.data));
+      return instance$3.visit(new Vector(this.data));
     }
     return new Array(0)[Symbol.iterator]();
   }
@@ -32665,10 +31707,10 @@ Table[_a$1] = ((proto) => {
   proto._nullCount = -1;
   proto[Symbol.isConcatSpreadable] = true;
   proto["isValid"] = wrapChunkedCall1(isChunkedValid);
-  proto["get"] = wrapChunkedCall1(instance$6.getVisitFn(Type$1.Struct));
-  proto["set"] = wrapChunkedCall2(instance$7.getVisitFn(Type$1.Struct));
-  proto["indexOf"] = wrapChunkedIndexOf(instance$5.getVisitFn(Type$1.Struct));
-  proto["getByteLength"] = wrapChunkedCall1(instance$3.getVisitFn(Type$1.Struct));
+  proto["get"] = wrapChunkedCall1(instance$5.getVisitFn(Type$1.Struct));
+  proto["set"] = wrapChunkedCall2(instance$6.getVisitFn(Type$1.Struct));
+  proto["indexOf"] = wrapChunkedIndexOf(instance$4.getVisitFn(Type$1.Struct));
+  proto["getByteLength"] = wrapChunkedCall1(instance$2.getVisitFn(Type$1.Struct));
   return "Table";
 })(Table.prototype);
 var _a;
@@ -32731,19 +31773,19 @@ class RecordBatch$2 {
     return this.data.getValid(index);
   }
   get(index) {
-    return instance$6.visit(this.data, index);
+    return instance$5.visit(this.data, index);
   }
   set(index, value) {
-    return instance$7.visit(this.data, index, value);
+    return instance$6.visit(this.data, index, value);
   }
   indexOf(element, offset) {
-    return instance$5.visit(this.data, element, offset);
+    return instance$4.visit(this.data, element, offset);
   }
   getByteLength(index) {
-    return instance$3.visit(this.data, index);
+    return instance$2.visit(this.data, index);
   }
   [Symbol.iterator]() {
-    return instance$4.visit(new Vector([this.data]));
+    return instance$3.visit(new Vector([this.data]));
   }
   toArray() {
     return [...this];
@@ -34752,6 +33794,7 @@ class Tile {
     __publicField(this, "local_dictionary_lookups");
     __publicField(this, "_extent");
     __publicField(this, "numeric_id");
+    __publicField(this, "_buffer_manager");
     this.promise = Promise.resolve();
     this.download_state = "Unattempted";
     this.key = String(Math.random());
@@ -34770,6 +33813,27 @@ class Tile {
   }
   download() {
     throw new Error("Not implemented");
+  }
+  delete_column_if_exists(colname) {
+    var _a2;
+    console.log(colname, this.key);
+    if (this._batch) {
+      (_a2 = this._buffer_manager) == null ? void 0 : _a2.release(colname);
+      this._batch = add_or_delete_column(this.record_batch, colname, null);
+    }
+  }
+  apply_transformation(name) {
+    const transform = this.dataset.transformations[name];
+    if (transform === void 0) {
+      throw new Error(`Transformation ${name} is not defined`);
+    }
+    const transformed = transform(this);
+    this._batch = add_or_delete_column(this.record_batch, name, transformed);
+  }
+  add_column(name, data) {
+    console.log({ name, data });
+    this._batch = add_or_delete_column(this.record_batch, name, data);
+    return this._batch;
   }
   is_visible(max_ix, viewport_limits) {
     if (this.min_ix === void 0) {
@@ -34834,7 +33898,7 @@ class Tile {
     }
   }
   forEach(callback) {
-    for (const p of this.points()) {
+    for (const p of this.points(void 0, false)) {
       if (p === void 0) {
         continue;
       }
@@ -34868,7 +33932,7 @@ class Tile {
     if (this.parent) {
       return this.parent.max_ix + 1;
     }
-    return;
+    return 0;
   }
   async schema() {
     await this.download();
@@ -34958,6 +34022,7 @@ class Tile {
 }
 class QuadTile extends Tile {
   constructor(base_url, key, parent, dataset, prefs) {
+    var _a2;
     super(dataset);
     __publicField(this, "url");
     __publicField(this, "bearer_token", "");
@@ -34967,14 +34032,11 @@ class QuadTile extends Tile {
     __publicField(this, "_already_called", false);
     __publicField(this, "child_locations", []);
     this.url = base_url;
-    if (prefs != void 0 && "bearer_token" in prefs) {
-      this.bearer_token = prefs["bearer_token"];
-    }
+    this.bearer_token = (_a2 = prefs == null ? void 0 : prefs.bearer_token) != null ? _a2 : "";
     this.parent = parent;
     this.key = key;
     const [z, x, y] = key.split("/").map((d) => Number.parseInt(d));
     this.codes = [z, x, y];
-    this.class = new.target;
   }
   get extent() {
     if (this._extent) {
@@ -34988,7 +34050,7 @@ class QuadTile extends Tile {
     if (this.max_ix < max_ix) {
       promises = this.children.map((child) => child.download_to_depth(max_ix));
     }
-    return Promise.all(promises);
+    await Promise.all(promises);
   }
   async download() {
     if (this._download) {
@@ -34998,7 +34060,7 @@ class QuadTile extends Tile {
       throw "Illegally attempting to download twice";
     }
     this._already_called = true;
-    var url = `${this.url}/${this.key}.feather`;
+    let url = `${this.url}/${this.key}.feather`;
     this.download_state = "In progress";
     if (this.bearer_token) {
       url = url.replace("/public", "");
@@ -35033,11 +34095,10 @@ class QuadTile extends Tile {
       }
       this.highest_known_ix = this.max_ix;
     }).catch((error) => {
-      console.log(error);
       this.download_state = "Failed";
       console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
-
         `);
+      console.log(error);
       throw error;
     });
     return this._download;
@@ -35046,13 +34107,13 @@ class QuadTile extends Tile {
     if (this.download_state !== "Complete") {
       return [];
     }
+    const constructor = this.constructor;
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
-        this._children.push(
-          new this.class(this.url, key, this, this.dataset, {
-            bearer_token: this.bearer_token
-          })
-        );
+        const child = new constructor(this.url, key, this, this.dataset, {
+          bearer_token: this.bearer_token
+        });
+        this._children.push(child);
       }
     }
     return this._children;
@@ -35071,7 +34132,7 @@ class QuadTile extends Tile {
   }
 }
 class ArrowTile extends Tile {
-  constructor(table, dataset, batch_num, plot, parent = null) {
+  constructor(table, dataset, batch_num, parent = null) {
     super(dataset);
     __publicField(this, "batch_num");
     __publicField(this, "full_tab");
@@ -35093,7 +34154,7 @@ class ArrowTile extends Tile {
       this._min_ix = seed;
       this._max_ix = seed + batch.numRows;
       this.highest_known_ix = this._max_ix;
-      this._batch = bind_column(this.record_batch, "ix", array2);
+      this._batch = add_or_delete_column(this.record_batch, "ix", array2);
       console.log("Updated batch to", this._batch);
     }
     console.log(this._batch.getChild("x"));
@@ -35121,12 +34182,12 @@ class ArrowTile extends Tile {
     while (++ix <= this.batch_num * 4 + 4) {
       if (ix < this.full_tab.batches.length) {
         this._children.push(
-          new ArrowTile(this.full_tab, this.dataset, ix, this.plot, this)
+          new ArrowTile(this.full_tab, this.dataset, ix, this)
         );
       }
     }
-    for (let child of this._children) {
-      for (let dim of ["x", "y"]) {
+    for (const child of this._children) {
+      for (const dim of ["x", "y"]) {
         this._extent[dim][0] = Math.min(
           this._extent[dim][0],
           child._extent[dim][0]
@@ -35175,6 +34236,10 @@ class Dataset {
   }
   static from_arrow_table(table, prefs, plot) {
     return new ArrowDataset(table, prefs, plot);
+  }
+  delete_column_if_exists(name) {
+    this.map((d) => d.delete_column_if_exists(name));
+    delete this.transformations[name];
   }
   domain(dimension, max_ix = 1e6) {
     var _a2;
@@ -35232,7 +34297,7 @@ class Dataset {
     const results = [];
     this.visit((d) => {
       results.push(callback(d));
-    }, after = after);
+    }, after);
     return results;
   }
   visit(callback, after = false, filter2 = (x) => true) {
@@ -35269,20 +34334,21 @@ class Dataset {
   add_tiled_column(field_name, buffer) {
     const tb = tableFromIPC(buffer);
     const records = {};
-    window.tb = tb;
-    for (let batch of tb.batches) {
+    for (const batch of tb.batches) {
       const offsets = batch.getChild("data").data[0].valueOffsets;
       const values = batch.getChild("data").data[0].children[0];
       for (let i = 0; i < batch.data.length; i++) {
         const tilename = batch.getChild("_tile").get(i);
-        records[tilename] = values.values.slice(offsets[i], offsets[i + 1]);
+        records[tilename] = values.values.slice(
+          offsets[i],
+          offsets[i + 1]
+        );
       }
     }
     this.transformations[field_name] = function(tile) {
       const { key } = tile;
-      tile.record_batch.numRows;
       const array2 = records[key];
-      return bind_column(tile.record_batch, field_name, array2);
+      return array2;
     };
   }
   add_sparse_identifiers(field_name, ids) {
@@ -35295,7 +34361,7 @@ class Dataset {
       for (const [ix, value] of Object.entries(sparse_values)) {
         array2[Number.parseInt(ix)] = value;
       }
-      return bind_column(tile.record_batch, field_name, array2);
+      return array2;
     };
   }
   add_label_identifiers(ids, field_name, key_field = "_id") {
@@ -35426,25 +34492,57 @@ function check_overlap(tile, bbox) {
   }
   return area(intersection) / area(bbox);
 }
-function bind_column(batch, field_name, data) {
+function add_or_delete_column(batch, field_name, data) {
+  const tb = {};
+  for (const field of batch.schema.fields) {
+    if (field.name === field_name) {
+      if (data === null) {
+        continue;
+      } else {
+        throw new Error(`Name ${field.name} already exists, can't add.`);
+      }
+    }
+    tb[field.name] = batch.getChild(field.name).data[0];
+  }
   if (data === void 0) {
     throw new Error("Must pass data to bind_column");
   }
-  const current_keys = new Set(
-    [...batch.schema.fields].map((d) => d.name)
-  );
-  if (current_keys.has(field_name)) {
-    throw new Error(`Field ${field_name} already exists in batch`);
+  if (data !== null) {
+    if (data instanceof Float32Array) {
+      tb[field_name] = makeVector(data).data[0];
+    } else {
+      tb[field_name] = data.data[0];
+    }
   }
-  const tb = {};
-  for (const key of current_keys) {
-    tb[key] = batch.getChild(key).data[0];
-  }
-  tb[field_name] = vectorFromArray(data).data[0];
   const new_batch = new RecordBatch$2(tb);
+  for (const [k, v] of batch.schema.metadata) {
+    new_batch.schema.metadata.set(k, v);
+  }
+  for (const oldfield of batch.schema.fields) {
+    const newfield = new_batch.schema.fields.find(
+      (d) => d.name === oldfield.name
+    );
+    if (newfield !== void 0) {
+      for (const [k, v] of oldfield.metadata) {
+        newfield.metadata.set(k, v);
+      }
+    } else if (data !== null) {
+      throw new Error("Error!");
+    }
+  }
+  if (data !== null) {
+    const this_field = new_batch.schema.fields.find(
+      (d) => d.name === field_name
+    );
+    this_field == null ? void 0 : this_field.metadata.set(
+      "created by deepscatter",
+      new Date().toISOString()
+    );
+  }
   return new_batch;
 }
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
+  console.log({ batch, ids, field_name, key_field });
   const hashtab = /* @__PURE__ */ new Set();
   for (const item of Object.keys(ids)) {
     const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || "").join("");
@@ -35457,6 +34555,7 @@ function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
   }
   const offsets = kfield.data[0].valueOffsets;
   const values = kfield.data[0].values;
+  console.log({ kfield });
   for (let i = 0; i < batch.numRows; i++) {
     const code = values.slice(offsets[i], offsets[i + 1]);
     const shortversion = code.slice(0, 4).join("");
@@ -35467,7 +34566,7 @@ function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
       }
     }
   }
-  return bind_column(batch, field_name, updatedFloatArray);
+  return updatedFloatArray;
 }
 var dist = {};
 var quickselect = { exports: {} };
@@ -36520,6 +35619,7 @@ class Scatterplot {
     this.bound = true;
   }
   add_identifier_column(name, codes, key_field) {
+    console.log({ codes });
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
   }

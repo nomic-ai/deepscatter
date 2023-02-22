@@ -42,6 +42,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   //  public contour_vals : Uint8Array;
   public tick_num?: number;
   public reglframe?: REGL.FrameCallback;
+  public _integer_buffer?: Buffer;
   //  public _renderer :  Renderer;
 
   constructor(selector, tileSet: Dataset<T>, scatterplot: Scatterplot<T>) {
@@ -657,10 +658,18 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   color_pick(x: number, y: number): null | StructRowProxy {
     if (y === 0) {
       // Not sure why, but this makes things complainy.
+      // console.warn('that thing again.');
       return null;
     }
     const tile_number = this.color_pick_single(x, y, 'tile_id');
+    if (tile_number == -1) {
+      // Bail immediately to avoid wasting a draw call.
+      return null;
+    }
     const row_number = this.color_pick_single(x, y, 'ix_in_tile');
+    if (row_number === -1) {
+      return null;
+    }
     for (const tile of this.visible_tiles()) {
       if (tile.numeric_id === tile_number) {
         return tile.record_batch.get(row_number) as StructRowProxy;
@@ -1043,11 +1052,10 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       }
       return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
     });
-    type encodingkey = keyof Encoding;
 
     const aes_to_buffer_num: Record<string, number> = {}; // eg 'x' => 3
 
-    // Pre-allocate the 'ix' buffer.
+    // Pre-allocate the 'ix' buffer and the 'ix_in_tile' buffers.
     const variable_to_buffer_num: Record<string, number> = {
       ix: 0,
       ix_in_tile: 1,
@@ -1065,6 +1073,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
         continue;
       } else {
         // Don't use the last value, use the current value.
+        // Loses animation but otherwise plots nicely.
         // Strategy will break if more than 15 base channels are defined,
         // which is not currently possible.
         aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
@@ -1100,7 +1109,7 @@ export class TileBufferManager<T extends Tile> {
   public tile: T;
   public regl: Regl;
   public renderer: ReglRenderer<T>;
-  public regl_elements: Map<string, BufferLocation | null> = new Map();
+  public regl_elements: Map<string, BufferLocation | null>;
 
   constructor(regl: Regl, tile: T, renderer: ReglRenderer<T>) {
     this.tile = tile;
@@ -1108,6 +1117,17 @@ export class TileBufferManager<T extends Tile> {
     this.renderer = renderer;
     // Reuse the same buffer for all `ix_in_tile` keys, because
     // it's just a set of integers going up.
+    this.regl_elements = new Map([
+      [
+        'ix_in_tile',
+        {
+          offset: 0,
+          stride: 4,
+          buffer: renderer.integer_buffer,
+          byte_size: 4 * 2 ** 16,
+        },
+      ],
+    ]);
   }
 
   /**
@@ -1129,16 +1149,8 @@ export class TileBufferManager<T extends Tile> {
       }
     }
 
-    for (const key of ['ix', ...needed_dimensions]) {
-      const current =
-        key === 'ix_in_tile'
-          ? {
-              offset: 0,
-              stride: 4,
-              buffer: renderer.integer_buffer,
-              byte_size: this.tile.record_batch.numRows * 4,
-            }
-          : this.regl_elements.get(key);
+    for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
+      const current = this.regl_elements.get(key);
 
       if (current === null) {
         // It's in the process of being built.
@@ -1164,8 +1176,13 @@ export class TileBufferManager<T extends Tile> {
     }
     return true;
   }
-
-  release(colname: string) {
+  /**
+   *
+   * @param colname the name of the column to release
+   *
+   * @returns Nothing, not even if the column isn't currently defined.
+   */
+  release(colname: string): void {
     let current;
     if ((current = this.regl_elements.get(colname))) {
       this.renderer.buffers.free_block(current);
@@ -1186,10 +1203,11 @@ export class TileBufferManager<T extends Tile> {
     let column = tile.record_batch.getChild(key);
 
     if (!column) {
-      if (tile.dataset.transformations[key]) {
+      const transformation = tile.dataset.transformations[key];
+      if (transformation !== undefined) {
         // Sometimes the transformation for creating the column may be defined but not yet applied.
         // If so, apply it right away.
-        tile._batch = tile.dataset.transformations[key](tile);
+        tile.apply_transformation(key);
         column = tile.record_batch.getChild(key);
         if (!column) {
           throw new Error(`${key} was not created.`);

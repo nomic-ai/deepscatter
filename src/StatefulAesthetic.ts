@@ -104,6 +104,7 @@ export class StatefulAesthetic<T extends Aesthetic> {
       // And mark not to bother animating it.
       this.needs_transitions = false;
     } else {
+      console.log(this.states[0].current_encoding, stringy)
       // Flip the current encoding to the second position.
       this.states.reverse();
       this.states[0].update(encoding);
