@@ -1,7 +1,7 @@
 export const default_background_options: BackgroundOptions = {
   color: 'gray',
-  opacity: 0.2,
-  size: 0.66,
+  opacity: [0.2, 1],
+  size: [0.66, 1],
   mouseover: false,
 };
 
@@ -12,8 +12,10 @@ export const default_API_call: APICall = {
   // Not many points.
   max_points: 1000,
   // Encoding defaults are handled by the Aesthetic class.
-  encoding: {},
+  encoding: {
+    
+  },
   point_size: 1, // base size before aes modifications.
   alpha: 40, // Default screen saturation target.
   background_options: default_background_options,
-};
+} as const;

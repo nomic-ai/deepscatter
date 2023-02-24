@@ -96,7 +96,6 @@ export abstract class Tile {
   }
 
   delete_column_if_exists(colname: string) {
-    console.log(colname, this.key);
     if (this._batch) {
       this._buffer_manager?.release(colname);
       this._batch = add_or_delete_column(this.record_batch, colname, null);
@@ -113,7 +112,6 @@ export abstract class Tile {
   }
 
   add_column(name: string, data: Float32Array) {
-    console.log({ name, data });
     this._batch = add_or_delete_column(this.record_batch, name, data);
     return this._batch;
   }
@@ -458,7 +456,7 @@ export class QuadTile extends Tile {
         this.download_state = 'Failed';
         console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
         `);
-        console.log(error);
+        console.warn(error);
         throw error;
       });
     return this._download;
@@ -522,11 +520,9 @@ export class ArrowTile extends Tile {
     this.batch_num = batch_num;
     // On arrow tables, it's reasonable to just add a new index by order.
     if (this._batch.getChild('ix') === null) {
-      console.log('Manually setting ix');
+      console.warn('Manually setting ix');
       const batch = this._batch;
-      console.log({ batch, rows: batch.numRows });
       const array = new Float32Array(batch.numRows);
-      console.log('SEED', this.dataset._ix_seed);
       const seed = this.dataset._ix_seed;
       this.dataset._ix_seed += batch.numRows;
       for (let i = 0; i < batch.numRows; i++) {
@@ -537,9 +533,7 @@ export class ArrowTile extends Tile {
       // This bubbles up to parents.
       this.highest_known_ix = this._max_ix;
       this._batch = add_or_delete_column(this.record_batch, 'ix', array);
-      console.log('Updated batch to', this._batch);
     }
-    console.log(this._batch.getChild('x'));
     this._extent = {
       x: extent(this._batch.getChild('x')),
       y: extent(this._batch.getChild('y')),

@@ -8,15 +8,18 @@ import type { AestheticSet } from './AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Dataset, QuadtileSet } from './Dataset';
 
-abstract class PlotSetting {
-  abstract start: number;
-  abstract value: number;
-  abstract target: number;
+class PlotSetting {
+  start: number;
+  value: number;
+  target: number;
   timer: Timer | undefined;
-  transform: 'geometric' | 'arithmetic';
-  constructor() {
-    this.transform = 'arithmetic';
-  }
+  transform: 'geometric' | 'arithmetic' = 'arithmetic';
+  constructor(start: number, transform : 'geometric' | 'arithmetic' = 'arithmetic' as const) {
+      this.transform = transform
+      this.start = start;
+      this.value = start;
+      this.target = start
+  } 
   update(value: number, duration: number) {
     if (duration === 0) {
       this.value = value;
@@ -51,49 +54,35 @@ abstract class PlotSetting {
   }
 }
 
-class MaxPoints extends PlotSetting {
-  value = 10_000;
-  start = 10_000;
-  target = 10_000;
-  constructor() {
-    super();
-    this.transform = 'geometric';
-  }
-}
-
-class TargetOpacity extends PlotSetting {
-  value = 50;
-  start = 50;
-  target = 50;
-}
-
-class PointSize extends PlotSetting {
-  value = 1;
-  start = 1;
-  target = 1;
-  constructor() {
-    super();
-    this.transform = 'geometric';
-  }
-}
-
 class RenderProps {
   // Aesthetics that adhere to the state of the _renderer_
   // as opposed to the individual points.
   // These can transition a little more beautifully.
-  maxPoints: MaxPoints;
-  targetOpacity: TargetOpacity;
-  pointSize: PointSize;
+  maxPoints: PlotSetting;
+  targetOpacity: PlotSetting;
+  pointSize: PlotSetting;
+  foregroundOpacity: PlotSetting;
+  backgroundOpacity: PlotSetting;
+  foregroundSize: PlotSetting;
+  backgroundSize: PlotSetting;
   constructor() {
-    this.maxPoints = new MaxPoints();
-    this.targetOpacity = new TargetOpacity();
-    this.pointSize = new PointSize();
+    this.maxPoints = new PlotSetting(10_000, 'geometric');
+    this.pointSize = new PlotSetting(1, 'geometric');
+    this.targetOpacity = new PlotSetting(50);
+    this.foregroundOpacity = new PlotSetting(1);
+    this.backgroundOpacity = new PlotSetting(.5);
+    this.foregroundSize = new PlotSetting(1, 'geometric');
+    this.backgroundSize = new PlotSetting(1, 'geometric')
   }
-  apply_prefs(prefs: APICall) {
+  apply_prefs(prefs: CompletePrefs) {
     const { duration } = prefs;
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
     this.pointSize.update(prefs.point_size, duration);
+    this.foregroundOpacity.update(prefs.background_options.opacity[1], duration);
+    this.backgroundOpacity.update(prefs.background_options.opacity[0], duration);
+    this.foregroundSize.update(prefs.background_options.size[1], duration);
+    this.backgroundSize.update(prefs.background_options.size[0], duration);
   }
   get max_points() {
     return this.maxPoints.value;
@@ -103,6 +92,18 @@ class RenderProps {
   }
   get point_size() {
     return this.pointSize.value;
+  }
+  get foreground_opacity() {
+    return this.foregroundOpacity.value;
+  }
+  get background_opacity() {
+    return this.backgroundOpacity.value;
+  }
+  get foreground_size() {
+    return this.foregroundSize.value;
+  }
+  get background_size() {
+    return this.backgroundSize.value;
   }
 }
 
@@ -117,10 +118,10 @@ export class Renderer<TileType extends Tile> {
   public deferred_functions: Array<() => void>;
   public _use_scale_to_download_tiles = true;
   public zoom?: Zoom;
-  public aes?: AestheticSet;
+  public aes?: AestheticSet<TileType>;
   public _zoom?: Zoom;
   public _initializations: Promise<void>[] = [];
-  public render_props: RenderProps;
+  public render_props: RenderProps = new RenderProps();
   constructor(
     selector: string,
     tileSet: Dataset<TileType>,
@@ -136,7 +137,6 @@ export class Renderer<TileType extends Tile> {
     this.height = +select(this.canvas).attr('height');
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
-    this.render_props = new RenderProps();
   }
 
   get discard_share() {
@@ -145,9 +145,14 @@ export class Renderer<TileType extends Tile> {
     // For now, I don't actually do it.
     return 0;
   }
-
-  get prefs(): APICall {
-    const p = { ...this.scatterplot.prefs };
+  /**
+   * Render prefs are scatterplot prefs, but for a single tile
+   * instead of for a whole table.
+   */
+  get prefs(): RenderPrefs {
+    const p = { ...this.scatterplot.prefs,
+    } as RenderPrefs;
+    // Delete the arrow stuff b/c serializing it is crazy expensive.
     p.arrow_table = undefined;
     p.arrow_buffer = undefined;
     return p;

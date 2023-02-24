@@ -49,7 +49,7 @@ export default class Scatterplot<T extends Tile> {
   private _zoom: Zoom;
   // The queue of draw calls are a chain of promises.
   private plot_queue: Promise<void> = Promise.resolve(0);
-  public prefs: APICall;
+  public prefs: CompletePrefs;
   // Whether the scatterplot has finished loading.
   ready: Promise<void>;
   public click_handler: ClickFunction;
@@ -148,7 +148,6 @@ export default class Scatterplot<T extends Tile> {
     codes: string[] | Record<string, number>,
     key_field: string
   ) {
-    console.log({codes})
     const true_codes: Record<string, number> = Array.isArray(codes)
       ? Object.fromEntries(codes.map((next) => [next, 1]))
       : codes;
@@ -472,7 +471,10 @@ export default class Scatterplot<T extends Tile> {
     /* PUBLIC see set click_function */
     return this.click_handler.f;
   }
-
+  /**
+   * Plots a set of prefs, and returns a promise that resolves
+   * upon the completion of the plot (not including any time for transitions). 
+   */
   async plotAPI(prefs: APICall): Promise<void> {
     await this.plot_queue;
     this.plot_queue = this.unsafe_plotAPI(prefs);
@@ -496,7 +498,15 @@ export default class Scatterplot<T extends Tile> {
     if (prefs.tooltip_html) {
       this.tooltip_html = Function('datum', prefs.tooltip_html);
     }
-
+    if (prefs.background_options) {
+      // these two numbers can be set either on fg/bg or just on fg
+      if (prefs.background_options.opacity && typeof(prefs.background_options.opacity) == "number") {
+        prefs.background_options.opacity = [prefs.background_options.opacity, 1]
+      }
+      if (prefs.background_options.size && typeof(prefs.background_options.size) == "number") {
+        prefs.background_options.size = [prefs.background_options.size, 1]
+      }
+    }
     if (prefs.labels) {
       const { url, label_field, size_field } = prefs.labels;
       const name = (prefs.labels.name || url) as string;

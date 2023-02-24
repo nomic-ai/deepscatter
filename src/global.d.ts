@@ -63,12 +63,17 @@ declare global {
     color?: string;
 
     // A multiplier against the point's opacity otherwise.
-    opacity?: number;
+    // A single value describes the background; an array 
+    // describes the foreground and background separately.
+    opacity?: number | [number, number];
 
-    // A multiplier against the point's size otherwise,
-    size?: number;
+    // A multiplier against the point's size. Default 0.66.
+    // A single value describes the background; an array 
+    // describes the foreground and background separately.
 
-    // Whether the points should respond on mouseover.
+    size?: number | [number, number];
+
+    // Whether the background points should respond on mouseover.
     mouseover?: boolean;
   };
 
@@ -242,9 +247,30 @@ declare global {
     bearer_token?: string;
   };
 
+
   type InitialAPICall = APICall & {
     encoding: Encoding;
   } & DataSpec;
 
+  // A full API call includes all of these.
+  // Encoding settings are not described here.
+  type CompletePrefs = APICall & {
+    background_options: {
+      color: string;
+      opacity: [number, number];
+      size: [number, number];
+      mouseover: boolean;
+    },
+    alpha : number,
+    point_size : number,
+    duration: number,
+    zoom_balance: number,
+    max_points: number
+  }
+
+  type RenderPrefs = CompletePrefs & {
+    arrow_table?: Table,
+    arrow_buffer?: Buffer
+  }
   export type TileType = QuadTile | ArrowTile;
 }

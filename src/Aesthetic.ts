@@ -21,8 +21,6 @@ export const scales = {
   literal: scaleIdentity,
 } as const;
 
-type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
-
 // A channel is usually going to be one of these.
 // Only color channels are different
 type DefaultChannel =
@@ -188,7 +186,6 @@ export abstract class Aesthetic<
     if (this.use_map_on_regl === 0) {
       return 0;
     }
-    //    console.log(this.aesthetic_map.get_position(this.id));
     return this.aesthetic_map.get_position(this.id);
   }
 
@@ -394,7 +391,6 @@ export abstract class Aesthetic<
     } else {
       input = input.map((d) => this.scale(d));
     }
-    //    console.log({ func });
     const values = input.map((i) => func(i));
     this.texture_buffer.set(values);
   }

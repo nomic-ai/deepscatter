@@ -43,7 +43,9 @@ uniform float u_base_size;
 uniform float u_alpha;
 uniform float u_foreground_number; // -1 -- everything is foreground; 0 -- background; 1 -- foreground.
 uniform vec4 u_background_rgba;
+uniform float u_foreground_alpha;
 uniform float u_background_mouseover;
+uniform float u_foreground_size;
 uniform float u_background_size;
 
 uniform sampler2D u_one_d_aesthetic_map;
@@ -1212,7 +1214,7 @@ void main() {
     u_last_foreground_map_position,
     a_last_foreground_is_constant
   );
-  
+  float fg_ease = mix(last_foreground_status, foreground_status, ease);
   if (ease < ix_to_random(ix, 1.)) {
     foreground_status = last_foreground_status;
   }
@@ -1327,11 +1329,15 @@ void main() {
       gl_Position = discard_me;
       return;
     }
+    if (u_foreground_number == 1.) {
+      gl_PointSize *= u_foreground_size;
+      fill = vec4(fill.rgb, min(1., fill.a * u_foreground_alpha));
+    }
     // If we're in background mode, got to change the points a bit.
     if (u_foreground_number == 0.) { 
       gl_PointSize *= u_background_size;
       // Should the color piker run?
-      if (u_color_picker_mode == 1.) {
+      if (u_color_picker_mode >= 1.) {
         if (u_background_mouseover == 1.) {
           // pass--keep the colors as are.
         } else {

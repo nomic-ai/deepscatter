@@ -170,6 +170,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     };
 
     // Clone.
+    console.log(props)
     return JSON.parse(JSON.stringify(props));
   }
 
@@ -184,7 +185,6 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   render_points(props) {
     // Regl is faster if it can render a large number of draw calls together.
     const prop_list = [];
-
     let call_no = 0;
     const needs_background_pass =
       (this.aes.store.foreground.states[0].active as boolean) ||
@@ -874,6 +874,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
         u_maxix: (_, { max_ix }) => max_ix,
         u_alpha: (_, { alpha }) => alpha,
         u_foreground_number: (_, { foreground }) => foreground,
+        u_foreground_alpha: () => this.render_props.foreground_opacity,
         u_background_rgba: () => {
           const color = this.prefs.background_options.color;
           const { r, g, b } = rgb(color);
@@ -884,9 +885,11 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
             this.prefs.background_options.opacity,
           ] as [number, number, number, number];
         },
-        u_background_mouseover: () =>
-          this.prefs.background_options.mouseover ? 1 : 0,
-        u_background_size: () => this.prefs.background_options.size,
+        u_background_mouseover: () => 
+          this.prefs.background_options.mouseover ? 1 : 0
+        ,
+        u_background_size: () => this.render_props.background_size,
+        u_foreground_size: () => this.render_props.foreground_size,
         u_k: (_, props) => {
           return props.transform.k;
         },

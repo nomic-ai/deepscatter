@@ -70,7 +70,7 @@ export abstract class Dataset<T extends Tile> {
     max_ix: number,
     queue_length: number
   ): void;
-
+  
   delete_column_if_exists(name: string) {
     // This is a complicated operation to actually free up memory.
     // Clone the record batches, without this data;
@@ -516,7 +516,6 @@ function supplement_identifiers(
   field_name: string,
   key_field = '_id'
 ): ArrowBuildable {
-  console.log({batch, ids, field_name, key_field})
   /* Add the identifiers from the batch to the ids array */
 
   // A quick lookup before performing a costly string decode.
@@ -533,7 +532,6 @@ function supplement_identifiers(
 
   const offsets = kfield.data[0].valueOffsets;
   const values = kfield.data[0].values;
-  console.log({kfield})
   // For every identifier, look if it's in the id array.
   for (let i = 0; i < batch.numRows; i++) {
     const code = values.slice(offsets[i], offsets[i + 1]);

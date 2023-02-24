@@ -15570,10 +15570,16 @@ function decodeFloat(x, y, z, w) {
   return FLOAT_VIEW[0];
 }
 class PlotSetting {
-  constructor() {
+  constructor(start2, transform = "arithmetic") {
+    __publicField(this, "start");
+    __publicField(this, "value");
+    __publicField(this, "target");
     __publicField(this, "timer");
-    __publicField(this, "transform");
-    this.transform = "arithmetic";
+    __publicField(this, "transform", "arithmetic");
+    this.transform = transform;
+    this.start = start2;
+    this.value = start2;
+    this.target = start2;
   }
   update(value, duration) {
     if (duration === 0) {
@@ -15605,46 +15611,32 @@ class PlotSetting {
     this.timer = timer_object;
   }
 }
-class MaxPoints extends PlotSetting {
-  constructor() {
-    super();
-    __publicField(this, "value", 1e4);
-    __publicField(this, "start", 1e4);
-    __publicField(this, "target", 1e4);
-    this.transform = "geometric";
-  }
-}
-class TargetOpacity extends PlotSetting {
-  constructor() {
-    super(...arguments);
-    __publicField(this, "value", 50);
-    __publicField(this, "start", 50);
-    __publicField(this, "target", 50);
-  }
-}
-class PointSize extends PlotSetting {
-  constructor() {
-    super();
-    __publicField(this, "value", 1);
-    __publicField(this, "start", 1);
-    __publicField(this, "target", 1);
-    this.transform = "geometric";
-  }
-}
 class RenderProps {
   constructor() {
     __publicField(this, "maxPoints");
     __publicField(this, "targetOpacity");
     __publicField(this, "pointSize");
-    this.maxPoints = new MaxPoints();
-    this.targetOpacity = new TargetOpacity();
-    this.pointSize = new PointSize();
+    __publicField(this, "foregroundOpacity");
+    __publicField(this, "backgroundOpacity");
+    __publicField(this, "foregroundSize");
+    __publicField(this, "backgroundSize");
+    this.maxPoints = new PlotSetting(1e4, "geometric");
+    this.pointSize = new PlotSetting(1, "geometric");
+    this.targetOpacity = new PlotSetting(50);
+    this.foregroundOpacity = new PlotSetting(1);
+    this.backgroundOpacity = new PlotSetting(0.5);
+    this.foregroundSize = new PlotSetting(1, "geometric");
+    this.backgroundSize = new PlotSetting(1, "geometric");
   }
   apply_prefs(prefs) {
     const { duration } = prefs;
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
     this.pointSize.update(prefs.point_size, duration);
+    this.foregroundOpacity.update(prefs.background_options.opacity[1], duration);
+    this.backgroundOpacity.update(prefs.background_options.opacity[0], duration);
+    this.foregroundSize.update(prefs.background_options.size[1], duration);
+    this.backgroundSize.update(prefs.background_options.size[0], duration);
   }
   get max_points() {
     return this.maxPoints.value;
@@ -15654,6 +15646,18 @@ class RenderProps {
   }
   get point_size() {
     return this.pointSize.value;
+  }
+  get foreground_opacity() {
+    return this.foregroundOpacity.value;
+  }
+  get background_opacity() {
+    return this.backgroundOpacity.value;
+  }
+  get foreground_size() {
+    return this.foregroundSize.value;
+  }
+  get background_size() {
+    return this.backgroundSize.value;
   }
 }
 class Renderer {
@@ -15670,7 +15674,7 @@ class Renderer {
     __publicField(this, "aes");
     __publicField(this, "_zoom");
     __publicField(this, "_initializations", []);
-    __publicField(this, "render_props");
+    __publicField(this, "render_props", new RenderProps());
     this.scatterplot = scatterplot;
     this.holder = select(selector2);
     this.canvas = select(
@@ -15681,13 +15685,14 @@ class Renderer {
     this.height = +select(this.canvas).attr("height");
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
-    this.render_props = new RenderProps();
   }
   get discard_share() {
     return 0;
   }
   get prefs() {
-    const p = { ...this.scatterplot.prefs };
+    const p = {
+      ...this.scatterplot.prefs
+    };
     p.arrow_table = void 0;
     p.arrow_buffer = void 0;
     return p;
@@ -15793,7 +15798,9 @@ uniform float u_base_size;
 uniform float u_alpha;
 uniform float u_foreground_number; // -1 -- everything is foreground; 0 -- background; 1 -- foreground.
 uniform vec4 u_background_rgba;
+uniform float u_foreground_alpha;
 uniform float u_background_mouseover;
+uniform float u_foreground_size;
 uniform float u_background_size;
 
 uniform sampler2D u_one_d_aesthetic_map;
@@ -17111,7 +17118,7 @@ void main() {
     u_last_foreground_map_position,
     a_last_foreground_is_constant
   );
-  
+  float fg_ease = mix(last_foreground_status, foreground_status, ease);
   if (ease < ix_to_random(ix, 1.)) {
     foreground_status = last_foreground_status;
   }
@@ -17226,11 +17233,15 @@ void main() {
       gl_Position = discard_me;
       return;
     }
+    if (u_foreground_number == 1.) {
+      gl_PointSize *= u_foreground_size;
+      fill = vec4(fill.rgb, min(1., fill.a * u_foreground_alpha));
+    }
     // If we're in background mode, got to change the points a bit.
     if (u_foreground_number == 0.) { 
       gl_PointSize *= u_background_size;
       // Should the color piker run?
-      if (u_color_picker_mode == 1.) {
+      if (u_color_picker_mode >= 1.) {
         if (u_background_mouseover == 1.) {
           // pass--keep the colors as are.
         } else {
@@ -23970,7 +23981,6 @@ class StatefulAesthetic {
       }
       this.needs_transitions = false;
     } else {
-      console.log(this.states[0].current_encoding, stringy);
       this.states.reverse();
       this.states[0].update(encoding);
       this.needs_transitions = true;
@@ -24262,6 +24272,7 @@ class ReglRenderer extends Renderer {
         [0, 0, 1]
       ].flat()
     };
+    console.log(props);
     return JSON.parse(JSON.stringify(props));
   }
   get default_webgl_scale() {
@@ -24663,6 +24674,7 @@ class ReglRenderer extends Renderer {
         u_maxix: (_, { max_ix }) => max_ix,
         u_alpha: (_, { alpha }) => alpha,
         u_foreground_number: (_, { foreground }) => foreground,
+        u_foreground_alpha: () => this.render_props.foreground_opacity,
         u_background_rgba: () => {
           const color2 = this.prefs.background_options.color;
           const { r, g, b } = rgb(color2);
@@ -24674,7 +24686,8 @@ class ReglRenderer extends Renderer {
           ];
         },
         u_background_mouseover: () => this.prefs.background_options.mouseover ? 1 : 0,
-        u_background_size: () => this.prefs.background_options.size,
+        u_background_size: () => this.render_props.background_size,
+        u_foreground_size: () => this.render_props.foreground_size,
         u_k: (_, props) => {
           return props.transform.k;
         },
@@ -33816,7 +33829,6 @@ class Tile {
   }
   delete_column_if_exists(colname) {
     var _a2;
-    console.log(colname, this.key);
     if (this._batch) {
       (_a2 = this._buffer_manager) == null ? void 0 : _a2.release(colname);
       this._batch = add_or_delete_column(this.record_batch, colname, null);
@@ -33831,7 +33843,6 @@ class Tile {
     this._batch = add_or_delete_column(this.record_batch, name, transformed);
   }
   add_column(name, data) {
-    console.log({ name, data });
     this._batch = add_or_delete_column(this.record_batch, name, data);
     return this._batch;
   }
@@ -34098,7 +34109,7 @@ class QuadTile extends Tile {
       this.download_state = "Failed";
       console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
         `);
-      console.log(error);
+      console.warn(error);
       throw error;
     });
     return this._download;
@@ -34141,11 +34152,9 @@ class ArrowTile extends Tile {
     this.download_state = "Complete";
     this.batch_num = batch_num;
     if (this._batch.getChild("ix") === null) {
-      console.log("Manually setting ix");
+      console.warn("Manually setting ix");
       const batch = this._batch;
-      console.log({ batch, rows: batch.numRows });
       const array2 = new Float32Array(batch.numRows);
-      console.log("SEED", this.dataset._ix_seed);
       const seed = this.dataset._ix_seed;
       this.dataset._ix_seed += batch.numRows;
       for (let i = 0; i < batch.numRows; i++) {
@@ -34155,9 +34164,7 @@ class ArrowTile extends Tile {
       this._max_ix = seed + batch.numRows;
       this.highest_known_ix = this._max_ix;
       this._batch = add_or_delete_column(this.record_batch, "ix", array2);
-      console.log("Updated batch to", this._batch);
     }
-    console.log(this._batch.getChild("x"));
     this._extent = {
       x: extent(this._batch.getChild("x")),
       y: extent(this._batch.getChild("y"))
@@ -34542,7 +34549,6 @@ function add_or_delete_column(batch, field_name, data) {
   return new_batch;
 }
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
-  console.log({ batch, ids, field_name, key_field });
   const hashtab = /* @__PURE__ */ new Set();
   for (const item of Object.keys(ids)) {
     const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || "").join("");
@@ -34555,7 +34561,6 @@ function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
   }
   const offsets = kfield.data[0].valueOffsets;
   const values = kfield.data[0].values;
-  console.log({ kfield });
   for (let i = 0; i < batch.numRows; i++) {
     const code = values.slice(offsets[i], offsets[i + 1]);
     const shortversion = code.slice(0, 4).join("");
@@ -35386,7 +35391,6 @@ class LabelMaker extends Renderer {
         d.data.y = y_.invert(event.y);
       });
       handler.on("end", (event, d) => {
-        console.log(`${d.data.x}	${d.data.y}	${d.data.text}`);
       });
       bboxes.call(handler);
     }
@@ -35535,8 +35539,8 @@ class DepthTree extends dist.RBush3D {
 }
 const default_background_options = {
   color: "gray",
-  opacity: 0.2,
-  size: 0.66,
+  opacity: [0.2, 1],
+  size: [0.66, 1],
   mouseover: false
 };
 const default_API_call = {
@@ -35619,7 +35623,6 @@ class Scatterplot {
     this.bound = true;
   }
   add_identifier_column(name, codes, key_field) {
-    console.log({ codes });
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
@@ -35829,6 +35832,14 @@ class Scatterplot {
     }
     if (prefs.tooltip_html) {
       this.tooltip_html = Function("datum", prefs.tooltip_html);
+    }
+    if (prefs.background_options) {
+      if (prefs.background_options.opacity && typeof prefs.background_options.opacity == "number") {
+        prefs.background_options.opacity = [prefs.background_options.opacity, 1];
+      }
+      if (prefs.background_options.size && typeof prefs.background_options.size == "number") {
+        prefs.background_options.size = [prefs.background_options.size, 1];
+      }
     }
     if (prefs.labels) {
       const { url, label_field, size_field } = prefs.labels;
