@@ -22,9 +22,10 @@ function nothing() {
 }
 
 type ArrowBuildable = Vector | Float32Array;
+type Transformation<T> = (arg0: T) => ArrowBuildable | Promise<ArrowBuildable>;
 
 export abstract class Dataset<T extends Tile> {
-  public transformations: Record<string, (arg0: T) => ArrowBuildable> = {};
+  public transformations: Record<string, Transformation<T>>= {};
   abstract root_tile: T;
   protected plot: Plot;
   abstract ready: Promise<void>;
@@ -70,7 +71,7 @@ export abstract class Dataset<T extends Tile> {
     max_ix: number,
     queue_length: number
   ): void;
-  
+
   delete_column_if_exists(name: string) {
     // This is a complicated operation to actually free up memory.
     // Clone the record batches, without this data;
@@ -206,6 +207,11 @@ export abstract class Dataset<T extends Tile> {
     return this.root_tile.record_batch.schema;
   }
 
+  /**
+   * 
+   * @param field_name the name of the column to create
+   * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
+   */
   add_tiled_column(field_name: string, buffer: Uint8Array): void {
     const tb = tableFromIPC(buffer);
     const records: Record<string, Float32Array> = {};
@@ -400,6 +406,50 @@ export class QuadtileSet extends Dataset<QuadTile> {
         });
     }
   }
+
+
+   /**
+   * 
+   * @param field_name the name of the column to create
+   * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
+   */
+   add_macrotiled_column(field_name: string, transformation : (ids: string[]) => Promise<Uint8Array>): void {
+    const megatile_tasks : Record<string, Promise<void>> = {};
+    const records: Record<string, Float32Array> = {};
+
+    async function get_table(tile: QuadTile) {
+      const { key, macrotile } = tile;
+      if (megatile_tasks[macrotile] !== undefined) {
+        return await megatile_tasks[macrotile];
+      } else {
+        megatile_tasks[macrotile] = transformation(tile.macro_siblings)
+          .then(buffer => {
+            const tb = tableFromIPC(buffer);
+            for (const batch of tb.batches) {
+              const offsets = batch.getChild('data')!.data[0].valueOffsets;
+              const values = batch.getChild('data')!.data[0].children[0];
+              for (let i = 0; i < batch.data.length; i++) {
+                const tilename = batch.getChild('_tile').get(i) as string;
+                records[tilename] = values.values.slice(
+                  offsets[i],
+                  offsets[i + 1]
+                ) as Float32Array;
+              }
+            }
+            return
+        })
+        return megatile_tasks[macrotile]
+      }
+    }
+
+    this.transformations[field_name] = async function (tile) {
+      await get_table(tile)
+      const array = records[tile.key];
+      return array;
+    };
+  }
+
+
 }
 
 function area(rect: Rectangle) {

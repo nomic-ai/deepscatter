@@ -108,7 +108,7 @@ function selection_selectChild(match) {
   return this.select(match == null ? childFirst : childFind(typeof match === "function" ? match : childMatcher(match)));
 }
 var filter = Array.prototype.filter;
-function children() {
+function children$1() {
   return Array.from(this.children);
 }
 function childrenFilter(match) {
@@ -117,7 +117,7 @@ function childrenFilter(match) {
   };
 }
 function selection_selectChildren(match) {
-  return this.selectAll(match == null ? children : childrenFilter(typeof match === "function" ? match : childMatcher(match)));
+  return this.selectAll(match == null ? children$1 : childrenFilter(typeof match === "function" ? match : childMatcher(match)));
 }
 function selection_filter(match) {
   if (typeof match !== "function")
@@ -23872,6 +23872,11 @@ class Color extends Aesthetic {
   update(encoding) {
     super.update(encoding);
     this.current_encoding = encoding;
+    if (encoding === null) {
+      encoding = {
+        constant: this.default_constant
+      };
+    }
     if (!isConstantChannel(encoding)) {
       if (encoding.range && typeof encoding.range[0] === "string") {
         this.encode_for_textures(encoding.range);
@@ -24272,7 +24277,6 @@ class ReglRenderer extends Renderer {
         [0, 0, 1]
       ].flat()
     };
-    console.log(props);
     return JSON.parse(JSON.stringify(props));
   }
   get default_webgl_scale() {
@@ -24330,17 +24334,20 @@ class ReglRenderer extends Renderer {
       depth: 1
     });
     const start2 = Date.now();
-    while (Date.now() - start2 < 10 && this.deferred_functions.length > 0) {
-      const current = this.deferred_functions.shift();
-      if (current === void 0) {
-        continue;
-      }
-      try {
-        current();
-      } catch (error) {
-        console.warn(error, current);
+    async function pop_deferred_functions(deferred_functions) {
+      while (Date.now() - start2 < 10 && deferred_functions.length > 0) {
+        const current = deferred_functions.shift();
+        if (current === void 0) {
+          continue;
+        }
+        try {
+          await current();
+        } catch (error) {
+          console.warn(error, current);
+        }
       }
     }
+    void pop_deferred_functions(this.deferred_functions);
     try {
       this.render_all(props);
     } catch (error) {
@@ -24863,7 +24870,7 @@ class TileBufferManager {
       ]
     ]);
   }
-  ready(block_for_buffers = true) {
+  ready() {
     const { renderer, regl_elements } = this;
     const needed_dimensions = /* @__PURE__ */ new Set();
     for (const [k, v] of renderer.aes) {
@@ -24883,15 +24890,8 @@ class TileBufferManager {
           return false;
         }
         regl_elements.set(key, null);
-        if (block_for_buffers) {
-          if (key === void 0) {
-            continue;
-          }
-          this.create_regl_buffer(key);
-        } else {
-          renderer.deferred_functions.push(() => this.create_regl_buffer(key));
-          return false;
-        }
+        renderer.deferred_functions.push(() => this.create_regl_buffer(key));
+        return false;
       }
     }
     return true;
@@ -24905,7 +24905,7 @@ class TileBufferManager {
   get count() {
     return this.tile.record_batch.numRows;
   }
-  create_buffer_data(key) {
+  async create_buffer_data(key) {
     var _a2;
     const { tile } = this;
     if (!tile.ready) {
@@ -24913,9 +24913,9 @@ class TileBufferManager {
     }
     let column = tile.record_batch.getChild(key);
     if (!column) {
-      const transformation = tile.dataset.transformations[key];
+      const transformation = await tile.dataset.transformations[key];
       if (transformation !== void 0) {
-        tile.apply_transformation(key);
+        await tile.apply_transformation(key);
         column = tile.record_batch.getChild(key);
         if (!column) {
           throw new Error(`${key} was not created.`);
@@ -24959,9 +24959,9 @@ class TileBufferManager {
     }
     return column.data[0].values;
   }
-  create_regl_buffer(key) {
+  async create_regl_buffer(key) {
     const { regl_elements, renderer } = this;
-    const data = this.create_buffer_data(key);
+    const data = await this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {
       console.warn(typeof data, data);
       throw new Error("Buffer data must be a Float32Array");
@@ -33834,12 +33834,15 @@ class Tile {
       this._batch = add_or_delete_column(this.record_batch, colname, null);
     }
   }
-  apply_transformation(name) {
+  async apply_transformation(name) {
     const transform = this.dataset.transformations[name];
     if (transform === void 0) {
       throw new Error(`Transformation ${name} is not defined`);
     }
-    const transformed = transform(this);
+    const transformed = await transform(this);
+    if (transformed === void 0) {
+      throw new Error(`Transformation ${name} failed`);
+    }
     this._batch = add_or_delete_column(this.record_batch, name, transformed);
   }
   add_column(name, data) {
@@ -34114,6 +34117,12 @@ class QuadTile extends Tile {
     });
     return this._download;
   }
+  get macrotile() {
+    return macrotile(this.key);
+  }
+  get macro_siblings() {
+    return macrotile_siblings(this.key);
+  }
   get children() {
     if (this.download_state !== "Complete") {
       return [];
@@ -34218,6 +34227,46 @@ function p_in_rect(p, rect) {
     return true;
   }
   return p[0] < rect.x[1] && p[0] > rect.x[0] && p[1] < rect.y[1] && p[1] > rect.y[0];
+}
+function macrotile(key, size = 2, parents = 2) {
+  let [z, x, y] = key.split("/").map((d) => parseInt(d));
+  let moves = 0;
+  while (!(moves >= parents && z % size == 0)) {
+    x = Math.floor(x / 2);
+    y = Math.floor(y / 2);
+    z = z - 1;
+    moves++;
+  }
+  return `${z}/${x}/${y}`;
+}
+function macrotile_siblings(key, size = 2, parents = 2) {
+  return macrotile_descendants(macrotile(key, size, parents), size, parents);
+}
+const descendant_cache = /* @__PURE__ */ new Map();
+function macrotile_descendants(macrokey, size = 2, parents = 2) {
+  if (descendant_cache.has(macrokey)) {
+    return descendant_cache.get(macrokey);
+  }
+  const parent_tiles = [[macrokey]];
+  while (parent_tiles.length < parents) {
+    parent_tiles.unshift(parent_tiles[0].map(children).flat());
+  }
+  const sibling_tiles = [parent_tiles[0].map(children).flat()];
+  while (sibling_tiles.length < size) {
+    sibling_tiles.unshift(sibling_tiles[0].map(children).flat());
+  }
+  sibling_tiles.reverse();
+  const descendants = sibling_tiles.flat();
+  descendant_cache.set(macrokey, descendants);
+  return descendants;
+}
+function children(tile) {
+  const [z, x, y] = tile.split("/").map((d) => parseInt(d));
+  const children2 = [];
+  for (let i = 0; i < 4; i++) {
+    children2.push(`${z + 1}/${x * 2 + i % 2}/${y * 2 + Math.floor(i / 2)}`);
+  }
+  return children2;
 }
 function nothing() {
 }
@@ -34472,6 +34521,38 @@ class QuadtileSet extends Dataset {
         throw error;
       });
     }
+  }
+  add_macrotiled_column(field_name, transformation) {
+    const megatile_tasks = {};
+    const records = {};
+    async function get_table(tile) {
+      const { key, macrotile: macrotile2 } = tile;
+      if (megatile_tasks[macrotile2] !== void 0) {
+        return await megatile_tasks[macrotile2];
+      } else {
+        megatile_tasks[macrotile2] = transformation(tile.macro_siblings).then((buffer) => {
+          const tb = tableFromIPC(buffer);
+          for (const batch of tb.batches) {
+            const offsets = batch.getChild("data").data[0].valueOffsets;
+            const values = batch.getChild("data").data[0].children[0];
+            for (let i = 0; i < batch.data.length; i++) {
+              const tilename = batch.getChild("_tile").get(i);
+              records[tilename] = values.values.slice(
+                offsets[i],
+                offsets[i + 1]
+              );
+            }
+          }
+          return;
+        });
+        return megatile_tasks[macrotile2];
+      }
+    }
+    this.transformations[field_name] = async function(tile) {
+      await get_table(tile);
+      const array2 = records[tile.key];
+      return array2;
+    };
   }
 }
 function area(rect) {
@@ -35585,6 +35666,7 @@ class Scatterplot {
     __publicField(this, "prefs");
     __publicField(this, "ready");
     __publicField(this, "click_handler");
+    __publicField(this, "hooks", {});
     __publicField(this, "tooltip_handler");
     __publicField(this, "label_click_handler");
     __publicField(this, "on_zoom");
@@ -35788,6 +35870,18 @@ class Scatterplot {
     }
     merge(this.prefs, prefs);
   }
+  add_hook(name, hook, clobber = false) {
+    if (this.hooks[name] !== void 0 && !clobber) {
+      throw new Error(`Hook ${name} already exists`);
+    }
+    this.hooks[name] = hook;
+  }
+  remove_hook(name) {
+    if (this.hooks[name] === void 0) {
+      throw new Error(`Hook ${name} does not exist`);
+    }
+    delete this.hooks[name];
+  }
   stop_labellers() {
     for (const [k, v] of Object.entries(this.secondary_renderers)) {
       if (v && v["label_key"] !== void 0) {
@@ -35821,7 +35915,11 @@ class Scatterplot {
   async plotAPI(prefs) {
     await this.plot_queue;
     this.plot_queue = this.unsafe_plotAPI(prefs);
-    return await this.plot_queue;
+    await this.plot_queue;
+    for (const [_, hook] of Object.entries(this.hooks)) {
+      hook();
+    }
+    return;
   }
   async unsafe_plotAPI(prefs) {
     if (prefs === null) {
@@ -35834,10 +35932,10 @@ class Scatterplot {
       this.tooltip_html = Function("datum", prefs.tooltip_html);
     }
     if (prefs.background_options) {
-      if (prefs.background_options.opacity && typeof prefs.background_options.opacity == "number") {
+      if (prefs.background_options.opacity && typeof prefs.background_options.opacity === "number") {
         prefs.background_options.opacity = [prefs.background_options.opacity, 1];
       }
-      if (prefs.background_options.size && typeof prefs.background_options.size == "number") {
+      if (prefs.background_options.size && typeof prefs.background_options.size === "number") {
         prefs.background_options.size = [prefs.background_options.size, 1];
       }
     }

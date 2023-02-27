@@ -34,7 +34,7 @@ type PossibleGLVals = number | [number, number, number]
 export abstract class Aesthetic<
   GlValueType extends PossibleGLVals = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
   JSValueType = number, // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red
-  ChannelType extends Channel = DefaultChannel
+  ChannelType extends RootChannel = DefaultChannel
 > {
   public abstract default_range: [number, number];
   public abstract default_constant: JSValueType;

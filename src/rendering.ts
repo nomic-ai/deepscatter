@@ -115,7 +115,7 @@ export class Renderer<TileType extends Tile> {
   public dataset: Dataset<TileType>;
   public width: number;
   public height: number;
-  public deferred_functions: Array<() => void>;
+  public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
   public zoom?: Zoom;
   public aes?: AestheticSet<TileType>;

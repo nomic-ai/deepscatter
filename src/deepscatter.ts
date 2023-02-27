@@ -12,6 +12,7 @@ import { Renderer } from './rendering';
 import { ArrowTile, QuadTile, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 
+
 // DOM elements that deepscatter uses.
 const base_elements = [
   {
@@ -32,6 +33,7 @@ const base_elements = [
   },
 ];
 
+type Hook = () => void;
 /**
  * The core type of the module is a single scatterplot that manages
  * all data and renderering.
@@ -53,6 +55,7 @@ export default class Scatterplot<T extends Tile> {
   // Whether the scatterplot has finished loading.
   ready: Promise<void>;
   public click_handler: ClickFunction;
+  private hooks: Record<string, Hook> = {};
   public tooltip_handler: TooltipHTML;
   public label_click_handler: LabelClick;
   // In order to preserve JSON serializable nature of prefs, the consumer directly sets this
@@ -423,6 +426,29 @@ export default class Scatterplot<T extends Tile> {
     }
     merge(this.prefs, prefs);
   }
+  /**
+   * Hooks provide a mechanism to run arbitrary code after call of plotAPI has resolved.
+   * This is useful for--e.g.--updating a legend only when the plot changes.
+   * 
+   * @param name The name of the hook to add.
+   * @param hook A function to run after each plot command.
+   */
+  public add_hook(name : string, hook: Hook, unsafe = false) {
+    if (this.hooks[name] !== undefined && !unsafe) {
+      throw new Error(`Hook ${name} already exists`);
+    }
+    this.hooks[name] = hook;
+  }
+
+  public remove_hook(name : string, unsafe = false) {
+    if (this.hooks[name] === undefined) {
+      if (unsafe) {
+        return
+      }
+      throw new Error(`Hook ${name} does not exist`);
+    }
+    delete this.hooks[name];
+  }
 
   public stop_labellers() {
     for (const [k, v] of Object.entries(this.secondary_renderers)) {
@@ -444,7 +470,7 @@ export default class Scatterplot<T extends Tile> {
    */
 
   public dim(dimension: string): ConcreteAesthetic {
-    return this._renderer.aes.dim(dimension).current as T;
+    return this._renderer.aes.dim(dimension).current as ConcreteAesthetic;
   }
 
   set tooltip_html(func) {
@@ -476,9 +502,71 @@ export default class Scatterplot<T extends Tile> {
    * upon the completion of the plot (not including any time for transitions). 
    */
   async plotAPI(prefs: APICall): Promise<void> {
+
     await this.plot_queue;
+    await this.start_transformations(prefs);
     this.plot_queue = this.unsafe_plotAPI(prefs);
-    return await this.plot_queue;
+    await this.plot_queue;
+    for (const [_, hook] of Object.entries(this.hooks)) {
+      hook();
+    }
+    return
+  }
+
+  /**
+   * Get a short head start on transformations. This prevents a flicker
+   * when a new data field needs to be loaded onto the GPU.
+   * 
+   * @param prefs The API call to prepare.
+   * @param delay Delay in milliseconds to give the data to get onto the GPU.
+   * 110 ms seems like a decent compromise; barely perceptible to humans as a UI response 
+   * time, but enough time
+   * for three animation ticks to run.
+   * @returns A promise that resolves immediately if there's no work to do, 
+   * or after the delay if there is.
+   */
+  async start_transformations(prefs : APICall, delay = 110) : Promise<void> {
+    // If there's not a transition time, things might get weird and a flicker
+    // is probably OK. Using the *current* transition time means that the start
+    // of a set of duration-0 calls (like, e.g., dragging a time slider) will
+    // block but that 
+    if (this.prefs.duration < delay) {
+          return Promise.resolve();
+        }
+    const needed_keys : Set<string> = new Set();
+    if (!prefs.encoding) {
+      return Promise.resolve();
+    }
+    for (const [k, v] of Object.entries(prefs.encoding)) {
+      if (v && typeof(v) !== 'string' && v['field'] !== undefined) {
+        needed_keys.add(v['field']);
+      }
+    }
+    let num_unready_columns = 0;
+
+    if (this._renderer) {
+      for (const tile of this._renderer.visible_tiles()) {
+        // Allow unready tiles to stay unready; who know's what's going on there.
+        const manager = tile._buffer_manager
+        if (manager !== undefined && manager.ready()) {
+          for (const key of needed_keys) {
+            if (manager.ready_or_not_here_it_comes(key)) {
+              num_unready_columns += 1;
+            }
+         }
+        }
+      }
+    } else {
+      return Promise.resolve();
+    }
+    if (num_unready_columns === this._renderer.visible_tiles().length) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve()
+      }, delay);
+    });
   }
 
   /**
@@ -500,10 +588,10 @@ export default class Scatterplot<T extends Tile> {
     }
     if (prefs.background_options) {
       // these two numbers can be set either on fg/bg or just on fg
-      if (prefs.background_options.opacity && typeof(prefs.background_options.opacity) == "number") {
+      if (prefs.background_options.opacity && typeof(prefs.background_options.opacity) === "number") {
         prefs.background_options.opacity = [prefs.background_options.opacity, 1]
       }
-      if (prefs.background_options.size && typeof(prefs.background_options.size) == "number") {
+      if (prefs.background_options.size && typeof(prefs.background_options.size) === "number") {
         prefs.background_options.size = [prefs.background_options.size, 1]
       }
     }
@@ -726,7 +814,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
       };
     }
     const thisis = this;
-    console.log({ thisis, p: this.plot });
     void this.plot.plotAPI({
       encoding: { filter },
     });
@@ -753,7 +840,6 @@ class TooltipHTML extends SettableFunction<string> {
       null,
       'tile_key',
     ]);
-    //    console.log({ ...point });
     for (const [k, v] of point) {
       // Don't show missing data.
       if (v === null) {

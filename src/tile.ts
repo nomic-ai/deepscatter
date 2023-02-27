@@ -24,7 +24,6 @@ import {
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
 import type { Dataset, QuadtileSet } from './Dataset';
-import Scatterplot from './deepscatter';
 type MinMax = [number, number];
 
 export type Rectangle = {
@@ -102,12 +101,15 @@ export abstract class Tile {
     }
   }
 
-  apply_transformation(name: string): Vector {
+  async apply_transformation(name: string): Promise<void> {
     const transform = this.dataset.transformations[name];
     if (transform === undefined) {
       throw new Error(`Transformation ${name} is not defined`);
     }
-    const transformed = transform(this);
+    const transformed = await transform(this);
+    if (transformed === undefined) {
+      throw new Error(`Transformation ${name} failed`);
+    }
     this._batch = add_or_delete_column(this.record_batch, name, transformed);
   }
 
@@ -462,6 +464,21 @@ export class QuadTile extends Tile {
     return this._download;
   }
 
+  /** 
+   * Sometimes it's useful to do operations on batches of tiles. This function
+   * defines a grouping of tiles in the same general region to be operated on.
+   * In general they will have about 80 elements (16 + 64), but the top level
+   * has just 5. (4 + 1). Note a macro tile with the name [2/0/0] does not actually include
+   * the tile [2/0/0] itself, but rather the tiles [4/0/0], [4/1/0], [4/0/1], [4/1/1], [5/0/0] etc.
+   */
+  get macrotile() : string {
+    return macrotile(this.key);
+  }
+
+  get macro_siblings() : Array<string> {
+   return macrotile_siblings(this.key);
+  }
+
   get children(): Array<this> {
     // create or return children.
 
@@ -597,4 +614,47 @@ export function p_in_rect(p: Point, rect: Rectangle | undefined) {
   return (
     p[0] < rect.x[1] && p[0] > rect.x[0] && p[1] < rect.y[1] && p[1] > rect.y[0]
   );
+}
+function macrotile(key: string, size = 2, parents = 2) {
+  let [z, x, y] = key.split("/").map((d) => parseInt(d));
+  let moves = 0;
+  while (!(moves >= parents && z % size == 0)) {
+    x = Math.floor(x / 2);
+    y = Math.floor(y / 2);
+    z = z - 1;
+    moves++;
+  }
+  return `${z}/${x}/${y}`;
+}
+
+function macrotile_siblings(key: string, size = 2, parents = 2) : Array<string> {
+  return macrotile_descendants(macrotile(key, size, parents), size, parents);
+}
+
+const descendant_cache = new Map<string, string[]>();
+function macrotile_descendants(macrokey: string, size = 2, parents = 2) : Array<string> {
+  if (descendant_cache.has(macrokey)) {
+    return descendant_cache.get(macrokey) as string[];
+  }
+  const parent_tiles = [[macrokey]];
+  while (parent_tiles.length < parents) {
+    parent_tiles.unshift(parent_tiles[0].map(children).flat());
+  }
+  const sibling_tiles = [parent_tiles[0].map(children).flat()];
+  while (sibling_tiles.length < size) {
+    sibling_tiles.unshift(sibling_tiles[0].map(children).flat());
+  }
+  sibling_tiles.reverse();
+  const descendants = sibling_tiles.flat();
+  descendant_cache.set(macrokey, descendants);
+  return descendants;
+}
+
+function children(tile : string) {
+  const [z, x, y] = tile.split("/").map((d) => parseInt(d)) as [number, number, number];
+  const children = [];
+  for (let i = 0; i < 4; i++) {
+    children.push(`${z + 1}/${x * 2 + (i % 2)}/${y * 2 + Math.floor(i / 2)}`);
+  }
+  return children;
 }

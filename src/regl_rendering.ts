@@ -20,7 +20,7 @@ import { StructRowProxy } from 'apache-arrow';
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer<T extends Tile> extends Renderer<T> {
   public regl: Regl;
-  public aes: AestheticSet;
+  public aes: AestheticSet<T>;
   public buffer_size = 1024 * 1024 * 64; // Use GPU memory in blocks of 64 MB buffers by default.
   private _buffers: MultipurposeBufferSet;
   public _initializations: Promise<void>[];
@@ -170,7 +170,6 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     };
 
     // Clone.
-    console.log(props)
     return JSON.parse(JSON.stringify(props));
   }
 
@@ -247,18 +246,24 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       depth: 1,
     });
     const start = Date.now();
-    while (Date.now() - start < 10 && this.deferred_functions.length > 0) {
-      // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
-      const current = this.deferred_functions.shift();
-      if (current === undefined) {
-        continue;
-      }
-      try {
-        current();
-      } catch (error) {
-        console.warn(error, current);
+
+    async function pop_deferred_functions(deferred_functions : (() => void | Promise<void>)[]) {
+      while (Date.now() - start < 10 && deferred_functions.length > 0) {
+        // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
+        const current = deferred_functions.shift();
+        if (current === undefined) {
+          continue;
+        }
+        try {
+          await current();
+        } catch (error) {
+          console.warn(error, current);
+        }
       }
     }
+    // Run 10 ms of deferred functions.
+    void pop_deferred_functions(this.deferred_functions);
+
     try {
       this.render_all(props);
     } catch (error) {
@@ -1133,16 +1138,18 @@ export class TileBufferManager<T extends Tile> {
     ]);
   }
 
+
   /**
    *
-   * @param block_for_buffers Whether to
+   * @param
    * @returns
    */
-  ready(block_for_buffers = true) {
+  ready() {
     // Is the buffer ready with all the aesthetics for the current plot?
-    //Block for buffers:
-    const { renderer, regl_elements } = this;
-    // Don't allocate buffers for dimensions until they're needed.
+    const { renderer } = this;
+
+    // We don't allocate buffers for dimensions until they're needed.
+    // This code checks what buffers the current plot call is expecting.
     const needed_dimensions: Set<Dimension> = new Set();
     for (const [k, v] of renderer.aes) {
       for (const aesthetic of v.states) {
@@ -1153,29 +1160,38 @@ export class TileBufferManager<T extends Tile> {
     }
 
     for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
-      const current = this.regl_elements.get(key);
-
-      if (current === null) {
-        // It's in the process of being built.
+      if (!this.ready_or_not_here_it_comes(key)) {
         return false;
       }
-      if (current === undefined) {
-        if (!this.tile.ready) {
-          // Can't build b/c no tile ready.
-          return false;
-        }
-        // Request that the buffer be created before returning false.
-        regl_elements.set(key, null);
-        if (block_for_buffers) {
-          if (key === undefined) {
-            continue;
-          }
-          this.create_regl_buffer(key);
-        } else {
-          renderer.deferred_functions.push(() => this.create_regl_buffer(key));
-          return false;
-        }
+    }
+    return true;
+  }
+  /**
+   * Creates a deferred call that will populate the regl buffer
+   * when there's some free time.
+   * 
+   * @param key a string representing the requested column; must either exist in the
+   * record batch or have a means for creating it asynchronously in 'transformations.'
+   * @returns true if the column is ready, false if it's not ready and a deferred call
+   * was created.
+   */
+  ready_or_not_here_it_comes(key : string) {
+    const { renderer, regl_elements } = this;
+
+    const current = this.regl_elements.get(key);
+    if (current === null) {
+      // It's in the process of being built.
+      return false;
+    }
+    if (current === undefined) {
+      if (!this.tile.ready) {
+        // Can't build b/c no tile ready.
+        return false;
       }
+      // Request that the buffer be created before returning false.
+      regl_elements.set(key, null);
+      renderer.deferred_functions.push(() => this.create_regl_buffer(key));
+      return false;
     }
     return true;
   }
@@ -1197,7 +1213,7 @@ export class TileBufferManager<T extends Tile> {
     return this.tile.record_batch.numRows;
   }
 
-  create_buffer_data(key: string): Float32Array {
+  async create_buffer_data(key: string): Promise<Float32Array> {
     const { tile } = this;
     if (!tile.ready) {
       throw new Error('Tile table not present.');
@@ -1206,11 +1222,11 @@ export class TileBufferManager<T extends Tile> {
     let column = tile.record_batch.getChild(key);
 
     if (!column) {
-      const transformation = tile.dataset.transformations[key];
+      const transformation = await tile.dataset.transformations[key];
       if (transformation !== undefined) {
         // Sometimes the transformation for creating the column may be defined but not yet applied.
         // If so, apply it right away.
-        tile.apply_transformation(key);
+        await tile.apply_transformation(key);
         column = tile.record_batch.getChild(key);
         if (!column) {
           throw new Error(`${key} was not created.`);
@@ -1276,9 +1292,9 @@ export class TileBufferManager<T extends Tile> {
     return column.data[0].values as Float32Array;
   }
 
-  create_regl_buffer(key: string) {
+  async create_regl_buffer(key: string) : Promise<void> {
     const { regl_elements, renderer } = this;
-    const data = this.create_buffer_data(key);
+    const data = await this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {
       console.warn(typeof data, data);
       throw new Error('Buffer data must be a Float32Array');
@@ -1393,7 +1409,6 @@ class MultipurposeBufferSet {
       // the same recordbatch--so only reuse those so as not to slowly leak out memory
       // by creating small unallocated strips at the end.
       if (buffer_loc.byte_size === bytes_needed) {
-        console.log('Reusing', buffer_loc);
         // Delete this element from the list of free buffers.
         this.freed_buffers.splice(i, 1);
         return {

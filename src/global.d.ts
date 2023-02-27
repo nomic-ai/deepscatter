@@ -53,6 +53,7 @@ declare global {
     stride: number;
     byte_size: number; // in bytes;
   };
+  
   type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
   type FunctionalChannel = LambdaChannel | OpChannel;
@@ -148,7 +149,7 @@ declare global {
 
   export type BooleanChannel = FunctionalChannel | ConstantBool;
 
-  export type Channel =
+  export type RootChannel =
     | BooleanChannel
     | BasicChannel
     | string
@@ -157,7 +158,7 @@ declare global {
     | ConstantChannel
     | LambdaChannel;
 
-  export type JitterChannel = Channel & {
+  export type JitterChannel = RootChannel & {
     /**
      * Jitter channels have a method.
      * 'spiral' animates along a log spiral.
@@ -175,17 +176,17 @@ declare global {
    * And encoding.
    */
   export type Encoding = {
-    x?: Channel;
-    y?: Channel;
+    x?: RootChannel;
+    y?: RootChannel;
     color?: null | ColorChannel;
-    size?: null | Channel;
-    shape?: null | Channel;
+    size?: null | RootChannel;
+    shape?: null | RootChannel;
     filter?: null | FunctionalChannel;
     filter2?: null | FunctionalChannel;
     jitter_radius?: null | JitterChannel;
-    jitter_speed?: null | Channel;
-    x0?: null | Channel;
-    y0?: null | Channel;
+    jitter_speed?: null | RootChannel;
+    x0?: null | RootChannel;
+    y0?: null | RootChannel;
     position?: string;
     position0?: string;
   };

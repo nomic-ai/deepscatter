@@ -232,6 +232,11 @@ export class Color extends Aesthetic<
   update(encoding: ColorChannel) {
     super.update(encoding);
     this.current_encoding = encoding;
+    if (encoding === null) {
+      encoding = {
+        constant: this.default_constant
+      }
+    }
     if (!isConstantChannel(encoding)) {
       if (encoding.range && typeof encoding.range[0] === 'string') {
         this.encode_for_textures(encoding.range);
