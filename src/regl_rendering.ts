@@ -1310,28 +1310,6 @@ export class TileBufferManager<T extends Tile> {
   }
 }
 
-/*
-function interpolate_regl_property(props, name : string, weight : 'linear' | 'log' | 'sqrt' = 'linear') {
-  const { relative_time, prefs } = props
-  if (relative_time >= 1) {
-    return prefs[name];
-  }
-  const start = prefs[`last_${name}`] || prefs[name];
-  const end = prefs[name];
-  if (weight === 'linear') {
-//    console.log(start, end, relative_time)
-    return start * (1 - relative_time) + end * relative_time;
-  } else if (weight === 'log') {
-    return Math.exp(Math.log(start) * (1 - relative_time) + Math.log(end) * relative_time);
-  } else if (weight === 'sqrt') {
-    return Math.sqrt(
-      (Math.sqrt(start) * (1 - relative_time)) ** 2 +
-      (Math.sqrt(end) * relative_time) ** 2
-    )
-  }
-}
-*/
-
 class MultipurposeBufferSet {
   // An abstraction creating an expandable set of buffers that can be subdivided
   // to put more than one variable on the same
