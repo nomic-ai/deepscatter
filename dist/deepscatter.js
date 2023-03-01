@@ -24871,7 +24871,7 @@ class TileBufferManager {
     ]);
   }
   ready() {
-    const { renderer, regl_elements } = this;
+    const { renderer } = this;
     const needed_dimensions = /* @__PURE__ */ new Set();
     for (const [k, v] of renderer.aes) {
       for (const aesthetic of v.states) {
@@ -24881,18 +24881,25 @@ class TileBufferManager {
       }
     }
     for (const key of ["ix", "ix_in_tile", ...needed_dimensions]) {
-      const current = this.regl_elements.get(key);
-      if (current === null) {
+      if (!this.ready_or_not_here_it_comes(key)) {
         return false;
       }
-      if (current === void 0) {
-        if (!this.tile.ready) {
-          return false;
-        }
-        regl_elements.set(key, null);
-        renderer.deferred_functions.push(() => this.create_regl_buffer(key));
+    }
+    return true;
+  }
+  ready_or_not_here_it_comes(key) {
+    const { renderer, regl_elements } = this;
+    const current = this.regl_elements.get(key);
+    if (current === null) {
+      return false;
+    }
+    if (current === void 0) {
+      if (!this.tile.ready) {
         return false;
       }
+      regl_elements.set(key, null);
+      renderer.deferred_functions.push(() => this.create_regl_buffer(key));
+      return false;
     }
     return true;
   }
@@ -25012,7 +25019,6 @@ class MultipurposeBufferSet {
     let i = 0;
     for (const buffer_loc of this.freed_buffers) {
       if (buffer_loc.byte_size === bytes_needed) {
-        console.log("Reusing", buffer_loc);
         this.freed_buffers.splice(i, 1);
         return {
           buffer: buffer_loc.buffer,
@@ -35870,14 +35876,17 @@ class Scatterplot {
     }
     merge(this.prefs, prefs);
   }
-  add_hook(name, hook, clobber = false) {
-    if (this.hooks[name] !== void 0 && !clobber) {
+  add_hook(name, hook, unsafe = false) {
+    if (this.hooks[name] !== void 0 && !unsafe) {
       throw new Error(`Hook ${name} already exists`);
     }
     this.hooks[name] = hook;
   }
-  remove_hook(name) {
+  remove_hook(name, unsafe = false) {
     if (this.hooks[name] === void 0) {
+      if (unsafe) {
+        return;
+      }
       throw new Error(`Hook ${name} does not exist`);
     }
     delete this.hooks[name];
@@ -35913,13 +35922,56 @@ class Scatterplot {
     return this.click_handler.f;
   }
   async plotAPI(prefs) {
+    if (prefs === void 0) {
+      return;
+    }
     await this.plot_queue;
+    if (prefs) {
+      await this.start_transformations(prefs);
+    }
     this.plot_queue = this.unsafe_plotAPI(prefs);
     await this.plot_queue;
     for (const [_, hook] of Object.entries(this.hooks)) {
       hook();
     }
     return;
+  }
+  async start_transformations(prefs, delay = 110) {
+    if (this.prefs.duration < delay) {
+      return Promise.resolve();
+    }
+    const needed_keys = /* @__PURE__ */ new Set();
+    if (!prefs.encoding) {
+      return Promise.resolve();
+    }
+    for (const [k, v] of Object.entries(prefs.encoding)) {
+      if (v && typeof v !== "string" && v["field"] !== void 0) {
+        needed_keys.add(v["field"]);
+      }
+    }
+    let num_unready_columns = 0;
+    if (this._renderer) {
+      for (const tile of this._renderer.visible_tiles()) {
+        const manager = tile._buffer_manager;
+        if (manager !== void 0 && manager.ready()) {
+          for (const key of needed_keys) {
+            if (manager.ready_or_not_here_it_comes(key)) {
+              num_unready_columns += 1;
+            }
+          }
+        }
+      }
+    } else {
+      return Promise.resolve();
+    }
+    if (num_unready_columns === this._renderer.visible_tiles().length) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, delay);
+    });
   }
   async unsafe_plotAPI(prefs) {
     if (prefs === null) {
@@ -36091,8 +36143,6 @@ class LabelClick extends SettableFunction {
         lambda: `d => d === '${feature.properties[labelset.label_key]}'`
       };
     }
-    const thisis = this;
-    console.log({ thisis, p: this.plot });
     void this.plot.plotAPI({
       encoding: { filter: filter2 }
     });

@@ -502,9 +502,13 @@ export default class Scatterplot<T extends Tile> {
    * upon the completion of the plot (not including any time for transitions). 
    */
   async plotAPI(prefs: APICall): Promise<void> {
-
+    if (prefs === undefined) {
+      return;
+    }
     await this.plot_queue;
-    await this.start_transformations(prefs);
+    if (prefs) {
+      await this.start_transformations(prefs);
+    }
     this.plot_queue = this.unsafe_plotAPI(prefs);
     await this.plot_queue;
     for (const [_, hook] of Object.entries(this.hooks)) {
@@ -531,8 +535,8 @@ export default class Scatterplot<T extends Tile> {
     // of a set of duration-0 calls (like, e.g., dragging a time slider) will
     // block but that 
     if (this.prefs.duration < delay) {
-          return Promise.resolve();
-        }
+      return Promise.resolve();
+    }
     const needed_keys : Set<string> = new Set();
     if (!prefs.encoding) {
       return Promise.resolve();
