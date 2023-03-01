@@ -34093,7 +34093,11 @@ class QuadTile extends Tile {
       const buffer = await response.arrayBuffer();
       this.download_state = "Complete";
       this._table_buffer = buffer;
-      this._batch = tableFromIPC(buffer).batches[0];
+      const batch = tableFromIPC(buffer).batches[0];
+      const ids_as_ints = new BigInt64Array([...batch.getChild("_id")].map((d) => parseInt(d)));
+      add_or_delete_column(batch, "_id", null);
+      add_or_delete_column(batch, "_id", ids_as_ints);
+      this._batch;
       const metadata = this._batch.schema.metadata;
       const extent2 = metadata.get("extent");
       if (extent2) {
