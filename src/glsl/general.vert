@@ -787,6 +787,7 @@ void run_color_fill(in float ease) {
     } else {
       float fractional_color = linstep(u_color_domain, a_color);
       float color_pos = (u_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
+      fractional_color = domainify(u_color_domain, u_color_transform, a_color, true);
       fill = texture2D(u_color_aesthetic_map , vec2(color_pos, fractional_color));
       fill = vec4(fill.rgb, alpha);
     }
