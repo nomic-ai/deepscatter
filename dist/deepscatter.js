@@ -34093,14 +34093,13 @@ class QuadTile extends Tile {
       const buffer = await response.arrayBuffer();
       this.download_state = "Complete";
       this._table_buffer = buffer;
-      const batch = tableFromIPC(buffer).batches[0];
-      const ids_as_ints = new BigInt64Array([...batch.getChild("_id")].map((d) => BigInt(d)));
-      add_or_delete_column(batch, "_id", null);
-      if ("_id" in batch.schema.fields) {
+      this._batch = tableFromIPC(buffer).batches[0];
+      const ids_as_ints = new BigInt64Array([...this._batch.getChild("_id")].map((d) => BigInt(d)));
+      this._batch = add_or_delete_column(this._batch, "_id", null);
+      if ("_id" in this._batch.schema.fields) {
         throw "Failed to delete _id column";
       }
-      add_or_delete_column(batch, "_id", ids_as_ints);
-      this._batch;
+      this._batch = add_or_delete_column(this._batch, "_id", ids_as_ints);
       const metadata = this._batch.schema.metadata;
       const extent2 = metadata.get("extent");
       if (extent2) {
@@ -34609,7 +34608,7 @@ function add_or_delete_column(batch, field_name, data) {
     throw new Error("Must pass data to bind_column");
   }
   if (data !== null) {
-    if (data instanceof Float32Array) {
+    if (data instanceof Float32Array || data instanceof BigInt64Array) {
       tb[field_name] = makeVector(data).data[0];
     } else {
       tb[field_name] = data.data[0];
@@ -34643,15 +34642,27 @@ function add_or_delete_column(batch, field_name, data) {
   return new_batch;
 }
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
-  const hashtab = /* @__PURE__ */ new Set();
-  for (const item of Object.keys(ids)) {
-    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || "").join("");
-    hashtab.add(code);
-  }
+  const keytype = typeof Object.keys(ids)[0];
+  console.log({ keytype });
   const updatedFloatArray = new Float32Array(batch.numRows);
   const kfield = batch.getChild(key_field);
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
+  }
+  if (keytype === "bigint") {
+    let i = 0;
+    for (const value of kfield.data[0].values) {
+      if (ids[kfield.get(i)] !== void 0) {
+        updatedFloatArray[i] = ids[value];
+      }
+      i++;
+    }
+    return updatedFloatArray;
+  }
+  const hashtab = /* @__PURE__ */ new Set();
+  for (const item of Object.keys(ids)) {
+    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || "").join("");
+    hashtab.add(code);
   }
   const offsets = kfield.data[0].valueOffsets;
   const values = kfield.data[0].values;
@@ -35719,6 +35730,7 @@ class Scatterplot {
   }
   add_identifier_column(name, codes, key_field) {
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
+    console.log({ true_codes });
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
   async add_labels_from_url(url, name, label_key, size_key, options) {
