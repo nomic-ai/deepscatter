@@ -432,12 +432,17 @@ export class QuadTile extends Tile {
         const buffer = await response.arrayBuffer();
         this.download_state = 'Complete';
         this._table_buffer = buffer;
-        const batch = tableFromIPC(buffer).batches[0];
-        const ids_as_ints = new BigInt64Array([...batch.getChild('_id')].map(d => parseInt(d)))
+        this._batch = tableFromIPC(buffer).batches[0];
+        console.log(this._batch)
+        const ids_as_ints = new BigInt64Array([...this._batch.getChild('_id')].map(d => BigInt(d)))
         // First delete
-        add_or_delete_column(batch, '_id', null);
-        add_or_delete_column(batch, '_id', ids_as_ints);
-        this._batch
+        this._batch = add_or_delete_column(this._batch, '_id', null);
+        if ('_id' in this._batch.schema.fields) {
+          throw 'Failed to delete _id column';
+        }
+        console.log(this._batch.schema)
+        console.log({ids_as_ints})
+        this._batch = add_or_delete_column(this._batch, '_id', ids_as_ints);
         const metadata = this._batch.schema.metadata;
         const extent = metadata.get('extent');
         if (extent) {
