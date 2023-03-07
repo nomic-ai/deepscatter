@@ -535,45 +535,67 @@ export default class Scatterplot<T extends Tile> {
     // is probably OK. Using the *current* transition time means that the start
     // of a set of duration-0 calls (like, e.g., dragging a time slider) will
     // block but that 
-    if (this.prefs.duration < delay) {
-      return Promise.resolve();
-    }
-    const needed_keys : Set<string> = new Set();
-    if (!prefs.encoding) {
-      return Promise.resolve();
-    }
-    for (const [k, v] of Object.entries(prefs.encoding)) {
-      if (v && typeof(v) !== 'string' && v['field'] !== undefined) {
-        needed_keys.add(v['field']);
+    return new Promise(((resolve) => {
+      if (this.prefs.duration < delay) {
+        delay = this.prefs.duration;
       }
-    }
-    let num_unready_columns = 0;
-
-    if (this._renderer) {
-      for (const tile of this._renderer.visible_tiles()) {
-        // Allow unready tiles to stay unready; who know's what's going on there.
-        const manager = tile._buffer_manager
-        if (manager !== undefined && manager.ready()) {
-          for (const key of needed_keys) {
-            if (manager.ready_or_not_here_it_comes(key)) {
-              num_unready_columns += 1;
-            }
-         }
+      const needed_keys : Set<string> = new Set();
+      if (!prefs.encoding) {        
+        resolve()
+      }
+      for (const [k, v] of Object.entries(prefs.encoding)) {
+        if (v && typeof(v) !== 'string' && v['field'] !== undefined) {
+          needed_keys.add(v['field']);
         }
       }
-    } else {
-      return Promise.resolve();
-    }
-    if (num_unready_columns === this._renderer.visible_tiles().length) {
-      return Promise.resolve();
-    }
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve()
-      }, delay);
-    });
-  }
+      // I want to use this number to determine how much longer to wait.
+      let num_unready_columns = 0;
 
+      if (this._renderer) {
+        const promises : Promise<void>[] = [];
+        const sine_qua_non : Promise<void>[] = [];
+        for (const tile of this._renderer.visible_tiles()) {
+          // Allow unready tiles to stay unready; who know's what's going on there.
+          const manager = tile._buffer_manager
+          if (manager !== undefined && manager.ready()) {
+            for (const key of needed_keys) {
+              const { ready, promise } = manager.ready_or_not_here_it_comes(key)
+              if (!ready) {
+                num_unready_columns += 1;
+                if (promise !== null) {
+                  promises.push(promise);
+                  if (tile.key === '0/0/0') {
+                    // we really need this one done.
+                    sine_qua_non.push(promise);                    
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (promises.length === 0) {
+          resolve()
+        } else {
+          const starttime = Date.now();
+          // It's important to get at least the first promise done,
+          // because it's needed to determine some details about state.
+          void Promise.all(sine_qua_non).then(() => {
+            const endtime = Date.now();
+            const elapsed = endtime - starttime;
+            if (elapsed < delay) {
+              setTimeout(() => {
+                resolve()
+              }, delay - elapsed);
+            } else {
+              resolve()
+            }
+          })
+        }
+      } else {
+        resolve()
+      }
+    }));
+  }
   /**
    * This is the main plot entry point: it's unsafe to fire multiple
    * times in parallel because the transition state can get all borked up.

@@ -127,11 +127,12 @@
         field: 'y',
         transform: 'literal',
       },
-      /*      color: {
-              field: 'batch_id',
-              range: 'viridis',
-              domain: [0, 256],
-            }, */
+      color: {
+        field: 'integers',
+        range: 'viridis',
+        domain: [1, 65000],
+        transform: 'log'
+      },
     },
   });
   draw1.then(() => {
