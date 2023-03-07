@@ -34649,20 +34649,24 @@ function add_or_delete_column(batch, field_name, data) {
   return new_batch;
 }
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
-  const keytype = typeof Object.keys(ids)[0];
-  console.log({ keytype });
+  var _a2;
+  console.log("MY IDS", { ids });
   const updatedFloatArray = new Float32Array(batch.numRows);
   const kfield = batch.getChild(key_field);
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
   }
+  let keytype = "string";
+  if (((_a2 = kfield == null ? void 0 : kfield.type) == null ? void 0 : _a2.typeId) === 2) {
+    keytype = "bigint";
+  }
   if (keytype === "bigint") {
-    let i = 0;
-    for (const value of kfield.data[0].values) {
-      if (ids[kfield.get(i)] !== void 0) {
-        updatedFloatArray[i] = ids[value];
+    for (let i = 0; i < batch.numRows; i++) {
+      const value = ids[String(kfield.get(i))];
+      if (value !== void 0) {
+        updatedFloatArray[i] = value;
+        console.log("FOUND", value, kfield.get(i));
       }
-      i++;
     }
     return updatedFloatArray;
   }
