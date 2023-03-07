@@ -1160,7 +1160,7 @@ export class TileBufferManager<T extends Tile> {
     }
 
     for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
-      if (!this.ready_or_not_here_it_comes(key)) {
+      if (!this.ready_or_not_here_it_comes(key).ready) {
         return false;
       }
     }
@@ -1172,28 +1172,34 @@ export class TileBufferManager<T extends Tile> {
    * 
    * @param key a string representing the requested column; must either exist in the
    * record batch or have a means for creating it asynchronously in 'transformations.'
-   * @returns true if the column is ready, false if it's not ready and a deferred call
-   * was created.
+   * @returns both an instantly available object called 'ready' that says if we're ready
+   * to go: and, if the tile is ready, a promise that starts the update going and resolves
+   * once it's ready.
    */
-  ready_or_not_here_it_comes(key : string) {
+  ready_or_not_here_it_comes(key : string) : {ready : boolean, promise: null | Promise<void>} {
     const { renderer, regl_elements } = this;
 
     const current = this.regl_elements.get(key);
     if (current === null) {
       // It's in the process of being built.
-      return false;
+      return {ready: false, promise: null};
     }
     if (current === undefined) {
       if (!this.tile.ready) {
         // Can't build b/c no tile ready.
-        return false;
+        return {ready: false, promise: null};
       }
       // Request that the buffer be created before returning false.
       regl_elements.set(key, null);
-      renderer.deferred_functions.push(() => this.create_regl_buffer(key));
-      return false;
+      const created = new Promise<void>((resolve) => {
+        renderer.deferred_functions.push(async () => {
+          await this.create_regl_buffer(key)
+          resolve();
+        })
+      })
+      return {ready: false, promise: created};
     }
-    return true;
+    return {ready: true, promise: Promise.resolve()};
   }
   /**
    *

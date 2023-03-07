@@ -16693,6 +16693,7 @@ void run_color_fill(in float ease) {
     } else {
       float fractional_color = linstep(u_color_domain, a_color);
       float color_pos = (u_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
+      fractional_color = domainify(u_color_domain, u_color_transform, a_color, true);
       fill = texture2D(u_color_aesthetic_map , vec2(color_pos, fractional_color));
       fill = vec4(fill.rgb, alpha);
     }
@@ -16703,6 +16704,7 @@ void run_color_fill(in float ease) {
       } else {
         float last_fractional = linstep(u_last_color_domain, a_last_color);
         float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
+        last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, true);
         last_fill = texture2D(u_color_aesthetic_map, vec2(color_pos, last_fractional));
         // Alpha channel interpolation already happened.
         last_fill = vec4(last_fill.rgb, alpha);
@@ -24881,7 +24883,7 @@ class TileBufferManager {
       }
     }
     for (const key of ["ix", "ix_in_tile", ...needed_dimensions]) {
-      if (!this.ready_or_not_here_it_comes(key)) {
+      if (!this.ready_or_not_here_it_comes(key).ready) {
         return false;
       }
     }
@@ -24891,17 +24893,22 @@ class TileBufferManager {
     const { renderer, regl_elements } = this;
     const current = this.regl_elements.get(key);
     if (current === null) {
-      return false;
+      return { ready: false, promise: null };
     }
     if (current === void 0) {
       if (!this.tile.ready) {
-        return false;
+        return { ready: false, promise: null };
       }
       regl_elements.set(key, null);
-      renderer.deferred_functions.push(() => this.create_regl_buffer(key));
-      return false;
+      const created = new Promise((resolve) => {
+        renderer.deferred_functions.push(async () => {
+          await this.create_regl_buffer(key);
+          resolve();
+        });
+      });
+      return { ready: false, promise: created };
     }
-    return true;
+    return { ready: true, promise: Promise.resolve() };
   }
   release(colname) {
     let current;
@@ -35712,6 +35719,7 @@ class Scatterplot {
   }
   add_identifier_column(name, codes, key_field) {
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
+    console.log({ true_codes });
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
   async add_labels_from_url(url, name, label_key, size_key, options) {
@@ -35937,40 +35945,57 @@ class Scatterplot {
     return;
   }
   async start_transformations(prefs, delay = 110) {
-    if (this.prefs.duration < delay) {
-      return Promise.resolve();
-    }
-    const needed_keys = /* @__PURE__ */ new Set();
-    if (!prefs.encoding) {
-      return Promise.resolve();
-    }
-    for (const [k, v] of Object.entries(prefs.encoding)) {
-      if (v && typeof v !== "string" && v["field"] !== void 0) {
-        needed_keys.add(v["field"]);
+    return new Promise((resolve) => {
+      if (this.prefs.duration < delay) {
+        delay = this.prefs.duration;
       }
-    }
-    let num_unready_columns = 0;
-    if (this._renderer) {
-      for (const tile of this._renderer.visible_tiles()) {
-        const manager = tile._buffer_manager;
-        if (manager !== void 0 && manager.ready()) {
-          for (const key of needed_keys) {
-            if (manager.ready_or_not_here_it_comes(key)) {
-              num_unready_columns += 1;
+      const needed_keys = /* @__PURE__ */ new Set();
+      if (!prefs.encoding) {
+        resolve();
+      }
+      for (const [k, v] of Object.entries(prefs.encoding)) {
+        if (v && typeof v !== "string" && v["field"] !== void 0) {
+          needed_keys.add(v["field"]);
+        }
+      }
+      if (this._renderer) {
+        const promises = [];
+        const sine_qua_non = [];
+        for (const tile of this._renderer.visible_tiles()) {
+          const manager = tile._buffer_manager;
+          if (manager !== void 0 && manager.ready()) {
+            for (const key of needed_keys) {
+              const { ready, promise } = manager.ready_or_not_here_it_comes(key);
+              if (!ready) {
+                if (promise !== null) {
+                  promises.push(promise);
+                  if (tile.key === "0/0/0") {
+                    sine_qua_non.push(promise);
+                  }
+                }
+              }
             }
           }
         }
-      }
-    } else {
-      return Promise.resolve();
-    }
-    if (num_unready_columns === this._renderer.visible_tiles().length) {
-      return Promise.resolve();
-    }
-    return new Promise((resolve) => {
-      setTimeout(() => {
+        if (promises.length === 0) {
+          resolve();
+        } else {
+          const starttime = Date.now();
+          void Promise.all(sine_qua_non).then(() => {
+            const endtime = Date.now();
+            const elapsed = endtime - starttime;
+            if (elapsed < delay) {
+              setTimeout(() => {
+                resolve();
+              }, delay - elapsed);
+            } else {
+              resolve();
+            }
+          });
+        }
+      } else {
         resolve();
-      }, delay);
+      }
     });
   }
   async unsafe_plotAPI(prefs) {
