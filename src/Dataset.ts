@@ -567,10 +567,8 @@ function supplement_identifiers(
   key_field = '_id'
 ): ArrowBuildable {
   /* Add the identifiers from the batch to the ids array */
-
+  console.log("MY IDS", {ids})
   // A quick lookup before performing a costly string decode.
-  const keytype : 'string' | 'bigint' = typeof(Object.keys(ids)[0]) 
-  console.log({ keytype })
   const updatedFloatArray = new Float32Array(batch.numRows);
 
   const kfield = batch.getChild(key_field);
@@ -578,13 +576,19 @@ function supplement_identifiers(
     throw new Error(`Field ${key_field} not found in batch`);
   }
 
+  let keytype = 'string';
+  if (kfield?.type?.typeId === 2) {
+    keytype = 'bigint';
+  }
+
   if (keytype === 'bigint') {
-    let i = 0;
-    for (const value of kfield.data[0].values) {
-      if (ids[kfield.get(i)] !== undefined) {
-        updatedFloatArray[i] = ids[value] as number;
+    for (let i = 0; i < batch.numRows; i++) {
+      // the object coerces bigints to strings. We just live with that.
+      const value = ids[String(kfield.get(i))]
+      if (value !== undefined) {
+        updatedFloatArray[i] = value as number;
+        console.log("FOUND", value, kfield.get(i))
       }
-      i++;
     }
     return updatedFloatArray;
   }
