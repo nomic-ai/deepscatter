@@ -34101,12 +34101,6 @@ class QuadTile extends Tile {
       this.download_state = "Complete";
       this._table_buffer = buffer;
       this._batch = tableFromIPC(buffer).batches[0];
-      const ids_as_ints = new BigInt64Array([...this._batch.getChild("_id")].map((d) => BigInt(d)));
-      this._batch = add_or_delete_column(this._batch, "_id", null);
-      if ("_id" in this._batch.schema.fields) {
-        throw "Failed to delete _id column";
-      }
-      this._batch = add_or_delete_column(this._batch, "_id", ids_as_ints);
       const metadata = this._batch.schema.metadata;
       const extent2 = metadata.get("extent");
       if (extent2) {
@@ -34650,7 +34644,6 @@ function add_or_delete_column(batch, field_name, data) {
 }
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
   var _a2;
-  console.log("MY IDS", { ids });
   const updatedFloatArray = new Float32Array(batch.numRows);
   const kfield = batch.getChild(key_field);
   if (kfield === null) {
@@ -34665,7 +34658,6 @@ function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
       const value = ids[String(kfield.get(i))];
       if (value !== void 0) {
         updatedFloatArray[i] = value;
-        console.log("FOUND", value, kfield.get(i));
       }
     }
     return updatedFloatArray;
@@ -35741,7 +35733,6 @@ class Scatterplot {
   }
   add_identifier_column(name, codes, key_field) {
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
-    console.log({ true_codes });
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
   async add_labels_from_url(url, name, label_key, size_key, options) {

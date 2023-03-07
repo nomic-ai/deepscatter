@@ -567,7 +567,6 @@ function supplement_identifiers(
   key_field = '_id'
 ): ArrowBuildable {
   /* Add the identifiers from the batch to the ids array */
-  console.log("MY IDS", {ids})
   // A quick lookup before performing a costly string decode.
   const updatedFloatArray = new Float32Array(batch.numRows);
 
@@ -587,7 +586,6 @@ function supplement_identifiers(
       const value = ids[String(kfield.get(i))]
       if (value !== undefined) {
         updatedFloatArray[i] = value as number;
-        console.log("FOUND", value, kfield.get(i))
       }
     }
     return updatedFloatArray;

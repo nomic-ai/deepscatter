@@ -154,7 +154,6 @@ export default class Scatterplot<T extends Tile> {
     const true_codes: Record<string, number> = Array.isArray(codes)
       ? Object.fromEntries(codes.map((next) => [next, 1]))
       : codes;
-    console.log({true_codes})
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
 
