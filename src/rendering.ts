@@ -2,21 +2,24 @@
 import { select } from 'd3-selection';
 import { min } from 'd3-array';
 import type Scatterplot from './deepscatter';
-import type { Tileset } from './tile';
+import type { Tile } from './tile';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Dataset, QuadtileSet } from './Dataset';
 
-abstract class PlotSetting {
-  abstract start: number;
-  abstract value: number;
-  abstract target: number;
+class PlotSetting {
+  start: number;
+  value: number;
+  target: number;
   timer: Timer | undefined;
-  transform: 'geometric' | 'arithmetic';
-  constructor() {
-    this.transform = 'arithmetic';
-  }
+  transform: 'geometric' | 'arithmetic' = 'arithmetic';
+  constructor(start: number, transform : 'geometric' | 'arithmetic' = 'arithmetic' as const) {
+      this.transform = transform
+      this.start = start;
+      this.value = start;
+      this.target = start
+  } 
   update(value: number, duration: number) {
     if (duration === 0) {
       this.value = value;
@@ -51,49 +54,35 @@ abstract class PlotSetting {
   }
 }
 
-class MaxPoints extends PlotSetting {
-  value = 10_000;
-  start = 10_000;
-  target = 10_000;
-  constructor() {
-    super();
-    this.transform = 'geometric';
-  }
-}
-
-class TargetOpacity extends PlotSetting {
-  value = 50;
-  start = 50;
-  target = 50;
-}
-
-class PointSize extends PlotSetting {
-  value = 1;
-  start = 1;
-  target = 1;
-  constructor() {
-    super();
-    this.transform = 'geometric';
-  }
-}
-
 class RenderProps {
   // Aesthetics that adhere to the state of the _renderer_
   // as opposed to the individual points.
   // These can transition a little more beautifully.
-  maxPoints: MaxPoints;
-  targetOpacity: TargetOpacity;
-  pointSize: PointSize;
+  maxPoints: PlotSetting;
+  targetOpacity: PlotSetting;
+  pointSize: PlotSetting;
+  foregroundOpacity: PlotSetting;
+  backgroundOpacity: PlotSetting;
+  foregroundSize: PlotSetting;
+  backgroundSize: PlotSetting;
   constructor() {
-    this.maxPoints = new MaxPoints();
-    this.targetOpacity = new TargetOpacity();
-    this.pointSize = new PointSize();
+    this.maxPoints = new PlotSetting(10_000, 'geometric');
+    this.pointSize = new PlotSetting(1, 'geometric');
+    this.targetOpacity = new PlotSetting(50);
+    this.foregroundOpacity = new PlotSetting(1);
+    this.backgroundOpacity = new PlotSetting(.5);
+    this.foregroundSize = new PlotSetting(1, 'geometric');
+    this.backgroundSize = new PlotSetting(1, 'geometric')
   }
-  apply_prefs(prefs: APICall) {
+  apply_prefs(prefs: CompletePrefs) {
     const { duration } = prefs;
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
     this.pointSize.update(prefs.point_size, duration);
+    this.foregroundOpacity.update(prefs.background_options.opacity[1], duration);
+    this.backgroundOpacity.update(prefs.background_options.opacity[0], duration);
+    this.foregroundSize.update(prefs.background_options.size[1], duration);
+    this.backgroundSize.update(prefs.background_options.size[0], duration);
   }
   get max_points() {
     return this.maxPoints.value;
@@ -104,39 +93,50 @@ class RenderProps {
   get point_size() {
     return this.pointSize.value;
   }
+  get foreground_opacity() {
+    return this.foregroundOpacity.value;
+  }
+  get background_opacity() {
+    return this.backgroundOpacity.value;
+  }
+  get foreground_size() {
+    return this.foregroundSize.value;
+  }
+  get background_size() {
+    return this.backgroundSize.value;
+  }
 }
 
-export class Renderer {
+export class Renderer<TileType extends Tile> {
   // A renderer handles drawing to a display element.
-  public scatterplot: Scatterplot;
+  public scatterplot: Scatterplot<TileType>;
   public holder: d3.Selection<any, any, any, any>;
   public canvas: HTMLCanvasElement;
-  public tileSet: Tileset;
+  public dataset: Dataset<TileType>;
   public width: number;
   public height: number;
-  public deferred_functions: Array<() => void>;
+  public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
-  public zoom: Zoom;
-  public aes: AestheticSet;
-  public _zoom: Zoom;
-  public _initializations: Promise<any>[];
-  public render_props: RenderProps;
+  public zoom?: Zoom;
+  public aes?: AestheticSet<TileType>;
+  public _zoom?: Zoom;
+  public _initializations: Promise<void>[] = [];
+  public render_props: RenderProps = new RenderProps();
   constructor(
     selector: string,
-    tileSet: QuadtileSet,
-    scatterplot: Scatterplot
+    tileSet: Dataset<TileType>,
+    scatterplot: Scatterplot<TileType>
   ) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
     this.canvas = select(
       this.holder.node().firstElementChild
     ).node() as HTMLCanvasElement;
-    this.tileSet = tileSet;
+    this.dataset = tileSet;
     this.width = +select(this.canvas).attr('width');
     this.height = +select(this.canvas).attr('height');
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
-    this.render_props = new RenderProps();
   }
 
   get discard_share() {
@@ -145,9 +145,14 @@ export class Renderer {
     // For now, I don't actually do it.
     return 0;
   }
-
-  get prefs(): APICall {
-    const p = { ...this.scatterplot.prefs };
+  /**
+   * Render prefs are scatterplot prefs, but for a single tile
+   * instead of for a whole table.
+   */
+  get prefs(): RenderPrefs {
+    const p = { ...this.scatterplot.prefs,
+    } as RenderPrefs;
+    // Delete the arrow stuff b/c serializing it is crazy expensive.
     p.arrow_table = undefined;
     p.arrow_buffer = undefined;
     return p;
@@ -161,9 +166,9 @@ export class Renderer {
     // This extends a formula suggested by Ricky Reusser to include
     // discard share.
 
-    const { zoom_balance } = this.prefs;
+    const zoom_balance = this.prefs.zoom_balance ?? 1;
     const { alpha, point_size, max_ix, width, discard_share, height } = this;
-    const k = this.zoom.transform?.k || 1;
+    const k = this.zoom?.transform?.k ?? 1;
     const target_share = alpha / 100;
     const fraction_of_total_visible = 1 / k ** 2;
     const pixelRatio = window.devicePixelRatio || 1;
@@ -171,7 +176,7 @@ export class Renderer {
     const pixel_area = (width * height) / pixelRatio;
     const total_intended_points = min([
       max_ix,
-      (this.tileSet.highest_known_ix as number | undefined) || 1e10,
+      (this.dataset.highest_known_ix as number | undefined) || 1e10,
     ]) as number;
 
     const total_points = total_intended_points * (1 - discard_share);
@@ -203,22 +208,21 @@ export class Renderer {
     return (max_points * k * k) / point_size_adjust / point_size_adjust;
   }
 
-  visible_tiles(): Array<Tile> {
+  visible_tiles(): Array<TileType> {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
-    const { tileSet } = this;
+    const { dataset: tileSet } = this;
     // Materialize using a tileset method.
-    let all_tiles;
     const natural_display =
       this.aes.dim('x').current.field == 'x' &&
       this.aes.dim('y').current.field == 'y' &&
       this.aes.dim('x').last.field == 'x' &&
       this.aes.dim('y').last.field == 'y';
 
-    all_tiles = natural_display
+    const all_tiles = natural_display
       ? tileSet
-          .map((d: Tile) => d)
+          .map((d: TileType) => d)
           .filter((tile) => {
             const visible = tile.is_visible(
               max_ix,

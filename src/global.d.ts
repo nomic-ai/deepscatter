@@ -4,7 +4,8 @@ import type { Dataset } from './Dataset';
 import type { ArrowDataset } from './Dataset';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import type { Tile, QuadTile, ArrowTile } from './tile';
-import Scatterplot from './deepscatter';
+import type Scatterplot from './deepscatter';
+import type { Regl, Buffer } from 'regl';
 
 export type {
   Renderer,
@@ -46,6 +47,14 @@ declare global {
     domain?: [number, number];
     range?: [number, number];
   };
+  type BufferLocation = {
+    buffer: Buffer;
+    offset: number;
+    stride: number;
+    byte_size: number; // in bytes;
+  };
+  
+  type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
   type FunctionalChannel = LambdaChannel | OpChannel;
 
@@ -55,12 +64,17 @@ declare global {
     color?: string;
 
     // A multiplier against the point's opacity otherwise.
-    opacity?: number;
+    // A single value describes the background; an array 
+    // describes the foreground and background separately.
+    opacity?: number | [number, number];
 
-    // A multiplier against the point's size otherwise,
-    size?: number;
+    // A multiplier against the point's size. Default 0.66.
+    // A single value describes the background; an array 
+    // describes the foreground and background separately.
 
-    // Whether the points should respond on mouseover.
+    size?: number | [number, number];
+
+    // Whether the background points should respond on mouseover.
     mouseover?: boolean;
   };
 
@@ -93,13 +107,13 @@ declare global {
    */
   export interface BasicChannel {
     /** The name of a column in the data table to be encoded. */
-    field: string; // .
+    field: string;
     /**
      * A transformation to apply on the field.
      * 'literal' maps in the implied dataspace set by 'x', 'y', while
      * 'linear' transforms the data by the range and domain.
      */
-    transform?: 'log' | 'linear' | 'sqrt' | 'literal';
+    transform?: Transform;
     // The domain over which the data extends
     domain?: [number, number];
     // The range into which to map the data.
@@ -135,7 +149,7 @@ declare global {
 
   export type BooleanChannel = FunctionalChannel | ConstantBool;
 
-  export type Channel =
+  export type RootChannel =
     | BooleanChannel
     | BasicChannel
     | string
@@ -144,7 +158,7 @@ declare global {
     | ConstantChannel
     | LambdaChannel;
 
-  export type JitterChannel = Channel & {
+  export type JitterChannel = RootChannel & {
     /**
      * Jitter channels have a method.
      * 'spiral' animates along a log spiral.
@@ -162,22 +176,22 @@ declare global {
    * And encoding.
    */
   export type Encoding = {
-    x?: Channel;
-    y?: Channel;
+    x?: RootChannel;
+    y?: RootChannel;
     color?: null | ColorChannel;
-    size?: null | Channel;
-    shape?: null | Channel;
-    alpha?: null | Channel;
+    size?: null | RootChannel;
+    shape?: null | RootChannel;
     filter?: null | FunctionalChannel;
     filter2?: null | FunctionalChannel;
     jitter_radius?: null | JitterChannel;
-    jitter_speed?: null | Channel;
-    x0?: null | Channel;
-    y0?: null | Channel;
+    jitter_speed?: null | RootChannel;
+    x0?: null | RootChannel;
+    y0?: null | RootChannel;
     position?: string;
     position0?: string;
   };
 
+  type ColumnTimeLookups = Record<string, Date>;
   type TileKey = `${number}/${number}/${number}`;
 
   export type PointUpdate = {
@@ -230,11 +244,34 @@ declare global {
     encoding?: Encoding;
 
     background_options?: BackgroundOptions;
+
+    bearer_token?: string;
   };
+
 
   type InitialAPICall = APICall & {
     encoding: Encoding;
   } & DataSpec;
 
+  // A full API call includes all of these.
+  // Encoding settings are not described here.
+  type CompletePrefs = APICall & {
+    background_options: {
+      color: string;
+      opacity: [number, number];
+      size: [number, number];
+      mouseover: boolean;
+    },
+    alpha : number,
+    point_size : number,
+    duration: number,
+    zoom_balance: number,
+    max_points: number
+  }
+
+  type RenderPrefs = CompletePrefs & {
+    arrow_table?: Table,
+    arrow_buffer?: Buffer
+  }
   export type TileType = QuadTile | ArrowTile;
 }

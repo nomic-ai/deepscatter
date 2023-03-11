@@ -17,7 +17,6 @@ import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 const palette_size = 4096;
 import { randomLcg } from 'd3-random';
-
 /*function to_buffer(data: number[] | number[][]) {
   output.set(data.flat());
   return output;
@@ -147,30 +146,27 @@ export class Color extends Aesthetic<
   string,
   ColorChannel
 > {
-  _constant = [0.5, 0.5, 0.5] as [number, number, number];
-
+  _constant = '#CC5500'
   public texture_type = 'uint8';
-  public default_constant = [0.5, 0.5, 0.5] as [number, number, number];
+  public default_constant = '#CC5500'
   default_transform: Transform = 'linear';
   get default_range(): [number, number] {
     return [0, 1];
   }
-  current_encoding: ColorChannel = {
-    constant: 'gray',
-  };
+  current_encoding: null | ColorChannel = null;
   default_data(): Uint8Array {
     return color_palettes.viridis;
   }
   get use_map_on_regl() {
     // Always use a map for colors.
-    return 1;
+    return 1 as const;
   }
 
   get scale() {
     if (this._scale) {
       return this._scale;
     }
-    let scale = scales[this.transform]().domain(this.domain).range(this.range);
+    const scale = scales[this.transform]().domain(this.domain).range(this.range);
     const range = this.range;
 
     function capitalize(r: string) {
@@ -236,6 +232,11 @@ export class Color extends Aesthetic<
   update(encoding: ColorChannel) {
     super.update(encoding);
     this.current_encoding = encoding;
+    if (encoding === null) {
+      encoding = {
+        constant: this.default_constant
+      }
+    }
     if (!isConstantChannel(encoding)) {
       if (encoding.range && typeof encoding.range[0] === 'string') {
         this.encode_for_textures(encoding.range);

@@ -11,24 +11,30 @@ import {
   Data,
   Schema,
   tableFromIPC,
+  Vector,
+  makeVector,
 } from 'apache-arrow';
+
 type Key = string;
 
 function nothing() {
   /* do nothing */
 }
 
+type ArrowBuildable = Vector | Float32Array;
+type Transformation<T> = (arg0: T) => ArrowBuildable | Promise<ArrowBuildable>;
+
 export abstract class Dataset<T extends Tile> {
-  public transformations: Record<string, (arg0: T) => RecordBatch> = {};
+  public transformations: Record<string, Transformation<T>>= {};
   abstract root_tile: T;
-  protected plot: Scatterplot;
+  protected plot: Plot;
   abstract ready: Promise<void>;
   abstract get extent(): Rectangle;
   abstract promise: Promise<void>;
   private extents: Record<string, [number, number]> = {};
-  public _ix_seed: number = 0;
+  public _ix_seed = 0;
   public _schema?: Schema;
-  constructor(plot: Scatterplot) {
+  constructor(plot: Plot) {
     this.plot = plot;
     // If a linear identifier does not exist in the passed data, we add the ix columns in the order that
     // they are passed.
@@ -49,14 +55,14 @@ export abstract class Dataset<T extends Tile> {
   static from_quadfeather(
     url: string,
     prefs: APICall,
-    plot: Scatterplot
+    plot: Plot
   ): QuadtileSet {
     return new QuadtileSet(url, prefs, plot);
   }
   static from_arrow_table(
     table: Table,
     prefs: APICall,
-    plot: Scatterplot
+    plot: Plot
   ): ArrowDataset {
     return new ArrowDataset(table, prefs, plot);
   }
@@ -65,6 +71,16 @@ export abstract class Dataset<T extends Tile> {
     max_ix: number,
     queue_length: number
   ): void;
+
+  delete_column_if_exists(name: string) {
+    // This is a complicated operation to actually free up memory.
+    // Clone the record batches, without this data;
+    // This function on each tile also frees up the associated GPU memory.
+    this.map((d) => d.delete_column_if_exists(name));
+
+    // There may be data bound up in the function that creates it.
+    delete this.transformations[name];
+  }
 
   domain(dimension: string, max_ix = 1e6): [number, number] {
     if (this.extents[dimension]) {
@@ -136,7 +152,7 @@ export abstract class Dataset<T extends Tile> {
     const results: U[] = [];
     this.visit((d: T) => {
       results.push(callback(d));
-    }, (after = after));
+    }, after);
     return results;
   }
 
@@ -191,23 +207,29 @@ export abstract class Dataset<T extends Tile> {
     return this.root_tile.record_batch.schema;
   }
 
+  /**
+   * 
+   * @param field_name the name of the column to create
+   * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
+   */
   add_tiled_column(field_name: string, buffer: Uint8Array): void {
     const tb = tableFromIPC(buffer);
-    const records = {};
-    window.tb = tb;
-    for (let batch of tb.batches) {
-      const offsets = batch.getChild('data').data[0].valueOffsets;
-      const values = batch.getChild('data').data[0].children[0];
+    const records: Record<string, Float32Array> = {};
+    for (const batch of tb.batches) {
+      const offsets = batch.getChild('data')!.data[0].valueOffsets;
+      const values = batch.getChild('data')!.data[0].children[0];
       for (let i = 0; i < batch.data.length; i++) {
-        const tilename = batch.getChild('_tile').get(i);
-        records[tilename] = values.values.slice(offsets[i], offsets[i + 1]);
+        const tilename = batch.getChild('_tile').get(i) as string;
+        records[tilename] = values.values.slice(
+          offsets[i],
+          offsets[i + 1]
+        ) as Float32Array;
       }
     }
     this.transformations[field_name] = function (tile) {
       const { key } = tile;
-      const length = tile.record_batch.numRows;
       const array = records[key];
-      return bind_column(tile.record_batch, field_name, array);
+      return array;
     };
   }
 
@@ -220,7 +242,7 @@ export abstract class Dataset<T extends Tile> {
       for (const [ix, value] of Object.entries(sparse_values)) {
         array[Number.parseInt(ix)] = value;
       }
-      return bind_column(tile.record_batch, field_name, array);
+      return array;
     };
   }
 
@@ -228,8 +250,9 @@ export abstract class Dataset<T extends Tile> {
    *
    * @param ids A list of ids to get, keyed to the value to set them to.
    * @param field_name The name of the new field to create
-   * @param key_field
+   * @param key_field The column in the dataset to match them against.
    */
+
   add_label_identifiers(
     ids: Record<string, number>,
     field_name: string,
@@ -240,7 +263,7 @@ export abstract class Dataset<T extends Tile> {
         `Can't overwrite existing transformation for ${field_name}`
       );
     }
-    this.transformations[field_name] = function (tile) {
+    this.transformations[field_name] = function (tile: T) {
       return supplement_identifiers(
         tile.record_batch,
         ids,
@@ -285,7 +308,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   public promise: Promise<void> = Promise.resolve();
   public root_tile: ArrowTile;
 
-  constructor(table: Table, prefs: APICall, plot: Scatterplot) {
+  constructor(table: Table, prefs: APICall, plot: Plot) {
     super(plot);
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
@@ -313,7 +336,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
   public promise: Promise<void> = new Promise(nothing);
   root_tile: QuadTile;
 
-  constructor(base_url: string, prefs: APICall, plot: Scatterplot) {
+  constructor(base_url: string, prefs: APICall, plot: Plot) {
     super(plot);
     this.root_tile = new QuadTile(base_url, '0/0/0', null, this, prefs);
     this.promise = this.root_tile.promise;
@@ -383,6 +406,50 @@ export class QuadtileSet extends Dataset<QuadTile> {
         });
     }
   }
+
+
+   /**
+   * 
+   * @param field_name the name of the column to create
+   * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
+   */
+   add_macrotiled_column(field_name: string, transformation : (ids: string[]) => Promise<Uint8Array>): void {
+    const megatile_tasks : Record<string, Promise<void>> = {};
+    const records: Record<string, Float32Array> = {};
+
+    async function get_table(tile: QuadTile) {
+      const { key, macrotile } = tile;
+      if (megatile_tasks[macrotile] !== undefined) {
+        return await megatile_tasks[macrotile];
+      } else {
+        megatile_tasks[macrotile] = transformation(tile.macro_siblings)
+          .then(buffer => {
+            const tb = tableFromIPC(buffer);
+            for (const batch of tb.batches) {
+              const offsets = batch.getChild('data')!.data[0].valueOffsets;
+              const values = batch.getChild('data')!.data[0].children[0];
+              for (let i = 0; i < batch.data.length; i++) {
+                const tilename = batch.getChild('_tile').get(i) as string;
+                records[tilename] = values.values.slice(
+                  offsets[i],
+                  offsets[i + 1]
+                ) as Float32Array;
+              }
+            }
+            return
+        })
+        return megatile_tasks[macrotile]
+      }
+    }
+
+    this.transformations[field_name] = async function (tile) {
+      await get_table(tile)
+      const array = records[tile.key];
+      return array;
+    };
+  }
+
+
 }
 
 function area(rect: Rectangle) {
@@ -421,26 +488,67 @@ function check_overlap(tile: Tile, bbox: Rectangle): number {
   return area(intersection) / area(bbox);
 }
 
-export function bind_column(
+/**
+ *
+ * @param batch the batch to delete from.
+ * @param field_name the name of the field.
+ * @param data the data to add OR if null, the existing column to delete.
+ * @returns
+ */
+export function add_or_delete_column(
   batch: RecordBatch,
   field_name: string,
-  data: Float32Array
+  data: ArrowBuildable | null
 ): RecordBatch {
+  const tb: Record<string, Data> = {};
+  for (const field of batch.schema.fields) {
+    if (field.name === field_name) {
+      if (data === null) {
+        // Then it's dropped.
+        continue;
+      } else {
+        throw new Error(`Name ${field.name} already exists, can't add.`);
+      }
+    }
+    tb[field.name] = batch.getChild(field.name)!.data[0] as Data;
+  }
+
   if (data === undefined) {
     throw new Error('Must pass data to bind_column');
   }
-  const current_keys: Set<string> = new Set(
-    [...batch.schema.fields].map((d) => d.name)
-  );
-  if (current_keys.has(field_name)) {
-    throw new Error(`Field ${field_name} already exists in batch`);
+  if (data !== null) {
+    if (data instanceof Float32Array) {
+      tb[field_name] = makeVector(data).data[0];
+    } else {
+      tb[field_name] = data.data[0] as Data;
+    }
   }
-  const tb: Record<string, Data> = {};
-  for (const key of current_keys) {
-    tb[key] = batch.getChild(key).data[0];
-  }
-  tb[field_name] = vectorFromArray(data).data[0];
   const new_batch = new RecordBatch(tb);
+  for (const [k, v] of batch.schema.metadata) {
+    new_batch.schema.metadata.set(k, v);
+  }
+  for (const oldfield of batch.schema.fields) {
+    const newfield = new_batch.schema.fields.find(
+      (d) => d.name === oldfield.name
+    );
+    if (newfield !== undefined) {
+      for (const [k, v] of oldfield.metadata) {
+        newfield.metadata.set(k, v);
+      }
+    } else if (data !== null) {
+      throw new Error('Error!');
+    }
+  }
+  // Store the creation time on the table metadata.
+  if (data !== null) {
+    const this_field = new_batch.schema.fields.find(
+      (d) => d.name === field_name
+    );
+    this_field?.metadata.set(
+      'created by deepscatter',
+      new Date().toISOString()
+    );
+  }
   return new_batch;
 }
 
@@ -457,7 +565,7 @@ function supplement_identifiers(
   ids: Record<string, number>,
   field_name: string,
   key_field = '_id'
-): RecordBatch {
+): ArrowBuildable {
   /* Add the identifiers from the batch to the ids array */
 
   // A quick lookup before performing a costly string decode.
@@ -471,9 +579,9 @@ function supplement_identifiers(
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
   }
+
   const offsets = kfield.data[0].valueOffsets;
   const values = kfield.data[0].values;
-
   // For every identifier, look if it's in the id array.
   for (let i = 0; i < batch.numRows; i++) {
     const code = values.slice(offsets[i], offsets[i + 1]);
@@ -485,5 +593,5 @@ function supplement_identifiers(
       }
     }
   }
-  return bind_column(batch, field_name, updatedFloatArray);
+  return updatedFloatArray;
 }

@@ -329,7 +329,6 @@ export class LabelMaker extends Renderer {
         };
         this.scatterplot.plotAPI(command);
         select(event.target).style('opacity', 0);
-        console.log({ event, d });
       });
 
     if (this.options.draggable_labels) {
@@ -338,7 +337,6 @@ export class LabelMaker extends Renderer {
         d.data.y = y_.invert(event.y);
       });
       handler.on('end', (event, d) => {
-        console.log(`${d.data.x}\t${d.data.y}\t${d.data.text}`);
       });
       bboxes.call(handler);
     }
