@@ -1,10 +1,10 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
-  "dist"
+    "dist"
   ],
   "module": "./dist/deepscatter.js",
   "main": "./dist/deepscatter.umd.cjs",

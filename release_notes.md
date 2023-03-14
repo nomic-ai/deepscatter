@@ -1,3 +1,17 @@
+# 2.9.2
+
+- Fix bug in manually-assigned categorical color schemes involving the first color always being gray.
+
+# 2.9.1
+
+- Fix regression bug for log-scales on linear color schemes. 
+
+# 2.9.0
+
+- Allow asynchronous transformations. This is an internal change that allows alteration of tiles using any external resources--for instance, fetching search results from the Web or running duckdb on wasm.
+- Various changes resulting from that.
+- Customizable options for foreground/background behavior passed to the API as 'background_options'. 
+
 # 2.8.0
 
 - Add new 'foreground' aesthetic; when enabled, this moves points to the front of the screen and makes points behind it not clickable.
