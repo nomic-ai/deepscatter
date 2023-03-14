@@ -23903,15 +23903,22 @@ class Color extends Aesthetic {
         if (!this.is_dictionary()) {
           palette = palette_from_color_strings(range2);
         } else {
+          const data_values = this.column.data[0].dictionary.toArray();
           const dict_values = Object.fromEntries(
-            this.column.data[0].dictionary.toArray().map((val, i) => [val, i])
+            data_values.map((val, i) => [val, i])
           );
+          console.log({ dict_values });
           const colors2 = [];
-          for (const label of this.domain) {
-            if (dict_values[label] === void 0) {
-              colors2.push(range2[dict_values[label]]);
-            } else {
-              colors2.push("gray");
+          for (let i = 0; i < this.domain.length; i++) {
+            const label = this.domain[i];
+            const color2 = range2[i];
+            if (dict_values[label] !== void 0) {
+              colors2[dict_values[label]] = color2;
+            }
+          }
+          for (let i = 0; i < data_values.length; i++) {
+            if (colors2[i] === void 0) {
+              colors2[i] = "gray";
             }
           }
           palette = palette_from_color_strings(colors2);
