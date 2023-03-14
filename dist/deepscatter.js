@@ -23908,7 +23908,7 @@ class Color extends Aesthetic {
           );
           const colors2 = [];
           for (const label of this.domain) {
-            if (dict_values[label]) {
+            if (dict_values[label] === void 0) {
               colors2.push(range2[dict_values[label]]);
             } else {
               colors2.push("gray");

@@ -272,7 +272,7 @@ export class Color extends Aesthetic<
           );
           const colors = [];
           for (const label of this.domain) {
-            if (dict_values[label]) {
+            if (dict_values[label] === undefined) {
               colors.push(range[dict_values[label]]);
             } else {
               colors.push('gray');
