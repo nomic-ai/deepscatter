@@ -304,7 +304,6 @@ export default class Zoom {
     const scales: Record<string, ScaleLinear<number, number>> = {};
     if (extent === undefined) {
       throw new Error('Error--scales created before extent present.');
-      return {};
     }
 
     interface Scale_datum {
@@ -316,8 +315,8 @@ export default class Zoom {
     for (const [name, dim] of [
       ['x', width],
       ['y', height],
-    ]) {
-      const limits = extent[name];
+    ] as const) {
+      const limits = extent[name] as [number, number];
       const size_range = limits[1] - limits[0];
       scale_dat[name] = {
         limits,

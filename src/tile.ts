@@ -359,7 +359,6 @@ export abstract class Tile {
 
 export class QuadTile extends Tile {
   url: string;
-  bearer_token = '';
   key: string;
   public _children: Array<this> = [];
   codes: [number, number, number];
@@ -369,13 +368,10 @@ export class QuadTile extends Tile {
     base_url: string,
     key: string,
     parent: QuadTile | null,
-    dataset: QuadtileSet,
-    prefs: APICall
+    dataset: QuadtileSet
   ) {
     super(dataset);
     this.url = base_url;
-    this.bearer_token = prefs?.bearer_token ?? '';
-
     this.parent = parent as this;
     this.key = key;
     const [z, x, y] = key.split('/').map((d) => Number.parseInt(d));
@@ -416,16 +412,15 @@ export class QuadTile extends Tile {
     let url = `${this.url}/${this.key}.feather`;
     this.download_state = 'In progress';
 
-    if (this.bearer_token) {
+    //TODO: Atlas specific code--maybe check for nomic URL too.
+    if (window.localStorage.getItem('isLoggedIn') === 'true') {
       url = url.replace('/public', '');
     }
 
-    const request: RequestInit | undefined = this.bearer_token
-      ? {
+    const request: RequestInit =  {
           method: 'GET',
-          headers: { Authorization: 'Bearer ' + this.bearer_token },
-        }
-      : undefined;
+          credentials: 'include',
+        };
 
     this._download = fetch(url, request)
       .then(async (response): Promise<void> => {
@@ -489,14 +484,11 @@ export class QuadTile extends Tile {
       k: string,
       l: string,
       m: this,
-      data: typeof this.dataset,
-      prefs: APICall
+      data: typeof this.dataset
     ) => this;
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
-        const child = new constructor(this.url, key, this, this.dataset, {
-          bearer_token: this.bearer_token,
-        });
+        const child = new constructor(this.url, key, this, this.dataset);
         this._children.push(child);
       }
     }
