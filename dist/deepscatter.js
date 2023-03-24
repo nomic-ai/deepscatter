@@ -34055,18 +34055,15 @@ class Tile {
   }
 }
 class QuadTile extends Tile {
-  constructor(base_url, key, parent, dataset, prefs) {
-    var _a2;
+  constructor(base_url, key, parent, dataset) {
     super(dataset);
     __publicField(this, "url");
-    __publicField(this, "bearer_token", "");
     __publicField(this, "key");
     __publicField(this, "_children", []);
     __publicField(this, "codes");
     __publicField(this, "_already_called", false);
     __publicField(this, "child_locations", []);
     this.url = base_url;
-    this.bearer_token = (_a2 = prefs == null ? void 0 : prefs.bearer_token) != null ? _a2 : "";
     this.parent = parent;
     this.key = key;
     const [z, x, y] = key.split("/").map((d) => Number.parseInt(d));
@@ -34096,13 +34093,13 @@ class QuadTile extends Tile {
     this._already_called = true;
     let url = `${this.url}/${this.key}.feather`;
     this.download_state = "In progress";
-    if (this.bearer_token) {
+    if (window.localStorage.getItem("isLoggedIn") === "true") {
       url = url.replace("/public", "");
     }
-    const request = this.bearer_token ? {
+    const request = {
       method: "GET",
-      headers: { Authorization: "Bearer " + this.bearer_token }
-    } : void 0;
+      credentials: "include"
+    };
     this._download = fetch(url, request).then(async (response) => {
       const buffer = await response.arrayBuffer();
       this.download_state = "Complete";
@@ -34150,9 +34147,7 @@ class QuadTile extends Tile {
     const constructor = this.constructor;
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
-        const child = new constructor(this.url, key, this, this.dataset, {
-          bearer_token: this.bearer_token
-        });
+        const child = new constructor(this.url, key, this, this.dataset);
         this._children.push(child);
       }
     }
