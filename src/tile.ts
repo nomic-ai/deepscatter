@@ -67,7 +67,7 @@ export abstract class Tile {
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
   public _buffer_manager?: TileBufferManager<this>;
-  constructor(dataset: this) {
+  constructor(dataset: Dataset<this>) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';

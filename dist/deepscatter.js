@@ -23903,15 +23903,22 @@ class Color extends Aesthetic {
         if (!this.is_dictionary()) {
           palette = palette_from_color_strings(range2);
         } else {
+          const data_values = this.column.data[0].dictionary.toArray();
           const dict_values = Object.fromEntries(
-            this.column.data[0].dictionary.toArray().map((val, i) => [val, i])
+            data_values.map((val, i) => [val, i])
           );
+          console.log({ dict_values });
           const colors2 = [];
-          for (const label of this.domain) {
-            if (dict_values[label]) {
-              colors2.push(range2[dict_values[label]]);
-            } else {
-              colors2.push("gray");
+          for (let i = 0; i < this.domain.length; i++) {
+            const label = this.domain[i];
+            const color2 = range2[i];
+            if (dict_values[label] !== void 0) {
+              colors2[dict_values[label]] = color2;
+            }
+          }
+          for (let i = 0; i < data_values.length; i++) {
+            if (colors2[i] === void 0) {
+              colors2[i] = "gray";
             }
           }
           palette = palette_from_color_strings(colors2);
@@ -34609,7 +34616,7 @@ function add_or_delete_column(batch, field_name, data) {
     throw new Error("Must pass data to bind_column");
   }
   if (data !== null) {
-    if (data instanceof Float32Array) {
+    if (data instanceof Float32Array || data instanceof BigInt64Array) {
       tb[field_name] = makeVector(data).data[0];
     } else {
       tb[field_name] = data.data[0];
@@ -34643,15 +34650,29 @@ function add_or_delete_column(batch, field_name, data) {
   return new_batch;
 }
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
-  const hashtab = /* @__PURE__ */ new Set();
-  for (const item of Object.keys(ids)) {
-    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || "").join("");
-    hashtab.add(code);
-  }
+  var _a2;
   const updatedFloatArray = new Float32Array(batch.numRows);
   const kfield = batch.getChild(key_field);
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
+  }
+  let keytype = "string";
+  if (((_a2 = kfield == null ? void 0 : kfield.type) == null ? void 0 : _a2.typeId) === 2) {
+    keytype = "bigint";
+  }
+  if (keytype === "bigint") {
+    for (let i = 0; i < batch.numRows; i++) {
+      const value = ids[String(kfield.get(i))];
+      if (value !== void 0) {
+        updatedFloatArray[i] = value;
+      }
+    }
+    return updatedFloatArray;
+  }
+  const hashtab = /* @__PURE__ */ new Set();
+  for (const item of Object.keys(ids)) {
+    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || "").join("");
+    hashtab.add(code);
   }
   const offsets = kfield.data[0].valueOffsets;
   const values = kfield.data[0].values;
@@ -35719,7 +35740,6 @@ class Scatterplot {
   }
   add_identifier_column(name, codes, key_field) {
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
-    console.log({ true_codes });
     this._root.add_label_identifiers(true_codes, name, key_field);
   }
   async add_labels_from_url(url, name, label_key, size_key, options) {

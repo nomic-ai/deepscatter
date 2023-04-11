@@ -517,7 +517,7 @@ export function add_or_delete_column(
     throw new Error('Must pass data to bind_column');
   }
   if (data !== null) {
-    if (data instanceof Float32Array) {
+    if (data instanceof Float32Array || data instanceof BigInt64Array) {
       tb[field_name] = makeVector(data).data[0];
     } else {
       tb[field_name] = data.data[0] as Data;
@@ -562,22 +562,40 @@ export function add_or_delete_column(
  */
 function supplement_identifiers(
   batch: RecordBatch,
-  ids: Record<string, number>,
+  ids: Record<string, number> | Record<bigint, number>,
   field_name: string,
   key_field = '_id'
 ): ArrowBuildable {
   /* Add the identifiers from the batch to the ids array */
-
   // A quick lookup before performing a costly string decode.
-  const hashtab = new Set();
-  for (const item of Object.keys(ids)) {
-    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || '').join('');
-    hashtab.add(code);
-  }
   const updatedFloatArray = new Float32Array(batch.numRows);
+
   const kfield = batch.getChild(key_field);
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
+  }
+
+  let keytype = 'string';
+  if (kfield?.type?.typeId === 2) {
+    keytype = 'bigint';
+  }
+
+  if (keytype === 'bigint') {
+    for (let i = 0; i < batch.numRows; i++) {
+      // the object coerces bigints to strings. We just live with that.
+      const value = ids[String(kfield.get(i))]
+      if (value !== undefined) {
+        updatedFloatArray[i] = value as number;
+      }
+    }
+    return updatedFloatArray;
+  }
+
+  const hashtab = new Set();
+
+  for (const item of Object.keys(ids)) {
+    const code = [0, 1, 2, 3].map((i) => item.charCodeAt(i) || '').join('');
+    hashtab.add(code);
   }
 
   const offsets = kfield.data[0].valueOffsets;
@@ -593,5 +611,6 @@ function supplement_identifiers(
       }
     }
   }
+
   return updatedFloatArray;
 }

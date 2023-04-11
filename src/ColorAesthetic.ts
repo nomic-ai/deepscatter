@@ -265,17 +265,24 @@ export class Color extends Aesthetic<
         } else {
           // We need to find the integer identifiers for each of
           // the values in the domain.
+          const data_values = this.column.data[0]
+            .dictionary!.toArray()
           const dict_values = Object.fromEntries(
-            this.column.data[0]
-              .dictionary!.toArray()
+            data_values
               .map((val: string, i: Number) => [val, i])
           );
-          const colors = [];
-          for (const label of this.domain) {
-            if (dict_values[label]) {
-              colors.push(range[dict_values[label]]);
-            } else {
-              colors.push('gray');
+          console.log({dict_values})
+          const colors : string[] = [];
+          for (let i = 0; i < this.domain.length; i++) {
+            const label = this.domain[i];
+            const color = range[i];
+            if (dict_values[label] !== undefined) {
+              colors[dict_values[label]] = color;
+            }
+          }
+          for (let i = 0; i < data_values.length; i++) {
+            if (colors[i] === undefined) {
+              colors[i] = 'gray';
             }
           }
           palette = palette_from_color_strings(colors);
