@@ -1,10 +1,10 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
-  "dist"
+    "dist"
   ],
   "module": "./dist/deepscatter.js",
   "main": "./dist/deepscatter.umd.cjs",
@@ -33,20 +33,20 @@
     "Scatterplot"
   ],
   "author": "Ben Schmidt",
-  "license": "MIT",
+  "license": "CC BY-NC-SA 4.0",
   "bugs": {
     "url": "https://github.com/nomic-ai/deepscatter/issues"
   },
   "homepage": "https://github.com/nomic-ai/deepscatter#readme",
   "dependencies": {
-    "apache-arrow": "^10.0.1",
-    "d3-array": "^3.2.0",
+    "apache-arrow": "^11.0.0",
+    "d3-array": "^3.2.2",
     "d3-color": "^3.1.0",
-    "d3-contour": "^4.0.0",
+    "d3-contour": "^4.0.2",
     "d3-ease": "^3.0.1",
     "d3-fetch": "^3.0.1",
     "d3-format": "^3.1.0",
-    "d3-geo": "^3.0.1",
+    "d3-geo": "^3.1.0",
     "d3-interpolate": "^3.0.1",
     "d3-random": "^3.0.1",
     "d3-scale": "^4.0.2",
@@ -63,26 +63,26 @@
     "regl": "^2.1.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.28.1",
+    "@playwright/test": "^1.31.2",
     "@types/d3": "^7.4.0",
-    "@types/d3-geo": "^3.0.2",
-    "@types/d3-selection": "^3.0.3",
+    "@types/d3-geo": "^3.0.3",
+    "@types/d3-selection": "^3.0.4",
     "@types/geojson": "^7946.0.10",
     "@types/lodash.merge": "^4.6.7",
-    "@typescript-eslint/eslint-plugin": "^5.44.0",
-    "@typescript-eslint/parser": "^5.44.0",
-    "eslint": "^8.28.0",
-    "eslint-config-prettier": "^8.6.0",
-    "eslint-formatter-summary-chart": "^0.2.1",
-    "eslint-plugin-import": "^2.26.0",
+    "@typescript-eslint/eslint-plugin": "^5.54.1",
+    "@typescript-eslint/parser": "^5.54.1",
+    "eslint": "^8.36.0",
+    "eslint-config-prettier": "^8.7.0",
+    "eslint-formatter-summary-chart": "^0.3.0",
+    "eslint-plugin-import": "^2.27.5",
     "eslint-plugin-prettier": "^4.2.1",
-    "eslint-plugin-unicorn": "^45.0.0",
+    "eslint-plugin-unicorn": "^46.0.0",
     "glslify": "^7.1.1",
     "glslify-hex": "^2.1.1",
     "glslify-loader": "^2.0.0",
     "rollup-plugin-glslify": "^1.3.1",
-    "terser": "^5.16.0",
-    "typedoc": "^0.23.24",
-    "vite": "^3.2.4"
+    "terser": "^5.16.6",
+    "typedoc": "^0.23.26",
+    "vite": "^4.1.4"
   }
 }
