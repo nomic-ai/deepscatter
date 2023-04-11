@@ -12,7 +12,11 @@ export function isConstantChannel(
   return (input as ConstantChannel).constant !== undefined;
 }
 
-const isTypedArray = (function () {
-  const TypedArray = Object.getPrototypeOf(Uint8Array);
-  return (obj) => obj instanceof TypedArray;
-})();
+
+export function isURLLabels(labels: Labelcall): labels is URLLabels {
+  return labels !== null && (labels as URLLabels).url !== undefined;
+}
+
+export function isLabelset(labels: Labelcall): labels is Labelset {
+  return labels !== null && (labels as Labelset).labels !== undefined;
+}

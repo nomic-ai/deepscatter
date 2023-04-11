@@ -5583,9 +5583,20 @@ class Zoom {
     });
   }
   zoom_to_bbox(corners, duration = 4e3, buffer = 1.111) {
+    console.log("ZOOOOM");
     const scales2 = this.scales();
-    const [x02, x12] = corners.x.map(scales2.x);
-    const [y02, y12] = corners.y.map(scales2.y);
+    let [x02, x12] = corners.x.map(scales2.x);
+    let [y02, y12] = corners.y.map(scales2.y);
+    console.log(this.scatterplot.prefs.zoom_align, "AAH");
+    if (this.scatterplot.prefs.zoom_align === "right") {
+      const aspect_ratio = this.width / this.height;
+      const data_aspect_ratio = (x12 - x02) / (y12 - y02);
+      if (data_aspect_ratio < aspect_ratio) {
+        const extension = data_aspect_ratio / aspect_ratio;
+        console.log(extension, { x0: x02 });
+        x02 = x02 - (x12 - x02) * extension;
+      }
+    }
     const { svg_element_selection: canvas, zoomer, width, height } = this;
     const t = identity$3.translate(width / 2, height / 2).scale(1 / buffer / Math.max((x12 - x02) / width, (y12 - y02) / height)).translate(-(x02 + x12) / 2, -(y02 + y12) / 2);
     canvas.transition().duration(duration).call(zoomer.transform, t);
@@ -17290,6 +17301,12 @@ function isLambdaChannel(input) {
 function isConstantChannel(input) {
   return input.constant !== void 0;
 }
+function isURLLabels(labels) {
+  return labels !== null && labels.url !== void 0;
+}
+function isLabelset(labels) {
+  return labels !== null && labels.labels !== void 0;
+}
 var lodash = { exports: {} };
 /**
  * @license
@@ -23102,6 +23119,9 @@ class BooleanAesthetic extends Aesthetic {
     }
     if (input.op === "within") {
       return [4, input.a, input.b];
+    }
+    if (input.op === "between") {
+      return [4, (input.b - input.a) / 2, (input.b + input.a) / 2];
     }
     const val = [
       [null, "lt", "gt", "eq"].indexOf(input.op),
@@ -34097,8 +34117,7 @@ class QuadTile extends Tile {
       url = url.replace("/public", "");
     }
     const request = {
-      method: "GET",
-      credentials: "include"
+      method: "GET"
     };
     this._download = fetch(url, request).then(async (response) => {
       const buffer = await response.arrayBuffer();
@@ -35501,6 +35520,7 @@ class LabelMaker extends Renderer {
         d.data.y = y_.invert(event.y);
       });
       handler.on("end", (event, d) => {
+        console.log({ text: d.data.text, x: d.data.x, y: d.data.y });
       });
       bboxes.call(handler);
     }
@@ -35597,7 +35617,7 @@ class DepthTree extends dist.RBush3D {
       throw "Missing Aspect Ratio" + JSON.stringify(point);
     return p;
   }
-  insert_point(point, mindepth = 1) {
+  insert_point(point, mindepth = 1 / 4) {
     if (point.text === void 0 || point.text === "") {
       return;
     }
@@ -35660,7 +35680,8 @@ const default_API_call = {
   encoding: {},
   point_size: 1,
   alpha: 40,
-  background_options: default_background_options
+  background_options: default_background_options,
+  zoom_align: "center"
 };
 const base_elements = [
   {
@@ -35753,6 +35774,26 @@ class Scatterplot {
     labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
+  }
+  add_api_label(labelset) {
+    const geojson = {
+      type: "FeatureCollection",
+      features: labelset.labels.map((label) => {
+        return {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [label.x, label.y]
+          },
+          properties: {
+            text: label.text,
+            size: label.size || void 0
+          }
+        };
+      })
+    };
+    console.log("OPTIONS", labelset.options);
+    this.add_labels(geojson, labelset.name, "text", "size", labelset.options || {});
   }
   async reinitialize() {
     const { prefs } = this;
@@ -35915,6 +35956,7 @@ class Scatterplot {
     delete this.hooks[name];
   }
   stop_labellers() {
+    console.log("Stopping labels");
     for (const [k, v] of Object.entries(this.secondary_renderers)) {
       if (v && v["label_key"] !== void 0) {
         this.secondary_renderers[k].stop();
@@ -36014,6 +36056,7 @@ class Scatterplot {
     });
   }
   async unsafe_plotAPI(prefs) {
+    var _a2;
     if (prefs === null) {
       return;
     }
@@ -36031,19 +36074,6 @@ class Scatterplot {
         prefs.background_options.size = [prefs.background_options.size, 1];
       }
     }
-    if (prefs.labels) {
-      const { url, label_field, size_field } = prefs.labels;
-      const name = prefs.labels.name || url;
-      if (!this.secondary_renderers[name]) {
-        this.stop_labellers();
-        this.add_labels_from_url(url, name, label_field, size_field).catch(
-          (error) => {
-            console.error("Label addition failed.");
-            console.error(error);
-          }
-        );
-      }
-    }
     this.update_prefs(prefs);
     if (this._root === void 0) {
       await this.reinitialize();
@@ -36059,7 +36089,7 @@ class Scatterplot {
       if (prefs.zoom === null) {
         this._zoom.zoom_to(1, width / 2, height / 2);
         prefs.zoom = void 0;
-      } else if (prefs.zoom.bbox) {
+      } else if ((_a2 = prefs.zoom) == null ? void 0 : _a2.bbox) {
         this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration);
       }
     }
@@ -36075,6 +36105,31 @@ class Scatterplot {
     this._renderer.reglframe = this._renderer.regl.frame(() => {
       this._renderer.tick("Basic");
     });
+    if (prefs.labels !== void 0) {
+      if (isURLLabels(prefs.labels)) {
+        const { url, label_field, size_field } = prefs.labels;
+        const name = prefs.labels.name || url;
+        if (!this.secondary_renderers[name]) {
+          this.stop_labellers();
+          this.add_labels_from_url(url, name, label_field, size_field).catch(
+            (error) => {
+              console.error("Label addition failed.");
+              console.error(error);
+            }
+          );
+        }
+      } else if (isLabelset(prefs.labels)) {
+        if (!prefs.labels.name) {
+          throw new Error("API field `labels` must have a name.");
+        }
+        this.stop_labellers();
+        this.add_api_label(prefs.labels);
+      } else if (prefs.labels === null) {
+        this.stop_labellers();
+      } else {
+        throw new Error("API field `labels` format not recognized.");
+      }
+    }
     this._zoom.restart_timer(6e4);
   }
   async root_table() {

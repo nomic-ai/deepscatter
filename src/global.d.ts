@@ -199,6 +199,13 @@ declare global {
     values: Record<string, Record<number, number>>;
   };
 
+  type ZoomCall = {
+    'bbox': {
+      x: [number, number];
+      y: [number, number];
+    }
+  }
+
   export type Dimension = keyof Encoding;
 
   // Data can be passed in three ways:
@@ -219,6 +226,30 @@ declare global {
    * might update annotations on zoom events to keep them in sync.
    */
   export type onZoomCallback = (transform: d3.ZoomTransform) => null;
+
+  export type Label = {
+    x: number,
+    y: number,
+    text: string,
+  }
+  export type URLLabels = {
+    url: string,
+    options: LabelOptions,
+    label_field: string,
+    size_field: string,
+  }
+  export type LabelOptions = {
+    useColorScale?: boolean; // Whether the colors of text should inherit from the active color scale.
+    margin?: number; // The number of pixels around each box. Default 30.
+    draggable_labels?: boolean; // Should labels be draggable in place?
+  };
+
+  export type Labelset = {
+    labels: Label[],
+    name: string,
+    options?: LabelOptions,
+  }
+  export type Labelcall = Labelset | URLLabels | null;
 
   // An APICall is a JSON-serializable specification of the chart.
   export type APICall = {
@@ -242,11 +273,12 @@ declare global {
 
     //
     encoding?: Encoding;
-
+    labels?: Labelcall;
     background_options?: BackgroundOptions;
-
-    bearer_token?: string;
+    zoom?: ZoomCall;
+    zoom_align? : undefined | 'right' | 'left' | 'top' | 'bottom' | 'center';
   };
+
 
 
   type InitialAPICall = APICall & {

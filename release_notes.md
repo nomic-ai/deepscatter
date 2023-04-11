@@ -1,3 +1,9 @@
+
+# 2.10.0
+
+- Fully supported 'between' as alternative to 'within' for filter operations.
+- Allow passing labels through API directly.
+
 # 2.9.2
 
 - Fix bug in manually-assigned categorical color schemes involving the first color always being gray.

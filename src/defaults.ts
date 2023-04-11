@@ -18,4 +18,5 @@ export const default_API_call: APICall = {
   point_size: 1, // base size before aes modifications.
   alpha: 40, // Default screen saturation target.
   background_options: default_background_options,
+  zoom_align: 'center'
 } as const;

@@ -506,6 +506,9 @@ abstract class BooleanAesthetic extends Aesthetic<
     if (input.op === 'within') {
       return [4, input.a, input.b];
     }
+    if (input.op === 'between') {
+      return [4, (input.b - input.a) / 2, (input.b + input.a) / 2];
+    }
     const val: OpArray = [
       // Encoding of op as number.
       [null, 'lt', 'gt', 'eq'].indexOf(input.op),

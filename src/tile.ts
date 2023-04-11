@@ -419,7 +419,7 @@ export class QuadTile extends Tile {
 
     const request: RequestInit =  {
           method: 'GET',
-          credentials: 'include',
+//          credentials: 'include',
         };
 
     this._download = fetch(url, request)

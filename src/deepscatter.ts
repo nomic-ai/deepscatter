@@ -11,7 +11,7 @@ import { LabelMaker, LabelOptions } from './label_rendering';
 import { Renderer } from './rendering';
 import { ArrowTile, QuadTile, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
-
+import { isURLLabels, isLabelset } from './typing';
 
 // DOM elements that deepscatter uses.
 const base_elements = [
@@ -209,7 +209,28 @@ export default class Scatterplot<T extends Tile> {
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }
-
+  add_api_label(
+    labelset: Labelset
+  ) {
+    const geojson : FeatureCollection = {
+      type: 'FeatureCollection',
+      features: labelset.labels.map((label : Label) => {
+        return {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [label.x, label.y],
+          },
+          properties: {
+            text: label.text,
+            size: label.size || undefined,
+          },
+        };
+      })
+    };
+    console.log("OPTIONS", labelset.options)
+    this.add_labels(geojson, labelset.name, 'text', 'size', labelset.options || {});
+  }
   async reinitialize() {
     const { prefs } = this;
     if (prefs.source_url !== undefined) {
@@ -451,6 +472,7 @@ export default class Scatterplot<T extends Tile> {
   }
 
   public stop_labellers() {
+    console.log("Stopping labels")
     for (const [k, v] of Object.entries(this.secondary_renderers)) {
       // Stop any existing labels
       if (v && v['label_key'] !== undefined) {
@@ -621,19 +643,7 @@ export default class Scatterplot<T extends Tile> {
         prefs.background_options.size = [prefs.background_options.size, 1]
       }
     }
-    if (prefs.labels) {
-      const { url, label_field, size_field } = prefs.labels;
-      const name = (prefs.labels.name || url) as string;
-      if (!this.secondary_renderers[name]) {
-        this.stop_labellers();
-        this.add_labels_from_url(url, name, label_field, size_field).catch(
-          (error) => {
-            console.error('Label addition failed.');
-            console.error(error);
-          }
-        );
-      }
-    }
+
     this.update_prefs(prefs);
 
     // Some things have to be done *before* we can actually run this;
@@ -644,7 +654,7 @@ export default class Scatterplot<T extends Tile> {
     if (this._root === undefined) {
       await this.reinitialize();
     }
-
+    
     // Doesn't block.
     /*
     if (prefs.basemap_geojson) {
@@ -676,7 +686,7 @@ export default class Scatterplot<T extends Tile> {
       if (prefs.zoom === null) {
         this._zoom.zoom_to(1, width / 2, height / 2);
         prefs.zoom = undefined;
-      } else if (prefs.zoom.bbox) {
+      } else if (prefs.zoom?.bbox) {
         this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration);
       }
     }
@@ -695,6 +705,33 @@ export default class Scatterplot<T extends Tile> {
     this._renderer.reglframe = this._renderer.regl.frame(() => {
       this._renderer.tick('Basic');
     });
+
+    if (prefs.labels !== undefined) {
+      if (isURLLabels(prefs.labels)) {        
+        const { url, label_field, size_field } = prefs.labels;
+        const name = (prefs.labels.name || url) as string;
+        if (!this.secondary_renderers[name]) {
+          this.stop_labellers();
+          this.add_labels_from_url(url, name, label_field, size_field).catch(
+            (error) => {
+              console.error('Label addition failed.');
+              console.error(error);
+            }
+          );
+        }
+      } else if (isLabelset(prefs.labels)) {
+        if (!prefs.labels.name) {
+          throw new Error('API field `labels` must have a name.');
+        }
+        this.stop_labellers();
+        this.add_api_label(prefs.labels);
+      } else if (prefs.labels === null) {      
+        this.stop_labellers()
+      } else {
+        throw new Error('API field `labels` format not recognized.');
+      }
+      
+    }
 
     this._zoom.restart_timer(60_000);
   }

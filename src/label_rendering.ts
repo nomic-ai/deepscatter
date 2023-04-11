@@ -9,12 +9,6 @@ import type { Tile } from './tile';
 
 const handler = drag();
 
-export type LabelOptions = {
-  useColorScale?: boolean; // Whether the colors of text should inherit from the active color scale.
-  margin?: number; // The number of pixels around each box. Default 30.
-  draggable_labels?: boolean; // Should labels be draggable in place?
-};
-
 function pixel_ratio(scatterplot: Scatterplot): number {
   // pixelspace
   const [px1, px2] = scatterplot._zoom.scales().x.range() as [number, number];
@@ -337,6 +331,7 @@ export class LabelMaker extends Renderer {
         d.data.y = y_.invert(event.y);
       });
       handler.on('end', (event, d) => {
+        console.log({text: d.data.text, x: d.data.x, y: d.data.y});
       });
       bboxes.call(handler);
     }
@@ -518,7 +513,7 @@ class DepthTree extends RBush3D {
     return p;
   }
 
-  insert_point(point: RawPoint | Point, mindepth = 1) {
+  insert_point(point: RawPoint | Point, mindepth = 1/4) {
     if (point.text === undefined || point.text === '') {
       return;
     }
