@@ -1,6 +1,6 @@
 # Deep Scatterplots for the Web
 
-This is an evolving library for displaying more points than are ordinarily possible over the web.
+This is a library for allowing interactive visualization of extremely large datasets, in browser.
 
 It's fast for three reasons:
 
@@ -9,6 +9,7 @@ It's fast for three reasons:
    data as needed on zoom. Feather takes no time to parse in the browser
    once transferred, compresses pretty well, and can be directly copied to the GPU without
    transformation in JS. This is [the way of the future.](https://benschmidt.org/post/2020-01-15/2020-01-15-webgpu/)
+   We also now allow custom in-browser calculations on Arrow data.
 2. Most rendering is done in custom layers using WebGL, with a
    buffer management strategy handled by REGL. This means that
    there are no unnecessary abstractions around points or separate draw calls
@@ -20,15 +21,22 @@ It's fast for three reasons:
 
 It also runs in completely static settings, so you can host a million-point scatterplot over something like Github Pages.
 
+Deepscatter is the underlying graphics engine for [Atlas](https://atlas.nomic.ai). It is provided under an NC-CC-BY-SA license for all noncommercial use.
+
 # Examples
 
+- [Atlas map of 5.5 million tweets](https://atlas.nomic.ai/map/twitter). (Nomic)
+- [Narrative visualization of 20 million biomedical abstracts embedded using T-SNE.](https://static.nomic.ai/pubmed.html). (Collaboration between Nomic and the University of Tübingen).
 - [1 million+ documents from arxiv.com](https://observablehq.com/@bmschmidt/arxiv) rendered inside an Observable notebook. (Ben Schmidt)
 - [Every person in the 2010 and 2020 US Censuses](https://all-of-us.benschmidt.org) displayed in an interactive svelte-kit app. (Ben Schmidt)
-- [Newspaper Articles at the Library of Congress from the Reconstruction Era](https://situating.us/explore). (By Andromeda Yelton while in residency at the Library of Congress).
+- [Newspaper Articles at the Library of Congress from the Reconstruction Era](https://situating.us/explore). (Andromeda Yelton while in residency at the Library of Congress).
 
 # Get help
 
-Github issues, even low quality ones, are welcome here. There is also a dedicated [Deepscatter Slack](https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw) which you are welcome to join.
+Github issues, even low quality ones, are welcome here.
+
+There is also a dedicated [Deepscatter Slack](https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw) which you are welcome to join. Nomic maintains a [discord server](https://discord.gg/4M2QFmTt2k) that has dedicated Deepscatter and Atlas support channels.
+
 I came into doing this stuff from a very non-technical background and welcome people to join with naive questions.
 
 # Quick start
