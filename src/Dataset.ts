@@ -130,7 +130,7 @@ export abstract class Dataset<T extends Tile> {
         (bbox === undefined || current.is_visible(max_ix, bbox))
       ) {
         for (const point of current) {
-          if (p_in_rect([point.x, point.y], bbox) && point.ix <= max_ix) {
+          if (p_in_rect([point.x as number, point.y as number], bbox) && point.ix <= max_ix) {
             yield point;
           }
         }
@@ -523,6 +523,7 @@ export function add_or_delete_column(
       tb[field_name] = data.data[0] as Data;
     }
   }
+  
   const new_batch = new RecordBatch(tb);
   for (const [k, v] of batch.schema.metadata) {
     new_batch.schema.metadata.set(k, v);
