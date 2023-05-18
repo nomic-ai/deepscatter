@@ -109,7 +109,6 @@ export default class Zoom {
 
   zoom_to_bbox(corners : Rectangle, duration = 4000, buffer = 1.111, ) {
     // Zooms to two points.
-    console.log("ZOOOOM")
     const scales = this.scales();
     let [x0, x1] = corners.x.map(scales.x);
     let [y0, y1] = corners.y.map(scales.y);

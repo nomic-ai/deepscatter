@@ -5583,7 +5583,6 @@ class Zoom {
     });
   }
   zoom_to_bbox(corners, duration = 4e3, buffer = 1.111) {
-    console.log("ZOOOOM");
     const scales2 = this.scales();
     let [x02, x12] = corners.x.map(scales2.x);
     let [y02, y12] = corners.y.map(scales2.y);
@@ -23927,7 +23926,6 @@ class Color extends Aesthetic {
           const dict_values = Object.fromEntries(
             data_values.map((val, i) => [val, i])
           );
-          console.log({ dict_values });
           const colors2 = [];
           for (let i = 0; i < this.domain.length; i++) {
             const label = this.domain[i];
@@ -34103,6 +34101,32 @@ class QuadTile extends Tile {
     }
     await Promise.all(promises);
   }
+  async get_arrow(suffix = void 0) {
+    let url = `${this.url}/${this.key}.feather`;
+    if (window.localStorage.getItem("isLoggedIn") === "true") {
+      url = url.replace("/public", "");
+    }
+    if (suffix) {
+      url = url.replace(".feather", `.${suffix}.feather`);
+    }
+    const request = {
+      method: "GET",
+      credentials: "include"
+    };
+    const response = await fetch(url, request);
+    const buffer = await response.arrayBuffer();
+    const tb = tableFromIPC(buffer);
+    if (tb.batches.length > 1) {
+      console.warn(`More than one record batch at ${url}; all but first batch will be ignored.`);
+    }
+    const batch = tb.batches[0];
+    if (suffix === void 0) {
+      this.download_state = "Complete";
+      this._table_buffer = buffer;
+      this._batch = tableFromIPC(buffer).batches[0];
+    }
+    return batch;
+  }
   async download() {
     if (this._download) {
       return this._download;
@@ -34111,20 +34135,9 @@ class QuadTile extends Tile {
       throw "Illegally attempting to download twice";
     }
     this._already_called = true;
-    let url = `${this.url}/${this.key}.feather`;
     this.download_state = "In progress";
-    if (window.localStorage.getItem("isLoggedIn") === "true") {
-      url = url.replace("/public", "");
-    }
-    const request = {
-      method: "GET"
-    };
-    this._download = fetch(url, request).then(async (response) => {
-      const buffer = await response.arrayBuffer();
-      this.download_state = "Complete";
-      this._table_buffer = buffer;
-      this._batch = tableFromIPC(buffer).batches[0];
-      const metadata = this._batch.schema.metadata;
+    this._download = this.get_arrow().then((batch) => {
+      const metadata = batch.schema.metadata;
       const extent2 = metadata.get("extent");
       if (extent2) {
         this._extent = JSON.parse(extent2);
@@ -34133,7 +34146,7 @@ class QuadTile extends Tile {
       if (children2) {
         this.child_locations = JSON.parse(children2);
       }
-      const ixes = this._batch.getChild("ix");
+      const ixes = batch.getChild("ix");
       if (ixes === null) {
         throw "No ix column in table";
       }
@@ -34511,7 +34524,23 @@ class QuadtileSet extends Dataset {
     __publicField(this, "promise", new Promise(nothing));
     __publicField(this, "root_tile");
     this.root_tile = new QuadTile(base_url, "0/0/0", null, this, prefs);
-    this.promise = this.root_tile.promise;
+    this.promise = this.root_tile.download().then((d) => {
+      const schema = this.root_tile.record_batch.schema;
+      if (schema.metadata.has("sidecars")) {
+        for (const [k, v] of Object.entries(
+          JSON.parse(schema.metadata.get("sidecars"))
+        )) {
+          this.transformations[k] = async function(tile) {
+            const batch = await tile.get_arrow(v);
+            const column = batch.getChild(k);
+            if (column === null) {
+              throw new Error(`No column named ${k} in sidecar tile ${batch.schema.fields.map((f) => f.name)}`);
+            }
+            return column;
+          };
+        }
+      }
+    });
   }
   get ready() {
     return this.root_tile.download();
@@ -35765,8 +35794,8 @@ class Scatterplot {
       const features = await data.json();
       this.add_labels(features, name, label_key, size_key, options);
     }).catch((error) => {
+      console.warn(error);
       console.error("Broken addition of ", name);
-      console.log(error);
     });
   }
   add_labels(features, name, label_key, size_key, options = {}) {
@@ -35792,7 +35821,6 @@ class Scatterplot {
         };
       })
     };
-    console.log("OPTIONS", labelset.options);
     this.add_labels(geojson, labelset.name, "text", "size", labelset.options || {});
   }
   async reinitialize() {
@@ -35886,7 +35914,6 @@ class Scatterplot {
                   width,
                   height
                 );
-                console.log(i, j, sum$1(pixels));
                 const halfHeight = height / 2 | 0;
                 const bytesPerRow = width * 4;
                 var temp = new Uint8Array(width * 4);

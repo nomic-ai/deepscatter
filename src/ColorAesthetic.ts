@@ -271,7 +271,6 @@ export class Color extends Aesthetic<
             data_values
               .map((val: string, i: Number) => [val, i])
           );
-          console.log({dict_values})
           const colors : string[] = [];
           for (let i = 0; i < this.domain.length; i++) {
             const label = this.domain[i];

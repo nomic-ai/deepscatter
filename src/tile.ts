@@ -398,7 +398,38 @@ export class QuadTile extends Tile {
     await Promise.all(promises);
   }
 
+
+  async get_arrow(suffix : string | undefined = undefined) : Promise<RecordBatch>{
+    let url = `${this.url}/${this.key}.feather`;
+    //TODO: Atlas specific code--maybe check for nomic URL too.
+    if (window.localStorage.getItem('isLoggedIn') === 'true') {
+      url = url.replace('/public', '');
+    }
+    if (suffix) {
+      url = url.replace('.feather', `.${suffix}.feather`);
+    }
+    const request: RequestInit = {
+      method: 'GET',
+      credentials: 'include',
+    };
+    const response = await fetch(url, request);
+    const buffer = await response.arrayBuffer();
+
+    const tb = tableFromIPC(buffer);
+    if (tb.batches.length > 1) {
+      console.warn(`More than one record batch at ${url}; all but first batch will be ignored.`);
+    }
+    const batch = tb.batches[0];
+    if (suffix === undefined) {
+      this.download_state = 'Complete';
+      this._table_buffer = buffer;
+      this._batch = tableFromIPC(buffer).batches[0];
+    }
+    return batch;
+  }
+
   async download(): Promise<void> {
+
     // This should only be called once per tile.
     if (this._download) {
       return this._download;
@@ -409,35 +440,21 @@ export class QuadTile extends Tile {
     }
 
     this._already_called = true;
-    let url = `${this.url}/${this.key}.feather`;
     this.download_state = 'In progress';
 
-    //TODO: Atlas specific code--maybe check for nomic URL too.
-    if (window.localStorage.getItem('isLoggedIn') === 'true') {
-      url = url.replace('/public', '');
-    }
-
-    const request: RequestInit =  {
-          method: 'GET',
-//          credentials: 'include',
-        };
-
-    this._download = fetch(url, request)
-      .then(async (response): Promise<void> => {
-        const buffer = await response.arrayBuffer();
-        this.download_state = 'Complete';
-        this._table_buffer = buffer;
-        this._batch = tableFromIPC(buffer).batches[0];
-        const metadata = this._batch.schema.metadata;
+    this._download = this.get_arrow()
+      .then((batch) => {
+        const metadata = batch.schema.metadata;
         const extent = metadata.get('extent');
         if (extent) {
           this._extent = JSON.parse(extent) as Rectangle;
         }
+
         const children = metadata.get('children');
         if (children) {
           this.child_locations = JSON.parse(children) as string[];
         }
-        const ixes = this._batch.getChild('ix');
+        const ixes = batch.getChild('ix');
         if (ixes === null) {
           throw 'No ix column in table';
         }

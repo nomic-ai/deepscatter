@@ -339,7 +339,25 @@ export class QuadtileSet extends Dataset<QuadTile> {
   constructor(base_url: string, prefs: APICall, plot: Plot) {
     super(plot);
     this.root_tile = new QuadTile(base_url, '0/0/0', null, this, prefs);
-    this.promise = this.root_tile.promise;
+    this.promise = this.root_tile.download().then((d) => {
+      const schema = this.root_tile.record_batch.schema;
+      if (schema.metadata.has('sidecars')) {
+        for (const [k, v] of Object.entries(
+          JSON.parse(schema.metadata.get('sidecars')!)!
+        )) {
+          this.transformations[k] = async function (tile) {
+            const batch = await tile.get_arrow(v)
+            const column = batch.getChild(k)
+            if (column === null) {
+              throw new Error(`No column named ${k} in sidecar tile ${batch.schema.fields.map(f => f.name)}`)
+            }
+            return column
+          }
+        }
+      } else {
+        // "NO SIDECARS"
+      }
+    })
   }
 
   get ready() {

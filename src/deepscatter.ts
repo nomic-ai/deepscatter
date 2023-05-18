@@ -172,9 +172,9 @@ export default class Scatterplot<T extends Tile> {
         this.add_labels(features, name, label_key, size_key, options);
       })
       .catch((error) => {
+        console.warn(error);
         console.error('Broken addition of ', name);
         //        this.stop_labellers();
-        console.log(error);
       });
   }
   /**
@@ -228,9 +228,9 @@ export default class Scatterplot<T extends Tile> {
         };
       })
     };
-    console.log("OPTIONS", labelset.options)
     this.add_labels(geojson, labelset.name, 'text', 'size', labelset.options || {});
   }
+
   async reinitialize() {
     const { prefs } = this;
     if (prefs.source_url !== undefined) {
@@ -374,7 +374,6 @@ export default class Scatterplot<T extends Tile> {
                   width,
                   height
                 ) as Uint8Array;
-                console.log(i, j, sum(pixels));
 
                 // https://stackoverflow.com/questions/41969562/how-can-i-flip-the-result-of-webglrenderingcontext-readpixels
                 const halfHeight = (height / 2) | 0; // the | 0 keeps the result an int
