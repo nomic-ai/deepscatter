@@ -107,18 +107,18 @@ export default class Zoom {
       });
   }
 
-  zoom_to_bbox(corners : Rectangle, duration = 4000, buffer = 1.111, ) {
+  zoom_to_bbox(corners: Rectangle, duration = 4000, buffer = 1.111) {
     // Zooms to two points.
     const scales = this.scales();
     let [x0, x1] = corners.x.map(scales.x);
     let [y0, y1] = corners.y.map(scales.y);
-    console.log(this.scatterplot.prefs.zoom_align, "AAH")
+    console.log(this.scatterplot.prefs.zoom_align, 'AAH');
     if (this.scatterplot.prefs.zoom_align === 'right') {
       const aspect_ratio = this.width / this.height;
       const data_aspect_ratio = (x1 - x0) / (y1 - y0);
       if (data_aspect_ratio < aspect_ratio) {
         const extension = data_aspect_ratio / aspect_ratio;
-        console.log(extension, {x0})
+        console.log(extension, { x0 });
         x0 = x0 - (x1 - x0) * extension;
       }
     }

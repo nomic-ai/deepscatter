@@ -146,9 +146,9 @@ export class Color extends Aesthetic<
   string,
   ColorChannel
 > {
-  _constant = '#CC5500'
+  _constant = '#CC5500';
   public texture_type = 'uint8';
-  public default_constant = '#CC5500'
+  public default_constant = '#CC5500';
   default_transform: Transform = 'linear';
   get default_range(): [number, number] {
     return [0, 1];
@@ -166,7 +166,9 @@ export class Color extends Aesthetic<
     if (this._scale) {
       return this._scale;
     }
-    const scale = scales[this.transform]().domain(this.domain).range(this.range);
+    const scale = scales[this.transform]()
+      .domain(this.domain)
+      .range(this.range);
     const range = this.range;
 
     function capitalize(r: string) {
@@ -234,8 +236,8 @@ export class Color extends Aesthetic<
     this.current_encoding = encoding;
     if (encoding === null) {
       encoding = {
-        constant: this.default_constant
-      }
+        constant: this.default_constant,
+      };
     }
     if (!isConstantChannel(encoding)) {
       if (encoding.range && typeof encoding.range[0] === 'string') {
@@ -265,13 +267,11 @@ export class Color extends Aesthetic<
         } else {
           // We need to find the integer identifiers for each of
           // the values in the domain.
-          const data_values = this.column.data[0]
-            .dictionary!.toArray()
+          const data_values = this.column.data[0].dictionary!.toArray();
           const dict_values = Object.fromEntries(
-            data_values
-              .map((val: string, i: Number) => [val, i])
+            data_values.map((val: string, i: Number) => [val, i])
           );
-          const colors : string[] = [];
+          const colors: string[] = [];
           for (let i = 0; i < this.domain.length; i++) {
             const label = this.domain[i];
             const color = range[i];
