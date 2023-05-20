@@ -403,15 +403,17 @@ export class QuadTile extends Tile {
   ): Promise<RecordBatch> {
     let url = `${this.url}/${this.key}.feather`;
     //TODO: Atlas specific code--maybe check for nomic URL too.
+    let headers = {};
     if (window.localStorage.getItem('isLoggedIn') === 'true') {
       url = url.replace('/public', '');
+      headers = {credentials: 'include'};
     }
     if (suffix) {
       url = url.replace('.feather', `.${suffix}.feather`);
     }
     const request: RequestInit = {
       method: 'GET',
-      credentials: 'include',
+      ...headers
     };
     const response = await fetch(url, request);
     const buffer = await response.arrayBuffer();

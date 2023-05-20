@@ -15643,8 +15643,14 @@ class RenderProps {
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
     this.pointSize.update(prefs.point_size, duration);
-    this.foregroundOpacity.update(prefs.background_options.opacity[1], duration);
-    this.backgroundOpacity.update(prefs.background_options.opacity[0], duration);
+    this.foregroundOpacity.update(
+      prefs.background_options.opacity[1],
+      duration
+    );
+    this.backgroundOpacity.update(
+      prefs.background_options.opacity[0],
+      duration
+    );
     this.foregroundSize.update(prefs.background_options.size[1], duration);
     this.backgroundSize.update(prefs.background_options.size[0], duration);
   }
@@ -15700,9 +15706,7 @@ class Renderer {
     return 0;
   }
   get prefs() {
-    const p = {
-      ...this.scatterplot.prefs
-    };
+    const p = { ...this.scatterplot.prefs };
     p.arrow_table = void 0;
     p.arrow_buffer = void 0;
     return p;
@@ -22838,7 +22842,9 @@ class Aesthetic {
   }
   default_data() {
     const def = this.toGLType(this.default_constant);
-    return Array(this.aesthetic_map.texture_size).fill(def);
+    return Array(this.aesthetic_map.texture_size).fill(
+      def
+    );
   }
   get webGLDomain() {
     if (this.is_dictionary()) {
@@ -34103,21 +34109,25 @@ class QuadTile extends Tile {
   }
   async get_arrow(suffix = void 0) {
     let url = `${this.url}/${this.key}.feather`;
+    let headers = {};
     if (window.localStorage.getItem("isLoggedIn") === "true") {
       url = url.replace("/public", "");
+      headers = { credentials: "include" };
     }
     if (suffix) {
       url = url.replace(".feather", `.${suffix}.feather`);
     }
     const request = {
       method: "GET",
-      credentials: "include"
+      ...headers
     };
     const response = await fetch(url, request);
     const buffer = await response.arrayBuffer();
     const tb = tableFromIPC(buffer);
     if (tb.batches.length > 1) {
-      console.warn(`More than one record batch at ${url}; all but first batch will be ignored.`);
+      console.warn(
+        `More than one record batch at ${url}; all but first batch will be ignored.`
+      );
     }
     const batch = tb.batches[0];
     if (suffix === void 0) {
@@ -34534,7 +34544,11 @@ class QuadtileSet extends Dataset {
             const batch = await tile.get_arrow(v);
             const column = batch.getChild(k);
             if (column === null) {
-              throw new Error(`No column named ${k} in sidecar tile ${batch.schema.fields.map((f) => f.name)}`);
+              throw new Error(
+                `No column named ${k} in sidecar tile ${batch.schema.fields.map(
+                  (f) => f.name
+                )}`
+              );
             }
             return column;
           };
@@ -34593,21 +34607,23 @@ class QuadtileSet extends Dataset {
       if (megatile_tasks[macrotile2] !== void 0) {
         return await megatile_tasks[macrotile2];
       } else {
-        megatile_tasks[macrotile2] = transformation(tile.macro_siblings).then((buffer) => {
-          const tb = tableFromIPC(buffer);
-          for (const batch of tb.batches) {
-            const offsets = batch.getChild("data").data[0].valueOffsets;
-            const values = batch.getChild("data").data[0].children[0];
-            for (let i = 0; i < batch.data.length; i++) {
-              const tilename = batch.getChild("_tile").get(i);
-              records[tilename] = values.values.slice(
-                offsets[i],
-                offsets[i + 1]
-              );
+        megatile_tasks[macrotile2] = transformation(tile.macro_siblings).then(
+          (buffer) => {
+            const tb = tableFromIPC(buffer);
+            for (const batch of tb.batches) {
+              const offsets = batch.getChild("data").data[0].valueOffsets;
+              const values = batch.getChild("data").data[0].children[0];
+              for (let i = 0; i < batch.data.length; i++) {
+                const tilename = batch.getChild("_tile").get(i);
+                records[tilename] = values.values.slice(
+                  offsets[i],
+                  offsets[i + 1]
+                );
+              }
             }
+            return;
           }
-          return;
-        });
+        );
         return megatile_tasks[macrotile2];
       }
     }
@@ -35821,7 +35837,13 @@ class Scatterplot {
         };
       })
     };
-    this.add_labels(geojson, labelset.name, "text", "size", labelset.options || {});
+    this.add_labels(
+      geojson,
+      labelset.name,
+      "text",
+      "size",
+      labelset.options || {}
+    );
   }
   async reinitialize() {
     const { prefs } = this;
@@ -36095,7 +36117,10 @@ class Scatterplot {
     }
     if (prefs.background_options) {
       if (prefs.background_options.opacity && typeof prefs.background_options.opacity === "number") {
-        prefs.background_options.opacity = [prefs.background_options.opacity, 1];
+        prefs.background_options.opacity = [
+          prefs.background_options.opacity,
+          1
+        ];
       }
       if (prefs.background_options.size && typeof prefs.background_options.size === "number") {
         prefs.background_options.size = [prefs.background_options.size, 1];
