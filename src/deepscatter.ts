@@ -148,7 +148,11 @@ export default class Scatterplot<T extends Tile> {
    */
   add_identifier_column(
     name: string,
-    codes: string[] | bigint[] | Record<string, number> | Record<bigint, number>,
+    codes:
+      | string[]
+      | bigint[]
+      | Record<string, number>
+      | Record<bigint, number>,
     key_field: string
   ) {
     const true_codes: Record<string, number> = Array.isArray(codes)
@@ -172,9 +176,9 @@ export default class Scatterplot<T extends Tile> {
         this.add_labels(features, name, label_key, size_key, options);
       })
       .catch((error) => {
+        console.warn(error);
         console.error('Broken addition of ', name);
         //        this.stop_labellers();
-        console.log(error);
       });
   }
   /**
@@ -209,12 +213,10 @@ export default class Scatterplot<T extends Tile> {
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }
-  add_api_label(
-    labelset: Labelset
-  ) {
-    const geojson : FeatureCollection = {
+  add_api_label(labelset: Labelset) {
+    const geojson: FeatureCollection = {
       type: 'FeatureCollection',
-      features: labelset.labels.map((label : Label) => {
+      features: labelset.labels.map((label: Label) => {
         return {
           type: 'Feature',
           geometry: {
@@ -226,11 +228,17 @@ export default class Scatterplot<T extends Tile> {
             size: label.size || undefined,
           },
         };
-      })
+      }),
     };
-    console.log("OPTIONS", labelset.options)
-    this.add_labels(geojson, labelset.name, 'text', 'size', labelset.options || {});
+    this.add_labels(
+      geojson,
+      labelset.name,
+      'text',
+      'size',
+      labelset.options || {}
+    );
   }
+
   async reinitialize() {
     const { prefs } = this;
     if (prefs.source_url !== undefined) {
@@ -374,7 +382,6 @@ export default class Scatterplot<T extends Tile> {
                   width,
                   height
                 ) as Uint8Array;
-                console.log(i, j, sum(pixels));
 
                 // https://stackoverflow.com/questions/41969562/how-can-i-flip-the-result-of-webglrenderingcontext-readpixels
                 const halfHeight = (height / 2) | 0; // the | 0 keeps the result an int
@@ -450,21 +457,21 @@ export default class Scatterplot<T extends Tile> {
   /**
    * Hooks provide a mechanism to run arbitrary code after call of plotAPI has resolved.
    * This is useful for--e.g.--updating a legend only when the plot changes.
-   * 
+   *
    * @param name The name of the hook to add.
    * @param hook A function to run after each plot command.
    */
-  public add_hook(name : string, hook: Hook, unsafe = false) {
+  public add_hook(name: string, hook: Hook, unsafe = false) {
     if (this.hooks[name] !== undefined && !unsafe) {
       throw new Error(`Hook ${name} already exists`);
     }
     this.hooks[name] = hook;
   }
 
-  public remove_hook(name : string, unsafe = false) {
+  public remove_hook(name: string, unsafe = false) {
     if (this.hooks[name] === undefined) {
       if (unsafe) {
-        return
+        return;
       }
       throw new Error(`Hook ${name} does not exist`);
     }
@@ -472,7 +479,7 @@ export default class Scatterplot<T extends Tile> {
   }
 
   public stop_labellers() {
-    console.log("Stopping labels")
+    console.log('Stopping labels');
     for (const [k, v] of Object.entries(this.secondary_renderers)) {
       // Stop any existing labels
       if (v && v['label_key'] !== undefined) {
@@ -521,7 +528,7 @@ export default class Scatterplot<T extends Tile> {
   }
   /**
    * Plots a set of prefs, and returns a promise that resolves
-   * upon the completion of the plot (not including any time for transitions). 
+   * upon the completion of the plot (not including any time for transitions).
    */
   async plotAPI(prefs: APICall): Promise<void> {
     if (prefs === undefined) {
@@ -536,36 +543,36 @@ export default class Scatterplot<T extends Tile> {
     for (const [_, hook] of Object.entries(this.hooks)) {
       hook();
     }
-    return
+    return;
   }
 
   /**
    * Get a short head start on transformations. This prevents a flicker
    * when a new data field needs to be loaded onto the GPU.
-   * 
+   *
    * @param prefs The API call to prepare.
    * @param delay Delay in milliseconds to give the data to get onto the GPU.
-   * 110 ms seems like a decent compromise; barely perceptible to humans as a UI response 
+   * 110 ms seems like a decent compromise; barely perceptible to humans as a UI response
    * time, but enough time
    * for three animation ticks to run.
-   * @returns A promise that resolves immediately if there's no work to do, 
+   * @returns A promise that resolves immediately if there's no work to do,
    * or after the delay if there is.
    */
-  async start_transformations(prefs : APICall, delay = 110) : Promise<void> {
+  async start_transformations(prefs: APICall, delay = 110): Promise<void> {
     // If there's not a transition time, things might get weird and a flicker
     // is probably OK. Using the *current* transition time means that the start
     // of a set of duration-0 calls (like, e.g., dragging a time slider) will
-    // block but that 
-    return new Promise(((resolve) => {
+    // block but that
+    return new Promise((resolve) => {
       if (this.prefs.duration < delay) {
         delay = this.prefs.duration;
       }
-      const needed_keys : Set<string> = new Set();
-      if (!prefs.encoding) {        
-        resolve()
+      const needed_keys: Set<string> = new Set();
+      if (!prefs.encoding) {
+        resolve();
       }
       for (const [k, v] of Object.entries(prefs.encoding)) {
-        if (v && typeof(v) !== 'string' && v['field'] !== undefined) {
+        if (v && typeof v !== 'string' && v['field'] !== undefined) {
           needed_keys.add(v['field']);
         }
       }
@@ -573,21 +580,22 @@ export default class Scatterplot<T extends Tile> {
       let num_unready_columns = 0;
 
       if (this._renderer) {
-        const promises : Promise<void>[] = [];
-        const sine_qua_non : Promise<void>[] = [];
+        const promises: Promise<void>[] = [];
+        const sine_qua_non: Promise<void>[] = [];
         for (const tile of this._renderer.visible_tiles()) {
           // Allow unready tiles to stay unready; who know's what's going on there.
-          const manager = tile._buffer_manager
+          const manager = tile._buffer_manager;
           if (manager !== undefined && manager.ready()) {
             for (const key of needed_keys) {
-              const { ready, promise } = manager.ready_or_not_here_it_comes(key)
+              const { ready, promise } =
+                manager.ready_or_not_here_it_comes(key);
               if (!ready) {
                 num_unready_columns += 1;
                 if (promise !== null) {
                   promises.push(promise);
                   if (tile.key === '0/0/0') {
                     // we really need this one done.
-                    sine_qua_non.push(promise);                    
+                    sine_qua_non.push(promise);
                   }
                 }
               }
@@ -595,7 +603,7 @@ export default class Scatterplot<T extends Tile> {
           }
         }
         if (promises.length === 0) {
-          resolve()
+          resolve();
         } else {
           const starttime = Date.now();
           // It's important to get at least the first promise done,
@@ -605,17 +613,17 @@ export default class Scatterplot<T extends Tile> {
             const elapsed = endtime - starttime;
             if (elapsed < delay) {
               setTimeout(() => {
-                resolve()
+                resolve();
               }, delay - elapsed);
             } else {
-              resolve()
+              resolve();
             }
-          })
+          });
         }
       } else {
-        resolve()
+        resolve();
       }
-    }));
+    });
   }
   /**
    * This is the main plot entry point: it's unsafe to fire multiple
@@ -636,11 +644,20 @@ export default class Scatterplot<T extends Tile> {
     }
     if (prefs.background_options) {
       // these two numbers can be set either on fg/bg or just on fg
-      if (prefs.background_options.opacity && typeof(prefs.background_options.opacity) === "number") {
-        prefs.background_options.opacity = [prefs.background_options.opacity, 1]
+      if (
+        prefs.background_options.opacity &&
+        typeof prefs.background_options.opacity === 'number'
+      ) {
+        prefs.background_options.opacity = [
+          prefs.background_options.opacity,
+          1,
+        ];
       }
-      if (prefs.background_options.size && typeof(prefs.background_options.size) === "number") {
-        prefs.background_options.size = [prefs.background_options.size, 1]
+      if (
+        prefs.background_options.size &&
+        typeof prefs.background_options.size === 'number'
+      ) {
+        prefs.background_options.size = [prefs.background_options.size, 1];
       }
     }
 
@@ -654,7 +671,7 @@ export default class Scatterplot<T extends Tile> {
     if (this._root === undefined) {
       await this.reinitialize();
     }
-    
+
     // Doesn't block.
     /*
     if (prefs.basemap_geojson) {
@@ -707,7 +724,7 @@ export default class Scatterplot<T extends Tile> {
     });
 
     if (prefs.labels !== undefined) {
-      if (isURLLabels(prefs.labels)) {        
+      if (isURLLabels(prefs.labels)) {
         const { url, label_field, size_field } = prefs.labels;
         const name = (prefs.labels.name || url) as string;
         if (!this.secondary_renderers[name]) {
@@ -725,12 +742,11 @@ export default class Scatterplot<T extends Tile> {
         }
         this.stop_labellers();
         this.add_api_label(prefs.labels);
-      } else if (prefs.labels === null) {      
-        this.stop_labellers()
+      } else if (prefs.labels === null) {
+        this.stop_labellers();
       } else {
         throw new Error('API field `labels` format not recognized.');
       }
-      
     }
 
     this._zoom.restart_timer(60_000);

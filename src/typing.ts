@@ -12,7 +12,6 @@ export function isConstantChannel(
   return (input as ConstantChannel).constant !== undefined;
 }
 
-
 export function isURLLabels(labels: Labelcall): labels is URLLabels {
   return labels !== null && (labels as URLLabels).url !== undefined;
 }

@@ -25,7 +25,7 @@ type ArrowBuildable = Vector | Float32Array;
 type Transformation<T> = (arg0: T) => ArrowBuildable | Promise<ArrowBuildable>;
 
 export abstract class Dataset<T extends Tile> {
-  public transformations: Record<string, Transformation<T>>= {};
+  public transformations: Record<string, Transformation<T>> = {};
   abstract root_tile: T;
   protected plot: Plot;
   abstract ready: Promise<void>;
@@ -130,7 +130,10 @@ export abstract class Dataset<T extends Tile> {
         (bbox === undefined || current.is_visible(max_ix, bbox))
       ) {
         for (const point of current) {
-          if (p_in_rect([point.x, point.y], bbox) && point.ix <= max_ix) {
+          if (
+            p_in_rect([point.x as number, point.y as number], bbox) &&
+            point.ix <= max_ix
+          ) {
             yield point;
           }
         }
@@ -208,7 +211,7 @@ export abstract class Dataset<T extends Tile> {
   }
 
   /**
-   * 
+   *
    * @param field_name the name of the column to create
    * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
    */
@@ -339,7 +342,29 @@ export class QuadtileSet extends Dataset<QuadTile> {
   constructor(base_url: string, prefs: APICall, plot: Plot) {
     super(plot);
     this.root_tile = new QuadTile(base_url, '0/0/0', null, this, prefs);
-    this.promise = this.root_tile.promise;
+    this.promise = this.root_tile.download().then((d) => {
+      const schema = this.root_tile.record_batch.schema;
+      if (schema.metadata.has('sidecars')) {
+        for (const [k, v] of Object.entries(
+          JSON.parse(schema.metadata.get('sidecars')!)!
+        )) {
+          this.transformations[k] = async function (tile) {
+            const batch = await tile.get_arrow(v);
+            const column = batch.getChild(k);
+            if (column === null) {
+              throw new Error(
+                `No column named ${k} in sidecar tile ${batch.schema.fields.map(
+                  (f) => f.name
+                )}`
+              );
+            }
+            return column;
+          };
+        }
+      } else {
+        // "NO SIDECARS"
+      }
+    });
   }
 
   get ready() {
@@ -407,14 +432,16 @@ export class QuadtileSet extends Dataset<QuadTile> {
     }
   }
 
-
-   /**
-   * 
+  /**
+   *
    * @param field_name the name of the column to create
    * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
    */
-   add_macrotiled_column(field_name: string, transformation : (ids: string[]) => Promise<Uint8Array>): void {
-    const megatile_tasks : Record<string, Promise<void>> = {};
+  add_macrotiled_column(
+    field_name: string,
+    transformation: (ids: string[]) => Promise<Uint8Array>
+  ): void {
+    const megatile_tasks: Record<string, Promise<void>> = {};
     const records: Record<string, Float32Array> = {};
 
     async function get_table(tile: QuadTile) {
@@ -422,8 +449,8 @@ export class QuadtileSet extends Dataset<QuadTile> {
       if (megatile_tasks[macrotile] !== undefined) {
         return await megatile_tasks[macrotile];
       } else {
-        megatile_tasks[macrotile] = transformation(tile.macro_siblings)
-          .then(buffer => {
+        megatile_tasks[macrotile] = transformation(tile.macro_siblings).then(
+          (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
               const offsets = batch.getChild('data')!.data[0].valueOffsets;
@@ -436,20 +463,19 @@ export class QuadtileSet extends Dataset<QuadTile> {
                 ) as Float32Array;
               }
             }
-            return
-        })
-        return megatile_tasks[macrotile]
+            return;
+          }
+        );
+        return megatile_tasks[macrotile];
       }
     }
 
     this.transformations[field_name] = async function (tile) {
-      await get_table(tile)
+      await get_table(tile);
       const array = records[tile.key];
       return array;
     };
   }
-
-
 }
 
 function area(rect: Rectangle) {
@@ -523,6 +549,7 @@ export function add_or_delete_column(
       tb[field_name] = data.data[0] as Data;
     }
   }
+
   const new_batch = new RecordBatch(tb);
   for (const [k, v] of batch.schema.metadata) {
     new_batch.schema.metadata.set(k, v);
@@ -583,7 +610,7 @@ function supplement_identifiers(
   if (keytype === 'bigint') {
     for (let i = 0; i < batch.numRows; i++) {
       // the object coerces bigints to strings. We just live with that.
-      const value = ids[String(kfield.get(i))]
+      const value = ids[String(kfield.get(i))];
       if (value !== undefined) {
         updatedFloatArray[i] = value as number;
       }

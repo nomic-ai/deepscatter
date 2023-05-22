@@ -247,7 +247,9 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     });
     const start = Date.now();
 
-    async function pop_deferred_functions(deferred_functions : (() => void | Promise<void>)[]) {
+    async function pop_deferred_functions(
+      deferred_functions: (() => void | Promise<void>)[]
+    ) {
       while (Date.now() - start < 10 && deferred_functions.length > 0) {
         // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
         const current = deferred_functions.shift();
@@ -890,9 +892,8 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
             this.prefs.background_options.opacity,
           ] as [number, number, number, number];
         },
-        u_background_mouseover: () => 
-          this.prefs.background_options.mouseover ? 1 : 0
-        ,
+        u_background_mouseover: () =>
+          this.prefs.background_options.mouseover ? 1 : 0,
         u_background_size: () => this.render_props.background_size,
         u_foreground_size: () => this.render_props.foreground_size,
         u_k: (_, props) => {
@@ -1138,7 +1139,6 @@ export class TileBufferManager<T extends Tile> {
     ]);
   }
 
-
   /**
    *
    * @param
@@ -1169,37 +1169,40 @@ export class TileBufferManager<T extends Tile> {
   /**
    * Creates a deferred call that will populate the regl buffer
    * when there's some free time.
-   * 
+   *
    * @param key a string representing the requested column; must either exist in the
    * record batch or have a means for creating it asynchronously in 'transformations.'
    * @returns both an instantly available object called 'ready' that says if we're ready
    * to go: and, if the tile is ready, a promise that starts the update going and resolves
    * once it's ready.
    */
-  ready_or_not_here_it_comes(key : string) : {ready : boolean, promise: null | Promise<void>} {
+  ready_or_not_here_it_comes(key: string): {
+    ready: boolean;
+    promise: null | Promise<void>;
+  } {
     const { renderer, regl_elements } = this;
 
     const current = this.regl_elements.get(key);
     if (current === null) {
       // It's in the process of being built.
-      return {ready: false, promise: null};
+      return { ready: false, promise: null };
     }
     if (current === undefined) {
       if (!this.tile.ready) {
         // Can't build b/c no tile ready.
-        return {ready: false, promise: null};
+        return { ready: false, promise: null };
       }
       // Request that the buffer be created before returning false.
       regl_elements.set(key, null);
       const created = new Promise<void>((resolve) => {
         renderer.deferred_functions.push(async () => {
-          await this.create_regl_buffer(key)
+          await this.create_regl_buffer(key);
           resolve();
-        })
-      })
-      return {ready: false, promise: created};
+        });
+      });
+      return { ready: false, promise: created };
     }
-    return {ready: true, promise: Promise.resolve()};
+    return { ready: true, promise: Promise.resolve() };
   }
   /**
    *
@@ -1298,7 +1301,7 @@ export class TileBufferManager<T extends Tile> {
     return column.data[0].values as Float32Array;
   }
 
-  async create_regl_buffer(key: string) : Promise<void> {
+  async create_regl_buffer(key: string): Promise<void> {
     const { regl_elements, renderer } = this;
     const data = await this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {

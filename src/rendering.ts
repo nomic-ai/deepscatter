@@ -14,12 +14,15 @@ class PlotSetting {
   target: number;
   timer: Timer | undefined;
   transform: 'geometric' | 'arithmetic' = 'arithmetic';
-  constructor(start: number, transform : 'geometric' | 'arithmetic' = 'arithmetic' as const) {
-      this.transform = transform
-      this.start = start;
-      this.value = start;
-      this.target = start
-  } 
+  constructor(
+    start: number,
+    transform: 'geometric' | 'arithmetic' = 'arithmetic' as const
+  ) {
+    this.transform = transform;
+    this.start = start;
+    this.value = start;
+    this.target = start;
+  }
   update(value: number, duration: number) {
     if (duration === 0) {
       this.value = value;
@@ -70,17 +73,23 @@ class RenderProps {
     this.pointSize = new PlotSetting(1, 'geometric');
     this.targetOpacity = new PlotSetting(50);
     this.foregroundOpacity = new PlotSetting(1);
-    this.backgroundOpacity = new PlotSetting(.5);
+    this.backgroundOpacity = new PlotSetting(0.5);
     this.foregroundSize = new PlotSetting(1, 'geometric');
-    this.backgroundSize = new PlotSetting(1, 'geometric')
+    this.backgroundSize = new PlotSetting(1, 'geometric');
   }
   apply_prefs(prefs: CompletePrefs) {
     const { duration } = prefs;
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
     this.pointSize.update(prefs.point_size, duration);
-    this.foregroundOpacity.update(prefs.background_options.opacity[1], duration);
-    this.backgroundOpacity.update(prefs.background_options.opacity[0], duration);
+    this.foregroundOpacity.update(
+      prefs.background_options.opacity[1],
+      duration
+    );
+    this.backgroundOpacity.update(
+      prefs.background_options.opacity[0],
+      duration
+    );
     this.foregroundSize.update(prefs.background_options.size[1], duration);
     this.backgroundSize.update(prefs.background_options.size[0], duration);
   }
@@ -150,8 +159,7 @@ export class Renderer<TileType extends Tile> {
    * instead of for a whole table.
    */
   get prefs(): RenderPrefs {
-    const p = { ...this.scatterplot.prefs,
-    } as RenderPrefs;
+    const p = { ...this.scatterplot.prefs } as RenderPrefs;
     // Delete the arrow stuff b/c serializing it is crazy expensive.
     p.arrow_table = undefined;
     p.arrow_buffer = undefined;

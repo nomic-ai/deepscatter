@@ -29,7 +29,7 @@ type DefaultChannel =
   | LambdaChannel
   | ConstantChannel;
 
-type PossibleGLVals = number | [number, number, number]
+type PossibleGLVals = number | [number, number, number];
 
 export abstract class Aesthetic<
   GlValueType extends PossibleGLVals = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
@@ -84,7 +84,7 @@ export abstract class Aesthetic<
     return this.scale(this.value_for(point));
   }
 
-  abstract toGLType(val: JSValueType) : GlValueType;
+  abstract toGLType(val: JSValueType): GlValueType;
 
   get transform() {
     if (this._transform) return this._transform;
@@ -95,7 +95,7 @@ export abstract class Aesthetic<
     this._transform = transform;
   }
 
-  get scale() : (arg0: any) => JSValueType {
+  get scale(): (arg0: any) => JSValueType {
     if (this._scale) {
       return this._scale;
     }
@@ -150,7 +150,9 @@ export abstract class Aesthetic<
 
   default_data(): Uint8Array | Float32Array | Array<GlValueType> {
     const def = this.toGLType(this.default_constant);
-    return Array(this.aesthetic_map.texture_size).fill(def) as Array<GlValueType>;
+    return Array(this.aesthetic_map.texture_size).fill(
+      def
+    ) as Array<GlValueType>;
   }
 
   get webGLDomain() {
@@ -244,7 +246,7 @@ export abstract class Aesthetic<
     if (typeof encoding === 'string') {
       encoding = this.convert_string_encoding(encoding) as ChannelType;
     }
-    
+
     if (isNumber(encoding)) {
       const x: ConstantChannel = {
         constant: encoding,
@@ -318,8 +320,8 @@ export abstract class Aesthetic<
     if (this.field === null || this.field === undefined) {
       return false;
     }
-    if (this.arrow_column()?.type?.dictionary !== undefined) return true
-    return false
+    if (this.arrow_column()?.type?.dictionary !== undefined) return true;
+    return false;
   }
 
   get constant(): GlValueType {
@@ -410,7 +412,7 @@ abstract class OneDAesthetic extends Aesthetic {
   toGLType(a: number) {
     return a;
   }
-  
+
   static get_default_domain() {
     return [0, 1] as [number, number];
   }
@@ -491,8 +493,11 @@ abstract class BooleanAesthetic extends Aesthetic<
   update(encoding: BooleanChannel | null) {
     super.update(encoding);
 
-    if (this.current_encoding !== null && Object.keys(this.current_encoding).length === 0) {
-      this.current_encoding = null
+    if (
+      this.current_encoding !== null &&
+      Object.keys(this.current_encoding).length === 0
+    ) {
+      this.current_encoding = null;
     }
   }
 

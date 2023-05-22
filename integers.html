@@ -4,9 +4,9 @@
     <button id="even">Highlight Even</button>
     <button id="even2">Stable highlight Even</button>
     <button id="b">Clear</button>
-    <div id="filter">FILTER: </div>
-    <div id="filter2">FILTER2: </div>
-    <div id="foreground">FOREGROUND: </div>
+    <div id="filter">FILTER:</div>
+    <div id="filter2">FILTER2:</div>
+    <div id="foreground">FOREGROUND:</div>
   </div>
   <div id="deepscatter"></div>
 </body>
@@ -23,7 +23,7 @@
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
-    return Number(d).toString()
+    return Number(d).toString();
   }
   let batch_no = 0;
   /* Clifford attractor frame.*/
@@ -65,7 +65,7 @@
         x: vectorFromArray(x),
         y: vectorFromArray(y),
         //        ix: vectorFromArray(ix),
-        _id: vectorFromArray(vs, new Utf8),
+        _id: vectorFromArray(vs, new Utf8()),
         integers: vectorFromArray(integers),
         batch_id: vectorFromArray(batch_id),
       });
@@ -131,44 +131,43 @@
         field: 'integers',
         range: 'viridis',
         domain: [1, 65000],
-        transform: 'log'
+        transform: 'log',
       },
     },
   });
   draw1.then(() => {
     for (let dim of ['filter', 'filter2', 'foreground']) {
-      const id = document.getElementById(dim)
-      const button = document.createElement("button")
-      button.textContent = `clear`
+      const id = document.getElementById(dim);
+      const button = document.createElement('button');
+      button.textContent = `clear`;
       const encoding = {};
       encoding[dim] = null;
 
-      button.addEventListener("click", function () {
-        plot.plotAPI({ encoding })
-      })
-      id.appendChild(button)
+      button.addEventListener('click', function () {
+        plot.plotAPI({ encoding });
+      });
+      id.appendChild(button);
 
       for (const i of [2, 3, 5, 7, 11, 13, 17]) {
-        const button = document.createElement("button")
+        const button = document.createElement('button');
         button.textContent = `products of ${i}`;
-        button.addEventListener("click", function () {
-          bindproductsOf(i)
+        button.addEventListener('click', function () {
+          bindproductsOf(i);
           const encoding = {};
           encoding[dim] = {
             field: `products of ${i}`,
-            op: "gt",
-            a: 0
-          }
-          console.log(JSON.stringify(encoding, null, 2))
+            op: 'gt',
+            a: 0,
+          };
+          console.log(JSON.stringify(encoding, null, 2));
           plot.plotAPI({
-            encoding
-          })
-        })
-        id.appendChild(button)
+            encoding,
+          });
+        });
+        id.appendChild(button);
       }
     }
-
-  })
+  });
   window.plot = plot;
   const functions = {
     prime: (n) => eratosthenes(n),
@@ -178,35 +177,34 @@
 
   function bindproductsOf(n) {
     plot._root.transformations[`products of ${n}`] = function (tile) {
-      const integers = tile.record_batch.getChild("integers");
-      window.integers = integers
+      const integers = tile.record_batch.getChild('integers');
+      window.integers = integers;
       const output = new Float32Array(integers.length);
       for (let i = 0; i < integers.length; i += 1) {
-        let int = integers.get(i)
+        let int = integers.get(i);
         if (int % n === 0) {
-          output[i] += 1
-          int = int / n
+          output[i] += 1;
+          int = int / n;
         }
       }
       return output;
-    }
-    const matches = [...Array(n).keys()].filter((x) => x % 2 === 0)
+    };
+    const matches = [...Array(n).keys()].filter((x) => x % 2 === 0);
   }
-  const done = new Set()
+  const done = new Set();
   function highlight(key) {
     const vals = functions[key](num_batches * 2 ** 16);
-    console.log({ vals })
-    const prime_ids = vals.map(d => d.toString());
+    console.log({ vals });
+    const prime_ids = vals.map((d) => d.toString());
 
     const k2 = key.slice(0, 7) == 'stable_' ? key : '' + Math.random();
 
     if (!done.has(key)) {
       plot.add_identifier_column(k2, prime_ids, '_id');
-
     }
 
     if (key.slice(0, 7) == 'stable_') {
-      done.add(key)
+      done.add(key);
     }
     plot.plotAPI({
       duration: 1000,
@@ -219,8 +217,8 @@
         size: {
           field: k2,
           domain: [0, 1],
-          range: [.5, 5]
-        }
+          range: [0.5, 5],
+        },
       },
     });
   }

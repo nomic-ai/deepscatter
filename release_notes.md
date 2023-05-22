@@ -1,3 +1,6 @@
+# 2.11.0
+
+- Support 'sidecar' tiles to allow lazy loading of certain columns.
 
 # 2.10.0
 

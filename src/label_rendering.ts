@@ -331,7 +331,7 @@ export class LabelMaker extends Renderer {
         d.data.y = y_.invert(event.y);
       });
       handler.on('end', (event, d) => {
-        console.log({text: d.data.text, x: d.data.x, y: d.data.y});
+        console.log({ text: d.data.text, x: d.data.x, y: d.data.y });
       });
       bboxes.call(handler);
     }
@@ -513,7 +513,7 @@ class DepthTree extends RBush3D {
     return p;
   }
 
-  insert_point(point: RawPoint | Point, mindepth = 1/4) {
+  insert_point(point: RawPoint | Point, mindepth = 1 / 4) {
     if (point.text === undefined || point.text === '') {
       return;
     }

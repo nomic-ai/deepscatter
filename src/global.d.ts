@@ -53,7 +53,7 @@ declare global {
     stride: number;
     byte_size: number; // in bytes;
   };
-  
+
   type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
   type FunctionalChannel = LambdaChannel | OpChannel;
@@ -64,12 +64,12 @@ declare global {
     color?: string;
 
     // A multiplier against the point's opacity otherwise.
-    // A single value describes the background; an array 
+    // A single value describes the background; an array
     // describes the foreground and background separately.
     opacity?: number | [number, number];
 
     // A multiplier against the point's size. Default 0.66.
-    // A single value describes the background; an array 
+    // A single value describes the background; an array
     // describes the foreground and background separately.
 
     size?: number | [number, number];
@@ -200,11 +200,11 @@ declare global {
   };
 
   type ZoomCall = {
-    'bbox': {
+    bbox: {
       x: [number, number];
       y: [number, number];
-    }
-  }
+    };
+  };
 
   export type Dimension = keyof Encoding;
 
@@ -228,16 +228,16 @@ declare global {
   export type onZoomCallback = (transform: d3.ZoomTransform) => null;
 
   export type Label = {
-    x: number,
-    y: number,
-    text: string,
-  }
+    x: number;
+    y: number;
+    text: string;
+  };
   export type URLLabels = {
-    url: string,
-    options: LabelOptions,
-    label_field: string,
-    size_field: string,
-  }
+    url: string;
+    options: LabelOptions;
+    label_field: string;
+    size_field: string;
+  };
   export type LabelOptions = {
     useColorScale?: boolean; // Whether the colors of text should inherit from the active color scale.
     margin?: number; // The number of pixels around each box. Default 30.
@@ -245,10 +245,10 @@ declare global {
   };
 
   export type Labelset = {
-    labels: Label[],
-    name: string,
-    options?: LabelOptions,
-  }
+    labels: Label[];
+    name: string;
+    options?: LabelOptions;
+  };
   export type Labelcall = Labelset | URLLabels | null;
 
   // An APICall is a JSON-serializable specification of the chart.
@@ -276,10 +276,8 @@ declare global {
     labels?: Labelcall;
     background_options?: BackgroundOptions;
     zoom?: ZoomCall;
-    zoom_align? : undefined | 'right' | 'left' | 'top' | 'bottom' | 'center';
+    zoom_align?: undefined | 'right' | 'left' | 'top' | 'bottom' | 'center';
   };
-
-
 
   type InitialAPICall = APICall & {
     encoding: Encoding;
@@ -293,17 +291,17 @@ declare global {
       opacity: [number, number];
       size: [number, number];
       mouseover: boolean;
-    },
-    alpha : number,
-    point_size : number,
-    duration: number,
-    zoom_balance: number,
-    max_points: number
-  }
+    };
+    alpha: number;
+    point_size: number;
+    duration: number;
+    zoom_balance: number;
+    max_points: number;
+  };
 
   type RenderPrefs = CompletePrefs & {
-    arrow_table?: Table,
-    arrow_buffer?: Buffer
-  }
+    arrow_table?: Table;
+    arrow_buffer?: Buffer;
+  };
   export type TileType = QuadTile | ArrowTile;
 }

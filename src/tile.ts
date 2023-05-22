@@ -398,6 +398,41 @@ export class QuadTile extends Tile {
     await Promise.all(promises);
   }
 
+  async get_arrow(
+    suffix: string | undefined = undefined
+  ): Promise<RecordBatch> {
+    let url = `${this.url}/${this.key}.feather`;
+    //TODO: Atlas specific code--maybe check for nomic URL too.
+    let headers = {};
+    if (window.localStorage.getItem('isLoggedIn') === 'true') {
+      url = url.replace('/public', '');
+      headers = {credentials: 'include'};
+    }
+    if (suffix) {
+      url = url.replace('.feather', `.${suffix}.feather`);
+    }
+    const request: RequestInit = {
+      method: 'GET',
+      ...headers
+    };
+    const response = await fetch(url, request);
+    const buffer = await response.arrayBuffer();
+
+    const tb = tableFromIPC(buffer);
+    if (tb.batches.length > 1) {
+      console.warn(
+        `More than one record batch at ${url}; all but first batch will be ignored.`
+      );
+    }
+    const batch = tb.batches[0];
+    if (suffix === undefined) {
+      this.download_state = 'Complete';
+      this._table_buffer = buffer;
+      this._batch = tableFromIPC(buffer).batches[0];
+    }
+    return batch;
+  }
+
   async download(): Promise<void> {
     // This should only be called once per tile.
     if (this._download) {
@@ -409,35 +444,21 @@ export class QuadTile extends Tile {
     }
 
     this._already_called = true;
-    let url = `${this.url}/${this.key}.feather`;
     this.download_state = 'In progress';
 
-    //TODO: Atlas specific code--maybe check for nomic URL too.
-    if (window.localStorage.getItem('isLoggedIn') === 'true') {
-      url = url.replace('/public', '');
-    }
-
-    const request: RequestInit =  {
-          method: 'GET',
-//          credentials: 'include',
-        };
-
-    this._download = fetch(url, request)
-      .then(async (response): Promise<void> => {
-        const buffer = await response.arrayBuffer();
-        this.download_state = 'Complete';
-        this._table_buffer = buffer;
-        this._batch = tableFromIPC(buffer).batches[0];
-        const metadata = this._batch.schema.metadata;
+    this._download = this.get_arrow()
+      .then((batch) => {
+        const metadata = batch.schema.metadata;
         const extent = metadata.get('extent');
         if (extent) {
           this._extent = JSON.parse(extent) as Rectangle;
         }
+
         const children = metadata.get('children');
         if (children) {
           this.child_locations = JSON.parse(children) as string[];
         }
-        const ixes = this._batch.getChild('ix');
+        const ixes = batch.getChild('ix');
         if (ixes === null) {
           throw 'No ix column in table';
         }
@@ -459,19 +480,19 @@ export class QuadTile extends Tile {
     return this._download;
   }
 
-  /** 
+  /**
    * Sometimes it's useful to do operations on batches of tiles. This function
    * defines a grouping of tiles in the same general region to be operated on.
    * In general they will have about 80 elements (16 + 64), but the top level
    * has just 5. (4 + 1). Note a macro tile with the name [2/0/0] does not actually include
    * the tile [2/0/0] itself, but rather the tiles [4/0/0], [4/1/0], [4/0/1], [4/1/1], [5/0/0] etc.
    */
-  get macrotile() : string {
+  get macrotile(): string {
     return macrotile(this.key);
   }
 
-  get macro_siblings() : Array<string> {
-   return macrotile_siblings(this.key);
+  get macro_siblings(): Array<string> {
+    return macrotile_siblings(this.key);
   }
 
   get children(): Array<this> {
@@ -608,7 +629,7 @@ export function p_in_rect(p: Point, rect: Rectangle | undefined) {
   );
 }
 function macrotile(key: string, size = 2, parents = 2) {
-  let [z, x, y] = key.split("/").map((d) => parseInt(d));
+  let [z, x, y] = key.split('/').map((d) => parseInt(d));
   let moves = 0;
   while (!(moves >= parents && z % size == 0)) {
     x = Math.floor(x / 2);
@@ -619,12 +640,16 @@ function macrotile(key: string, size = 2, parents = 2) {
   return `${z}/${x}/${y}`;
 }
 
-function macrotile_siblings(key: string, size = 2, parents = 2) : Array<string> {
+function macrotile_siblings(key: string, size = 2, parents = 2): Array<string> {
   return macrotile_descendants(macrotile(key, size, parents), size, parents);
 }
 
 const descendant_cache = new Map<string, string[]>();
-function macrotile_descendants(macrokey: string, size = 2, parents = 2) : Array<string> {
+function macrotile_descendants(
+  macrokey: string,
+  size = 2,
+  parents = 2
+): Array<string> {
   if (descendant_cache.has(macrokey)) {
     return descendant_cache.get(macrokey) as string[];
   }
@@ -642,8 +667,12 @@ function macrotile_descendants(macrokey: string, size = 2, parents = 2) : Array<
   return descendants;
 }
 
-function children(tile : string) {
-  const [z, x, y] = tile.split("/").map((d) => parseInt(d)) as [number, number, number];
+function children(tile: string) {
+  const [z, x, y] = tile.split('/').map((d) => parseInt(d)) as [
+    number,
+    number,
+    number
+  ];
   const children = [];
   for (let i = 0; i < 4; i++) {
     children.push(`${z + 1}/${x * 2 + (i % 2)}/${y * 2 + Math.floor(i / 2)}`);
