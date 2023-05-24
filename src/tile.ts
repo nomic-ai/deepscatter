@@ -3,23 +3,8 @@ import { extent } from 'd3-array';
 import {
   Table,
   Vector,
-  Utf8,
-  Float32,
-  Float,
-  Int,
-  Uint32,
-  Int32,
-  Int64,
-  Dictionary,
   tableFromIPC,
-  tableToIPC,
-  vectorFromArray,
-  makeBuilder,
-  makeVector,
   RecordBatch,
-  Schema,
-  Data,
-  Field,
   StructRowProxy,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
@@ -99,6 +84,21 @@ export abstract class Tile {
       this._buffer_manager?.release(colname);
       this._batch = add_or_delete_column(this.record_batch, colname, null);
     }
+  }
+
+  async get_column(colname: string): Promise<Vector> {
+    if (this._batch === undefined) {
+      await this.promise;
+    }
+    const existing = this.record_batch.getChild(colname);
+    if (existing) {
+      return existing;
+    }
+    if (this.dataset.transformations[colname]) {
+      await this.apply_transformation(colname);
+      return this.record_batch.getChild(colname) as Vector;
+    }
+    throw new Error(`Column ${colname} not found`);
   }
 
   async apply_transformation(name: string): Promise<void> {
@@ -406,14 +406,14 @@ export class QuadTile extends Tile {
     let headers = {};
     if (window.localStorage.getItem('isLoggedIn') === 'true') {
       url = url.replace('/public', '');
-      headers = {credentials: 'include'};
+      headers = { credentials: 'include' };
     }
     if (suffix) {
       url = url.replace('.feather', `.${suffix}.feather`);
     }
     const request: RequestInit = {
       method: 'GET',
-      ...headers
+      ...headers,
     };
     const response = await fetch(url, request);
     const buffer = await response.arrayBuffer();

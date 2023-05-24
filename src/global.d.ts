@@ -5,7 +5,9 @@ import type { ArrowDataset } from './Dataset';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import type { Tile, QuadTile, ArrowTile } from './tile';
 import type Scatterplot from './deepscatter';
+import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
+import { DataSelection } from './selection';
 
 export type {
   Renderer,
@@ -40,6 +42,17 @@ declare global {
   type Newable<T> = { new (...args: any[]): T };
   type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
   type OpChannel = OneArgumentOp | TwoArgumentOp;
+
+  interface InitializedScatterplot<T extends Tile> {
+    _root: Dataset<T>;
+    _renderer: ReglRenderer<T>;
+  }
+
+  interface SelectionRecord {
+    ref: DataSelection<any> | null;
+    name: string;
+    flushed: boolean;    
+  }
   // Functions that are defined as strings and executed in JS.
   type LambdaChannel = {
     lambda: string;
@@ -47,6 +60,7 @@ declare global {
     domain?: [number, number];
     range?: [number, number];
   };
+
   type BufferLocation = {
     buffer: Buffer;
     offset: number;
@@ -189,6 +203,7 @@ declare global {
     y0?: null | RootChannel;
     position?: string;
     position0?: string;
+    foreground?: null | FunctionalChannel;
   };
 
   type ColumnTimeLookups = Record<string, Date>;

@@ -4,6 +4,9 @@
     <button id="even">Highlight Even</button>
     <button id="even2">Stable highlight Even</button>
     <button id="b">Clear</button>
+    <button id="select-ids">Select ids</button>
+    <input id="input-ids" title="selection" label="selection" type="text" value="1066 1968 2431 10012" />
+    <button id="select-lots-of-ids">Select lots of ids</button>
     <div id="filter">FILTER:</div>
     <div id="filter2">FILTER2:</div>
     <div id="foreground">FOREGROUND:</div>
@@ -64,7 +67,6 @@
       return new Table({
         x: vectorFromArray(x),
         y: vectorFromArray(y),
-        //        ix: vectorFromArray(ix),
         _id: vectorFromArray(vs, new Utf8()),
         integers: vectorFromArray(integers),
         batch_id: vectorFromArray(batch_id),
@@ -222,6 +224,21 @@
       },
     });
   }
+  document
+    .getElementById('select-ids')
+    .addEventListener('click', () => {
+      const ids = document.getElementById('input-ids').value.split(" ").filter(d => d)
+      console.log({ ids })
+      plot.select_data({ name: Math.random().toString(36), ids, idField: "_id" })
+    });
+
+  document
+    .getElementById('select-lots-of-ids')
+    .addEventListener('click', () => {
+
+      console.log({ ids })
+      plot.select_data({ name: Math.random().toString(36), ids, idField: "_id" })
+    });
   document
     .getElementById('prime')
     .addEventListener('click', () => highlight('prime'));

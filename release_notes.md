@@ -1,3 +1,7 @@
+# 2.12.0
+
+- Allow accessing dataset at `scatterplot.dataset`, rather than the confusing `scatterplot._root`.
+
 # 2.11.0
 
 - Support 'sidecar' tiles to allow lazy loading of certain columns.
@@ -13,13 +17,13 @@
 
 # 2.9.1
 
-- Fix regression bug for log-scales on linear color schemes. 
+- Fix regression bug for log-scales on linear color schemes.
 
 # 2.9.0
 
 - Allow asynchronous transformations. This is an internal change that allows alteration of tiles using any external resources--for instance, fetching search results from the Web or running duckdb on wasm.
 - Various changes resulting from that.
-- Customizable options for foreground/background behavior passed to the API as 'background_options'. 
+- Customizable options for foreground/background behavior passed to the API as 'background_options'.
 
 # 2.8.0
 

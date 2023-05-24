@@ -1249,6 +1249,7 @@ export class TileBufferManager<T extends Tile> {
         );
       }
     }
+    console.log({column})
     // Anything that isn't a single-precision float must be coerced to one.
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
@@ -1360,6 +1361,11 @@ class MultipurposeBufferSet {
     }
     this.pointer = 0;
     // Adds to beginning of list.
+    console.log({
+      type: 'float',
+      length: this.buffer_size,
+      usage: 'dynamic',
+    })
     this.buffers.unshift(
       this.regl.buffer({
         type: 'float',
