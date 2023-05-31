@@ -25352,11 +25352,6 @@ class MultipurposeBufferSet {
       });
     }
     this.pointer = 0;
-    console.log({
-      type: "float",
-      length: this.buffer_size,
-      usage: "dynamic"
-    });
     this.buffers.unshift(
       this.regl.buffer({
         type: "float",
