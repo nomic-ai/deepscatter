@@ -51,30 +51,20 @@
     click_function:
       "select('#ident').html(JSON.stringify(datum, undefined, 2))",
     encoding: {
+      /**
+      Note--if you do not have a field called 'class' in your dataset, this will fail!
+      */
       color: {
-        field: 'x',
-        //        range: "ylorrd"
         field: 'class',
         range: 'category10',
-        domain: [-2047, 2047],
       },
       x: {
         field: 'x',
         transform: 'literal',
       },
-      jitter_radius: {
-        method: 'uniform',
-        constant: 0.01,
-      },
       y: {
         field: 'y',
         transform: 'literal',
-      },
-      size: {
-        field: 'quantity',
-        transform: 'sqrt',
-        domain: [0, 3],
-        range: [0, 4],
       },
     },
   };
