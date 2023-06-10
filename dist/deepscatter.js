@@ -1,9 +1,3 @@
-var __defProp = Object.defineProperty;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __publicField = (obj, key, value) => {
-  __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-  return value;
-};
 var xhtml = "http://www.w3.org/1999/xhtml";
 const namespaces = {
   svg: "http://www.w3.org/2000/svg",
@@ -950,53 +944,67 @@ function intern_delete({ _intern, _key }, value) {
 function keyof(value) {
   return value !== null && typeof value === "object" ? value.valueOf() : value;
 }
-var e10 = Math.sqrt(50), e5 = Math.sqrt(10), e2 = Math.sqrt(2);
-function ticks(start2, stop, count) {
-  var reverse, i = -1, n, ticks2, step;
-  stop = +stop, start2 = +start2, count = +count;
-  if (start2 === stop && count > 0)
-    return [start2];
-  if (reverse = stop < start2)
-    n = start2, start2 = stop, stop = n;
-  if ((step = tickIncrement(start2, stop, count)) === 0 || !isFinite(step))
-    return [];
-  if (step > 0) {
-    let r0 = Math.round(start2 / step), r1 = Math.round(stop / step);
-    if (r0 * step < start2)
-      ++r0;
-    if (r1 * step > stop)
-      --r1;
-    ticks2 = new Array(n = r1 - r0 + 1);
-    while (++i < n)
-      ticks2[i] = (r0 + i) * step;
+const e10 = Math.sqrt(50), e5 = Math.sqrt(10), e2 = Math.sqrt(2);
+function tickSpec(start2, stop, count) {
+  const step = (stop - start2) / Math.max(0, count), power = Math.floor(Math.log10(step)), error = step / Math.pow(10, power), factor = error >= e10 ? 10 : error >= e5 ? 5 : error >= e2 ? 2 : 1;
+  let i1, i2, inc2;
+  if (power < 0) {
+    inc2 = Math.pow(10, -power) / factor;
+    i1 = Math.round(start2 * inc2);
+    i2 = Math.round(stop * inc2);
+    if (i1 / inc2 < start2)
+      ++i1;
+    if (i2 / inc2 > stop)
+      --i2;
+    inc2 = -inc2;
   } else {
-    step = -step;
-    let r0 = Math.round(start2 * step), r1 = Math.round(stop * step);
-    if (r0 / step < start2)
-      ++r0;
-    if (r1 / step > stop)
-      --r1;
-    ticks2 = new Array(n = r1 - r0 + 1);
-    while (++i < n)
-      ticks2[i] = (r0 + i) / step;
+    inc2 = Math.pow(10, power) * factor;
+    i1 = Math.round(start2 / inc2);
+    i2 = Math.round(stop / inc2);
+    if (i1 * inc2 < start2)
+      ++i1;
+    if (i2 * inc2 > stop)
+      --i2;
   }
-  if (reverse)
-    ticks2.reverse();
+  if (i2 < i1 && 0.5 <= count && count < 2)
+    return tickSpec(start2, stop, count * 2);
+  return [i1, i2, inc2];
+}
+function ticks(start2, stop, count) {
+  stop = +stop, start2 = +start2, count = +count;
+  if (!(count > 0))
+    return [];
+  if (start2 === stop)
+    return [start2];
+  const reverse = stop < start2, [i1, i2, inc2] = reverse ? tickSpec(stop, start2, count) : tickSpec(start2, stop, count);
+  if (!(i2 >= i1))
+    return [];
+  const n = i2 - i1 + 1, ticks2 = new Array(n);
+  if (reverse) {
+    if (inc2 < 0)
+      for (let i = 0; i < n; ++i)
+        ticks2[i] = (i2 - i) / -inc2;
+    else
+      for (let i = 0; i < n; ++i)
+        ticks2[i] = (i2 - i) * inc2;
+  } else {
+    if (inc2 < 0)
+      for (let i = 0; i < n; ++i)
+        ticks2[i] = (i1 + i) / -inc2;
+    else
+      for (let i = 0; i < n; ++i)
+        ticks2[i] = (i1 + i) * inc2;
+  }
   return ticks2;
 }
 function tickIncrement(start2, stop, count) {
-  var step = (stop - start2) / Math.max(0, count), power = Math.floor(Math.log(step) / Math.LN10), error = step / Math.pow(10, power);
-  return power >= 0 ? (error >= e10 ? 10 : error >= e5 ? 5 : error >= e2 ? 2 : 1) * Math.pow(10, power) : -Math.pow(10, -power) / (error >= e10 ? 10 : error >= e5 ? 5 : error >= e2 ? 2 : 1);
+  stop = +stop, start2 = +start2, count = +count;
+  return tickSpec(start2, stop, count)[2];
 }
 function tickStep(start2, stop, count) {
-  var step0 = Math.abs(stop - start2) / Math.max(0, count), step1 = Math.pow(10, Math.floor(Math.log(step0) / Math.LN10)), error = step0 / step1;
-  if (error >= e10)
-    step1 *= 10;
-  else if (error >= e5)
-    step1 *= 5;
-  else if (error >= e2)
-    step1 *= 2;
-  return stop < start2 ? -step1 : step1;
+  stop = +stop, start2 = +start2, count = +count;
+  const reverse = stop < start2, inc2 = reverse ? tickIncrement(stop, start2, count) : tickIncrement(start2, stop, count);
+  return (reverse ? -1 : 1) * (inc2 < 0 ? 1 / -inc2 : inc2);
 }
 function max(values, valueof) {
   let max2;
@@ -1059,7 +1067,7 @@ function* flatten(arrays) {
     yield* array2;
   }
 }
-function merge$1(arrays) {
+function merge(arrays) {
   return Array.from(flatten(arrays));
 }
 function range(start2, stop, step) {
@@ -1416,7 +1424,7 @@ function clipRectangle(x02, y02, x12, y12) {
       activeStream = bufferStream, segments = [], polygon = [], clean = true;
     }
     function polygonEnd() {
-      var startInside = polygonInside(), cleanInside = clean && startInside, visible2 = (segments = merge$1(segments)).length;
+      var startInside = polygonInside(), cleanInside = clean && startInside, visible2 = (segments = merge(segments)).length;
       if (cleanInside || visible2) {
         stream.polygonStart();
         if (cleanInside) {
@@ -1686,65 +1694,93 @@ function lengthPoint(x, y) {
   x0 = x, y0 = y;
 }
 const pathMeasure = lengthStream;
-function PathString() {
-  this._string = [];
-}
-PathString.prototype = {
-  _radius: 4.5,
-  _circle: circle(4.5),
-  pointRadius: function(_) {
-    if ((_ = +_) !== this._radius)
-      this._radius = _, this._circle = null;
+let cacheDigits, cacheAppend, cacheRadius, cacheCircle;
+class PathString {
+  constructor(digits) {
+    this._append = digits == null ? append : appendRound(digits);
+    this._radius = 4.5;
+    this._ = "";
+  }
+  pointRadius(_) {
+    this._radius = +_;
     return this;
-  },
-  polygonStart: function() {
+  }
+  polygonStart() {
     this._line = 0;
-  },
-  polygonEnd: function() {
+  }
+  polygonEnd() {
     this._line = NaN;
-  },
-  lineStart: function() {
+  }
+  lineStart() {
     this._point = 0;
-  },
-  lineEnd: function() {
+  }
+  lineEnd() {
     if (this._line === 0)
-      this._string.push("Z");
+      this._ += "Z";
     this._point = NaN;
-  },
-  point: function(x, y) {
+  }
+  point(x, y) {
     switch (this._point) {
       case 0: {
-        this._string.push("M", x, ",", y);
+        this._append`M${x},${y}`;
         this._point = 1;
         break;
       }
       case 1: {
-        this._string.push("L", x, ",", y);
+        this._append`L${x},${y}`;
         break;
       }
       default: {
-        if (this._circle == null)
-          this._circle = circle(this._radius);
-        this._string.push("M", x, ",", y, this._circle);
+        this._append`M${x},${y}`;
+        if (this._radius !== cacheRadius || this._append !== cacheAppend) {
+          const r = this._radius;
+          const s = this._;
+          this._ = "";
+          this._append`m0,${r}a${r},${r} 0 1,1 0,${-2 * r}a${r},${r} 0 1,1 0,${2 * r}z`;
+          cacheRadius = r;
+          cacheAppend = this._append;
+          cacheCircle = this._;
+          this._ = s;
+        }
+        this._ += cacheCircle;
         break;
       }
     }
-  },
-  result: function() {
-    if (this._string.length) {
-      var result = this._string.join("");
-      this._string = [];
-      return result;
-    } else {
-      return null;
-    }
   }
-};
-function circle(radius) {
-  return "m0," + radius + "a" + radius + "," + radius + " 0 1,1 0," + -2 * radius + "a" + radius + "," + radius + " 0 1,1 0," + 2 * radius + "z";
+  result() {
+    const result = this._;
+    this._ = "";
+    return result.length ? result : null;
+  }
+}
+function append(strings) {
+  let i = 1;
+  this._ += strings[0];
+  for (const j = strings.length; i < j; ++i) {
+    this._ += arguments[i] + strings[i];
+  }
+}
+function appendRound(digits) {
+  const d = Math.floor(digits);
+  if (!(d >= 0))
+    throw new RangeError(`invalid digits: ${digits}`);
+  if (d > 15)
+    return append;
+  if (d !== cacheDigits) {
+    const k = 10 ** d;
+    cacheDigits = d;
+    cacheAppend = function append2(strings) {
+      let i = 1;
+      this._ += strings[0];
+      for (const j = strings.length; i < j; ++i) {
+        this._ += Math.round(arguments[i] * k) / k + strings[i];
+      }
+    };
+  }
+  return cacheAppend;
 }
 function geoPath(projection, context2) {
-  var pointRadius = 4.5, projectionStream, contextStream;
+  let digits = 3, pointRadius = 4.5, projectionStream, contextStream;
   function path(object2) {
     if (object2) {
       if (typeof pointRadius === "function")
@@ -1770,12 +1806,15 @@ function geoPath(projection, context2) {
     return pathCentroid.result();
   };
   path.projection = function(_) {
-    return arguments.length ? (projectionStream = _ == null ? (projection = null, identity$5) : (projection = _).stream, path) : projection;
+    if (!arguments.length)
+      return projection;
+    projectionStream = _ == null ? (projection = null, identity$5) : (projection = _).stream;
+    return path;
   };
   path.context = function(_) {
     if (!arguments.length)
       return context2;
-    contextStream = _ == null ? (context2 = null, new PathString()) : new PathContext(context2 = _);
+    contextStream = _ == null ? (context2 = null, new PathString(digits)) : new PathContext(context2 = _);
     if (typeof pointRadius !== "function")
       contextStream.pointRadius(pointRadius);
     return path;
@@ -1786,7 +1825,22 @@ function geoPath(projection, context2) {
     pointRadius = typeof _ === "function" ? _ : (contextStream.pointRadius(+_), +_);
     return path;
   };
-  return path.projection(projection).context(context2);
+  path.digits = function(_) {
+    if (!arguments.length)
+      return digits;
+    if (_ == null)
+      digits = null;
+    else {
+      const d = Math.floor(_);
+      if (!(d >= 0))
+        throw new RangeError(`invalid digits: ${_}`);
+      digits = d;
+    }
+    if (context2 === null)
+      contextStream = new PathString(digits);
+    return path;
+  };
+  return path.projection(projection).digits(digits).context(context2);
 }
 function transformer$2(methods) {
   return function(stream) {
@@ -1922,7 +1976,15 @@ function geoIdentity() {
   return projection;
 }
 var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
-var lodash_merge = { exports: {} };
+var lodash_mergeExports = {};
+var lodash_merge = {
+  get exports() {
+    return lodash_mergeExports;
+  },
+  set exports(v) {
+    lodash_mergeExports = v;
+  }
+};
 (function(module, exports) {
   var LARGE_ARRAY_SIZE = 200;
   var HASH_UNDEFINED = "__lodash_hash_undefined__";
@@ -2000,7 +2062,7 @@ var lodash_merge = { exports: {} };
   var reIsNative = RegExp(
     "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
   );
-  var Buffer3 = moduleExports ? root2.Buffer : void 0, Symbol2 = root2.Symbol, Uint8Array2 = root2.Uint8Array, allocUnsafe = Buffer3 ? Buffer3.allocUnsafe : void 0, getPrototype = overArg(Object.getPrototypeOf, Object), objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, symToStringTag = Symbol2 ? Symbol2.toStringTag : void 0;
+  var Buffer2 = moduleExports ? root2.Buffer : void 0, Symbol2 = root2.Symbol, Uint8Array2 = root2.Uint8Array, allocUnsafe = Buffer2 ? Buffer2.allocUnsafe : void 0, getPrototype = overArg(Object.getPrototypeOf, Object), objectCreate = Object.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, symToStringTag = Symbol2 ? Symbol2.toStringTag : void 0;
   var defineProperty = function() {
     try {
       var func = getNative(Object, "defineProperty");
@@ -2009,8 +2071,8 @@ var lodash_merge = { exports: {} };
     } catch (e) {
     }
   }();
-  var nativeIsBuffer = Buffer3 ? Buffer3.isBuffer : void 0, nativeMax = Math.max, nativeNow = Date.now;
-  var Map2 = getNative(root2, "Map"), nativeCreate = getNative(Object, "create");
+  var nativeIsBuffer = Buffer2 ? Buffer2.isBuffer : void 0, nativeMax = Math.max, nativeNow = Date.now;
+  var Map3 = getNative(root2, "Map"), nativeCreate = getNative(Object, "create");
   var baseCreate = function() {
     function object2() {
     }
@@ -2127,7 +2189,7 @@ var lodash_merge = { exports: {} };
     this.size = 0;
     this.__data__ = {
       "hash": new Hash(),
-      "map": new (Map2 || ListCache)(),
+      "map": new (Map3 || ListCache)(),
       "string": new Hash()
     };
   }
@@ -2176,7 +2238,7 @@ var lodash_merge = { exports: {} };
     var data = this.__data__;
     if (data instanceof ListCache) {
       var pairs = data.__data__;
-      if (!Map2 || pairs.length < LARGE_ARRAY_SIZE - 1) {
+      if (!Map3 || pairs.length < LARGE_ARRAY_SIZE - 1) {
         pairs.push([key, value]);
         this.size = ++data.size;
         return this;
@@ -2195,7 +2257,11 @@ var lodash_merge = { exports: {} };
   function arrayLikeKeys(value, inherited) {
     var isArr = isArray(value), isArg = !isArr && isArguments(value), isBuff = !isArr && !isArg && isBuffer(value), isType = !isArr && !isArg && !isBuff && isTypedArray(value), skipIndexes = isArr || isArg || isBuff || isType, result = skipIndexes ? baseTimes(value.length, String) : [], length = result.length;
     for (var key in value) {
-      if ((inherited || hasOwnProperty.call(value, key)) && !(skipIndexes && (key == "length" || isBuff && (key == "offset" || key == "parent") || isType && (key == "buffer" || key == "byteLength" || key == "byteOffset") || isIndex(key, length)))) {
+      if ((inherited || hasOwnProperty.call(value, key)) && !(skipIndexes && // Safari 9 has enumerable `arguments.length` in strict mode.
+      (key == "length" || // Node.js 0.10 has enumerable non-index properties on buffers.
+      isBuff && (key == "offset" || key == "parent") || // PhantomJS 2 has enumerable non-index properties on typed arrays.
+      isType && (key == "buffer" || key == "byteLength" || key == "byteOffset") || // Skip index properties.
+      isIndex(key, length)))) {
         result.push(key);
       }
     }
@@ -2595,8 +2661,7 @@ var lodash_merge = { exports: {} };
     return false;
   }
   module.exports = merge2;
-})(lodash_merge, lodash_merge.exports);
-const merge = lodash_merge.exports;
+})(lodash_merge, lodash_mergeExports);
 var frame = 0, timeout$1 = 0, interval = 0, pokeDelay = 1e3, taskHead, taskTail, clockLast = 0, clockNow = 0, clockSkew = 0, clock = typeof performance === "object" && performance.now ? performance : Date, setFrame = typeof window === "object" && window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : function(f) {
   setTimeout(f, 17);
 };
@@ -3175,6 +3240,7 @@ define(Color$1, color, {
     return this.rgb().displayable();
   },
   hex: color_formatHex,
+  // Deprecated! Use color.formatHex.
   formatHex: color_formatHex,
   formatHex8: color_formatHex8,
   formatHsl: color_formatHsl,
@@ -3242,6 +3308,7 @@ define(Rgb, rgb, extend(Color$1, {
     return -0.5 <= this.r && this.r < 255.5 && (-0.5 <= this.g && this.g < 255.5) && (-0.5 <= this.b && this.b < 255.5) && (0 <= this.opacity && this.opacity <= 1);
   },
   hex: rgb_formatHex,
+  // Deprecated! Use color.formatHex.
   formatHex: rgb_formatHex,
   formatHex8: rgb_formatHex8,
   formatRgb: rgb_formatRgb,
@@ -3750,7 +3817,9 @@ function schedule(node, name, id2, index, group, timing) {
   create(node, id2, {
     name,
     index,
+    // For context during callback.
     group,
+    // For context during callback.
     on: emptyOn,
     tween: emptyTween,
     time: timing.time,
@@ -4377,6 +4446,7 @@ function cubicInOut(t) {
 }
 var defaultTiming = {
   time: null,
+  // Set on use.
   delay: 0,
   duration: 250,
   ease: cubicInOut
@@ -5104,9 +5174,9 @@ const formatTypes = {
 function identity$1(x) {
   return x;
 }
-var map = Array.prototype.map, prefixes = ["y", "z", "a", "f", "p", "n", "\xB5", "m", "", "k", "M", "G", "T", "P", "E", "Z", "Y"];
+var map = Array.prototype.map, prefixes = ["y", "z", "a", "f", "p", "n", "µ", "m", "", "k", "M", "G", "T", "P", "E", "Z", "Y"];
 function formatLocale(locale2) {
-  var group = locale2.grouping === void 0 || locale2.thousands === void 0 ? identity$1 : formatGroup(map.call(locale2.grouping, Number), locale2.thousands + ""), currencyPrefix = locale2.currency === void 0 ? "" : locale2.currency[0] + "", currencySuffix = locale2.currency === void 0 ? "" : locale2.currency[1] + "", decimal = locale2.decimal === void 0 ? "." : locale2.decimal + "", numerals = locale2.numerals === void 0 ? identity$1 : formatNumerals(map.call(locale2.numerals, String)), percent = locale2.percent === void 0 ? "%" : locale2.percent + "", minus = locale2.minus === void 0 ? "\u2212" : locale2.minus + "", nan = locale2.nan === void 0 ? "NaN" : locale2.nan + "";
+  var group = locale2.grouping === void 0 || locale2.thousands === void 0 ? identity$1 : formatGroup(map.call(locale2.grouping, Number), locale2.thousands + ""), currencyPrefix = locale2.currency === void 0 ? "" : locale2.currency[0] + "", currencySuffix = locale2.currency === void 0 ? "" : locale2.currency[1] + "", decimal = locale2.decimal === void 0 ? "." : locale2.decimal + "", numerals = locale2.numerals === void 0 ? identity$1 : formatNumerals(map.call(locale2.numerals, String)), percent = locale2.percent === void 0 ? "%" : locale2.percent + "", minus = locale2.minus === void 0 ? "−" : locale2.minus + "", nan = locale2.nan === void 0 ? "NaN" : locale2.nan + "";
   function newFormat(specifier) {
     specifier = formatSpecifier(specifier);
     var fill = specifier.fill, align = specifier.align, sign = specifier.sign, symbol = specifier.symbol, zero2 = specifier.zero, width = specifier.width, comma = specifier.comma, precision = specifier.precision, trim = specifier.trim, type = specifier.type;
@@ -5529,18 +5599,6 @@ function sequentialPow() {
 }
 class Zoom {
   constructor(selector2, prefs, plot) {
-    __publicField(this, "prefs");
-    __publicField(this, "svg_element_selection");
-    __publicField(this, "width");
-    __publicField(this, "height");
-    __publicField(this, "renderers");
-    __publicField(this, "tileSet");
-    __publicField(this, "_timer");
-    __publicField(this, "_scales");
-    __publicField(this, "zoomer");
-    __publicField(this, "transform");
-    __publicField(this, "_start");
-    __publicField(this, "scatterplot");
     this.prefs = prefs;
     this.svg_element_selection = select(selector2);
     this.width = +this.svg_element_selection.attr("width");
@@ -5758,7 +5816,8 @@ class Zoom {
   }
   tick(force = false) {
     this._start = this._start || Date.now();
-    if (force !== true && this._timer && this._timer.stop_at <= Date.now()) {
+    if (force !== true && this._timer && //@ts-ignore
+    this._timer.stop_at <= Date.now()) {
       this._timer.stop();
     }
   }
@@ -5772,13 +5831,22 @@ function window_transform(x_scale, y_scale) {
   const xmulti = gap(x_scale.range()) / gap(x_scale.domain());
   const ymulti = gap(y_scale.range()) / gap(y_scale.domain());
   const m1 = [
+    // transform by the scale;
     [xmulti, 0, -xmulti * x_mid + mean(x_scale.range())],
     [0, ymulti, -ymulti * y_mid + mean(y_scale.range())],
     [0, 0, 1]
   ];
   return m1;
 }
-var regl = { exports: {} };
+var reglExports = {};
+var regl = {
+  get exports() {
+    return reglExports;
+  },
+  set exports(v) {
+    reglExports = v;
+  }
+};
 (function(module, exports) {
   (function(global2, factory) {
     module.exports = factory();
@@ -6864,6 +6932,7 @@ var regl = { exports: {} };
         npotTextureCube = !gl.getError();
       }
       return {
+        // drawing buffer bit depth
         colorBits: [
           gl.getParameter(GL_RED_BITS),
           gl.getParameter(GL_GREEN_BITS),
@@ -6873,12 +6942,16 @@ var regl = { exports: {} };
         depthBits: gl.getParameter(GL_DEPTH_BITS),
         stencilBits: gl.getParameter(GL_STENCIL_BITS),
         subpixelBits: gl.getParameter(GL_SUBPIXEL_BITS),
+        // supported extensions
         extensions: Object.keys(extensions).filter(function(ext) {
           return !!extensions[ext];
         }),
+        // max aniso samples
         maxAnisotropic,
+        // max draw buffers
         maxDrawbuffers,
         maxColorAttachments,
+        // point and line size ranges
         pointSizeDims: gl.getParameter(GL_ALIASED_POINT_SIZE_RANGE),
         lineWidthDims: gl.getParameter(GL_ALIASED_LINE_WIDTH_RANGE),
         maxViewportDims: gl.getParameter(GL_MAX_VIEWPORT_DIMS),
@@ -6892,10 +6965,12 @@ var regl = { exports: {} };
         maxVertexTextureUnits: gl.getParameter(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS),
         maxVaryingVectors: gl.getParameter(GL_MAX_VARYING_VECTORS),
         maxFragmentUniforms: gl.getParameter(GL_MAX_FRAGMENT_UNIFORM_VECTORS),
+        // vendor info
         glsl: gl.getParameter(GL_SHADING_LANGUAGE_VERSION),
         renderer: gl.getParameter(GL_RENDERER),
         vendor: gl.getParameter(GL_VENDOR),
         version: gl.getParameter(GL_VERSION),
+        // quirks
         readFloat,
         npotTextureCube
       };
@@ -11208,19 +11283,19 @@ var regl = { exports: {} };
         return a < b ? -1 : 1;
       });
     }
-    function Declaration(thisDep, contextDep, propDep, append) {
+    function Declaration(thisDep, contextDep, propDep, append2) {
       this.thisDep = thisDep;
       this.contextDep = contextDep;
       this.propDep = propDep;
-      this.append = append;
+      this.append = append2;
     }
     function isStatic(decl) {
       return decl && !(decl.thisDep || decl.contextDep || decl.propDep);
     }
-    function createStaticDecl(append) {
-      return new Declaration(false, false, false, append);
+    function createStaticDecl(append2) {
+      return new Declaration(false, false, false, append2);
     }
-    function createDynamicDecl(dyn, append) {
+    function createDynamicDecl(dyn, append2) {
       var type = dyn.type;
       if (type === DYN_FUNC$1) {
         var numArgs = dyn.data.length;
@@ -11228,7 +11303,7 @@ var regl = { exports: {} };
           true,
           numArgs >= 1,
           numArgs >= 2,
-          append
+          append2
         );
       } else if (type === DYN_THUNK) {
         var data = dyn.data;
@@ -11236,14 +11311,14 @@ var regl = { exports: {} };
           data.thisDep,
           data.contextDep,
           data.propDep,
-          append
+          append2
         );
       } else if (type === DYN_CONSTANT$1) {
         return new Declaration(
           false,
           false,
           false,
-          append
+          append2
         );
       } else if (type === DYN_ARRAY$1) {
         var thisDep = false;
@@ -11276,14 +11351,14 @@ var regl = { exports: {} };
           thisDep,
           contextDep,
           propDep,
-          append
+          append2
         );
       } else {
         return new Declaration(
           type === DYN_STATE$1,
           type === DYN_CONTEXT$1,
           type === DYN_PROP$1,
-          append
+          append2
         );
       }
     }
@@ -12194,6 +12269,7 @@ var regl = { exports: {} };
           vao,
           vaoActive,
           elementsActive,
+          // static draw props
           static: staticDraw
         };
       }
@@ -15095,7 +15171,7 @@ var regl = { exports: {} };
       }
       return -1;
     }
-    function wrapREGL2(args) {
+    function wrapREGL(args) {
       var config = parseArgs(args);
       if (!config) {
         return null;
@@ -15129,6 +15205,7 @@ var regl = { exports: {} };
       var drawState = {
         elements: null,
         primitive: 4,
+        // GL_TRIANGLES
         count: -1,
         offset: 0,
         instances: -1
@@ -15525,11 +15602,15 @@ var regl = { exports: {} };
         };
       }
       var regl2 = extend2(compileProcedure, {
+        // Clear current FBO
         clear,
+        // Short cuts for dynamic variables
         prop: dynamic.define.bind(null, DYN_PROP),
         context: dynamic.define.bind(null, DYN_CONTEXT),
         this: dynamic.define.bind(null, DYN_STATE),
+        // executes an empty draw command
         draw: compileProcedure({}),
+        // Resources
         buffer: function(options) {
           return bufferState.create(options, GL_ARRAY_BUFFER, false, false);
         },
@@ -15542,15 +15623,21 @@ var regl = { exports: {} };
         framebuffer: framebufferState.create,
         framebufferCube: framebufferState.createCube,
         vao: attributeState.createVAO,
+        // Expose context attributes
         attributes: glAttributes,
+        // Frame rendering
         frame: frame2,
         on: addListener,
+        // System limits
         limits,
         hasExtension: function(name) {
           return limits.extensions.indexOf(name.toLowerCase()) >= 0;
         },
+        // Read pixels
         read: readPixels,
+        // Destroy regl and all associated resources
         destroy,
+        // Direct GL state manipulation
         _gl: gl,
         _refresh: refresh,
         poll: function() {
@@ -15559,16 +15646,17 @@ var regl = { exports: {} };
             timer2.update();
           }
         },
+        // Current time
         now: now2,
+        // regl Statistics Information
         stats: stats$$1
       });
       config.onDone(null, regl2);
       return regl2;
     }
-    return wrapREGL2;
+    return wrapREGL;
   });
 })(regl);
-const wrapREGL = regl.exports;
 var glslReadFloat = decodeFloat;
 var UINT8_VIEW = new Uint8Array(4);
 var FLOAT_VIEW = new Float32Array(UINT8_VIEW.buffer);
@@ -15581,11 +15669,7 @@ function decodeFloat(x, y, z, w) {
 }
 class PlotSetting {
   constructor(start2, transform = "arithmetic") {
-    __publicField(this, "start");
-    __publicField(this, "value");
-    __publicField(this, "target");
-    __publicField(this, "timer");
-    __publicField(this, "transform", "arithmetic");
+    this.transform = "arithmetic";
     this.transform = transform;
     this.start = start2;
     this.value = start2;
@@ -15623,13 +15707,6 @@ class PlotSetting {
 }
 class RenderProps {
   constructor() {
-    __publicField(this, "maxPoints");
-    __publicField(this, "targetOpacity");
-    __publicField(this, "pointSize");
-    __publicField(this, "foregroundOpacity");
-    __publicField(this, "backgroundOpacity");
-    __publicField(this, "foregroundSize");
-    __publicField(this, "backgroundSize");
     this.maxPoints = new PlotSetting(1e4, "geometric");
     this.pointSize = new PlotSetting(1, "geometric");
     this.targetOpacity = new PlotSetting(50);
@@ -15678,19 +15755,9 @@ class RenderProps {
 }
 class Renderer {
   constructor(selector2, tileSet, scatterplot) {
-    __publicField(this, "scatterplot");
-    __publicField(this, "holder");
-    __publicField(this, "canvas");
-    __publicField(this, "dataset");
-    __publicField(this, "width");
-    __publicField(this, "height");
-    __publicField(this, "deferred_functions");
-    __publicField(this, "_use_scale_to_download_tiles", true);
-    __publicField(this, "zoom");
-    __publicField(this, "aes");
-    __publicField(this, "_zoom");
-    __publicField(this, "_initializations", []);
-    __publicField(this, "render_props", new RenderProps());
+    this._use_scale_to_download_tiles = true;
+    this._initializations = [];
+    this.render_props = new RenderProps();
     this.scatterplot = scatterplot;
     this.holder = select(selector2);
     this.canvas = select(
@@ -15705,6 +15772,10 @@ class Renderer {
   get discard_share() {
     return 0;
   }
+  /**
+   * Render prefs are scatterplot prefs, but for a single tile
+   * instead of for a whole table.
+   */
   get prefs() {
     const p = { ...this.scatterplot.prefs };
     p.arrow_table = void 0;
@@ -17310,7 +17381,15 @@ function isURLLabels(labels) {
 function isLabelset(labels) {
   return labels !== null && labels.labels !== void 0;
 }
-var lodash = { exports: {} };
+var lodashExports = {};
+var lodash = {
+  get exports() {
+    return lodashExports;
+  },
+  set exports(v) {
+    lodashExports = v;
+  }
+};
 /**
  * @license
  * Lodash <https://lodash.com/>
@@ -17371,7 +17450,7 @@ var lodash = { exports: {} };
     var reNoMatch = /($^)/;
     var reUnescapedString = /['\n\r\u2028\u2029\\]/g;
     var rsAstralRange = "\\ud800-\\udfff", rsComboMarksRange = "\\u0300-\\u036f", reComboHalfMarksRange = "\\ufe20-\\ufe2f", rsComboSymbolsRange = "\\u20d0-\\u20ff", rsComboRange = rsComboMarksRange + reComboHalfMarksRange + rsComboSymbolsRange, rsDingbatRange = "\\u2700-\\u27bf", rsLowerRange = "a-z\\xdf-\\xf6\\xf8-\\xff", rsMathOpRange = "\\xac\\xb1\\xd7\\xf7", rsNonCharRange = "\\x00-\\x2f\\x3a-\\x40\\x5b-\\x60\\x7b-\\xbf", rsPunctuationRange = "\\u2000-\\u206f", rsSpaceRange = " \\t\\x0b\\f\\xa0\\ufeff\\n\\r\\u2028\\u2029\\u1680\\u180e\\u2000\\u2001\\u2002\\u2003\\u2004\\u2005\\u2006\\u2007\\u2008\\u2009\\u200a\\u202f\\u205f\\u3000", rsUpperRange = "A-Z\\xc0-\\xd6\\xd8-\\xde", rsVarRange = "\\ufe0e\\ufe0f", rsBreakRange = rsMathOpRange + rsNonCharRange + rsPunctuationRange + rsSpaceRange;
-    var rsApos = "['\u2019]", rsAstral = "[" + rsAstralRange + "]", rsBreak = "[" + rsBreakRange + "]", rsCombo = "[" + rsComboRange + "]", rsDigits = "\\d+", rsDingbat = "[" + rsDingbatRange + "]", rsLower = "[" + rsLowerRange + "]", rsMisc = "[^" + rsAstralRange + rsBreakRange + rsDigits + rsDingbatRange + rsLowerRange + rsUpperRange + "]", rsFitz = "\\ud83c[\\udffb-\\udfff]", rsModifier = "(?:" + rsCombo + "|" + rsFitz + ")", rsNonAstral = "[^" + rsAstralRange + "]", rsRegional = "(?:\\ud83c[\\udde6-\\uddff]){2}", rsSurrPair = "[\\ud800-\\udbff][\\udc00-\\udfff]", rsUpper = "[" + rsUpperRange + "]", rsZWJ = "\\u200d";
+    var rsApos = "['’]", rsAstral = "[" + rsAstralRange + "]", rsBreak = "[" + rsBreakRange + "]", rsCombo = "[" + rsComboRange + "]", rsDigits = "\\d+", rsDingbat = "[" + rsDingbatRange + "]", rsLower = "[" + rsLowerRange + "]", rsMisc = "[^" + rsAstralRange + rsBreakRange + rsDigits + rsDingbatRange + rsLowerRange + rsUpperRange + "]", rsFitz = "\\ud83c[\\udffb-\\udfff]", rsModifier = "(?:" + rsCombo + "|" + rsFitz + ")", rsNonAstral = "[^" + rsAstralRange + "]", rsRegional = "(?:\\ud83c[\\udde6-\\uddff]){2}", rsSurrPair = "[\\ud800-\\udbff][\\udc00-\\udfff]", rsUpper = "[" + rsUpperRange + "]", rsZWJ = "\\u200d";
     var rsMiscLower = "(?:" + rsLower + "|" + rsMisc + ")", rsMiscUpper = "(?:" + rsUpper + "|" + rsMisc + ")", rsOptContrLower = "(?:" + rsApos + "(?:d|ll|m|re|s|t|ve))?", rsOptContrUpper = "(?:" + rsApos + "(?:D|LL|M|RE|S|T|VE))?", reOptMod = rsModifier + "?", rsOptVar = "[" + rsVarRange + "]?", rsOptJoin = "(?:" + rsZWJ + "(?:" + [rsNonAstral, rsRegional, rsSurrPair].join("|") + ")" + rsOptVar + reOptMod + ")*", rsOrdLower = "\\d*(?:1st|2nd|3rd|(?![123])\\dth)(?=\\b|[A-Z_])", rsOrdUpper = "\\d*(?:1ST|2ND|3RD|(?![123])\\dTH)(?=\\b|[a-z_])", rsSeq = rsOptVar + reOptMod + rsOptJoin, rsEmoji = "(?:" + [rsDingbat, rsRegional, rsSurrPair].join("|") + ")" + rsSeq, rsSymbol = "(?:" + [rsNonAstral + rsCombo + "?", rsCombo, rsRegional, rsSurrPair, rsAstral].join("|") + ")";
     var reApos = RegExp(rsApos, "g");
     var reComboMark = RegExp(rsCombo, "g");
@@ -17428,196 +17507,198 @@ var lodash = { exports: {} };
     cloneableTags[argsTag] = cloneableTags[arrayTag] = cloneableTags[arrayBufferTag] = cloneableTags[dataViewTag] = cloneableTags[boolTag] = cloneableTags[dateTag] = cloneableTags[float32Tag] = cloneableTags[float64Tag] = cloneableTags[int8Tag] = cloneableTags[int16Tag] = cloneableTags[int32Tag] = cloneableTags[mapTag] = cloneableTags[numberTag] = cloneableTags[objectTag] = cloneableTags[regexpTag] = cloneableTags[setTag] = cloneableTags[stringTag] = cloneableTags[symbolTag] = cloneableTags[uint8Tag] = cloneableTags[uint8ClampedTag] = cloneableTags[uint16Tag] = cloneableTags[uint32Tag] = true;
     cloneableTags[errorTag] = cloneableTags[funcTag] = cloneableTags[weakMapTag] = false;
     var deburredLetters = {
-      "\xC0": "A",
-      "\xC1": "A",
-      "\xC2": "A",
-      "\xC3": "A",
-      "\xC4": "A",
-      "\xC5": "A",
-      "\xE0": "a",
-      "\xE1": "a",
-      "\xE2": "a",
-      "\xE3": "a",
-      "\xE4": "a",
-      "\xE5": "a",
-      "\xC7": "C",
-      "\xE7": "c",
-      "\xD0": "D",
-      "\xF0": "d",
-      "\xC8": "E",
-      "\xC9": "E",
-      "\xCA": "E",
-      "\xCB": "E",
-      "\xE8": "e",
-      "\xE9": "e",
-      "\xEA": "e",
-      "\xEB": "e",
-      "\xCC": "I",
-      "\xCD": "I",
-      "\xCE": "I",
-      "\xCF": "I",
-      "\xEC": "i",
-      "\xED": "i",
-      "\xEE": "i",
-      "\xEF": "i",
-      "\xD1": "N",
-      "\xF1": "n",
-      "\xD2": "O",
-      "\xD3": "O",
-      "\xD4": "O",
-      "\xD5": "O",
-      "\xD6": "O",
-      "\xD8": "O",
-      "\xF2": "o",
-      "\xF3": "o",
-      "\xF4": "o",
-      "\xF5": "o",
-      "\xF6": "o",
-      "\xF8": "o",
-      "\xD9": "U",
-      "\xDA": "U",
-      "\xDB": "U",
-      "\xDC": "U",
-      "\xF9": "u",
-      "\xFA": "u",
-      "\xFB": "u",
-      "\xFC": "u",
-      "\xDD": "Y",
-      "\xFD": "y",
-      "\xFF": "y",
-      "\xC6": "Ae",
-      "\xE6": "ae",
-      "\xDE": "Th",
-      "\xFE": "th",
-      "\xDF": "ss",
-      "\u0100": "A",
-      "\u0102": "A",
-      "\u0104": "A",
-      "\u0101": "a",
-      "\u0103": "a",
-      "\u0105": "a",
-      "\u0106": "C",
-      "\u0108": "C",
-      "\u010A": "C",
-      "\u010C": "C",
-      "\u0107": "c",
-      "\u0109": "c",
-      "\u010B": "c",
-      "\u010D": "c",
-      "\u010E": "D",
-      "\u0110": "D",
-      "\u010F": "d",
-      "\u0111": "d",
-      "\u0112": "E",
-      "\u0114": "E",
-      "\u0116": "E",
-      "\u0118": "E",
-      "\u011A": "E",
-      "\u0113": "e",
-      "\u0115": "e",
-      "\u0117": "e",
-      "\u0119": "e",
-      "\u011B": "e",
-      "\u011C": "G",
-      "\u011E": "G",
-      "\u0120": "G",
-      "\u0122": "G",
-      "\u011D": "g",
-      "\u011F": "g",
-      "\u0121": "g",
-      "\u0123": "g",
-      "\u0124": "H",
-      "\u0126": "H",
-      "\u0125": "h",
-      "\u0127": "h",
-      "\u0128": "I",
-      "\u012A": "I",
-      "\u012C": "I",
-      "\u012E": "I",
-      "\u0130": "I",
-      "\u0129": "i",
-      "\u012B": "i",
-      "\u012D": "i",
-      "\u012F": "i",
-      "\u0131": "i",
-      "\u0134": "J",
-      "\u0135": "j",
-      "\u0136": "K",
-      "\u0137": "k",
-      "\u0138": "k",
-      "\u0139": "L",
-      "\u013B": "L",
-      "\u013D": "L",
-      "\u013F": "L",
-      "\u0141": "L",
-      "\u013A": "l",
-      "\u013C": "l",
-      "\u013E": "l",
-      "\u0140": "l",
-      "\u0142": "l",
-      "\u0143": "N",
-      "\u0145": "N",
-      "\u0147": "N",
-      "\u014A": "N",
-      "\u0144": "n",
-      "\u0146": "n",
-      "\u0148": "n",
-      "\u014B": "n",
-      "\u014C": "O",
-      "\u014E": "O",
-      "\u0150": "O",
-      "\u014D": "o",
-      "\u014F": "o",
-      "\u0151": "o",
-      "\u0154": "R",
-      "\u0156": "R",
-      "\u0158": "R",
-      "\u0155": "r",
-      "\u0157": "r",
-      "\u0159": "r",
-      "\u015A": "S",
-      "\u015C": "S",
-      "\u015E": "S",
-      "\u0160": "S",
-      "\u015B": "s",
-      "\u015D": "s",
-      "\u015F": "s",
-      "\u0161": "s",
-      "\u0162": "T",
-      "\u0164": "T",
-      "\u0166": "T",
-      "\u0163": "t",
-      "\u0165": "t",
-      "\u0167": "t",
-      "\u0168": "U",
-      "\u016A": "U",
-      "\u016C": "U",
-      "\u016E": "U",
-      "\u0170": "U",
-      "\u0172": "U",
-      "\u0169": "u",
-      "\u016B": "u",
-      "\u016D": "u",
-      "\u016F": "u",
-      "\u0171": "u",
-      "\u0173": "u",
-      "\u0174": "W",
-      "\u0175": "w",
-      "\u0176": "Y",
-      "\u0177": "y",
-      "\u0178": "Y",
-      "\u0179": "Z",
-      "\u017B": "Z",
-      "\u017D": "Z",
-      "\u017A": "z",
-      "\u017C": "z",
-      "\u017E": "z",
-      "\u0132": "IJ",
-      "\u0133": "ij",
-      "\u0152": "Oe",
-      "\u0153": "oe",
-      "\u0149": "'n",
-      "\u017F": "s"
+      // Latin-1 Supplement block.
+      "À": "A",
+      "Á": "A",
+      "Â": "A",
+      "Ã": "A",
+      "Ä": "A",
+      "Å": "A",
+      "à": "a",
+      "á": "a",
+      "â": "a",
+      "ã": "a",
+      "ä": "a",
+      "å": "a",
+      "Ç": "C",
+      "ç": "c",
+      "Ð": "D",
+      "ð": "d",
+      "È": "E",
+      "É": "E",
+      "Ê": "E",
+      "Ë": "E",
+      "è": "e",
+      "é": "e",
+      "ê": "e",
+      "ë": "e",
+      "Ì": "I",
+      "Í": "I",
+      "Î": "I",
+      "Ï": "I",
+      "ì": "i",
+      "í": "i",
+      "î": "i",
+      "ï": "i",
+      "Ñ": "N",
+      "ñ": "n",
+      "Ò": "O",
+      "Ó": "O",
+      "Ô": "O",
+      "Õ": "O",
+      "Ö": "O",
+      "Ø": "O",
+      "ò": "o",
+      "ó": "o",
+      "ô": "o",
+      "õ": "o",
+      "ö": "o",
+      "ø": "o",
+      "Ù": "U",
+      "Ú": "U",
+      "Û": "U",
+      "Ü": "U",
+      "ù": "u",
+      "ú": "u",
+      "û": "u",
+      "ü": "u",
+      "Ý": "Y",
+      "ý": "y",
+      "ÿ": "y",
+      "Æ": "Ae",
+      "æ": "ae",
+      "Þ": "Th",
+      "þ": "th",
+      "ß": "ss",
+      // Latin Extended-A block.
+      "Ā": "A",
+      "Ă": "A",
+      "Ą": "A",
+      "ā": "a",
+      "ă": "a",
+      "ą": "a",
+      "Ć": "C",
+      "Ĉ": "C",
+      "Ċ": "C",
+      "Č": "C",
+      "ć": "c",
+      "ĉ": "c",
+      "ċ": "c",
+      "č": "c",
+      "Ď": "D",
+      "Đ": "D",
+      "ď": "d",
+      "đ": "d",
+      "Ē": "E",
+      "Ĕ": "E",
+      "Ė": "E",
+      "Ę": "E",
+      "Ě": "E",
+      "ē": "e",
+      "ĕ": "e",
+      "ė": "e",
+      "ę": "e",
+      "ě": "e",
+      "Ĝ": "G",
+      "Ğ": "G",
+      "Ġ": "G",
+      "Ģ": "G",
+      "ĝ": "g",
+      "ğ": "g",
+      "ġ": "g",
+      "ģ": "g",
+      "Ĥ": "H",
+      "Ħ": "H",
+      "ĥ": "h",
+      "ħ": "h",
+      "Ĩ": "I",
+      "Ī": "I",
+      "Ĭ": "I",
+      "Į": "I",
+      "İ": "I",
+      "ĩ": "i",
+      "ī": "i",
+      "ĭ": "i",
+      "į": "i",
+      "ı": "i",
+      "Ĵ": "J",
+      "ĵ": "j",
+      "Ķ": "K",
+      "ķ": "k",
+      "ĸ": "k",
+      "Ĺ": "L",
+      "Ļ": "L",
+      "Ľ": "L",
+      "Ŀ": "L",
+      "Ł": "L",
+      "ĺ": "l",
+      "ļ": "l",
+      "ľ": "l",
+      "ŀ": "l",
+      "ł": "l",
+      "Ń": "N",
+      "Ņ": "N",
+      "Ň": "N",
+      "Ŋ": "N",
+      "ń": "n",
+      "ņ": "n",
+      "ň": "n",
+      "ŋ": "n",
+      "Ō": "O",
+      "Ŏ": "O",
+      "Ő": "O",
+      "ō": "o",
+      "ŏ": "o",
+      "ő": "o",
+      "Ŕ": "R",
+      "Ŗ": "R",
+      "Ř": "R",
+      "ŕ": "r",
+      "ŗ": "r",
+      "ř": "r",
+      "Ś": "S",
+      "Ŝ": "S",
+      "Ş": "S",
+      "Š": "S",
+      "ś": "s",
+      "ŝ": "s",
+      "ş": "s",
+      "š": "s",
+      "Ţ": "T",
+      "Ť": "T",
+      "Ŧ": "T",
+      "ţ": "t",
+      "ť": "t",
+      "ŧ": "t",
+      "Ũ": "U",
+      "Ū": "U",
+      "Ŭ": "U",
+      "Ů": "U",
+      "Ű": "U",
+      "Ų": "U",
+      "ũ": "u",
+      "ū": "u",
+      "ŭ": "u",
+      "ů": "u",
+      "ű": "u",
+      "ų": "u",
+      "Ŵ": "W",
+      "ŵ": "w",
+      "Ŷ": "Y",
+      "ŷ": "y",
+      "Ÿ": "Y",
+      "Ź": "Z",
+      "Ż": "Z",
+      "Ž": "Z",
+      "ź": "z",
+      "ż": "z",
+      "ž": "z",
+      "Ĳ": "IJ",
+      "ĳ": "ij",
+      "Œ": "Oe",
+      "œ": "oe",
+      "ŉ": "'n",
+      "ſ": "s"
     };
     var htmlEscapes = {
       "&": "&amp;",
@@ -18006,7 +18087,7 @@ var lodash = { exports: {} };
     }
     var runInContext = function runInContext2(context2) {
       context2 = context2 == null ? root2 : _.defaults(root2.Object(), context2, _.pick(root2, contextProps));
-      var Array2 = context2.Array, Date2 = context2.Date, Error2 = context2.Error, Function2 = context2.Function, Math2 = context2.Math, Object2 = context2.Object, RegExp2 = context2.RegExp, String2 = context2.String, TypeError2 = context2.TypeError;
+      var Array2 = context2.Array, Date3 = context2.Date, Error2 = context2.Error, Function2 = context2.Function, Math2 = context2.Math, Object2 = context2.Object, RegExp2 = context2.RegExp, String2 = context2.String, TypeError2 = context2.TypeError;
       var arrayProto = Array2.prototype, funcProto = Function2.prototype, objectProto = Object2.prototype;
       var coreJsData = context2["__core-js_shared__"];
       var funcToString = funcProto.toString;
@@ -18022,7 +18103,7 @@ var lodash = { exports: {} };
       var reIsNative = RegExp2(
         "^" + funcToString.call(hasOwnProperty).replace(reRegExpChar, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
       );
-      var Buffer3 = moduleExports ? context2.Buffer : undefined$1, Symbol2 = context2.Symbol, Uint8Array2 = context2.Uint8Array, allocUnsafe = Buffer3 ? Buffer3.allocUnsafe : undefined$1, getPrototype = overArg(Object2.getPrototypeOf, Object2), objectCreate = Object2.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol2 ? Symbol2.isConcatSpreadable : undefined$1, symIterator = Symbol2 ? Symbol2.iterator : undefined$1, symToStringTag = Symbol2 ? Symbol2.toStringTag : undefined$1;
+      var Buffer2 = moduleExports ? context2.Buffer : undefined$1, Symbol2 = context2.Symbol, Uint8Array2 = context2.Uint8Array, allocUnsafe = Buffer2 ? Buffer2.allocUnsafe : undefined$1, getPrototype = overArg(Object2.getPrototypeOf, Object2), objectCreate = Object2.create, propertyIsEnumerable = objectProto.propertyIsEnumerable, splice = arrayProto.splice, spreadableSymbol = Symbol2 ? Symbol2.isConcatSpreadable : undefined$1, symIterator = Symbol2 ? Symbol2.iterator : undefined$1, symToStringTag = Symbol2 ? Symbol2.toStringTag : undefined$1;
       var defineProperty = function() {
         try {
           var func = getNative(Object2, "defineProperty");
@@ -18031,12 +18112,12 @@ var lodash = { exports: {} };
         } catch (e) {
         }
       }();
-      var ctxClearTimeout = context2.clearTimeout !== root2.clearTimeout && context2.clearTimeout, ctxNow = Date2 && Date2.now !== root2.Date.now && Date2.now, ctxSetTimeout = context2.setTimeout !== root2.setTimeout && context2.setTimeout;
-      var nativeCeil = Math2.ceil, nativeFloor = Math2.floor, nativeGetSymbols = Object2.getOwnPropertySymbols, nativeIsBuffer = Buffer3 ? Buffer3.isBuffer : undefined$1, nativeIsFinite = context2.isFinite, nativeJoin = arrayProto.join, nativeKeys = overArg(Object2.keys, Object2), nativeMax = Math2.max, nativeMin = Math2.min, nativeNow = Date2.now, nativeParseInt = context2.parseInt, nativeRandom = Math2.random, nativeReverse = arrayProto.reverse;
-      var DataView2 = getNative(context2, "DataView"), Map2 = getNative(context2, "Map"), Promise2 = getNative(context2, "Promise"), Set4 = getNative(context2, "Set"), WeakMap = getNative(context2, "WeakMap"), nativeCreate = getNative(Object2, "create");
+      var ctxClearTimeout = context2.clearTimeout !== root2.clearTimeout && context2.clearTimeout, ctxNow = Date3 && Date3.now !== root2.Date.now && Date3.now, ctxSetTimeout = context2.setTimeout !== root2.setTimeout && context2.setTimeout;
+      var nativeCeil = Math2.ceil, nativeFloor = Math2.floor, nativeGetSymbols = Object2.getOwnPropertySymbols, nativeIsBuffer = Buffer2 ? Buffer2.isBuffer : undefined$1, nativeIsFinite = context2.isFinite, nativeJoin = arrayProto.join, nativeKeys = overArg(Object2.keys, Object2), nativeMax = Math2.max, nativeMin = Math2.min, nativeNow = Date3.now, nativeParseInt = context2.parseInt, nativeRandom = Math2.random, nativeReverse = arrayProto.reverse;
+      var DataView2 = getNative(context2, "DataView"), Map3 = getNative(context2, "Map"), Promise2 = getNative(context2, "Promise"), Set4 = getNative(context2, "Set"), WeakMap = getNative(context2, "WeakMap"), nativeCreate = getNative(Object2, "create");
       var metaMap = WeakMap && new WeakMap();
       var realNames = {};
-      var dataViewCtorString = toSource(DataView2), mapCtorString = toSource(Map2), promiseCtorString = toSource(Promise2), setCtorString = toSource(Set4), weakMapCtorString = toSource(WeakMap);
+      var dataViewCtorString = toSource(DataView2), mapCtorString = toSource(Map3), promiseCtorString = toSource(Promise2), setCtorString = toSource(Set4), weakMapCtorString = toSource(WeakMap);
       var symbolProto = Symbol2 ? Symbol2.prototype : undefined$1, symbolValueOf = symbolProto ? symbolProto.valueOf : undefined$1, symbolToString = symbolProto ? symbolProto.toString : undefined$1;
       function lodash2(value) {
         if (isObjectLike(value) && !isArray(value) && !(value instanceof LazyWrapper)) {
@@ -18075,11 +18156,47 @@ var lodash = { exports: {} };
         this.__values__ = undefined$1;
       }
       lodash2.templateSettings = {
+        /**
+         * Used to detect `data` property values to be HTML-escaped.
+         *
+         * @memberOf _.templateSettings
+         * @type {RegExp}
+         */
         "escape": reEscape,
+        /**
+         * Used to detect code to be evaluated.
+         *
+         * @memberOf _.templateSettings
+         * @type {RegExp}
+         */
         "evaluate": reEvaluate,
+        /**
+         * Used to detect `data` property values to inject.
+         *
+         * @memberOf _.templateSettings
+         * @type {RegExp}
+         */
         "interpolate": reInterpolate,
+        /**
+         * Used to reference the data object in the template text.
+         *
+         * @memberOf _.templateSettings
+         * @type {string}
+         */
         "variable": "",
+        /**
+         * Used to import variables into the compiled template.
+         *
+         * @memberOf _.templateSettings
+         * @type {Object}
+         */
         "imports": {
+          /**
+           * A reference to the `lodash` function.
+           *
+           * @memberOf _.templateSettings.imports
+           * @type {Function}
+           */
           "_": lodash2
         }
       };
@@ -18245,7 +18362,7 @@ var lodash = { exports: {} };
         this.size = 0;
         this.__data__ = {
           "hash": new Hash(),
-          "map": new (Map2 || ListCache)(),
+          "map": new (Map3 || ListCache)(),
           "string": new Hash()
         };
       }
@@ -18310,7 +18427,7 @@ var lodash = { exports: {} };
         var data = this.__data__;
         if (data instanceof ListCache) {
           var pairs = data.__data__;
-          if (!Map2 || pairs.length < LARGE_ARRAY_SIZE - 1) {
+          if (!Map3 || pairs.length < LARGE_ARRAY_SIZE - 1) {
             pairs.push([key, value]);
             this.size = ++data.size;
             return this;
@@ -18329,7 +18446,11 @@ var lodash = { exports: {} };
       function arrayLikeKeys(value, inherited) {
         var isArr = isArray(value), isArg = !isArr && isArguments(value), isBuff = !isArr && !isArg && isBuffer(value), isType = !isArr && !isArg && !isBuff && isTypedArray(value), skipIndexes = isArr || isArg || isBuff || isType, result2 = skipIndexes ? baseTimes(value.length, String2) : [], length = result2.length;
         for (var key in value) {
-          if ((inherited || hasOwnProperty.call(value, key)) && !(skipIndexes && (key == "length" || isBuff && (key == "offset" || key == "parent") || isType && (key == "buffer" || key == "byteLength" || key == "byteOffset") || isIndex(key, length)))) {
+          if ((inherited || hasOwnProperty.call(value, key)) && !(skipIndexes && // Safari 9 has enumerable `arguments.length` in strict mode.
+          (key == "length" || // Node.js 0.10 has enumerable non-index properties on buffers.
+          isBuff && (key == "offset" || key == "parent") || // PhantomJS 2 has enumerable non-index properties on typed arrays.
+          isType && (key == "buffer" || key == "byteLength" || key == "byteOffset") || // Skip index properties.
+          isIndex(key, length)))) {
             result2.push(key);
           }
         }
@@ -20050,7 +20171,7 @@ var lodash = { exports: {} };
         return result2;
       };
       var getTag = baseGetTag;
-      if (DataView2 && getTag(new DataView2(new ArrayBuffer(1))) != dataViewTag || Map2 && getTag(new Map2()) != mapTag || Promise2 && getTag(Promise2.resolve()) != promiseTag || Set4 && getTag(new Set4()) != setTag || WeakMap && getTag(new WeakMap()) != weakMapTag) {
+      if (DataView2 && getTag(new DataView2(new ArrayBuffer(1))) != dataViewTag || Map3 && getTag(new Map3()) != mapTag || Promise2 && getTag(Promise2.resolve()) != promiseTag || Set4 && getTag(new Set4()) != setTag || WeakMap && getTag(new WeakMap()) != weakMapTag) {
         getTag = function(value) {
           var result2 = baseGetTag(value), Ctor = result2 == objectTag ? value.constructor : undefined$1, ctorString = Ctor ? toSource(Ctor) : "";
           if (ctorString) {
@@ -22747,7 +22868,7 @@ var lodash = { exports: {} };
       root2._ = _;
     }
   }).call(commonjsGlobal);
-})(lodash, lodash.exports);
+})(lodash, lodashExports);
 const scales = {
   sqrt,
   log,
@@ -22756,22 +22877,11 @@ const scales = {
 };
 class Aesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
-    __publicField(this, "_constant");
-    __publicField(this, "_transform");
-    __publicField(this, "scatterplot");
-    __publicField(this, "field", null);
-    __publicField(this, "regl");
-    __publicField(this, "_texture_buffer", null);
-    __publicField(this, "_domain");
-    __publicField(this, "_range");
-    __publicField(this, "_func");
-    __publicField(this, "dataset");
-    __publicField(this, "partner", null);
-    __publicField(this, "_textures", {});
-    __publicField(this, "_scale");
-    __publicField(this, "current_encoding", null);
-    __publicField(this, "aesthetic_map");
-    __publicField(this, "id");
+    this.field = null;
+    this._texture_buffer = null;
+    this.partner = null;
+    this._textures = {};
+    this.current_encoding = null;
     this.aesthetic_map = aesthetic_map;
     if (this.aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined");
@@ -22919,7 +23029,7 @@ class Aesthetic {
     if (typeof encoding === "string") {
       encoding = this.convert_string_encoding(encoding);
     }
-    if (lodash.exports.isNumber(encoding)) {
+    if (lodashExports.isNumber(encoding)) {
       const x = {
         constant: encoding
       };
@@ -23052,9 +23162,9 @@ class OneDAesthetic extends Aesthetic {
 class Size extends OneDAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "_constant", 1);
-    __publicField(this, "default_constant", 1);
-    __publicField(this, "default_transform", "sqrt");
+    this._constant = 1;
+    this.default_constant = 1;
+    this.default_transform = "sqrt";
   }
   static get default_constant() {
     return 1.5;
@@ -23066,10 +23176,10 @@ class Size extends OneDAesthetic {
 class PositionalAesthetic extends OneDAesthetic {
   constructor(scatterplot, regl2, tile, map2) {
     super(scatterplot, regl2, tile, map2);
-    __publicField(this, "default_range", [-1, 1]);
-    __publicField(this, "default_constant", 0);
-    __publicField(this, "default_transform", "literal");
-    __publicField(this, "_constant", 0);
+    this.default_range = [-1, 1];
+    this.default_constant = 0;
+    this.default_transform = "literal";
+    this._constant = 0;
     this._transform = "literal";
   }
   get range() {
@@ -23087,7 +23197,7 @@ class PositionalAesthetic extends OneDAesthetic {
 class X extends PositionalAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "field", "x");
+    this.field = "x";
   }
 }
 class X0 extends X {
@@ -23095,7 +23205,7 @@ class X0 extends X {
 class Y extends PositionalAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "field", "y");
+    this.field = "y";
   }
 }
 class Y0 extends Y {
@@ -23129,6 +23239,7 @@ class BooleanAesthetic extends Aesthetic {
       return [4, (input.b - input.a) / 2, (input.b + input.a) / 2];
     }
     const val = [
+      // Encoding of op as number.
       [null, "lt", "gt", "eq"].indexOf(input.op),
       input.a,
       0
@@ -23189,11 +23300,11 @@ class BooleanAesthetic extends Aesthetic {
 class Foreground extends BooleanAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "current_encoding", null);
-    __publicField(this, "_constant", 1);
-    __publicField(this, "default_constant", 1);
-    __publicField(this, "default_range", [0, 1]);
-    __publicField(this, "default_transform", "literal");
+    this.current_encoding = null;
+    this._constant = 1;
+    this.default_constant = 1;
+    this.default_range = [0, 1];
+    this.default_transform = "literal";
   }
   get active() {
     if (this.current_encoding === null || isConstantChannel(this.current_encoding)) {
@@ -23205,20 +23316,20 @@ class Foreground extends BooleanAesthetic {
 class Filter extends BooleanAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "current_encoding", null);
-    __publicField(this, "_constant", 1);
-    __publicField(this, "default_constant", 1);
-    __publicField(this, "default_transform", "literal");
-    __publicField(this, "default_range", [0, 1]);
+    this.current_encoding = null;
+    this._constant = 1;
+    this.default_constant = 1;
+    this.default_transform = "literal";
+    this.default_range = [0, 1];
   }
 }
 class Jitter_speed extends OneDAesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "default_transform", "linear");
-    __publicField(this, "default_range", [0, 1]);
-    __publicField(this, "default_constant", 0.5);
-    __publicField(this, "_constant", 0);
+    this.default_transform = "linear";
+    this.default_range = [0, 1];
+    this.default_constant = 0.5;
+    this._constant = 0;
   }
 }
 function encode_jitter_to_int(jitter) {
@@ -23242,10 +23353,10 @@ function encode_jitter_to_int(jitter) {
 class Jitter_radius extends Aesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "_constant", 0);
-    __publicField(this, "jitter_int_formatted", 0);
-    __publicField(this, "default_transform", "linear");
-    __publicField(this, "_method", "None");
+    this._constant = 0;
+    this.jitter_int_formatted = 0;
+    this.default_transform = "linear";
+    this._method = "None";
   }
   toGLType(a) {
     return a;
@@ -23641,81 +23752,81 @@ var inferno = ramp(colors("00000401000501010601010802010a02020c02020e03021004031
 var plasma = ramp(colors("0d088710078813078916078a19068c1b068d1d068e20068f2206902406912605912805922a05932c05942e05952f059631059733059735049837049938049a3a049a3c049b3e049c3f049c41049d43039e44039e46039f48039f4903a04b03a14c02a14e02a25002a25102a35302a35502a45601a45801a45901a55b01a55c01a65e01a66001a66100a76300a76400a76600a76700a86900a86a00a86c00a86e00a86f00a87100a87201a87401a87501a87701a87801a87a02a87b02a87d03a87e03a88004a88104a78305a78405a78606a68707a68808a68a09a58b0aa58d0ba58e0ca48f0da4910ea3920fa39410a29511a19613a19814a099159f9a169f9c179e9d189d9e199da01a9ca11b9ba21d9aa31e9aa51f99a62098a72197a82296aa2395ab2494ac2694ad2793ae2892b02991b12a90b22b8fb32c8eb42e8db52f8cb6308bb7318ab83289ba3388bb3488bc3587bd3786be3885bf3984c03a83c13b82c23c81c33d80c43e7fc5407ec6417dc7427cc8437bc9447aca457acb4679cc4778cc4977cd4a76ce4b75cf4c74d04d73d14e72d24f71d35171d45270d5536fd5546ed6556dd7566cd8576bd9586ada5a6ada5b69db5c68dc5d67dd5e66de5f65de6164df6263e06363e16462e26561e26660e3685fe4695ee56a5de56b5de66c5ce76e5be76f5ae87059e97158e97257ea7457eb7556eb7655ec7754ed7953ed7a52ee7b51ef7c51ef7e50f07f4ff0804ef1814df1834cf2844bf3854bf3874af48849f48948f58b47f58c46f68d45f68f44f79044f79143f79342f89441f89540f9973ff9983ef99a3efa9b3dfa9c3cfa9e3bfb9f3afba139fba238fca338fca537fca636fca835fca934fdab33fdac33fdae32fdaf31fdb130fdb22ffdb42ffdb52efeb72dfeb82cfeba2cfebb2bfebd2afebe2afec029fdc229fdc328fdc527fdc627fdc827fdca26fdcb26fccd25fcce25fcd025fcd225fbd324fbd524fbd724fad824fada24f9dc24f9dd25f8df25f8e125f7e225f7e425f6e626f6e826f5e926f5eb27f4ed27f3ee27f3f027f2f227f1f426f1f525f0f724f0f921"));
 const d3Chromatic = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  schemeCategory10: category10,
+  interpolateBlues: Blues,
+  interpolateBrBG: BrBG,
+  interpolateBuGn: BuGn,
+  interpolateBuPu: BuPu,
+  interpolateCividis: cividis,
+  interpolateCool: cool,
+  interpolateCubehelixDefault: cubehelix,
+  interpolateGnBu: GnBu,
+  interpolateGreens: Greens,
+  interpolateGreys: Greys,
+  interpolateInferno: inferno,
+  interpolateMagma: magma,
+  interpolateOrRd: OrRd,
+  interpolateOranges: Oranges,
+  interpolatePRGn: PRGn,
+  interpolatePiYG: PiYG,
+  interpolatePlasma: plasma,
+  interpolatePuBu: PuBu,
+  interpolatePuBuGn: PuBuGn,
+  interpolatePuOr: PuOr,
+  interpolatePuRd: PuRd,
+  interpolatePurples: Purples,
+  interpolateRainbow: rainbow,
+  interpolateRdBu: RdBu,
+  interpolateRdGy: RdGy,
+  interpolateRdPu: RdPu,
+  interpolateRdYlBu: RdYlBu,
+  interpolateRdYlGn: RdYlGn,
+  interpolateReds: Reds,
+  interpolateSinebow: sinebow,
+  interpolateSpectral: Spectral,
+  interpolateTurbo: turbo,
+  interpolateViridis: viridis,
+  interpolateWarm: warm,
+  interpolateYlGn: YlGn,
+  interpolateYlGnBu: YlGnBu,
+  interpolateYlOrBr: YlOrBr,
+  interpolateYlOrRd: YlOrRd,
   schemeAccent: Accent,
+  schemeBlues: scheme$5,
+  schemeBrBG: scheme$q,
+  schemeBuGn: scheme$h,
+  schemeBuPu: scheme$g,
+  schemeCategory10: category10,
   schemeDark2: Dark2,
+  schemeGnBu: scheme$f,
+  schemeGreens: scheme$4,
+  schemeGreys: scheme$3,
+  schemeOrRd: scheme$e,
+  schemeOranges: scheme,
+  schemePRGn: scheme$p,
   schemePaired: Paired,
   schemePastel1: Pastel1,
   schemePastel2: Pastel2,
+  schemePiYG: scheme$o,
+  schemePuBu: scheme$c,
+  schemePuBuGn: scheme$d,
+  schemePuOr: scheme$n,
+  schemePuRd: scheme$b,
+  schemePurples: scheme$2,
+  schemeRdBu: scheme$m,
+  schemeRdGy: scheme$l,
+  schemeRdPu: scheme$a,
+  schemeRdYlBu: scheme$k,
+  schemeRdYlGn: scheme$j,
+  schemeReds: scheme$1,
   schemeSet1: Set1,
   schemeSet2: Set2,
   schemeSet3: Set3,
-  schemeTableau10: Tableau10,
-  interpolateBrBG: BrBG,
-  schemeBrBG: scheme$q,
-  interpolatePRGn: PRGn,
-  schemePRGn: scheme$p,
-  interpolatePiYG: PiYG,
-  schemePiYG: scheme$o,
-  interpolatePuOr: PuOr,
-  schemePuOr: scheme$n,
-  interpolateRdBu: RdBu,
-  schemeRdBu: scheme$m,
-  interpolateRdGy: RdGy,
-  schemeRdGy: scheme$l,
-  interpolateRdYlBu: RdYlBu,
-  schemeRdYlBu: scheme$k,
-  interpolateRdYlGn: RdYlGn,
-  schemeRdYlGn: scheme$j,
-  interpolateSpectral: Spectral,
   schemeSpectral: scheme$i,
-  interpolateBuGn: BuGn,
-  schemeBuGn: scheme$h,
-  interpolateBuPu: BuPu,
-  schemeBuPu: scheme$g,
-  interpolateGnBu: GnBu,
-  schemeGnBu: scheme$f,
-  interpolateOrRd: OrRd,
-  schemeOrRd: scheme$e,
-  interpolatePuBuGn: PuBuGn,
-  schemePuBuGn: scheme$d,
-  interpolatePuBu: PuBu,
-  schemePuBu: scheme$c,
-  interpolatePuRd: PuRd,
-  schemePuRd: scheme$b,
-  interpolateRdPu: RdPu,
-  schemeRdPu: scheme$a,
-  interpolateYlGnBu: YlGnBu,
-  schemeYlGnBu: scheme$9,
-  interpolateYlGn: YlGn,
+  schemeTableau10: Tableau10,
   schemeYlGn: scheme$8,
-  interpolateYlOrBr: YlOrBr,
+  schemeYlGnBu: scheme$9,
   schemeYlOrBr: scheme$7,
-  interpolateYlOrRd: YlOrRd,
-  schemeYlOrRd: scheme$6,
-  interpolateBlues: Blues,
-  schemeBlues: scheme$5,
-  interpolateGreens: Greens,
-  schemeGreens: scheme$4,
-  interpolateGreys: Greys,
-  schemeGreys: scheme$3,
-  interpolatePurples: Purples,
-  schemePurples: scheme$2,
-  interpolateReds: Reds,
-  schemeReds: scheme$1,
-  interpolateOranges: Oranges,
-  schemeOranges: scheme,
-  interpolateCividis: cividis,
-  interpolateCubehelixDefault: cubehelix,
-  interpolateRainbow: rainbow,
-  interpolateWarm: warm,
-  interpolateCool: cool,
-  interpolateSinebow: sinebow,
-  interpolateTurbo: turbo,
-  interpolateViridis: viridis,
-  interpolateMagma: magma,
-  interpolateInferno: inferno,
-  interpolatePlasma: plasma
+  schemeYlOrRd: scheme$6
 }, Symbol.toStringTag, { value: "Module" }));
 const mul = 1664525;
 const inc = 1013904223;
@@ -23830,11 +23941,11 @@ okabe();
 class Color extends Aesthetic {
   constructor() {
     super(...arguments);
-    __publicField(this, "_constant", "#CC5500");
-    __publicField(this, "texture_type", "uint8");
-    __publicField(this, "default_constant", "#CC5500");
-    __publicField(this, "default_transform", "linear");
-    __publicField(this, "current_encoding", null);
+    this._constant = "#CC5500";
+    this.texture_type = "uint8";
+    this.default_constant = "#CC5500";
+    this.default_transform = "linear";
+    this.current_encoding = null;
   }
   get default_range() {
     return [0, 1];
@@ -23977,12 +24088,7 @@ const dimensions = {
 };
 class StatefulAesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map, Factory) {
-    __publicField(this, "states");
-    __publicField(this, "dataset");
-    __publicField(this, "regl");
-    __publicField(this, "scatterplot");
-    __publicField(this, "needs_transitions", false);
-    __publicField(this, "aesthetic_map");
+    this.needs_transitions = false;
     if (aesthetic_map === void 0) {
       throw new Error("Aesthetic map is undefined.");
     }
@@ -24027,13 +24133,7 @@ class StatefulAesthetic {
 }
 class AestheticSet {
   constructor(scatterplot, regl2, tileSet) {
-    __publicField(this, "tileSet");
-    __publicField(this, "scatterplot");
-    __publicField(this, "regl");
-    __publicField(this, "encoding", {});
-    __publicField(this, "position_interpolation");
-    __publicField(this, "store");
-    __publicField(this, "aesthetic_map");
+    this.encoding = {};
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl2;
@@ -24120,15 +24220,8 @@ class AestheticSet {
 }
 class TextureSet {
   constructor(regl2, texture_size = 4096) {
-    __publicField(this, "_one_d_texture");
-    __publicField(this, "_color_texture");
-    __publicField(this, "texture_size");
-    __publicField(this, "regl");
-    __publicField(this, "id_locs", {});
-    __publicField(this, "texture_widths");
-    __publicField(this, "offsets", {});
-    __publicField(this, "_one_d_position");
-    __publicField(this, "_color_position");
+    this.id_locs = {};
+    this.offsets = {};
     this.texture_size = texture_size;
     this.texture_widths = 32;
     this.regl = regl2;
@@ -24205,38 +24298,19 @@ class TextureSet {
   }
 }
 class ReglRenderer extends Renderer {
+  //  public _renderer :  Renderer;
   constructor(selector2, tileSet, scatterplot) {
     super(selector2, tileSet, scatterplot);
-    __publicField(this, "regl");
-    __publicField(this, "aes");
-    __publicField(this, "buffer_size", 1024 * 1024 * 64);
-    __publicField(this, "_buffers");
-    __publicField(this, "_initializations");
-    __publicField(this, "tileSet");
-    __publicField(this, "zoom");
-    __publicField(this, "_zoom");
-    __publicField(this, "_start");
-    __publicField(this, "most_recent_restart");
-    __publicField(this, "_default_webgl_scale");
-    __publicField(this, "_webgl_scale_history");
-    __publicField(this, "_renderer");
-    __publicField(this, "_use_scale_to_download_tiles", true);
-    __publicField(this, "sprites");
-    __publicField(this, "fbos", {});
-    __publicField(this, "textures", {});
-    __publicField(this, "_fill_buffer");
-    __publicField(this, "contour_vals");
-    __publicField(this, "tick_num");
-    __publicField(this, "reglframe");
-    __publicField(this, "_integer_buffer");
-    __publicField(this, "aes_to_buffer_num");
-    __publicField(this, "variable_to_buffer_num");
-    __publicField(this, "buffer_num_to_variable");
+    this.buffer_size = 1024 * 1024 * 64;
+    this._use_scale_to_download_tiles = true;
+    this.fbos = {};
+    this.textures = {};
     const c2 = this.canvas;
     if (this.canvas === void 0) {
       throw new Error("No canvas found");
     }
-    this.regl = wrapREGL({
+    this.regl = reglExports({
+      //      extensions: 'angle_instanced_arrays',
       optionalExtensions: [
         "OES_standard_derivatives",
         "OES_element_index_uint",
@@ -24249,6 +24323,7 @@ class ReglRenderer extends Renderer {
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
     this.initialize_textures();
     this._initializations = [
+      // some things that need to be initialized before the renderer is loaded.
       this.tileSet.promise.then(() => {
         this.remake_renderer();
         this._webgl_scale_history = [
@@ -24271,6 +24346,31 @@ class ReglRenderer extends Renderer {
     this.tileSet = dataset;
     return this;
   }
+  /* 
+    apply_webgl_scale() {
+    // Should probably be attached to AestheticSet, not to this class.
+  
+    // The webgl transform can either be 'literal', in which case it uses
+    // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
+    // in which case it has to calculate off of the x and y dimensions.
+  
+      this._use_scale_to_download_tiles = true;
+      if (
+        (this.aes.encoding.x.transform && this.aes.encoding.x.transform !== 'literal')
+      || (this.aes.encoding.y.transform && this.aes.encoding.y.transform !== 'literal')
+      ) {
+        const webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat();
+        this._webgl_scale_history.unshift(webglscale);
+        this._use_scale_to_download_tiles = false;
+      } else {
+        if (!this._webgl_scale_history) {
+          this._webgl_scale_history = [];
+        }
+        // Use the default linked to the coordinates used to build the tree.
+        this._webgl_scale_history.unshift(this.default_webgl_scale);
+      }
+    }
+    */
   get props() {
     this.allocate_aesthetic_buffers();
     const {
@@ -24281,6 +24381,7 @@ class ReglRenderer extends Renderer {
     } = this;
     const { transform } = this.zoom;
     const props = {
+      // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
       corners: this.zoom.current_corners(),
@@ -24304,6 +24405,7 @@ class ReglRenderer extends Renderer {
       aes_to_buffer_num,
       variable_to_buffer_num,
       color_picker_mode: 0,
+      // whether to draw as a color picker.
       zoom_matrix: [
         [transform.k, 0, transform.x],
         [0, transform.k, transform.y],
@@ -24403,6 +24505,15 @@ class ReglRenderer extends Renderer {
           iChannel0: fbo1,
           direction
         },
+        /* blend: {
+          enable: true,
+          func: {
+            srcRGB: 'one',
+            srcAlpha: 'one',
+            dstRGB: 'one minus src alpha',
+            dstAlpha: 'one minus src alpha',
+          },
+        }, */
         vert: `
         precision mediump float;
         attribute vec2 position;
@@ -24484,6 +24595,67 @@ class ReglRenderer extends Renderer {
       })();
     }
   }
+  /*
+    set_image_data(tile, ix) {
+    // Stores a *single* image onto the texture.
+      const { regl } = this;
+  
+      this.initialize_sprites(tile);
+  
+      //    const { sprites, image_locations } = tile._regl_elements;
+      const { current_position } = sprites;
+      if (current_position[1] > (4096 - 18 * 2)) {
+        console.error(`First spritesheet overflow on ${tile.key}`);
+        // Just move back to the beginning. Will cause all sorts of havoc.
+        sprites.current_position = [0, 0];
+        return;
+      }
+      if (!tile.table.get(ix)._jpeg) {
+  
+      }
+    }
+    */
+  /*
+    spritesheet_setter(word) {
+    // Set if not there.
+      let ctx = 0;
+      if (!this.spritesheet) {
+        const offscreen = create('canvas')
+          .attr('width', 4096)
+          .attr('width', 4096)
+          .style('display', 'none');
+  
+        ctx = offscreen.node().getContext('2d');
+        const font_size = 32;
+        ctx.font = `${font_size}px Times New Roman`;
+        ctx.fillStyle = 'black';
+        ctx.lookups = new Map();
+        ctx.position = [0, font_size - font_size / 4.0];
+        this.spritesheet = ctx;
+      } else {
+        ctx = this.spritesheet;
+      }
+      let [x, y] = ctx.position;
+  
+      if (ctx.lookups.get(word)) {
+        return ctx.lookups.get(word);
+      }
+      const w_ = ctx.measureText(word).width;
+      if (w_ > 4096) {
+        return;
+      }
+      if ((x + w_) > 4096) {
+        x = 0;
+        y += font_size;
+      }
+      ctx.fillText(word, x, y);
+      lookups.set(word, { x, y, width: w_ });
+      // ctx.strokeRect(x, y - font_size, width, font_size)
+      x += w_;
+      ctx.position = [x, y];
+      return lookups.get(word);
+    }
+    */
   initialize_textures() {
     const { regl: regl2 } = this;
     this.fbos = this.fbos || {};
@@ -24497,11 +24669,13 @@ class ReglRenderer extends Renderer {
       depth: false
     });
     this.fbos.lines = regl2.framebuffer({
+      // type: 'half float',
       width: this.width,
       height: this.height,
       depth: false
     });
     this.fbos.points = regl2.framebuffer({
+      // type: 'half float',
       width: this.width,
       height: this.height,
       depth: false
@@ -24545,6 +24719,81 @@ class ReglRenderer extends Renderer {
     });
     return this.textures[url];
   }
+  /*
+    plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
+      const { scatterplot, regl, tileSet } = this.aes;
+  
+      const saved_aes = this.aes;
+  
+      if (buffer === undefined) {
+      // Mock up dummy syntax to use the main draw buffer.
+        buffer = {
+          width: this.width,
+          height: this.height,
+          use: (f) => f(),
+        };
+      }
+  
+      const { width, height } = buffer;
+  
+      this.aes = new AestheticSet(scatterplot, regl, tileSet);
+  
+      const x_length = map._root.table.getColumn(x_field).data.dictionary.length;
+  
+      const stride = 1;
+  
+      let nearest_pow_2 = 1;
+      while (nearest_pow_2 < x_length) {
+        nearest_pow_2 *= 2;
+      }
+  
+      const encoding = {
+        x: {
+          field: x_field,
+          transform: 'linear',
+          domain: [-2047, -2047 + nearest_pow_2],
+        },
+        y: y_field !== undefined ? {
+          field: y_field,
+          transform: 'linear',
+          domain: [-2047, -2020],
+  
+        } : { constant: -1 },
+        size: 1,
+        color: {
+          constant: [0, 0, 0],
+          transform: 'literal',
+        },
+        jitter_radius: {
+          constant: 1 / 2560, // maps to x jitter
+          method: 'uniform', // Means x in radius and y in speed.
+        },
+  
+        jitter_speed: y_field === undefined ? 1 : 1 / 256, // maps to y jitter
+      };
+      // Twice to overwrite the defaults and avoid interpolation.
+      this.aes.apply_encoding(encoding);
+      this.aes.apply_encoding(encoding);
+      this.aes.x[1] = saved_aes.x[0];
+      this.aes.y[1] = saved_aes.y[0];
+      this.aes.filter1 = saved_aes.filter1;
+      this.aes.filter2 = saved_aes.filter2;
+  
+      const { props } = this;
+      props.block_for_buffers = true;
+      props.grid_mode = 1;
+  
+      const minilist = new Uint8Array(width * height * 4);
+  
+      buffer.use(() => {
+        this.regl.clear({ color: [0, 0, 0, 0] });
+        this.render_points(props);
+        regl.read({ data: minilist });
+      });
+      // Then revert back.
+      this.aes = saved_aes;
+    }
+     */
   n_visible(only_color = -1) {
     let { width, height } = this;
     width = Math.floor(width);
@@ -24619,6 +24868,29 @@ class ReglRenderer extends Renderer {
     const point_as_int = Math.round(point_as_float);
     return point_as_int;
   }
+  /* blur(fbo) {
+    var passes = [];
+    var radii = [Math.round(
+      Math.max(1, state.bloom.radius * pixelRatio / state.bloom.downsample))];
+    for (var radius = nextPow2(radii[0]) / 2; radius >= 1; radius /= 2) {
+      radii.push(radius);
+    }
+    radii.forEach(radius => {
+      for (var pass = 0; pass < state.bloom.blur.passes; pass++) {
+        passes.push({
+          kernel: 13,
+          src: bloomFbo[0],
+          dst: bloomFbo[1],
+          direction: [radius, 0]
+        }, {
+          kernel: 13,
+          src: bloomFbo[1],
+          dst: bloomFbo[0],
+          direction: [0, radius]
+        });
+      }
+    })
+  } */
   get fill_buffer() {
     if (!this._fill_buffer) {
       const { regl: regl2 } = this;
@@ -24675,8 +24947,13 @@ class ReglRenderer extends Renderer {
       count(_, props) {
         return props.manager.count;
       },
-      attributes: {},
+      attributes: {
+        //        buffer_0: (_, props) => props.manager.regl_elements.get('ix'),
+        //        buffer_1: this.integer_buffer
+      },
+      // Filled below.
       uniforms: {
+        //@ts-ignore
         u_update_time: regl2.prop("update_time"),
         u_transition_duration(_, props) {
           return props.prefs.duration;
@@ -24694,6 +24971,7 @@ class ReglRenderer extends Renderer {
           }
           return this.textures.empty_texture;
         },
+        //@ts-ignore
         u_color_picker_mode: regl2.prop("color_picker_mode"),
         u_position_interpolation_mode() {
           if (this.aes.position_interpolation) {
@@ -24702,13 +24980,21 @@ class ReglRenderer extends Renderer {
           return 0;
         },
         u_grid_mode: (_, { grid_mode }) => grid_mode,
+        //@ts-ignore
         u_colors_as_grid: regl2.prop("colors_as_grid"),
+        /*        u_constant_color: () => (this.aes.dim("color").current.constant !== undefined
+          ? this.aes.dim("color").current.constant
+          : [-1, -1, -1]),
+        u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
+          ? this.aes.dim("color").last.constant
+          : [-1, -1, -1]),*/
         u_tile_id: (_, props) => props.tile_id,
         u_width: ({ viewportWidth }) => viewportWidth,
         u_height: ({ viewportHeight }) => viewportHeight,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
         u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
+        //@ts-ignore
         u_zoom_balance: regl2.prop("zoom_balance"),
         u_base_size: (_, { point_size }) => point_size,
         u_maxix: (_, { max_ix }) => max_ix,
@@ -24731,7 +25017,10 @@ class ReglRenderer extends Renderer {
         u_k: (_, props) => {
           return props.transform.k;
         },
+        // Allow interpolation between different coordinate systems.
+        //@ts-ignore
         u_window_scale: regl2.prop("webgl_scale"),
+        //@ts-ignore
         u_last_window_scale: regl2.prop("last_webgl_scale"),
         u_time: ({ time }) => time,
         u_filter_numeric() {
@@ -24777,6 +25066,7 @@ class ReglRenderer extends Renderer {
       "filter",
       "filter2",
       "foreground"
+      //      'character',
     ]) {
       for (const time of ["current", "last"]) {
         const temporal = time === "current" ? "" : "last_";
@@ -24815,6 +25105,7 @@ class ReglRenderer extends Renderer {
   allocate_aesthetic_buffers() {
     const buffers = [];
     const priorities = [
+      // How important is safe interpolation?
       "x",
       "y",
       "color",
@@ -24884,10 +25175,6 @@ class ReglRenderer extends Renderer {
 }
 class TileBufferManager {
   constructor(regl2, tile, renderer) {
-    __publicField(this, "tile");
-    __publicField(this, "regl");
-    __publicField(this, "renderer");
-    __publicField(this, "regl_elements");
     this.tile = tile;
     this.regl = regl2;
     this.renderer = renderer;
@@ -24903,6 +25190,11 @@ class TileBufferManager {
       ]
     ]);
   }
+  /**
+   *
+   * @param
+   * @returns
+   */
   ready() {
     const { renderer } = this;
     const needed_dimensions = /* @__PURE__ */ new Set();
@@ -24920,6 +25212,16 @@ class TileBufferManager {
     }
     return true;
   }
+  /**
+   * Creates a deferred call that will populate the regl buffer
+   * when there's some free time.
+   *
+   * @param key a string representing the requested column; must either exist in the
+   * record batch or have a means for creating it asynchronously in 'transformations.'
+   * @returns both an instantly available object called 'ready' that says if we're ready
+   * to go: and, if the tile is ready, a promise that starts the update going and resolves
+   * once it's ready.
+   */
   ready_or_not_here_it_comes(key) {
     const { renderer, regl_elements } = this;
     const current = this.regl_elements.get(key);
@@ -24941,6 +25243,12 @@ class TileBufferManager {
     }
     return { ready: true, promise: Promise.resolve() };
   }
+  /**
+   *
+   * @param colname the name of the column to release
+   *
+   * @returns Nothing, not even if the column isn't currently defined.
+   */
   release(colname) {
     let current;
     if (current = this.regl_elements.get(colname)) {
@@ -24974,6 +25282,7 @@ class TileBufferManager {
         );
       }
     }
+    console.log({ column });
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
       const source_buffer = column.data[0];
@@ -25019,12 +25328,13 @@ class TileBufferManager {
   }
 }
 class MultipurposeBufferSet {
+  /**
+   *
+   * @param regl the Regl context we're using.
+   * @param buffer_size The number of bytes on each strip of memory that we'll ask for.
+   */
   constructor(regl2, buffer_size) {
-    __publicField(this, "regl");
-    __publicField(this, "buffers");
-    __publicField(this, "buffer_size");
-    __publicField(this, "pointer");
-    __publicField(this, "freed_buffers", []);
+    this.freed_buffers = [];
     this.regl = regl2;
     this.buffer_size = buffer_size;
     this.buffers = [];
@@ -25037,6 +25347,7 @@ class MultipurposeBufferSet {
         buffer: this.buffers[0],
         offset: this.pointer,
         stride: 4,
+        // meaningless here.
         byte_size: this.buffer_size - this.pointer
       });
     }
@@ -25049,9 +25360,21 @@ class MultipurposeBufferSet {
       })
     );
   }
+  /**
+   * Freeing a block means just adding its space back into the list of open blocks.
+   * There's no need to actually zero out the memory or anything.
+   *
+   * @param buff The location of the buffer we're done with.
+   */
   free_block(buff) {
     this.freed_buffers.push(buff);
   }
+  /**
+   *
+   * @param items The number of datapoints in the arrow column being allocated
+   * @param bytes_per_item The number of bytes per item in the arrow column being allocated
+   * @returns
+   */
   allocate_block(items, bytes_per_item) {
     const bytes_needed = items * bytes_per_item;
     let i = 0;
@@ -25071,6 +25394,7 @@ class MultipurposeBufferSet {
       this.generate_new_buffer();
     }
     const value = {
+      // First slot stores the active buffer.
       buffer: this.buffers[0],
       offset: this.pointer,
       stride: bytes_per_item,
@@ -25405,6 +25729,7 @@ function toArrayBufferViewAsyncIterator(ArrayCtor, source) {
     };
     const buffers = typeof source === "string" ? wrap(source) : ArrayBuffer.isView(source) ? wrap(source) : source instanceof ArrayBuffer ? wrap(source) : source instanceof SharedArrayBuf ? wrap(source) : isIterable(source) ? emit(source) : !isAsyncIterable(source) ? wrap(source) : source;
     yield __await(
+      // otherwise if AsyncIterable, use it
       yield* __asyncDelegator(__asyncValues(pump$1(function(it) {
         return __asyncGenerator(this, arguments, function* () {
           let r = null;
@@ -25446,9 +25771,11 @@ const streamAdapters = {
   fromNodeStream(stream) {
     return pump(fromNodeStream(stream));
   },
+  // @ts-ignore
   toDOMStream(source, options) {
     throw new Error(`"toDOMStream" not available in this environment`);
   },
+  // @ts-ignore
   toNodeStream(source, options) {
     throw new Error(`"toNodeStream" not available in this environment`);
   }
@@ -25793,7 +26120,7 @@ function valueToString(x) {
     return x[Symbol.toPrimitive]("string");
   }
   if (ArrayBuffer.isView(x)) {
-    if (x instanceof BigInt64Array || x instanceof BigUint64Array) {
+    if (x instanceof BigInt64ArrayCtor || x instanceof BigUint64ArrayCtor) {
       return `[${[...x].map((x2) => valueToString(x2))}]`;
     }
     return `[${x}]`;
@@ -25889,6 +26216,7 @@ function decimalToString(a) {
   return digits !== null && digits !== void 0 ? digits : `0`;
 }
 class BN {
+  /** @nocollapse */
   static new(num, isSigned) {
     switch (isSigned) {
       case true:
@@ -25908,12 +26236,15 @@ class BN {
     }
     return new UnsignedBigNum(num);
   }
+  /** @nocollapse */
   static signed(num) {
     return new SignedBigNum(num);
   }
+  /** @nocollapse */
   static unsigned(num) {
     return new UnsignedBigNum(num);
   }
+  /** @nocollapse */
   static decimal(num) {
     return new DecimalBigNum(num);
   }
@@ -25923,63 +26254,83 @@ class BN {
 }
 var _a$3, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
 class DataType {
+  /** @nocollapse */
   static isNull(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Null;
   }
+  /** @nocollapse */
   static isInt(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Int;
   }
+  /** @nocollapse */
   static isFloat(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Float;
   }
+  /** @nocollapse */
   static isBinary(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Binary;
   }
+  /** @nocollapse */
   static isUtf8(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Utf8;
   }
+  /** @nocollapse */
   static isBool(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Bool;
   }
+  /** @nocollapse */
   static isDecimal(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Decimal;
   }
+  /** @nocollapse */
   static isDate(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Date;
   }
+  /** @nocollapse */
   static isTime(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Time;
   }
+  /** @nocollapse */
   static isTimestamp(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Timestamp;
   }
+  /** @nocollapse */
   static isInterval(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Interval;
   }
+  /** @nocollapse */
   static isList(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.List;
   }
+  /** @nocollapse */
   static isStruct(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Struct;
   }
+  /** @nocollapse */
   static isUnion(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Union;
   }
+  /** @nocollapse */
   static isFixedSizeBinary(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.FixedSizeBinary;
   }
+  /** @nocollapse */
   static isFixedSizeList(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.FixedSizeList;
   }
+  /** @nocollapse */
   static isMap(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Map;
   }
+  /** @nocollapse */
   static isDictionary(x) {
     return (x === null || x === void 0 ? void 0 : x.typeId) === Type$1.Dictionary;
   }
+  /** @nocollapse */
   static isDenseUnion(x) {
     return DataType.isUnion(x) && x.mode === UnionMode$1.Dense;
   }
+  /** @nocollapse */
   static isSparseUnion(x) {
     return DataType.isUnion(x) && x.mode === UnionMode$1.Sparse;
   }
@@ -25993,14 +26344,14 @@ DataType[_a$3] = ((proto) => {
   proto.ArrayType = Array;
   return proto[Symbol.toStringTag] = "DataType";
 })(DataType.prototype);
-class Null$1 extends DataType {
+let Null$1 = class Null extends DataType {
   toString() {
     return `Null`;
   }
   get typeId() {
     return Type$1.Null;
   }
-}
+};
 _b = Symbol.toStringTag;
 Null$1[_b] = ((proto) => proto[Symbol.toStringTag] = "Null")(Null$1.prototype);
 class Int_ extends DataType {
@@ -26021,7 +26372,7 @@ class Int_ extends DataType {
       case 32:
         return this.isSigned ? Int32Array : Uint32Array;
       case 64:
-        return this.isSigned ? BigInt64Array : BigUint64Array;
+        return this.isSigned ? BigInt64ArrayCtor : BigUint64ArrayCtor;
     }
     throw new Error(`Unrecognized ${this[Symbol.toStringTag]} type`);
   }
@@ -26059,14 +26410,14 @@ class Int32 extends Int_ {
     return Int32Array;
   }
 }
-class Int64$1 extends Int_ {
+let Int64$1 = class Int64 extends Int_ {
   constructor() {
     super(true, 64);
   }
   get ArrayType() {
-    return BigInt64Array;
+    return BigInt64ArrayCtor;
   }
-}
+};
 class Uint8 extends Int_ {
   constructor() {
     super(false, 8);
@@ -26091,22 +26442,22 @@ class Uint32 extends Int_ {
     return Uint32Array;
   }
 }
-class Uint64$1 extends Int_ {
+let Uint64$1 = class Uint64 extends Int_ {
   constructor() {
     super(false, 64);
   }
   get ArrayType() {
-    return BigUint64Array;
+    return BigUint64ArrayCtor;
   }
-}
+};
 Object.defineProperty(Int8.prototype, "ArrayType", { value: Int8Array });
 Object.defineProperty(Int16.prototype, "ArrayType", { value: Int16Array });
 Object.defineProperty(Int32.prototype, "ArrayType", { value: Int32Array });
-Object.defineProperty(Int64$1.prototype, "ArrayType", { value: BigInt64Array });
+Object.defineProperty(Int64$1.prototype, "ArrayType", { value: BigInt64ArrayCtor });
 Object.defineProperty(Uint8.prototype, "ArrayType", { value: Uint8Array });
 Object.defineProperty(Uint16.prototype, "ArrayType", { value: Uint16Array });
 Object.defineProperty(Uint32.prototype, "ArrayType", { value: Uint32Array });
-Object.defineProperty(Uint64$1.prototype, "ArrayType", { value: BigUint64Array });
+Object.defineProperty(Uint64$1.prototype, "ArrayType", { value: BigUint64ArrayCtor });
 class Float extends DataType {
   constructor(precision) {
     super();
@@ -26147,7 +26498,7 @@ class Float64 extends Float {
 }
 Object.defineProperty(Float32.prototype, "ArrayType", { value: Float32Array });
 Object.defineProperty(Float64.prototype, "ArrayType", { value: Float64Array });
-class Binary$1 extends DataType {
+let Binary$1 = class Binary extends DataType {
   constructor() {
     super();
   }
@@ -26157,13 +26508,13 @@ class Binary$1 extends DataType {
   toString() {
     return `Binary`;
   }
-}
+};
 _e = Symbol.toStringTag;
 Binary$1[_e] = ((proto) => {
   proto.ArrayType = Uint8Array;
   return proto[Symbol.toStringTag] = "Binary";
 })(Binary$1.prototype);
-class Utf8$1 extends DataType {
+let Utf8$1 = class Utf8 extends DataType {
   constructor() {
     super();
   }
@@ -26173,13 +26524,13 @@ class Utf8$1 extends DataType {
   toString() {
     return `Utf8`;
   }
-}
+};
 _f = Symbol.toStringTag;
 Utf8$1[_f] = ((proto) => {
   proto.ArrayType = Uint8Array;
   return proto[Symbol.toStringTag] = "Utf8";
 })(Utf8$1.prototype);
-class Bool$1 extends DataType {
+let Bool$1 = class Bool extends DataType {
   constructor() {
     super();
   }
@@ -26189,13 +26540,13 @@ class Bool$1 extends DataType {
   toString() {
     return `Bool`;
   }
-}
+};
 _g = Symbol.toStringTag;
 Bool$1[_g] = ((proto) => {
   proto.ArrayType = Uint8Array;
   return proto[Symbol.toStringTag] = "Bool";
 })(Bool$1.prototype);
-class Decimal$1 extends DataType {
+let Decimal$1 = class Decimal extends DataType {
   constructor(scale, precision, bitWidth = 128) {
     super();
     this.scale = scale;
@@ -26208,7 +26559,7 @@ class Decimal$1 extends DataType {
   toString() {
     return `Decimal[${this.precision}e${this.scale > 0 ? `+` : ``}${this.scale}]`;
   }
-}
+};
 _h = Symbol.toStringTag;
 Decimal$1[_h] = ((proto) => {
   proto.scale = null;
@@ -26251,7 +26602,7 @@ class Time_ extends DataType {
       case 32:
         return Int32Array;
       case 64:
-        return BigInt64Array;
+        return BigInt64ArrayCtor;
     }
     throw new Error(`Unrecognized ${this[Symbol.toStringTag]} type`);
   }
@@ -26300,7 +26651,7 @@ Interval_[_m] = ((proto) => {
   proto.ArrayType = Int32Array;
   return proto[Symbol.toStringTag] = "Interval";
 })(Interval_.prototype);
-class List$1 extends DataType {
+let List$1 = class List extends DataType {
   constructor(child) {
     super();
     this.children = [child];
@@ -26320,7 +26671,7 @@ class List$1 extends DataType {
   get ArrayType() {
     return this.valueType.ArrayType;
   }
-}
+};
 _o = Symbol.toStringTag;
 List$1[_o] = ((proto) => {
   proto.children = null;
@@ -26367,7 +26718,7 @@ Union_[_q] = ((proto) => {
   proto.ArrayType = Int8Array;
   return proto[Symbol.toStringTag] = "Union";
 })(Union_.prototype);
-class FixedSizeBinary$1 extends DataType {
+let FixedSizeBinary$1 = class FixedSizeBinary extends DataType {
   constructor(byteWidth) {
     super();
     this.byteWidth = byteWidth;
@@ -26378,14 +26729,14 @@ class FixedSizeBinary$1 extends DataType {
   toString() {
     return `FixedSizeBinary[${this.byteWidth}]`;
   }
-}
+};
 _r = Symbol.toStringTag;
 FixedSizeBinary$1[_r] = ((proto) => {
   proto.byteWidth = null;
   proto.ArrayType = Uint8Array;
   return proto[Symbol.toStringTag] = "FixedSizeBinary";
 })(FixedSizeBinary$1.prototype);
-class FixedSizeList$1 extends DataType {
+let FixedSizeList$1 = class FixedSizeList extends DataType {
   constructor(listSize, child) {
     super();
     this.listSize = listSize;
@@ -26406,7 +26757,7 @@ class FixedSizeList$1 extends DataType {
   toString() {
     return `FixedSizeList[${this.listSize}]<${this.valueType}>`;
   }
-}
+};
 _s = Symbol.toStringTag;
 FixedSizeList$1[_s] = ((proto) => {
   proto.children = null;
@@ -27630,7 +27981,10 @@ function truncateBitmap(offset, length, bitmap) {
   const alignedSize = bitmap.byteLength + 7 & ~7;
   if (offset > 0 || bitmap.byteLength < alignedSize) {
     const bytes = new Uint8Array(alignedSize);
-    bytes.set(offset % 8 === 0 ? bitmap.subarray(offset >> 3) : packBools(new BitIterator(bitmap, offset, length, null, getBool)).subarray(0, alignedSize));
+    bytes.set(offset % 8 === 0 ? bitmap.subarray(offset >> 3) : (
+      // Otherwise iterate each bit from the offset and return a new one
+      packBools(new BitIterator(bitmap, offset, length, null, getBool)).subarray(0, alignedSize)
+    ));
     return bytes;
   }
   return bitmap;
@@ -27692,7 +28046,12 @@ function popcnt_bit_range(data, lhs, rhs) {
   }
   const rhsInside = rhs >> 3 << 3;
   const lhsInside = lhs + (lhs % 8 === 0 ? 0 : 8 - lhs % 8);
-  return popcnt_bit_range(data, lhs, lhsInside) + popcnt_bit_range(data, rhsInside, rhs) + popcnt_array(data, lhsInside >> 3, rhsInside - lhsInside >> 3);
+  return (
+    // Get the popcnt of bits between the left hand side, and the next highest multiple of 8
+    popcnt_bit_range(data, lhs, lhsInside) + // Get the popcnt of bits between the right hand side, and the next lowest multiple of 8
+    popcnt_bit_range(data, rhsInside, rhs) + // Get the popcnt of all bits between the left and right hand sides' multiples of 8
+    popcnt_array(data, lhsInside >> 3, rhsInside - lhsInside >> 3)
+  );
 }
 function popcnt_array(arr, byteOffset, byteLength) {
   let cnt = 0, pos = Math.trunc(byteOffset);
@@ -27808,6 +28167,7 @@ class Data {
       length,
       nullCount,
       buffers,
+      // Don't slice children if we have value offsets (the variable-width types)
       children2.length === 0 || this.valueOffsets ? children2 : this._sliceChildren(children2, childStride * offset, childStride * length)
     );
   }
@@ -27829,7 +28189,8 @@ class Data {
     let arr;
     const { buffers } = this;
     (arr = buffers[BufferType.TYPE]) && (buffers[BufferType.TYPE] = arr.subarray(offset, offset + length));
-    (arr = buffers[BufferType.OFFSET]) && (buffers[BufferType.OFFSET] = arr.subarray(offset, offset + length + 1)) || (arr = buffers[BufferType.DATA]) && (buffers[BufferType.DATA] = typeId === 6 ? arr : arr.subarray(stride * offset, stride * (offset + length)));
+    (arr = buffers[BufferType.OFFSET]) && (buffers[BufferType.OFFSET] = arr.subarray(offset, offset + length + 1)) || // Otherwise if no offsets, slice the data buffer. Don't slice the data vector for Booleans, since the offset goes by bits not bytes
+    (arr = buffers[BufferType.DATA]) && (buffers[BufferType.DATA] = typeId === 6 ? arr : arr.subarray(stride * offset, stride * (offset + length)));
     return buffers;
   }
   _sliceChildren(children2, offset, length) {
@@ -28382,57 +28743,123 @@ class Vector {
     this.numChildren = (_d2 = (_c2 = type.children) === null || _c2 === void 0 ? void 0 : _c2.length) !== null && _d2 !== void 0 ? _d2 : 0;
     this.length = this._offsets[this._offsets.length - 1];
   }
+  /**
+   * The aggregate size (in bytes) of this Vector's buffers and/or child Vectors.
+   */
   get byteLength() {
     if (this._byteLength === -1) {
       this._byteLength = this.data.reduce((byteLength, data) => byteLength + data.byteLength, 0);
     }
     return this._byteLength;
   }
+  /**
+   * The number of null elements in this Vector.
+   */
   get nullCount() {
     if (this._nullCount === -1) {
       this._nullCount = computeChunkNullCounts(this.data);
     }
     return this._nullCount;
   }
+  /**
+   * The Array or TypedAray constructor used for the JS representation
+   *  of the element's values in {@link Vector.prototype.toArray `toArray()`}.
+   */
   get ArrayType() {
     return this.type.ArrayType;
   }
+  /**
+   * The name that should be printed when the Vector is logged in a message.
+   */
   get [Symbol.toStringTag]() {
     return `${this.VectorName}<${this.type[Symbol.toStringTag]}>`;
   }
+  /**
+   * The name of this Vector.
+   */
   get VectorName() {
     return `${Type$1[this.type.typeId]}Vector`;
   }
+  /**
+   * Check whether an element is null.
+   * @param index The index at which to read the validity bitmap.
+   */
+  // @ts-ignore
   isValid(index) {
     return false;
   }
+  /**
+   * Get an element value by position.
+   * @param index The index of the element to read.
+   */
+  // @ts-ignore
   get(index) {
     return null;
   }
+  /**
+   * Set an element value by position.
+   * @param index The index of the element to write.
+   * @param value The value to set.
+   */
+  // @ts-ignore
   set(index, value) {
     return;
   }
+  /**
+   * Retrieve the index of the first occurrence of a value in an Vector.
+   * @param element The value to locate in the Vector.
+   * @param offset The index at which to begin the search. If offset is omitted, the search starts at index 0.
+   */
+  // @ts-ignore
   indexOf(element, offset) {
     return -1;
   }
   includes(element, offset) {
     return this.indexOf(element, offset) > 0;
   }
+  /**
+   * Get the size in bytes of an element by index.
+   * @param index The index at which to get the byteLength.
+   */
+  // @ts-ignore
   getByteLength(index) {
     return 0;
   }
+  /**
+   * Iterator for the Vector's elements.
+   */
   [Symbol.iterator]() {
     return instance$3.visit(this);
   }
+  /**
+   * Combines two or more Vectors of the same type.
+   * @param others Additional Vectors to add to the end of this Vector.
+   */
   concat(...others) {
     return new Vector(this.data.concat(others.flatMap((x) => x.data).flat(Number.POSITIVE_INFINITY)));
   }
+  /**
+   * Return a zero-copy sub-section of this Vector.
+   * @param start The beginning of the specified portion of the Vector.
+   * @param end The end of the specified portion of the Vector. This is exclusive of the element at the index 'end'.
+   */
   slice(begin, end) {
     return new Vector(clampRange(this, begin, end, ({ data, _offsets }, begin2, end2) => sliceChunks(data, _offsets, begin2, end2)));
   }
   toJSON() {
     return [...this];
   }
+  /**
+   * Return a JavaScript Array or TypedArray of the Vector's elements.
+   *
+   * @note If this Vector contains a single Data chunk and the Vector's type is a
+   *  primitive numeric type corresponding to one of the JavaScript TypedArrays, this
+   *  method returns a zero-copy slice of the underlying TypedArray values. If there's
+   *  more than one chunk, the resulting TypedArray will be a copy of the data from each
+   *  chunk's underlying TypedArray values.
+   *
+   * @returns An Array or TypedArray of the Vector's elements, based on the Vector's DataType.
+   */
   toArray() {
     const { type, data, length, stride, ArrayType } = this;
     switch (type.typeId) {
@@ -28447,22 +28874,35 @@ class Vector {
           case 1:
             return data[0].values.subarray(0, length * stride);
           default:
-            return data.reduce((memo, { values }) => {
-              memo.array.set(values, memo.offset);
-              memo.offset += values.length;
+            return data.reduce((memo, { values, length: chunk_length }) => {
+              memo.array.set(values.subarray(0, chunk_length * stride), memo.offset);
+              memo.offset += chunk_length * stride;
               return memo;
             }, { array: new ArrayType(length * stride), offset: 0 }).array;
         }
     }
     return [...this];
   }
+  /**
+   * Returns a string representation of the Vector.
+   *
+   * @returns A string representation of the Vector.
+   */
   toString() {
     return `[${[...this].join(",")}]`;
   }
+  /**
+   * Returns a child Vector by name, or null if this Vector has no child with the given name.
+   * @param name The name of the child to retrieve.
+   */
   getChild(name) {
     var _b2;
     return this.getChildAt((_b2 = this.type.children) === null || _b2 === void 0 ? void 0 : _b2.findIndex((f) => f.name === name));
   }
+  /**
+   * Returns a child Vector by index, or null if this Vector has no child at the supplied index.
+   * @param index The index of the child to retrieve.
+   */
   getChildAt(index) {
     if (index > -1 && index < this.numChildren) {
       return new Vector(this.data.map(({ children: children2 }) => children2[index]));
@@ -28475,6 +28915,17 @@ class Vector {
     }
     return false;
   }
+  /**
+   * Adds memoization to the Vector's {@link get} method. For dictionary
+   * vectors, this method return a vector that memoizes only the dictionary
+   * values.
+   *
+   * Memoization is very useful when decoding a value is expensive such as
+   * Uft8. The memoization creates a cache of the size of the Vector and
+   * therfore increases memory usage.
+   *
+   * @returns A new vector that memoizes calls to {@link get}.
+   */
   memoize() {
     if (DataType.isDictionary(this.type)) {
       const dictionary = new MemoizedVector(this.data[0].dictionary);
@@ -28487,6 +28938,12 @@ class Vector {
     }
     return new MemoizedVector(this);
   }
+  /**
+   * Returns a vector without memoization of the {@link get} method. If this
+   * vector is not memoized, this method returns this vector.
+   *
+   * @returns A a vector without memoization.
+   */
   unmemoize() {
     if (DataType.isDictionary(this.type) && this.isMemoized) {
       const dictionary = this.data[0].dictionary.unmemoize();
@@ -28592,7 +29049,7 @@ function makeVector(init2) {
       if (init2 instanceof Int32Array) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Int32() }))]);
       }
-      if (init2 instanceof BigInt64Array) {
+      if (init2 instanceof BigInt64ArrayCtor) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Int64$1() }))]);
       }
       if (init2 instanceof Uint8Array || init2 instanceof Uint8ClampedArray) {
@@ -28604,7 +29061,7 @@ function makeVector(init2) {
       if (init2 instanceof Uint32Array) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Uint32() }))]);
       }
-      if (init2 instanceof BigUint64Array) {
+      if (init2 instanceof BigUint64ArrayCtor) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Uint64$1() }))]);
       }
       if (init2 instanceof Float32Array) {
@@ -28631,12 +29088,22 @@ class Block {
     this.bb = bb;
     return this;
   }
+  /**
+   * Index to the start of the RecordBlock (note this is past the Message header)
+   */
   offset() {
     return this.bb.readInt64(this.bb_pos);
   }
+  /**
+   * Length of the metadata
+   */
   metaDataLength() {
     return this.bb.readInt32(this.bb_pos + 8);
   }
+  /**
+   * Length of the data (this is aligned so there can be a gap between this and
+   * the metadata).
+   */
   bodyLength() {
     return this.bb.readInt64(this.bb_pos + 16);
   }
@@ -28660,13 +29127,13 @@ const int32 = new Int32Array(2);
 const float32 = new Float32Array(int32.buffer);
 const float64 = new Float64Array(int32.buffer);
 const isLittleEndian = new Uint16Array(new Uint8Array([1, 0]).buffer)[0] === 1;
-class Long$3 {
+let Long$3 = class Long {
   constructor(low, high) {
     this.low = low | 0;
     this.high = high | 0;
   }
   static create(low, high) {
-    return low == 0 && high == 0 ? Long$3.ZERO : new Long$3(low, high);
+    return low == 0 && high == 0 ? Long.ZERO : new Long(low, high);
   }
   toFloat64() {
     return (this.low >>> 0) + this.high * 4294967296;
@@ -28674,33 +29141,51 @@ class Long$3 {
   equals(other) {
     return this.low == other.low && this.high == other.high;
   }
-}
+};
 Long$3.ZERO = new Long$3(0, 0);
 var Encoding;
 (function(Encoding2) {
   Encoding2[Encoding2["UTF8_BYTES"] = 1] = "UTF8_BYTES";
   Encoding2[Encoding2["UTF16_STRING"] = 2] = "UTF16_STRING";
 })(Encoding || (Encoding = {}));
-class ByteBuffer$2 {
+let ByteBuffer$2 = class ByteBuffer {
+  /**
+   * Create a new ByteBuffer with a given array of bytes (`Uint8Array`)
+   */
   constructor(bytes_) {
     this.bytes_ = bytes_;
     this.position_ = 0;
   }
+  /**
+   * Create and allocate a new ByteBuffer with a given size.
+   */
   static allocate(byte_size) {
-    return new ByteBuffer$2(new Uint8Array(byte_size));
+    return new ByteBuffer(new Uint8Array(byte_size));
   }
   clear() {
     this.position_ = 0;
   }
+  /**
+   * Get the underlying `Uint8Array`.
+   */
   bytes() {
     return this.bytes_;
   }
+  /**
+   * Get the buffer's position.
+   */
   position() {
     return this.position_;
   }
+  /**
+   * Set the buffer's position.
+   */
   setPosition(position) {
     this.position_ = position;
   }
+  /**
+   * Get the buffer's capacity.
+   */
   capacity() {
     return this.bytes_.length;
   }
@@ -28780,6 +29265,11 @@ class ByteBuffer$2 {
     this.writeInt32(offset, int32[isLittleEndian ? 0 : 1]);
     this.writeInt32(offset + 4, int32[isLittleEndian ? 1 : 0]);
   }
+  /**
+   * Return the file identifier.   Behavior is undefined for FlatBuffers whose
+   * schema does not include a file_identifier (likely points at padding or the
+   * start of a the root vtable).
+   */
   getBufferIdentifier() {
     if (this.bytes_.length < this.position_ + SIZEOF_INT + FILE_IDENTIFIER_LENGTH) {
       throw new Error("FlatBuffers: ByteBuffer is too short to contain an identifier.");
@@ -28790,15 +29280,34 @@ class ByteBuffer$2 {
     }
     return result;
   }
+  /**
+   * Look up a field in the vtable, return an offset into the object, or 0 if the
+   * field is not present.
+   */
   __offset(bb_pos, vtable_offset) {
     const vtable = bb_pos - this.readInt32(bb_pos);
     return vtable_offset < this.readInt16(vtable) ? this.readInt16(vtable + vtable_offset) : 0;
   }
+  /**
+   * Initialize any Table-derived type to point to the union at the given offset.
+   */
   __union(t, offset) {
     t.bb_pos = offset + this.readInt32(offset);
     t.bb = this;
     return t;
   }
+  /**
+   * Create a JavaScript string from UTF-8 data stored inside the FlatBuffer.
+   * This allocates a new string and converts to wide chars upon each access.
+   *
+   * To avoid the conversion to UTF-16, pass Encoding.UTF8_BYTES as
+   * the "optionalEncoding" argument. This is useful for avoiding conversion to
+   * and from UTF-16 when the data will just be packaged back up in another
+   * FlatBuffer later on.
+   *
+   * @param offset
+   * @param opt_encoding Defaults to UTF16_STRING
+   */
   __string(offset, opt_encoding) {
     offset += this.readInt32(offset);
     const length = this.readInt32(offset);
@@ -28836,18 +29345,34 @@ class ByteBuffer$2 {
     }
     return result;
   }
+  /**
+   * Handle unions that can contain string as its member, if a Table-derived type then initialize it,
+   * if a string then return a new one
+   *
+   * WARNING: strings are immutable in JS so we can't change the string that the user gave us, this
+   * makes the behaviour of __union_with_string different compared to __union
+   */
   __union_with_string(o, offset) {
     if (typeof o === "string") {
       return this.__string(offset);
     }
     return this.__union(o, offset);
   }
+  /**
+   * Retrieve the relative offset stored at "offset"
+   */
   __indirect(offset) {
     return offset + this.readInt32(offset);
   }
+  /**
+   * Get the start of data of a vector whose offset is stored at "offset" in this object.
+   */
   __vector(offset) {
     return offset + this.readInt32(offset) + SIZEOF_INT;
   }
+  /**
+   * Get the length of a vector whose offset is stored at "offset" in this object.
+   */
   __vector_len(offset) {
     return this.readInt32(offset + this.readInt32(offset));
   }
@@ -28862,9 +29387,15 @@ class ByteBuffer$2 {
     }
     return true;
   }
+  /**
+   * A helper function to avoid generated code depending on this file directly.
+   */
   createLong(low, high) {
     return Long$3.create(low, high);
   }
+  /**
+   * A helper function for generating list for obj api
+   */
   createScalarList(listAccessor, listLength) {
     const ret = [];
     for (let i = 0; i < listLength; ++i) {
@@ -28874,6 +29405,12 @@ class ByteBuffer$2 {
     }
     return ret;
   }
+  /**
+   * A helper function for generating list for obj api
+   * @param listAccessor function that accepts an index and return data at that index
+   * @param listLength listLength
+   * @param res result list
+   */
   createObjList(listAccessor, listLength) {
     const ret = [];
     for (let i = 0; i < listLength; ++i) {
@@ -28884,8 +29421,11 @@ class ByteBuffer$2 {
     }
     return ret;
   }
-}
-class Builder$2 {
+};
+let Builder$2 = class Builder {
+  /**
+   * Create a FlatBufferBuilder.
+   */
   constructor(opt_initial_size) {
     this.minalign = 1;
     this.vtable = null;
@@ -28918,15 +29458,40 @@ class Builder$2 {
     this.force_defaults = false;
     this.string_maps = null;
   }
+  /**
+   * In order to save space, fields that are set to their default value
+   * don't get serialized into the buffer. Forcing defaults provides a
+   * way to manually disable this optimization.
+   *
+   * @param forceDefaults true always serializes default values
+   */
   forceDefaults(forceDefaults) {
     this.force_defaults = forceDefaults;
   }
+  /**
+   * Get the ByteBuffer representing the FlatBuffer. Only call this after you've
+   * called finish(). The actual data starts at the ByteBuffer's current position,
+   * not necessarily at 0.
+   */
   dataBuffer() {
     return this.bb;
   }
+  /**
+   * Get the bytes representing the FlatBuffer. Only call this after you've
+   * called finish().
+   */
   asUint8Array() {
     return this.bb.bytes().subarray(this.bb.position(), this.bb.position() + this.offset());
   }
+  /**
+   * Prepare to write an element of `size` after `additional_bytes` have been
+   * written, e.g. if you write a string, you need to align such the int length
+   * field is aligned to 4 bytes, and the string data follows it directly. If all
+   * you need to do is alignment, `additional_bytes` will be 0.
+   *
+   * @param size This is the of the new element to write
+   * @param additional_bytes The padding size
+   */
   prep(size, additional_bytes) {
     if (size > this.minalign) {
       this.minalign = size;
@@ -28934,7 +29499,7 @@ class Builder$2 {
     const align_size = ~(this.bb.capacity() - this.space + additional_bytes) + 1 & size - 1;
     while (this.space < align_size + size + additional_bytes) {
       const old_buf_size = this.bb.capacity();
-      this.bb = Builder$2.growByteBuffer(this.bb);
+      this.bb = Builder.growByteBuffer(this.bb);
       this.space += this.bb.capacity() - old_buf_size;
     }
     this.pad(align_size);
@@ -28962,26 +29527,50 @@ class Builder$2 {
   writeFloat64(value) {
     this.bb.writeFloat64(this.space -= 8, value);
   }
+  /**
+   * Add an `int8` to the buffer, properly aligned, and grows the buffer (if necessary).
+   * @param value The `int8` to add the the buffer.
+   */
   addInt8(value) {
     this.prep(1, 0);
     this.writeInt8(value);
   }
+  /**
+   * Add an `int16` to the buffer, properly aligned, and grows the buffer (if necessary).
+   * @param value The `int16` to add the the buffer.
+   */
   addInt16(value) {
     this.prep(2, 0);
     this.writeInt16(value);
   }
+  /**
+   * Add an `int32` to the buffer, properly aligned, and grows the buffer (if necessary).
+   * @param value The `int32` to add the the buffer.
+   */
   addInt32(value) {
     this.prep(4, 0);
     this.writeInt32(value);
   }
+  /**
+   * Add an `int64` to the buffer, properly aligned, and grows the buffer (if necessary).
+   * @param value The `int64` to add the the buffer.
+   */
   addInt64(value) {
     this.prep(8, 0);
     this.writeInt64(value);
   }
+  /**
+   * Add a `float32` to the buffer, properly aligned, and grows the buffer (if necessary).
+   * @param value The `float32` to add the the buffer.
+   */
   addFloat32(value) {
     this.prep(4, 0);
     this.writeFloat32(value);
   }
+  /**
+   * Add a `float64` to the buffer, properly aligned, and grows the buffer (if necessary).
+   * @param value The `float64` to add the the buffer.
+   */
   addFloat64(value) {
     this.prep(8, 0);
     this.writeFloat64(value);
@@ -29028,29 +29617,59 @@ class Builder$2 {
       this.slot(voffset);
     }
   }
+  /**
+   * Structs are stored inline, so nothing additional is being added. `d` is always 0.
+   */
   addFieldStruct(voffset, value, defaultValue) {
     if (value != defaultValue) {
       this.nested(value);
       this.slot(voffset);
     }
   }
+  /**
+   * Structures are always stored inline, they need to be created right
+   * where they're used.  You'll get this assertion failure if you
+   * created it elsewhere.
+   */
   nested(obj) {
     if (obj != this.offset()) {
       throw new Error("FlatBuffers: struct must be serialized inline.");
     }
   }
+  /**
+   * Should not be creating any other object, string or vector
+   * while an object is being constructed
+   */
   notNested() {
     if (this.isNested) {
       throw new Error("FlatBuffers: object serialization must not be nested.");
     }
   }
+  /**
+   * Set the current vtable at `voffset` to the current location in the buffer.
+   */
   slot(voffset) {
     if (this.vtable !== null)
       this.vtable[voffset] = this.offset();
   }
+  /**
+   * @returns Offset relative to the end of the buffer.
+   */
   offset() {
     return this.bb.capacity() - this.space;
   }
+  /**
+   * Doubles the size of the backing ByteBuffer and copies the old data towards
+   * the end of the new buffer (since we build the buffer backwards).
+   *
+   * @param bb The current buffer with the existing data
+   * @returns A new byte buffer with the old data copied
+   * to it. The data is located at the end of the buffer.
+   *
+   * uint8Array.set() formally takes {Array<number>|ArrayBufferView}, so to pass
+   * it a uint8Array we need to suppress the type check:
+   * @suppress {checkTypes}
+   */
   static growByteBuffer(bb) {
     const old_buf_size = bb.capacity();
     if (old_buf_size & 3221225472) {
@@ -29062,10 +29681,20 @@ class Builder$2 {
     nbb.bytes().set(bb.bytes(), new_buf_size - old_buf_size);
     return nbb;
   }
+  /**
+   * Adds on offset, relative to where it will be written.
+   *
+   * @param offset The offset to add.
+   */
   addOffset(offset) {
     this.prep(SIZEOF_INT, 0);
     this.writeInt32(this.offset() - offset + SIZEOF_INT);
   }
+  /**
+   * Start encoding a new object in the buffer.  Users will not usually need to
+   * call this directly. The FlatBuffers compiler will generate helper methods
+   * that call this method internally.
+   */
   startObject(numfields) {
     this.notNested();
     if (this.vtable == null) {
@@ -29078,6 +29707,11 @@ class Builder$2 {
     this.isNested = true;
     this.object_start = this.offset();
   }
+  /**
+   * Finish off writing the object that is under construction.
+   *
+   * @returns The offset to the object inside `dataBuffer`
+   */
   endObject() {
     if (this.vtable == null || !this.isNested) {
       throw new Error("FlatBuffers: endObject called without startObject");
@@ -29120,6 +29754,9 @@ class Builder$2 {
     this.isNested = false;
     return vtableloc;
   }
+  /**
+   * Finalize a buffer, poiting to the given `root_table`.
+   */
   finish(root_table, opt_file_identifier, opt_size_prefix) {
     const size_prefix = opt_size_prefix ? SIZE_PREFIX_LENGTH : 0;
     if (opt_file_identifier) {
@@ -29139,9 +29776,16 @@ class Builder$2 {
     }
     this.bb.setPosition(this.space);
   }
+  /**
+   * Finalize a size prefixed buffer, pointing to the given `root_table`.
+   */
   finishSizePrefixed(root_table, opt_file_identifier) {
     this.finish(root_table, opt_file_identifier, true);
   }
+  /**
+   * This checks a required field has been set in a given table that has
+   * just been constructed.
+   */
   requiredField(table, field) {
     const table_start = this.bb.capacity() - table;
     const vtable_start = table_start - this.bb.readInt32(table_start);
@@ -29150,16 +29794,39 @@ class Builder$2 {
       throw new Error("FlatBuffers: field " + field + " must be set");
     }
   }
+  /**
+   * Start a new array/vector of objects.  Users usually will not call
+   * this directly. The FlatBuffers compiler will create a start/end
+   * method for vector types in generated code.
+   *
+   * @param elem_size The size of each element in the array
+   * @param num_elems The number of elements in the array
+   * @param alignment The alignment of the array
+   */
   startVector(elem_size, num_elems, alignment) {
     this.notNested();
     this.vector_num_elems = num_elems;
     this.prep(SIZEOF_INT, elem_size * num_elems);
     this.prep(alignment, elem_size * num_elems);
   }
+  /**
+   * Finish off the creation of an array and all its elements. The array must be
+   * created with `startVector`.
+   *
+   * @returns The offset at which the newly created array
+   * starts.
+   */
   endVector() {
     this.writeInt32(this.vector_num_elems);
     return this.offset();
   }
+  /**
+   * Encode the string `s` in the buffer using UTF-8. If the string passed has
+   * already been seen, we return the offset of the already written string
+   *
+   * @param s The string to encode
+   * @return The offset in the buffer where the encoded string starts
+   */
   createSharedString(s) {
     if (!s) {
       return 0;
@@ -29174,6 +29841,13 @@ class Builder$2 {
     this.string_maps.set(s, offset);
     return offset;
   }
+  /**
+   * Encode the string `s` in the buffer using UTF-8. If a Uint8Array is passed
+   * instead of a string, it is assumed to contain valid UTF-8 encoded data.
+   *
+   * @param s The string to encode
+   * @return The offset in the buffer where the encoded string starts
+   */
   createString(s) {
     if (!s) {
       return 0;
@@ -29218,9 +29892,17 @@ class Builder$2 {
     }
     return this.endVector();
   }
+  /**
+   * A helper function to avoid generated code depending on this file directly.
+   */
   createLong(low, high) {
     return Long$3.create(low, high);
   }
+  /**
+   * A helper function to pack an object
+   *
+   * @returns offset of obj
+   */
   createObjectOffset(obj) {
     if (obj === null) {
       return 0;
@@ -29231,6 +29913,11 @@ class Builder$2 {
       return obj.pack(this);
     }
   }
+  /**
+   * A helper function to pack a list of object
+   *
+   * @returns list of offsets of each non null object
+   */
   createObjectOffsetList(list) {
     const ret = [];
     for (let i = 0; i < list.length; ++i) {
@@ -29248,7 +29935,7 @@ class Builder$2 {
     this.createObjectOffsetList(list);
     return this.endVector();
   }
-}
+};
 class KeyValue {
   constructor() {
     this.bb = null;
@@ -29373,14 +30060,32 @@ class DictionaryEncoding {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
     return (obj || new DictionaryEncoding()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * The known dictionary id in the application where this data is used. In
+   * the file or streaming formats, the dictionary ids are found in the
+   * DictionaryBatch messages
+   */
   id() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.readInt64(this.bb_pos + offset) : this.bb.createLong(0, 0);
   }
+  /**
+   * The dictionary indices are constrained to be non-negative integers. If
+   * this field is null, the indices must be signed int32. To maximize
+   * cross-language compatibility and performance, implementations are
+   * recommended to prefer signed integer types over unsigned integer types
+   * and to avoid uint64 indices unless they are required by an application.
+   */
   indexType(obj) {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? (obj || new Int()).__init(this.bb.__indirect(this.bb_pos + offset), this.bb) : null;
   }
+  /**
+   * By default, dictionaries are not ordered, or the order does not have
+   * semantic meaning. In some statistical, applications, dictionary-encoding
+   * is used to represent ordered categorical data, and we provide a way to
+   * preserve that metadata here
+   */
   isOrdered() {
     const offset = this.bb.__offset(this.bb_pos, 8);
     return offset ? !!this.bb.readInt8(this.bb_pos + offset) : false;
@@ -29409,7 +30114,7 @@ class DictionaryEncoding {
     return offset;
   }
 }
-class Binary {
+class Binary2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29420,11 +30125,11 @@ class Binary {
     return this;
   }
   static getRootAsBinary(bb, obj) {
-    return (obj || new Binary()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Binary2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsBinary(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Binary()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Binary2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static startBinary(builder) {
     builder.startObject(0);
@@ -29434,11 +30139,11 @@ class Binary {
     return offset;
   }
   static createBinary(builder) {
-    Binary.startBinary(builder);
-    return Binary.endBinary(builder);
+    Binary2.startBinary(builder);
+    return Binary2.endBinary(builder);
   }
 }
-class Bool {
+class Bool2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29449,11 +30154,11 @@ class Bool {
     return this;
   }
   static getRootAsBool(bb, obj) {
-    return (obj || new Bool()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Bool2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsBool(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Bool()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Bool2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static startBool(builder) {
     builder.startObject(0);
@@ -29463,8 +30168,8 @@ class Bool {
     return offset;
   }
   static createBool(builder) {
-    Bool.startBool(builder);
-    return Bool.endBool(builder);
+    Bool2.startBool(builder);
+    return Bool2.endBool(builder);
   }
 }
 var DateUnit;
@@ -29472,7 +30177,7 @@ var DateUnit;
   DateUnit2[DateUnit2["DAY"] = 0] = "DAY";
   DateUnit2[DateUnit2["MILLISECOND"] = 1] = "MILLISECOND";
 })(DateUnit || (DateUnit = {}));
-class Date$1 {
+let Date$1 = class Date2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29483,11 +30188,11 @@ class Date$1 {
     return this;
   }
   static getRootAsDate(bb, obj) {
-    return (obj || new Date$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Date2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsDate(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Date$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Date2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   unit() {
     const offset = this.bb.__offset(this.bb_pos, 4);
@@ -29504,12 +30209,12 @@ class Date$1 {
     return offset;
   }
   static createDate(builder, unit2) {
-    Date$1.startDate(builder);
-    Date$1.addUnit(builder, unit2);
-    return Date$1.endDate(builder);
+    Date2.startDate(builder);
+    Date2.addUnit(builder, unit2);
+    return Date2.endDate(builder);
   }
-}
-class Decimal {
+};
+class Decimal2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29520,20 +30225,30 @@ class Decimal {
     return this;
   }
   static getRootAsDecimal(bb, obj) {
-    return (obj || new Decimal()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Decimal2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsDecimal(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Decimal()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Decimal2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * Total number of decimal digits
+   */
   precision() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.readInt32(this.bb_pos + offset) : 0;
   }
+  /**
+   * Number of digits after the decimal point "."
+   */
   scale() {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? this.bb.readInt32(this.bb_pos + offset) : 0;
   }
+  /**
+   * Number of bits per value. The only accepted widths are 128 and 256.
+   * We use bitWidth for consistency with Int::bitWidth.
+   */
   bitWidth() {
     const offset = this.bb.__offset(this.bb_pos, 8);
     return offset ? this.bb.readInt32(this.bb_pos + offset) : 128;
@@ -29555,11 +30270,11 @@ class Decimal {
     return offset;
   }
   static createDecimal(builder, precision, scale, bitWidth) {
-    Decimal.startDecimal(builder);
-    Decimal.addPrecision(builder, precision);
-    Decimal.addScale(builder, scale);
-    Decimal.addBitWidth(builder, bitWidth);
-    return Decimal.endDecimal(builder);
+    Decimal2.startDecimal(builder);
+    Decimal2.addPrecision(builder, precision);
+    Decimal2.addScale(builder, scale);
+    Decimal2.addBitWidth(builder, bitWidth);
+    return Decimal2.endDecimal(builder);
   }
 }
 var TimeUnit;
@@ -29569,7 +30284,7 @@ var TimeUnit;
   TimeUnit2[TimeUnit2["MICROSECOND"] = 2] = "MICROSECOND";
   TimeUnit2[TimeUnit2["NANOSECOND"] = 3] = "NANOSECOND";
 })(TimeUnit || (TimeUnit = {}));
-class FixedSizeBinary {
+class FixedSizeBinary2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29580,12 +30295,15 @@ class FixedSizeBinary {
     return this;
   }
   static getRootAsFixedSizeBinary(bb, obj) {
-    return (obj || new FixedSizeBinary()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new FixedSizeBinary2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsFixedSizeBinary(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new FixedSizeBinary()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new FixedSizeBinary2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * Number of bytes per value
+   */
   byteWidth() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.readInt32(this.bb_pos + offset) : 0;
@@ -29601,12 +30319,12 @@ class FixedSizeBinary {
     return offset;
   }
   static createFixedSizeBinary(builder, byteWidth) {
-    FixedSizeBinary.startFixedSizeBinary(builder);
-    FixedSizeBinary.addByteWidth(builder, byteWidth);
-    return FixedSizeBinary.endFixedSizeBinary(builder);
+    FixedSizeBinary2.startFixedSizeBinary(builder);
+    FixedSizeBinary2.addByteWidth(builder, byteWidth);
+    return FixedSizeBinary2.endFixedSizeBinary(builder);
   }
 }
-class FixedSizeList {
+class FixedSizeList2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29617,12 +30335,15 @@ class FixedSizeList {
     return this;
   }
   static getRootAsFixedSizeList(bb, obj) {
-    return (obj || new FixedSizeList()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new FixedSizeList2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsFixedSizeList(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new FixedSizeList()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new FixedSizeList2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * Number of list items per value
+   */
   listSize() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.readInt32(this.bb_pos + offset) : 0;
@@ -29638,9 +30359,9 @@ class FixedSizeList {
     return offset;
   }
   static createFixedSizeList(builder, listSize) {
-    FixedSizeList.startFixedSizeList(builder);
-    FixedSizeList.addListSize(builder, listSize);
-    return FixedSizeList.endFixedSizeList(builder);
+    FixedSizeList2.startFixedSizeList(builder);
+    FixedSizeList2.addListSize(builder, listSize);
+    return FixedSizeList2.endFixedSizeList(builder);
   }
 }
 var Precision;
@@ -29729,7 +30450,7 @@ class Interval {
     return Interval.endInterval(builder);
   }
 }
-class List {
+class List2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29740,11 +30461,11 @@ class List {
     return this;
   }
   static getRootAsList(bb, obj) {
-    return (obj || new List()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new List2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsList(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new List()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new List2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static startList(builder) {
     builder.startObject(0);
@@ -29754,11 +30475,11 @@ class List {
     return offset;
   }
   static createList(builder) {
-    List.startList(builder);
-    return List.endList(builder);
+    List2.startList(builder);
+    return List2.endList(builder);
   }
 }
-class Map$1 {
+let Map$1 = class Map2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29769,12 +30490,15 @@ class Map$1 {
     return this;
   }
   static getRootAsMap(bb, obj) {
-    return (obj || new Map$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Map2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsMap(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Map$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Map2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * Set to true if the keys within each value are sorted
+   */
   keysSorted() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? !!this.bb.readInt8(this.bb_pos + offset) : false;
@@ -29790,12 +30514,12 @@ class Map$1 {
     return offset;
   }
   static createMap(builder, keysSorted) {
-    Map$1.startMap(builder);
-    Map$1.addKeysSorted(builder, keysSorted);
-    return Map$1.endMap(builder);
+    Map2.startMap(builder);
+    Map2.addKeysSorted(builder, keysSorted);
+    return Map2.endMap(builder);
   }
-}
-class Null {
+};
+class Null2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -29806,11 +30530,11 @@ class Null {
     return this;
   }
   static getRootAsNull(bb, obj) {
-    return (obj || new Null()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Null2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsNull(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Null()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Null2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static startNull(builder) {
     builder.startObject(0);
@@ -29820,8 +30544,8 @@ class Null {
     return offset;
   }
   static createNull(builder) {
-    Null.startNull(builder);
-    return Null.endNull(builder);
+    Null2.startNull(builder);
+    return Null2.endNull(builder);
   }
 }
 class Struct_ {
@@ -30011,7 +30735,7 @@ class Union {
     return Union.endUnion(builder);
   }
 }
-class Utf8 {
+class Utf82 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -30022,11 +30746,11 @@ class Utf8 {
     return this;
   }
   static getRootAsUtf8(bb, obj) {
-    return (obj || new Utf8()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Utf82()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsUtf8(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Utf8()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Utf82()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static startUtf8(builder) {
     builder.startObject(0);
@@ -30036,8 +30760,8 @@ class Utf8 {
     return offset;
   }
   static createUtf8(builder) {
-    Utf8.startUtf8(builder);
-    return Utf8.endUtf8(builder);
+    Utf82.startUtf8(builder);
+    return Utf82.endUtf8(builder);
   }
 }
 var Type;
@@ -30065,7 +30789,7 @@ var Type;
   Type2[Type2["LargeUtf8"] = 20] = "LargeUtf8";
   Type2[Type2["LargeList"] = 21] = "LargeList";
 })(Type || (Type = {}));
-class Field$1 {
+let Field$1 = class Field {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -30076,16 +30800,19 @@ class Field$1 {
     return this;
   }
   static getRootAsField(bb, obj) {
-    return (obj || new Field$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Field()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsField(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Field$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Field()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   name(optionalEncoding) {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.__string(this.bb_pos + offset, optionalEncoding) : null;
   }
+  /**
+   * Whether or not this field can contain nulls. Should be true in general.
+   */
   nullable() {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? !!this.bb.readInt8(this.bb_pos + offset) : false;
@@ -30094,22 +30821,36 @@ class Field$1 {
     const offset = this.bb.__offset(this.bb_pos, 8);
     return offset ? this.bb.readUint8(this.bb_pos + offset) : Type.NONE;
   }
+  /**
+   * This is the type of the decoded value if the field is dictionary encoded.
+   */
+  // @ts-ignore
   type(obj) {
     const offset = this.bb.__offset(this.bb_pos, 10);
     return offset ? this.bb.__union(obj, this.bb_pos + offset) : null;
   }
+  /**
+   * Present only if the field is dictionary encoded.
+   */
   dictionary(obj) {
     const offset = this.bb.__offset(this.bb_pos, 12);
     return offset ? (obj || new DictionaryEncoding()).__init(this.bb.__indirect(this.bb_pos + offset), this.bb) : null;
   }
+  /**
+   * children apply only to nested data types like Struct, List and Union. For
+   * primitive types children will have length 0.
+   */
   children(index, obj) {
     const offset = this.bb.__offset(this.bb_pos, 14);
-    return offset ? (obj || new Field$1()).__init(this.bb.__indirect(this.bb.__vector(this.bb_pos + offset) + index * 4), this.bb) : null;
+    return offset ? (obj || new Field()).__init(this.bb.__indirect(this.bb.__vector(this.bb_pos + offset) + index * 4), this.bb) : null;
   }
   childrenLength() {
     const offset = this.bb.__offset(this.bb_pos, 14);
     return offset ? this.bb.__vector_len(this.bb_pos + offset) : 0;
   }
+  /**
+   * User-defined metadata
+   */
   customMetadata(index, obj) {
     const offset = this.bb.__offset(this.bb_pos, 16);
     return offset ? (obj || new KeyValue()).__init(this.bb.__indirect(this.bb.__vector(this.bb_pos + offset) + index * 4), this.bb) : null;
@@ -30166,8 +30907,8 @@ class Field$1 {
     const offset = builder.endObject();
     return offset;
   }
-}
-class Schema$1 {
+};
+let Schema$1 = class Schema {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -30178,12 +30919,17 @@ class Schema$1 {
     return this;
   }
   static getRootAsSchema(bb, obj) {
-    return (obj || new Schema$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Schema()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsSchema(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Schema$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Schema()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * endianness of the buffer
+   * it is Little Endian by default
+   * if endianness doesn't match the underlying system then the vectors need to be converted
+   */
   endianness() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.readInt16(this.bb_pos + offset) : Endianness.Little;
@@ -30204,6 +30950,9 @@ class Schema$1 {
     const offset = this.bb.__offset(this.bb_pos, 8);
     return offset ? this.bb.__vector_len(this.bb_pos + offset) : 0;
   }
+  /**
+   * Features used in the stream/file.
+   */
   features(index) {
     const offset = this.bb.__offset(this.bb_pos, 10);
     return offset ? this.bb.readInt64(this.bb.__vector(this.bb_pos + offset) + index * 8) : this.bb.createLong(0, 0);
@@ -30268,14 +31017,14 @@ class Schema$1 {
     builder.finish(offset, void 0, true);
   }
   static createSchema(builder, endianness, fieldsOffset, customMetadataOffset, featuresOffset) {
-    Schema$1.startSchema(builder);
-    Schema$1.addEndianness(builder, endianness);
-    Schema$1.addFields(builder, fieldsOffset);
-    Schema$1.addCustomMetadata(builder, customMetadataOffset);
-    Schema$1.addFeatures(builder, featuresOffset);
-    return Schema$1.endSchema(builder);
+    Schema.startSchema(builder);
+    Schema.addEndianness(builder, endianness);
+    Schema.addFields(builder, fieldsOffset);
+    Schema.addCustomMetadata(builder, customMetadataOffset);
+    Schema.addFeatures(builder, featuresOffset);
+    return Schema.endSchema(builder);
   }
-}
+};
 class Footer {
   constructor() {
     this.bb = null;
@@ -30317,6 +31066,9 @@ class Footer {
     const offset = this.bb.__offset(this.bb_pos, 10);
     return offset ? this.bb.__vector_len(this.bb_pos + offset) : 0;
   }
+  /**
+   * User-defined metadata
+   */
   customMetadata(index, obj) {
     const offset = this.bb.__offset(this.bb_pos, 12);
     return offset ? (obj || new KeyValue()).__init(this.bb.__indirect(this.bb.__vector(this.bb_pos + offset) + index * 4), this.bb) : null;
@@ -30370,7 +31122,7 @@ class Footer {
     builder.finish(offset, void 0, true);
   }
 }
-class Schema {
+class Schema2 {
   constructor(fields = [], metadata, dictionaries) {
     this.fields = fields || [];
     this.metadata = metadata || /* @__PURE__ */ new Map();
@@ -30388,17 +31140,29 @@ class Schema {
   toString() {
     return `Schema<{ ${this.fields.map((f, i) => `${i}: ${f}`).join(", ")} }>`;
   }
+  /**
+   * Construct a new Schema containing only specified fields.
+   *
+   * @param fieldNames Names of fields to keep.
+   * @returns A new Schema of fields matching the specified names.
+   */
   select(fieldNames) {
     const names = new Set(fieldNames);
     const fields = this.fields.filter((f) => names.has(f.name));
-    return new Schema(fields, this.metadata);
+    return new Schema2(fields, this.metadata);
   }
+  /**
+   * Construct a new Schema containing only fields at the specified indices.
+   *
+   * @param fieldIndices Indices of fields to keep.
+   * @returns A new Schema of fields at the specified indices.
+   */
   selectAt(fieldIndices) {
     const fields = fieldIndices.map((i) => this.fields[i]).filter(Boolean);
-    return new Schema(fields, this.metadata);
+    return new Schema2(fields, this.metadata);
   }
   assign(...args) {
-    const other = args[0] instanceof Schema ? args[0] : Array.isArray(args[0]) ? new Schema(args[0]) : new Schema(args);
+    const other = args[0] instanceof Schema2 ? args[0] : Array.isArray(args[0]) ? new Schema2(args[0]) : new Schema2(args);
     const curFields = [...this.fields];
     const metadata = mergeMaps(mergeMaps(/* @__PURE__ */ new Map(), this.metadata), other.metadata);
     const newFields = other.fields.filter((f2) => {
@@ -30408,19 +31172,20 @@ class Schema {
       })) && false : true;
     });
     const newDictionaries = generateDictionaryMap(newFields, /* @__PURE__ */ new Map());
-    return new Schema([...curFields, ...newFields], metadata, new Map([...this.dictionaries, ...newDictionaries]));
+    return new Schema2([...curFields, ...newFields], metadata, new Map([...this.dictionaries, ...newDictionaries]));
   }
 }
-Schema.prototype.fields = null;
-Schema.prototype.metadata = null;
-Schema.prototype.dictionaries = null;
-class Field {
+Schema2.prototype.fields = null;
+Schema2.prototype.metadata = null;
+Schema2.prototype.dictionaries = null;
+class Field2 {
   constructor(name, type, nullable = false, metadata) {
     this.name = name;
     this.type = type;
     this.nullable = nullable;
     this.metadata = metadata || /* @__PURE__ */ new Map();
   }
+  /** @nocollapse */
   static new(...args) {
     let [name, type, nullable, metadata] = args;
     if (args[0] && typeof args[0] === "object") {
@@ -30429,7 +31194,7 @@ class Field {
       nullable === void 0 && (nullable = args[0].nullable);
       metadata === void 0 && (metadata = args[0].metadata);
     }
-    return new Field(`${name}`, type, nullable, metadata);
+    return new Field2(`${name}`, type, nullable, metadata);
   }
   get typeId() {
     return this.type.typeId;
@@ -30443,13 +31208,13 @@ class Field {
   clone(...args) {
     let [name, type, nullable, metadata] = args;
     !args[0] || typeof args[0] !== "object" ? [name = this.name, type = this.type, nullable = this.nullable, metadata = this.metadata] = args : { name = this.name, type = this.type, nullable = this.nullable, metadata = this.metadata } = args[0];
-    return Field.new(name, type, nullable, metadata);
+    return Field2.new(name, type, nullable, metadata);
   }
 }
-Field.prototype.type = null;
-Field.prototype.name = null;
-Field.prototype.nullable = null;
-Field.prototype.metadata = null;
+Field2.prototype.type = null;
+Field2.prototype.name = null;
+Field2.prototype.nullable = null;
+Field2.prototype.metadata = null;
 function mergeMaps(m1, m2) {
   return new Map([...m1 || /* @__PURE__ */ new Map(), ...m2 || /* @__PURE__ */ new Map()]);
 }
@@ -30480,15 +31245,17 @@ class Footer_ {
     recordBatches && (this._recordBatches = recordBatches);
     dictionaryBatches && (this._dictionaryBatches = dictionaryBatches);
   }
+  /** @nocollapse */
   static decode(buf) {
     buf = new ByteBuffer$1(toUint8Array(buf));
     const footer = Footer.getRootAsFooter(buf);
-    const schema = Schema.decode(footer.schema());
+    const schema = Schema2.decode(footer.schema());
     return new OffHeapFooter(schema, footer);
   }
+  /** @nocollapse */
   static encode(footer) {
     const b = new Builder$1();
-    const schemaOffset = Schema.encode(b, footer.schema);
+    const schemaOffset = Schema2.encode(b, footer.schema);
     Footer.startRecordBatchesVector(b, footer.numRecordBatches);
     for (const rb of [...footer.recordBatches()].slice().reverse()) {
       FileBlock.encode(b, rb);
@@ -30570,9 +31337,11 @@ class FileBlock {
     this.offset = typeof offset === "number" ? offset : offset.low;
     this.bodyLength = typeof bodyLength === "number" ? bodyLength : bodyLength.low;
   }
+  /** @nocollapse */
   static decode(block) {
     return new FileBlock(block.metaDataLength(), block.bodyLength(), block.offset());
   }
+  /** @nocollapse */
   static encode(b, fileBlock) {
     const { metaDataLength } = fileBlock;
     const offset = new Long$2(fileBlock.offset, 0);
@@ -31072,7 +31841,7 @@ class BaseInt64 {
     return `${intAsHex(this.buffer[1])} ${intAsHex(this.buffer[0])}`;
   }
 }
-class Uint64 extends BaseInt64 {
+class Uint642 extends BaseInt64 {
   times(other) {
     this._times(other);
     return this;
@@ -31081,42 +31850,48 @@ class Uint64 extends BaseInt64 {
     this._plus(other);
     return this;
   }
+  /** @nocollapse */
   static from(val, out_buffer = new Uint32Array(2)) {
-    return Uint64.fromString(typeof val === "string" ? val : val.toString(), out_buffer);
+    return Uint642.fromString(typeof val === "string" ? val : val.toString(), out_buffer);
   }
+  /** @nocollapse */
   static fromNumber(num, out_buffer = new Uint32Array(2)) {
-    return Uint64.fromString(num.toString(), out_buffer);
+    return Uint642.fromString(num.toString(), out_buffer);
   }
+  /** @nocollapse */
   static fromString(str, out_buffer = new Uint32Array(2)) {
     const length = str.length;
-    const out = new Uint64(out_buffer);
+    const out = new Uint642(out_buffer);
     for (let posn = 0; posn < length; ) {
       const group = kInt32DecimalDigits < length - posn ? kInt32DecimalDigits : length - posn;
-      const chunk = new Uint64(new Uint32Array([Number.parseInt(str.slice(posn, posn + group), 10), 0]));
-      const multiple = new Uint64(new Uint32Array([kPowersOfTen[group], 0]));
+      const chunk = new Uint642(new Uint32Array([Number.parseInt(str.slice(posn, posn + group), 10), 0]));
+      const multiple = new Uint642(new Uint32Array([kPowersOfTen[group], 0]));
       out.times(multiple);
       out.plus(chunk);
       posn += group;
     }
     return out;
   }
+  /** @nocollapse */
   static convertArray(values) {
     const data = new Uint32Array(values.length * 2);
     for (let i = -1, n = values.length; ++i < n; ) {
-      Uint64.from(values[i], new Uint32Array(data.buffer, data.byteOffset + 2 * i * 4, 2));
+      Uint642.from(values[i], new Uint32Array(data.buffer, data.byteOffset + 2 * i * 4, 2));
     }
     return data;
   }
+  /** @nocollapse */
   static multiply(left, right) {
-    const rtrn = new Uint64(new Uint32Array(left.buffer));
+    const rtrn = new Uint642(new Uint32Array(left.buffer));
     return rtrn.times(right);
   }
+  /** @nocollapse */
   static add(left, right) {
-    const rtrn = new Uint64(new Uint32Array(left.buffer));
+    const rtrn = new Uint642(new Uint32Array(left.buffer));
     return rtrn.plus(right);
   }
 }
-class Int64 extends BaseInt64 {
+class Int642 extends BaseInt64 {
   negate() {
     this.buffer[0] = ~this.buffer[0] + 1;
     this.buffer[1] = ~this.buffer[1];
@@ -31138,39 +31913,45 @@ class Int64 extends BaseInt64 {
     const other_high = other.buffer[1] << 0;
     return this_high < other_high || this_high === other_high && this.buffer[0] < other.buffer[0];
   }
+  /** @nocollapse */
   static from(val, out_buffer = new Uint32Array(2)) {
-    return Int64.fromString(typeof val === "string" ? val : val.toString(), out_buffer);
+    return Int642.fromString(typeof val === "string" ? val : val.toString(), out_buffer);
   }
+  /** @nocollapse */
   static fromNumber(num, out_buffer = new Uint32Array(2)) {
-    return Int64.fromString(num.toString(), out_buffer);
+    return Int642.fromString(num.toString(), out_buffer);
   }
+  /** @nocollapse */
   static fromString(str, out_buffer = new Uint32Array(2)) {
     const negate = str.startsWith("-");
     const length = str.length;
-    const out = new Int64(out_buffer);
+    const out = new Int642(out_buffer);
     for (let posn = negate ? 1 : 0; posn < length; ) {
       const group = kInt32DecimalDigits < length - posn ? kInt32DecimalDigits : length - posn;
-      const chunk = new Int64(new Uint32Array([Number.parseInt(str.slice(posn, posn + group), 10), 0]));
-      const multiple = new Int64(new Uint32Array([kPowersOfTen[group], 0]));
+      const chunk = new Int642(new Uint32Array([Number.parseInt(str.slice(posn, posn + group), 10), 0]));
+      const multiple = new Int642(new Uint32Array([kPowersOfTen[group], 0]));
       out.times(multiple);
       out.plus(chunk);
       posn += group;
     }
     return negate ? out.negate() : out;
   }
+  /** @nocollapse */
   static convertArray(values) {
     const data = new Uint32Array(values.length * 2);
     for (let i = -1, n = values.length; ++i < n; ) {
-      Int64.from(values[i], new Uint32Array(data.buffer, data.byteOffset + 2 * i * 4, 2));
+      Int642.from(values[i], new Uint32Array(data.buffer, data.byteOffset + 2 * i * 4, 2));
     }
     return data;
   }
+  /** @nocollapse */
   static multiply(left, right) {
-    const rtrn = new Int64(new Uint32Array(left.buffer));
+    const rtrn = new Int642(new Uint32Array(left.buffer));
     return rtrn.times(right);
   }
+  /** @nocollapse */
   static add(left, right) {
-    const rtrn = new Int64(new Uint32Array(left.buffer));
+    const rtrn = new Int642(new Uint32Array(left.buffer));
     return rtrn.plus(right);
   }
 }
@@ -31179,10 +31960,10 @@ class Int128 {
     this.buffer = buffer;
   }
   high() {
-    return new Int64(new Uint32Array(this.buffer.buffer, this.buffer.byteOffset + 8, 2));
+    return new Int642(new Uint32Array(this.buffer.buffer, this.buffer.byteOffset + 8, 2));
   }
   low() {
-    return new Int64(new Uint32Array(this.buffer.buffer, this.buffer.byteOffset, 2));
+    return new Int642(new Uint32Array(this.buffer.buffer, this.buffer.byteOffset, 2));
   }
   negate() {
     this.buffer[0] = ~this.buffer[0] + 1;
@@ -31201,27 +31982,27 @@ class Int128 {
     return this;
   }
   times(other) {
-    const L0 = new Uint64(new Uint32Array([this.buffer[3], 0]));
-    const L1 = new Uint64(new Uint32Array([this.buffer[2], 0]));
-    const L2 = new Uint64(new Uint32Array([this.buffer[1], 0]));
-    const L3 = new Uint64(new Uint32Array([this.buffer[0], 0]));
-    const R0 = new Uint64(new Uint32Array([other.buffer[3], 0]));
-    const R1 = new Uint64(new Uint32Array([other.buffer[2], 0]));
-    const R2 = new Uint64(new Uint32Array([other.buffer[1], 0]));
-    const R3 = new Uint64(new Uint32Array([other.buffer[0], 0]));
-    let product = Uint64.multiply(L3, R3);
+    const L0 = new Uint642(new Uint32Array([this.buffer[3], 0]));
+    const L1 = new Uint642(new Uint32Array([this.buffer[2], 0]));
+    const L2 = new Uint642(new Uint32Array([this.buffer[1], 0]));
+    const L3 = new Uint642(new Uint32Array([this.buffer[0], 0]));
+    const R0 = new Uint642(new Uint32Array([other.buffer[3], 0]));
+    const R1 = new Uint642(new Uint32Array([other.buffer[2], 0]));
+    const R2 = new Uint642(new Uint32Array([other.buffer[1], 0]));
+    const R3 = new Uint642(new Uint32Array([other.buffer[0], 0]));
+    let product = Uint642.multiply(L3, R3);
     this.buffer[0] = product.low();
-    const sum2 = new Uint64(new Uint32Array([product.high(), 0]));
-    product = Uint64.multiply(L2, R3);
+    const sum2 = new Uint642(new Uint32Array([product.high(), 0]));
+    product = Uint642.multiply(L2, R3);
     sum2.plus(product);
-    product = Uint64.multiply(L3, R2);
+    product = Uint642.multiply(L3, R2);
     sum2.plus(product);
     this.buffer[1] = sum2.low();
     this.buffer[3] = sum2.lessThan(product) ? 1 : 0;
     this.buffer[2] = sum2.high();
-    const high = new Uint64(new Uint32Array(this.buffer.buffer, this.buffer.byteOffset + 8, 2));
-    high.plus(Uint64.multiply(L1, R3)).plus(Uint64.multiply(L2, R2)).plus(Uint64.multiply(L3, R1));
-    this.buffer[3] += Uint64.multiply(L0, R3).plus(Uint64.multiply(L1, R2)).plus(Uint64.multiply(L2, R1)).plus(Uint64.multiply(L3, R0)).low();
+    const high = new Uint642(new Uint32Array(this.buffer.buffer, this.buffer.byteOffset + 8, 2));
+    high.plus(Uint642.multiply(L1, R3)).plus(Uint642.multiply(L2, R2)).plus(Uint642.multiply(L3, R1));
+    this.buffer[3] += Uint642.multiply(L0, R3).plus(Uint642.multiply(L1, R2)).plus(Uint642.multiply(L2, R1)).plus(Uint642.multiply(L3, R0)).low();
     return this;
   }
   plus(other) {
@@ -31248,20 +32029,25 @@ class Int128 {
   hex() {
     return `${intAsHex(this.buffer[3])} ${intAsHex(this.buffer[2])} ${intAsHex(this.buffer[1])} ${intAsHex(this.buffer[0])}`;
   }
+  /** @nocollapse */
   static multiply(left, right) {
     const rtrn = new Int128(new Uint32Array(left.buffer));
     return rtrn.times(right);
   }
+  /** @nocollapse */
   static add(left, right) {
     const rtrn = new Int128(new Uint32Array(left.buffer));
     return rtrn.plus(right);
   }
+  /** @nocollapse */
   static from(val, out_buffer = new Uint32Array(4)) {
     return Int128.fromString(typeof val === "string" ? val : val.toString(), out_buffer);
   }
+  /** @nocollapse */
   static fromNumber(num, out_buffer = new Uint32Array(4)) {
     return Int128.fromString(num.toString(), out_buffer);
   }
+  /** @nocollapse */
   static fromString(str, out_buffer = new Uint32Array(4)) {
     const negate = str.startsWith("-");
     const length = str.length;
@@ -31276,6 +32062,7 @@ class Int128 {
     }
     return negate ? out.negate() : out;
   }
+  /** @nocollapse */
   static convertArray(values) {
     const data = new Uint32Array(values.length * 4);
     for (let i = -1, n = values.length; ++i < n; ) {
@@ -31295,7 +32082,7 @@ class VectorLoader extends Visitor {
     this.dictionaries = dictionaries;
   }
   visit(node) {
-    return super.visit(node instanceof Field ? node.type : node);
+    return super.visit(node instanceof Field2 ? node.type : node);
   }
   visitNull(type, { length } = this.nextFieldNode()) {
     return makeData({ type, length });
@@ -31396,11 +32183,11 @@ class JSONVectorLoader extends VectorLoader {
   readData(type, { offset } = this.nextBufferRange()) {
     const { sources } = this;
     if (DataType.isTimestamp(type)) {
-      return toArrayBufferView(Uint8Array, Int64.convertArray(sources[offset]));
+      return toArrayBufferView(Uint8Array, Int642.convertArray(sources[offset]));
     } else if ((DataType.isInt(type) || DataType.isTime(type)) && type.bitWidth === 64) {
-      return toArrayBufferView(Uint8Array, Int64.convertArray(sources[offset]));
+      return toArrayBufferView(Uint8Array, Int642.convertArray(sources[offset]));
     } else if (DataType.isDate(type) && type.unit === DateUnit$1.MILLISECOND) {
-      return toArrayBufferView(Uint8Array, Int64.convertArray(sources[offset]));
+      return toArrayBufferView(Uint8Array, Int642.convertArray(sources[offset]));
     } else if (DataType.isDecimal(type)) {
       return toArrayBufferView(Uint8Array, Int128.convertArray(sources[offset]));
     } else if (DataType.isBinary(type) || DataType.isFixedSizeBinary(type)) {
@@ -31589,13 +32376,13 @@ class Table {
     var _b2, _c2;
     if (args.length === 0) {
       this.batches = [];
-      this.schema = new Schema([]);
+      this.schema = new Schema2([]);
       this._offsets = [0];
       return this;
     }
     let schema;
     let offsets;
-    if (args[0] instanceof Schema) {
+    if (args[0] instanceof Schema2) {
       schema = args.shift();
     }
     if (args[args.length - 1] instanceof Uint32Array) {
@@ -31609,7 +32396,7 @@ class Table {
           return x.batches;
         } else if (x instanceof Data) {
           if (x.type instanceof Struct) {
-            return [new RecordBatch$2(new Schema(x.type.children), x)];
+            return [new RecordBatch$2(new Schema2(x.type.children), x)];
           }
         } else if (Array.isArray(x)) {
           return x.flatMap((v) => unwrap(v));
@@ -31618,7 +32405,7 @@ class Table {
         } else if (typeof x === "object") {
           const keys = Object.keys(x);
           const vecs = keys.map((k) => new Vector([x[k]]));
-          const schema2 = new Schema(keys.map((k, i) => new Field(String(k), vecs[i].type)));
+          const schema2 = new Schema2(keys.map((k, i) => new Field2(String(k), vecs[i].type)));
           const [, batches2] = distributeVectorsIntoRecordBatches(schema2, vecs);
           return batches2.length === 0 ? [new RecordBatch$2(x)] : batches2;
         }
@@ -31626,8 +32413,8 @@ class Table {
       return [];
     };
     const batches = args.flatMap((v) => unwrap(v));
-    schema = (_c2 = schema !== null && schema !== void 0 ? schema : (_b2 = batches[0]) === null || _b2 === void 0 ? void 0 : _b2.schema) !== null && _c2 !== void 0 ? _c2 : new Schema([]);
-    if (!(schema instanceof Schema)) {
+    schema = (_c2 = schema !== null && schema !== void 0 ? schema : (_b2 = batches[0]) === null || _b2 === void 0 ? void 0 : _b2.schema) !== null && _c2 !== void 0 ? _c2 : new Schema2([]);
+    if (!(schema instanceof Schema2)) {
       throw new TypeError("Table constructor expects a [Schema, RecordBatch[]] pair.");
     }
     for (const batch of batches) {
@@ -31642,64 +32429,141 @@ class Table {
     this.batches = batches;
     this._offsets = offsets !== null && offsets !== void 0 ? offsets : computeChunkOffsets(this.data);
   }
+  /**
+   * The contiguous {@link RecordBatch `RecordBatch`} chunks of the Table rows.
+   */
   get data() {
     return this.batches.map(({ data }) => data);
   }
+  /**
+   * The number of columns in this Table.
+   */
   get numCols() {
     return this.schema.fields.length;
   }
+  /**
+   * The number of rows in this Table.
+   */
   get numRows() {
     return this.data.reduce((numRows, data) => numRows + data.length, 0);
   }
+  /**
+   * The number of null rows in this Table.
+   */
   get nullCount() {
     if (this._nullCount === -1) {
       this._nullCount = computeChunkNullCounts(this.data);
     }
     return this._nullCount;
   }
+  /**
+   * Check whether an element is null.
+   *
+   * @param index The index at which to read the validity bitmap.
+   */
+  // @ts-ignore
   isValid(index) {
     return false;
   }
+  /**
+   * Get an element value by position.
+   *
+   * @param index The index of the element to read.
+   */
+  // @ts-ignore
   get(index) {
     return null;
   }
+  /**
+   * Set an element value by position.
+   *
+   * @param index The index of the element to write.
+   * @param value The value to set.
+   */
+  // @ts-ignore
   set(index, value) {
     return;
   }
+  /**
+   * Retrieve the index of the first occurrence of a value in an Vector.
+   *
+   * @param element The value to locate in the Vector.
+   * @param offset The index at which to begin the search. If offset is omitted, the search starts at index 0.
+   */
+  // @ts-ignore
   indexOf(element, offset) {
     return -1;
   }
+  /**
+   * Get the size in bytes of an element by index.
+   * @param index The index at which to get the byteLength.
+   */
+  // @ts-ignore
   getByteLength(index) {
     return 0;
   }
+  /**
+   * Iterator for rows in this Table.
+   */
   [Symbol.iterator]() {
     if (this.batches.length > 0) {
       return instance$3.visit(new Vector(this.data));
     }
     return new Array(0)[Symbol.iterator]();
   }
+  /**
+   * Return a JavaScript Array of the Table rows.
+   *
+   * @returns An Array of Table rows.
+   */
   toArray() {
     return [...this];
   }
+  /**
+   * Returns a string representation of the Table rows.
+   *
+   * @returns A string representation of the Table rows.
+   */
   toString() {
     return `[
   ${this.toArray().join(",\n  ")}
 ]`;
   }
+  /**
+   * Combines two or more Tables of the same schema.
+   *
+   * @param others Additional Tables to add to the end of this Tables.
+   */
   concat(...others) {
     const schema = this.schema;
     const data = this.data.concat(others.flatMap(({ data: data2 }) => data2));
     return new Table(schema, data.map((data2) => new RecordBatch$2(schema, data2)));
   }
+  /**
+   * Return a zero-copy sub-section of this Table.
+   *
+   * @param begin The beginning of the specified portion of the Table.
+   * @param end The end of the specified portion of the Table. This is exclusive of the element at the index 'end'.
+   */
   slice(begin, end) {
     const schema = this.schema;
     [begin, end] = clampRange({ length: this.numRows }, begin, end);
     const data = sliceChunks(this.data, this._offsets, begin, end);
     return new Table(schema, data.map((chunk) => new RecordBatch$2(schema, chunk)));
   }
+  /**
+   * Returns a child Vector by name, or null if this Vector has no child with the given name.
+   *
+   * @param name The name of the child to retrieve.
+   */
   getChild(name) {
     return this.getChildAt(this.schema.fields.findIndex((f) => f.name === name));
   }
+  /**
+   * Returns a child Vector by index, or null if this Vector has no child at the supplied index.
+   *
+   * @param index The index of the child to retrieve.
+   */
   getChildAt(index) {
     if (index > -1 && index < this.schema.fields.length) {
       const data = this.data.map((data2) => data2.children[index]);
@@ -31712,6 +32576,12 @@ class Table {
     }
     return null;
   }
+  /**
+   * Sets a child Vector by name.
+   *
+   * @param name The name of the child to overwrite.
+   * @returns A new Table with the supplied child for the specified name.
+   */
   setChild(name, child) {
     var _b2;
     return this.setChildAt((_b2 = this.schema.fields) === null || _b2 === void 0 ? void 0 : _b2.findIndex((f) => f.name === name), child);
@@ -31731,10 +32601,22 @@ class Table {
     }
     return new Table(schema, batches);
   }
+  /**
+   * Construct a new Table containing only specified columns.
+   *
+   * @param columnNames Names of columns to keep.
+   * @returns A new Table of columns matching the specified names.
+   */
   select(columnNames) {
     const nameToIndex = this.schema.fields.reduce((m, f, i) => m.set(f.name, i), /* @__PURE__ */ new Map());
     return this.selectAt(columnNames.map((columnName) => nameToIndex.get(columnName)).filter((x) => x > -1));
   }
+  /**
+   * Construct a new Table containing only columns at the specified indices.
+   *
+   * @param columnIndices Indices of columns to keep.
+   * @returns A new Table of columns at the specified indices.
+   */
   selectAt(columnIndices) {
     const schema = this.schema.selectAt(columnIndices);
     const data = this.batches.map((batch) => batch.selectAt(columnIndices));
@@ -31771,12 +32653,12 @@ Table[_a$1] = ((proto) => {
   return "Table";
 })(Table.prototype);
 var _a;
-class RecordBatch$2 {
+let RecordBatch$2 = class RecordBatch {
   constructor(...args) {
     switch (args.length) {
       case 2: {
         [this.schema] = args;
-        if (!(this.schema instanceof Schema)) {
+        if (!(this.schema instanceof Schema2)) {
           throw new TypeError("RecordBatch constructor expects a [Schema, Data] pair.");
         }
         [
@@ -31798,14 +32680,14 @@ class RecordBatch$2 {
         const { fields, children: children2, length } = Object.keys(obj).reduce((memo, name, i) => {
           memo.children[i] = obj[name];
           memo.length = Math.max(memo.length, obj[name].length);
-          memo.fields[i] = Field.new({ name, type: obj[name].type, nullable: true });
+          memo.fields[i] = Field2.new({ name, type: obj[name].type, nullable: true });
           return memo;
         }, {
           length: 0,
           fields: new Array(),
           children: new Array()
         });
-        const schema = new Schema(fields);
+        const schema = new Schema2(fields);
         const data = makeData({ type: new Struct(fields), length, children: children2, nullCount: 0 });
         [this.schema, this.data] = ensureSameLengthData(schema, data.children, length);
         break;
@@ -31817,53 +32699,113 @@ class RecordBatch$2 {
   get dictionaries() {
     return this._dictionaries || (this._dictionaries = collectDictionaries(this.schema.fields, this.data.children));
   }
+  /**
+   * The number of columns in this RecordBatch.
+   */
   get numCols() {
     return this.schema.fields.length;
   }
+  /**
+   * The number of rows in this RecordBatch.
+   */
   get numRows() {
     return this.data.length;
   }
+  /**
+   * The number of null rows in this RecordBatch.
+   */
   get nullCount() {
     return this.data.nullCount;
   }
+  /**
+   * Check whether an element is null.
+   * @param index The index at which to read the validity bitmap.
+   */
   isValid(index) {
     return this.data.getValid(index);
   }
+  /**
+   * Get a row by position.
+   * @param index The index of the element to read.
+   */
   get(index) {
     return instance$5.visit(this.data, index);
   }
+  /**
+   * Set a row by position.
+   * @param index The index of the element to write.
+   * @param value The value to set.
+   */
   set(index, value) {
     return instance$6.visit(this.data, index, value);
   }
+  /**
+   * Retrieve the index of the first occurrence of a row in an RecordBatch.
+   * @param element The row to locate in the RecordBatch.
+   * @param offset The index at which to begin the search. If offset is omitted, the search starts at index 0.
+   */
   indexOf(element, offset) {
     return instance$4.visit(this.data, element, offset);
   }
+  /**
+   * Get the size (in bytes) of a row by index.
+   * @param index The row index for which to compute the byteLength.
+   */
   getByteLength(index) {
     return instance$2.visit(this.data, index);
   }
+  /**
+   * Iterator for rows in this RecordBatch.
+   */
   [Symbol.iterator]() {
     return instance$3.visit(new Vector([this.data]));
   }
+  /**
+   * Return a JavaScript Array of the RecordBatch rows.
+   * @returns An Array of RecordBatch rows.
+   */
   toArray() {
     return [...this];
   }
+  /**
+   * Combines two or more RecordBatch of the same schema.
+   * @param others Additional RecordBatch to add to the end of this RecordBatch.
+   */
   concat(...others) {
     return new Table(this.schema, [this, ...others]);
   }
+  /**
+   * Return a zero-copy sub-section of this RecordBatch.
+   * @param start The beginning of the specified portion of the RecordBatch.
+   * @param end The end of the specified portion of the RecordBatch. This is exclusive of the element at the index 'end'.
+   */
   slice(begin, end) {
     const [slice] = new Vector([this.data]).slice(begin, end).data;
-    return new RecordBatch$2(this.schema, slice);
+    return new RecordBatch(this.schema, slice);
   }
+  /**
+   * Returns a child Vector by name, or null if this Vector has no child with the given name.
+   * @param name The name of the child to retrieve.
+   */
   getChild(name) {
     var _b2;
     return this.getChildAt((_b2 = this.schema.fields) === null || _b2 === void 0 ? void 0 : _b2.findIndex((f) => f.name === name));
   }
+  /**
+   * Returns a child Vector by index, or null if this Vector has no child at the supplied index.
+   * @param index The index of the child to retrieve.
+   */
   getChildAt(index) {
     if (index > -1 && index < this.schema.fields.length) {
       return new Vector([this.data.children[index]]);
     }
     return null;
   }
+  /**
+   * Sets a child Vector by name.
+   * @param name The name of the child to overwrite.
+   * @returns A new RecordBatch with the new child for the specified name.
+   */
   setChild(name, child) {
     var _b2;
     return this.setChildAt((_b2 = this.schema.fields) === null || _b2 === void 0 ? void 0 : _b2.findIndex((f) => f.name === name), child);
@@ -31879,11 +32821,17 @@ class RecordBatch$2 {
       const children2 = data.children.slice();
       const field = fields[index].clone({ type: child.type });
       [fields[index], children2[index]] = [field, child.data[0]];
-      schema = new Schema(fields, new Map(this.schema.metadata));
+      schema = new Schema2(fields, new Map(this.schema.metadata));
       data = makeData({ type: new Struct(fields), children: children2 });
     }
-    return new RecordBatch$2(schema, data);
+    return new RecordBatch(schema, data);
   }
+  /**
+   * Construct a new RecordBatch containing only specified columns.
+   *
+   * @param columnNames Names of columns to keep.
+   * @returns A new RecordBatch of columns matching the specified names.
+   */
   select(columnNames) {
     const schema = this.schema.select(columnNames);
     const type = new Struct(schema.fields);
@@ -31894,15 +32842,21 @@ class RecordBatch$2 {
         children2[index] = this.data.children[index];
       }
     }
-    return new RecordBatch$2(schema, makeData({ type, length: this.numRows, children: children2 }));
+    return new RecordBatch(schema, makeData({ type, length: this.numRows, children: children2 }));
   }
+  /**
+   * Construct a new RecordBatch containing only columns at the specified indices.
+   *
+   * @param columnIndices Indices of columns to keep.
+   * @returns A new RecordBatch of columns matching at the specified indices.
+   */
   selectAt(columnIndices) {
     const schema = this.schema.selectAt(columnIndices);
     const children2 = columnIndices.map((i) => this.data.children[i]).filter(Boolean);
     const subset = makeData({ type: new Struct(schema.fields), length: this.numRows, children: children2 });
-    return new RecordBatch$2(schema, subset);
+    return new RecordBatch(schema, subset);
   }
-}
+};
 _a = Symbol.toStringTag;
 RecordBatch$2[_a] = ((proto) => {
   proto._nullCount = -1;
@@ -31984,10 +32938,17 @@ class BodyCompression {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
     return (obj || new BodyCompression()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * Compressor library.
+   * For LZ4_FRAME, each compressed buffer must consist of a single frame.
+   */
   codec() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.readInt8(this.bb_pos + offset) : CompressionType.LZ4_FRAME;
   }
+  /**
+   * Indicates the way the record batch body was compressed
+   */
   method() {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? this.bb.readInt8(this.bb_pos + offset) : BodyCompressionMethod.BUFFER;
@@ -32012,7 +32973,7 @@ class BodyCompression {
     return BodyCompression.endBodyCompression(builder);
   }
 }
-class Buffer2 {
+class Buffer {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -32022,9 +32983,20 @@ class Buffer2 {
     this.bb = bb;
     return this;
   }
+  /**
+   * The relative offset into the shared memory page where the bytes for this
+   * buffer starts
+   */
   offset() {
     return this.bb.readInt64(this.bb_pos);
   }
+  /**
+   * The absolute length (in bytes) of the memory buffer. The memory is found
+   * from offset (inclusive) to offset + length (non-inclusive). When building
+   * messages using the encapsulated IPC message, padding bytes may be written
+   * after a buffer, but such padding bytes do not need to be accounted for in
+   * the size here.
+   */
   length() {
     return this.bb.readInt64(this.bb_pos + 8);
   }
@@ -32038,7 +33010,7 @@ class Buffer2 {
     return builder.offset();
   }
 }
-class FieldNode$1 {
+let FieldNode$1 = class FieldNode {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -32048,9 +33020,18 @@ class FieldNode$1 {
     this.bb = bb;
     return this;
   }
+  /**
+   * The number of value slots in the Arrow array at this level of a nested
+   * tree
+   */
   length() {
     return this.bb.readInt64(this.bb_pos);
   }
+  /**
+   * The number of observed nulls. Fields with null_count == 0 may choose not
+   * to write their physical validity bitmap out as a materialized buffer,
+   * instead setting the length of the bitmap buffer to 0.
+   */
   nullCount() {
     return this.bb.readInt64(this.bb_pos + 8);
   }
@@ -32063,8 +33044,8 @@ class FieldNode$1 {
     builder.writeInt64(length);
     return builder.offset();
   }
-}
-class RecordBatch$1 {
+};
+let RecordBatch$1 = class RecordBatch2 {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -32075,16 +33056,23 @@ class RecordBatch$1 {
     return this;
   }
   static getRootAsRecordBatch(bb, obj) {
-    return (obj || new RecordBatch$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new RecordBatch2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsRecordBatch(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new RecordBatch$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new RecordBatch2()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
+  /**
+   * number of records / rows. The arrays in the batch should all have this
+   * length
+   */
   length() {
     const offset = this.bb.__offset(this.bb_pos, 4);
     return offset ? this.bb.readInt64(this.bb_pos + offset) : this.bb.createLong(0, 0);
   }
+  /**
+   * Nodes correspond to the pre-ordered flattened logical schema
+   */
   nodes(index, obj) {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? (obj || new FieldNode$1()).__init(this.bb.__vector(this.bb_pos + offset) + index * 16, this.bb) : null;
@@ -32093,14 +33081,25 @@ class RecordBatch$1 {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? this.bb.__vector_len(this.bb_pos + offset) : 0;
   }
+  /**
+   * Buffers correspond to the pre-ordered flattened buffer tree
+   *
+   * The number of buffers appended to this list depends on the schema. For
+   * example, most primitive arrays will have 2 buffers, 1 for the validity
+   * bitmap and 1 for the values. For struct arrays, there will only be a
+   * single buffer for the validity (nulls) bitmap
+   */
   buffers(index, obj) {
     const offset = this.bb.__offset(this.bb_pos, 8);
-    return offset ? (obj || new Buffer2()).__init(this.bb.__vector(this.bb_pos + offset) + index * 16, this.bb) : null;
+    return offset ? (obj || new Buffer()).__init(this.bb.__vector(this.bb_pos + offset) + index * 16, this.bb) : null;
   }
   buffersLength() {
     const offset = this.bb.__offset(this.bb_pos, 8);
     return offset ? this.bb.__vector_len(this.bb_pos + offset) : 0;
   }
+  /**
+   * Optional compression of the message body
+   */
   compression(obj) {
     const offset = this.bb.__offset(this.bb_pos, 10);
     return offset ? (obj || new BodyCompression()).__init(this.bb.__indirect(this.bb_pos + offset), this.bb) : null;
@@ -32130,8 +33129,8 @@ class RecordBatch$1 {
     const offset = builder.endObject();
     return offset;
   }
-}
-class DictionaryBatch$1 {
+};
+let DictionaryBatch$1 = class DictionaryBatch {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -32142,11 +33141,11 @@ class DictionaryBatch$1 {
     return this;
   }
   static getRootAsDictionaryBatch(bb, obj) {
-    return (obj || new DictionaryBatch$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new DictionaryBatch()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsDictionaryBatch(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new DictionaryBatch$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new DictionaryBatch()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   id() {
     const offset = this.bb.__offset(this.bb_pos, 4);
@@ -32156,6 +33155,11 @@ class DictionaryBatch$1 {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? (obj || new RecordBatch$1()).__init(this.bb.__indirect(this.bb_pos + offset), this.bb) : null;
   }
+  /**
+   * If isDelta is true the values in the dictionary are to be appended to a
+   * dictionary with the indicated id. If isDelta is false this dictionary
+   * should replace the existing dictionary.
+   */
   isDelta() {
     const offset = this.bb.__offset(this.bb_pos, 8);
     return offset ? !!this.bb.readInt8(this.bb_pos + offset) : false;
@@ -32176,7 +33180,7 @@ class DictionaryBatch$1 {
     const offset = builder.endObject();
     return offset;
   }
-}
+};
 var MessageHeader;
 (function(MessageHeader2) {
   MessageHeader2[MessageHeader2["NONE"] = 0] = "NONE";
@@ -32186,7 +33190,7 @@ var MessageHeader;
   MessageHeader2[MessageHeader2["Tensor"] = 4] = "Tensor";
   MessageHeader2[MessageHeader2["SparseTensor"] = 5] = "SparseTensor";
 })(MessageHeader || (MessageHeader = {}));
-class Message$1 {
+let Message$1 = class Message {
   constructor() {
     this.bb = null;
     this.bb_pos = 0;
@@ -32197,11 +33201,11 @@ class Message$1 {
     return this;
   }
   static getRootAsMessage(bb, obj) {
-    return (obj || new Message$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Message()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   static getSizePrefixedRootAsMessage(bb, obj) {
     bb.setPosition(bb.position() + SIZE_PREFIX_LENGTH);
-    return (obj || new Message$1()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+    return (obj || new Message()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
   }
   version() {
     const offset = this.bb.__offset(this.bb_pos, 4);
@@ -32211,6 +33215,7 @@ class Message$1 {
     const offset = this.bb.__offset(this.bb_pos, 6);
     return offset ? this.bb.readUint8(this.bb_pos + offset) : MessageHeader.NONE;
   }
+  // @ts-ignore
   header(obj) {
     const offset = this.bb.__offset(this.bb_pos, 8);
     return offset ? this.bb.__union(obj, this.bb_pos + offset) : null;
@@ -32266,23 +33271,23 @@ class Message$1 {
     builder.finish(offset, void 0, true);
   }
   static createMessage(builder, version, headerType, headerOffset, bodyLength, customMetadataOffset) {
-    Message$1.startMessage(builder);
-    Message$1.addVersion(builder, version);
-    Message$1.addHeaderType(builder, headerType);
-    Message$1.addHeader(builder, headerOffset);
-    Message$1.addBodyLength(builder, bodyLength);
-    Message$1.addCustomMetadata(builder, customMetadataOffset);
-    return Message$1.endMessage(builder);
+    Message.startMessage(builder);
+    Message.addVersion(builder, version);
+    Message.addHeaderType(builder, headerType);
+    Message.addHeader(builder, headerOffset);
+    Message.addBodyLength(builder, bodyLength);
+    Message.addCustomMetadata(builder, customMetadataOffset);
+    return Message.endMessage(builder);
   }
-}
+};
 var Long$1 = Long$3;
 class TypeAssembler extends Visitor {
   visit(node, builder) {
     return node == null || builder == null ? void 0 : super.visit(node, builder);
   }
   visitNull(_node, b) {
-    Null.startNull(b);
-    return Null.endNull(b);
+    Null2.startNull(b);
+    return Null2.endNull(b);
   }
   visitInt(node, b) {
     Int.startInt(b);
@@ -32296,23 +33301,23 @@ class TypeAssembler extends Visitor {
     return FloatingPoint.endFloatingPoint(b);
   }
   visitBinary(_node, b) {
-    Binary.startBinary(b);
-    return Binary.endBinary(b);
+    Binary2.startBinary(b);
+    return Binary2.endBinary(b);
   }
   visitBool(_node, b) {
-    Bool.startBool(b);
-    return Bool.endBool(b);
+    Bool2.startBool(b);
+    return Bool2.endBool(b);
   }
   visitUtf8(_node, b) {
-    Utf8.startUtf8(b);
-    return Utf8.endUtf8(b);
+    Utf82.startUtf8(b);
+    return Utf82.endUtf8(b);
   }
   visitDecimal(node, b) {
-    Decimal.startDecimal(b);
-    Decimal.addScale(b, node.scale);
-    Decimal.addPrecision(b, node.precision);
-    Decimal.addBitWidth(b, node.bitWidth);
-    return Decimal.endDecimal(b);
+    Decimal2.startDecimal(b);
+    Decimal2.addScale(b, node.scale);
+    Decimal2.addPrecision(b, node.precision);
+    Decimal2.addBitWidth(b, node.bitWidth);
+    return Decimal2.endDecimal(b);
   }
   visitDate(node, b) {
     Date$1.startDate(b);
@@ -32340,8 +33345,8 @@ class TypeAssembler extends Visitor {
     return Interval.endInterval(b);
   }
   visitList(_node, b) {
-    List.startList(b);
-    return List.endList(b);
+    List2.startList(b);
+    return List2.endList(b);
   }
   visitStruct(_node, b) {
     Struct_.startStruct_(b);
@@ -32366,14 +33371,14 @@ class TypeAssembler extends Visitor {
     return DictionaryEncoding.endDictionaryEncoding(b);
   }
   visitFixedSizeBinary(node, b) {
-    FixedSizeBinary.startFixedSizeBinary(b);
-    FixedSizeBinary.addByteWidth(b, node.byteWidth);
-    return FixedSizeBinary.endFixedSizeBinary(b);
+    FixedSizeBinary2.startFixedSizeBinary(b);
+    FixedSizeBinary2.addByteWidth(b, node.byteWidth);
+    return FixedSizeBinary2.endFixedSizeBinary(b);
   }
   visitFixedSizeList(node, b) {
-    FixedSizeList.startFixedSizeList(b);
-    FixedSizeList.addListSize(b, node.listSize);
-    return FixedSizeList.endFixedSizeList(b);
+    FixedSizeList2.startFixedSizeList(b);
+    FixedSizeList2.addListSize(b, node.listSize);
+    return FixedSizeList2.endFixedSizeList(b);
   }
   visitMap(node, b) {
     Map$1.startMap(b);
@@ -32383,24 +33388,24 @@ class TypeAssembler extends Visitor {
 }
 const instance = new TypeAssembler();
 function schemaFromJSON(_schema, dictionaries = /* @__PURE__ */ new Map()) {
-  return new Schema(schemaFieldsFromJSON(_schema, dictionaries), customMetadataFromJSON(_schema["customMetadata"]), dictionaries);
+  return new Schema2(schemaFieldsFromJSON(_schema, dictionaries), customMetadataFromJSON(_schema["customMetadata"]), dictionaries);
 }
 function recordBatchFromJSON(b) {
-  return new RecordBatch(b["count"], fieldNodesFromJSON(b["columns"]), buffersFromJSON(b["columns"]));
+  return new RecordBatch3(b["count"], fieldNodesFromJSON(b["columns"]), buffersFromJSON(b["columns"]));
 }
 function dictionaryBatchFromJSON(b) {
-  return new DictionaryBatch(recordBatchFromJSON(b["data"]), b["id"], b["isDelta"]);
+  return new DictionaryBatch2(recordBatchFromJSON(b["data"]), b["id"], b["isDelta"]);
 }
 function schemaFieldsFromJSON(_schema, dictionaries) {
-  return (_schema["fields"] || []).filter(Boolean).map((f) => Field.fromJSON(f, dictionaries));
+  return (_schema["fields"] || []).filter(Boolean).map((f) => Field2.fromJSON(f, dictionaries));
 }
 function fieldChildrenFromJSON(_field, dictionaries) {
-  return (_field["children"] || []).filter(Boolean).map((f) => Field.fromJSON(f, dictionaries));
+  return (_field["children"] || []).filter(Boolean).map((f) => Field2.fromJSON(f, dictionaries));
 }
 function fieldNodesFromJSON(xs) {
   return (xs || []).reduce((fieldNodes, column) => [
     ...fieldNodes,
-    new FieldNode(column["count"], nullCountFromJSON(column["VALIDITY"])),
+    new FieldNode2(column["count"], nullCountFromJSON(column["VALIDITY"])),
     ...fieldNodesFromJSON(column["children"])
   ], []);
 }
@@ -32427,16 +33432,16 @@ function fieldFromJSON(_field, dictionaries) {
   let dictType;
   if (!dictionaries || !(dictMeta = _field["dictionary"])) {
     type = typeFromJSON(_field, fieldChildrenFromJSON(_field, dictionaries));
-    field = new Field(_field["name"], type, _field["nullable"], customMetadataFromJSON(_field["customMetadata"]));
+    field = new Field2(_field["name"], type, _field["nullable"], customMetadataFromJSON(_field["customMetadata"]));
   } else if (!dictionaries.has(id2 = dictMeta["id"])) {
     keys = (keys = dictMeta["indexType"]) ? indexTypeFromJSON(keys) : new Int32();
     dictionaries.set(id2, type = typeFromJSON(_field, fieldChildrenFromJSON(_field, dictionaries)));
     dictType = new Dictionary(type, keys, id2, dictMeta["isOrdered"]);
-    field = new Field(_field["name"], dictType, _field["nullable"], customMetadataFromJSON(_field["customMetadata"]));
+    field = new Field2(_field["name"], dictType, _field["nullable"], customMetadataFromJSON(_field["customMetadata"]));
   } else {
     keys = (keys = dictMeta["indexType"]) ? indexTypeFromJSON(keys) : new Int32();
     dictType = new Dictionary(dictionaries.get(id2), keys, id2, dictMeta["isOrdered"]);
-    field = new Field(_field["name"], dictType, _field["nullable"], customMetadataFromJSON(_field["customMetadata"]));
+    field = new Field2(_field["name"], dictType, _field["nullable"], customMetadataFromJSON(_field["customMetadata"]));
   }
   return field || null;
 }
@@ -32514,10 +33519,10 @@ function typeFromJSON(f, children2) {
   }
   throw new Error(`Unrecognized type: "${typeId}"`);
 }
-var Long = Long$3;
-var Builder = Builder$2;
-var ByteBuffer = ByteBuffer$2;
-class Message {
+var Long2 = Long$3;
+var Builder2 = Builder$2;
+var ByteBuffer2 = ByteBuffer$2;
+class Message2 {
   constructor(bodyLength, version, headerType, header) {
     this._version = version;
     this._headerType = headerType;
@@ -32525,48 +33530,52 @@ class Message {
     header && (this._createHeader = () => header);
     this._bodyLength = typeof bodyLength === "number" ? bodyLength : bodyLength.low;
   }
+  /** @nocollapse */
   static fromJSON(msg, headerType) {
-    const message = new Message(0, MetadataVersion$1.V4, headerType);
+    const message = new Message2(0, MetadataVersion$1.V4, headerType);
     message._createHeader = messageHeaderFromJSON(msg, headerType);
     return message;
   }
+  /** @nocollapse */
   static decode(buf) {
-    buf = new ByteBuffer(toUint8Array(buf));
+    buf = new ByteBuffer2(toUint8Array(buf));
     const _message = Message$1.getRootAsMessage(buf);
     const bodyLength = _message.bodyLength();
     const version = _message.version();
     const headerType = _message.headerType();
-    const message = new Message(bodyLength, version, headerType);
+    const message = new Message2(bodyLength, version, headerType);
     message._createHeader = decodeMessageHeader(_message, headerType);
     return message;
   }
+  /** @nocollapse */
   static encode(message) {
-    const b = new Builder();
+    const b = new Builder2();
     let headerOffset = -1;
     if (message.isSchema()) {
-      headerOffset = Schema.encode(b, message.header());
+      headerOffset = Schema2.encode(b, message.header());
     } else if (message.isRecordBatch()) {
-      headerOffset = RecordBatch.encode(b, message.header());
+      headerOffset = RecordBatch3.encode(b, message.header());
     } else if (message.isDictionaryBatch()) {
-      headerOffset = DictionaryBatch.encode(b, message.header());
+      headerOffset = DictionaryBatch2.encode(b, message.header());
     }
     Message$1.startMessage(b);
     Message$1.addVersion(b, MetadataVersion$1.V4);
     Message$1.addHeader(b, headerOffset);
     Message$1.addHeaderType(b, message.headerType);
-    Message$1.addBodyLength(b, new Long(message.bodyLength, 0));
+    Message$1.addBodyLength(b, new Long2(message.bodyLength, 0));
     Message$1.finishMessageBuffer(b, Message$1.endMessage(b));
     return b.asUint8Array();
   }
+  /** @nocollapse */
   static from(header, bodyLength = 0) {
-    if (header instanceof Schema) {
-      return new Message(0, MetadataVersion$1.V4, MessageHeader$1.Schema, header);
+    if (header instanceof Schema2) {
+      return new Message2(0, MetadataVersion$1.V4, MessageHeader$1.Schema, header);
     }
-    if (header instanceof RecordBatch) {
-      return new Message(bodyLength, MetadataVersion$1.V4, MessageHeader$1.RecordBatch, header);
+    if (header instanceof RecordBatch3) {
+      return new Message2(bodyLength, MetadataVersion$1.V4, MessageHeader$1.RecordBatch, header);
     }
-    if (header instanceof DictionaryBatch) {
-      return new Message(bodyLength, MetadataVersion$1.V4, MessageHeader$1.DictionaryBatch, header);
+    if (header instanceof DictionaryBatch2) {
+      return new Message2(bodyLength, MetadataVersion$1.V4, MessageHeader$1.DictionaryBatch, header);
     }
     throw new Error(`Unrecognized Message header: ${header}`);
   }
@@ -32595,7 +33604,7 @@ class Message {
     return this.headerType === MessageHeader$1.DictionaryBatch;
   }
 }
-class RecordBatch {
+class RecordBatch3 {
   constructor(length, nodes, buffers) {
     this._nodes = nodes;
     this._buffers = buffers;
@@ -32611,7 +33620,7 @@ class RecordBatch {
     return this._buffers;
   }
 }
-class DictionaryBatch {
+class DictionaryBatch2 {
   constructor(data, id2, isDelta = false) {
     this._data = data;
     this._isDelta = isDelta;
@@ -32642,7 +33651,7 @@ class BufferRegion {
     this.length = typeof length === "number" ? length : length.low;
   }
 }
-class FieldNode {
+class FieldNode2 {
   constructor(length, nullCount) {
     this.length = typeof length === "number" ? length : length.low;
     this.nullCount = typeof nullCount === "number" ? nullCount : nullCount.low;
@@ -32652,11 +33661,11 @@ function messageHeaderFromJSON(message, type) {
   return () => {
     switch (type) {
       case MessageHeader$1.Schema:
-        return Schema.fromJSON(message);
+        return Schema2.fromJSON(message);
       case MessageHeader$1.RecordBatch:
-        return RecordBatch.fromJSON(message);
+        return RecordBatch3.fromJSON(message);
       case MessageHeader$1.DictionaryBatch:
-        return DictionaryBatch.fromJSON(message);
+        return DictionaryBatch2.fromJSON(message);
     }
     throw new Error(`Unrecognized Message type: { name: ${MessageHeader$1[type]}, type: ${type} }`);
   };
@@ -32665,55 +33674,55 @@ function decodeMessageHeader(message, type) {
   return () => {
     switch (type) {
       case MessageHeader$1.Schema:
-        return Schema.decode(message.header(new Schema$1()));
+        return Schema2.decode(message.header(new Schema$1()));
       case MessageHeader$1.RecordBatch:
-        return RecordBatch.decode(message.header(new RecordBatch$1()), message.version());
+        return RecordBatch3.decode(message.header(new RecordBatch$1()), message.version());
       case MessageHeader$1.DictionaryBatch:
-        return DictionaryBatch.decode(message.header(new DictionaryBatch$1()), message.version());
+        return DictionaryBatch2.decode(message.header(new DictionaryBatch$1()), message.version());
     }
     throw new Error(`Unrecognized Message type: { name: ${MessageHeader$1[type]}, type: ${type} }`);
   };
 }
-Field["encode"] = encodeField;
-Field["decode"] = decodeField;
-Field["fromJSON"] = fieldFromJSON;
-Schema["encode"] = encodeSchema;
-Schema["decode"] = decodeSchema;
-Schema["fromJSON"] = schemaFromJSON;
-RecordBatch["encode"] = encodeRecordBatch;
-RecordBatch["decode"] = decodeRecordBatch;
-RecordBatch["fromJSON"] = recordBatchFromJSON;
-DictionaryBatch["encode"] = encodeDictionaryBatch;
-DictionaryBatch["decode"] = decodeDictionaryBatch;
-DictionaryBatch["fromJSON"] = dictionaryBatchFromJSON;
-FieldNode["encode"] = encodeFieldNode;
-FieldNode["decode"] = decodeFieldNode;
+Field2["encode"] = encodeField;
+Field2["decode"] = decodeField;
+Field2["fromJSON"] = fieldFromJSON;
+Schema2["encode"] = encodeSchema;
+Schema2["decode"] = decodeSchema;
+Schema2["fromJSON"] = schemaFromJSON;
+RecordBatch3["encode"] = encodeRecordBatch;
+RecordBatch3["decode"] = decodeRecordBatch;
+RecordBatch3["fromJSON"] = recordBatchFromJSON;
+DictionaryBatch2["encode"] = encodeDictionaryBatch;
+DictionaryBatch2["decode"] = decodeDictionaryBatch;
+DictionaryBatch2["fromJSON"] = dictionaryBatchFromJSON;
+FieldNode2["encode"] = encodeFieldNode;
+FieldNode2["decode"] = decodeFieldNode;
 BufferRegion["encode"] = encodeBufferRegion;
 BufferRegion["decode"] = decodeBufferRegion;
 function decodeSchema(_schema, dictionaries = /* @__PURE__ */ new Map()) {
   const fields = decodeSchemaFields(_schema, dictionaries);
-  return new Schema(fields, decodeCustomMetadata(_schema), dictionaries);
+  return new Schema2(fields, decodeCustomMetadata(_schema), dictionaries);
 }
 function decodeRecordBatch(batch, version = MetadataVersion$1.V4) {
   if (batch.compression() !== null) {
     throw new Error("Record batch compression not implemented");
   }
-  return new RecordBatch(batch.length(), decodeFieldNodes(batch), decodeBuffers(batch, version));
+  return new RecordBatch3(batch.length(), decodeFieldNodes(batch), decodeBuffers(batch, version));
 }
 function decodeDictionaryBatch(batch, version = MetadataVersion$1.V4) {
-  return new DictionaryBatch(RecordBatch.decode(batch.data(), version), batch.id(), batch.isDelta());
+  return new DictionaryBatch2(RecordBatch3.decode(batch.data(), version), batch.id(), batch.isDelta());
 }
 function decodeBufferRegion(b) {
   return new BufferRegion(b.offset(), b.length());
 }
 function decodeFieldNode(f) {
-  return new FieldNode(f.length(), f.nullCount());
+  return new FieldNode2(f.length(), f.nullCount());
 }
 function decodeFieldNodes(batch) {
   const nodes = [];
   for (let f, i = -1, j = -1, n = batch.nodesLength(); ++i < n; ) {
     if (f = batch.nodes(i)) {
-      nodes[++j] = FieldNode.decode(f);
+      nodes[++j] = FieldNode2.decode(f);
     }
   }
   return nodes;
@@ -32734,7 +33743,7 @@ function decodeSchemaFields(schema, dictionaries) {
   const fields = [];
   for (let f, i = -1, j = -1, n = schema.fieldsLength(); ++i < n; ) {
     if (f = schema.fields(i)) {
-      fields[++j] = Field.decode(f, dictionaries);
+      fields[++j] = Field2.decode(f, dictionaries);
     }
   }
   return fields;
@@ -32743,7 +33752,7 @@ function decodeFieldChildren(field, dictionaries) {
   const children2 = [];
   for (let f, i = -1, j = -1, n = field.childrenLength(); ++i < n; ) {
     if (f = field.children(i)) {
-      children2[++j] = Field.decode(f, dictionaries);
+      children2[++j] = Field2.decode(f, dictionaries);
     }
   }
   return children2;
@@ -32757,16 +33766,16 @@ function decodeField(f, dictionaries) {
   let dictMeta;
   if (!dictionaries || !(dictMeta = f.dictionary())) {
     type = decodeFieldType(f, decodeFieldChildren(f, dictionaries));
-    field = new Field(f.name(), type, f.nullable(), decodeCustomMetadata(f));
+    field = new Field2(f.name(), type, f.nullable(), decodeCustomMetadata(f));
   } else if (!dictionaries.has(id2 = dictMeta.id().low)) {
     keys = (keys = dictMeta.indexType()) ? decodeIndexType(keys) : new Int32();
     dictionaries.set(id2, type = decodeFieldType(f, decodeFieldChildren(f, dictionaries)));
     dictType = new Dictionary(type, keys, id2, dictMeta.isOrdered());
-    field = new Field(f.name(), dictType, f.nullable(), decodeCustomMetadata(f));
+    field = new Field2(f.name(), dictType, f.nullable(), decodeCustomMetadata(f));
   } else {
     keys = (keys = dictMeta.indexType()) ? decodeIndexType(keys) : new Int32();
     dictType = new Dictionary(dictionaries.get(id2), keys, id2, dictMeta.isOrdered());
-    field = new Field(f.name(), dictType, f.nullable(), decodeCustomMetadata(f));
+    field = new Field2(f.name(), dictType, f.nullable(), decodeCustomMetadata(f));
   }
   return field || null;
 }
@@ -32812,7 +33821,7 @@ function decodeFieldType(f, children2) {
       return new Float(t.precision());
     }
     case Type["Decimal"]: {
-      const t = f.type(new Decimal());
+      const t = f.type(new Decimal2());
       return new Decimal$1(t.scale(), t.precision(), t.bitWidth());
     }
     case Type["Date"]: {
@@ -32836,11 +33845,11 @@ function decodeFieldType(f, children2) {
       return new Union_(t.mode(), t.typeIdsArray() || [], children2 || []);
     }
     case Type["FixedSizeBinary"]: {
-      const t = f.type(new FixedSizeBinary());
+      const t = f.type(new FixedSizeBinary2());
       return new FixedSizeBinary$1(t.byteWidth());
     }
     case Type["FixedSizeList"]: {
-      const t = f.type(new FixedSizeList());
+      const t = f.type(new FixedSizeList2());
       return new FixedSizeList$1(t.listSize(), (children2 || [])[0]);
     }
     case Type["Map"]: {
@@ -32851,7 +33860,7 @@ function decodeFieldType(f, children2) {
   throw new Error(`Unrecognized type: "${Type[typeId]}" (${typeId})`);
 }
 function encodeSchema(b, schema) {
-  const fieldOffsets = schema.fields.map((f) => Field.encode(b, f));
+  const fieldOffsets = schema.fields.map((f) => Field2.encode(b, f));
   Schema$1.startFieldsVector(b, fieldOffsets.length);
   const fieldsVectorOffset = Schema$1.createFieldsVector(b, fieldOffsets);
   const metadataOffset = !(schema.metadata && schema.metadata.size > 0) ? -1 : Schema$1.createCustomMetadataVector(b, [...schema.metadata].map(([k, v]) => {
@@ -32883,7 +33892,7 @@ function encodeField(b, field) {
     dictionaryOffset = instance.visit(type, b);
     typeOffset = instance.visit(type.dictionary, b);
   }
-  const childOffsets = (type.children || []).map((f) => Field.encode(b, f));
+  const childOffsets = (type.children || []).map((f) => Field2.encode(b, f));
   const childrenVectorOffset = Field$1.createChildrenVector(b, childOffsets);
   const metadataOffset = !(field.metadata && field.metadata.size > 0) ? -1 : Field$1.createCustomMetadataVector(b, [...field.metadata].map(([k, v]) => {
     const key = b.createString(`${k}`);
@@ -32917,35 +33926,40 @@ function encodeRecordBatch(b, recordBatch) {
   const buffers = recordBatch.buffers || [];
   RecordBatch$1.startNodesVector(b, nodes.length);
   for (const n of nodes.slice().reverse())
-    FieldNode.encode(b, n);
+    FieldNode2.encode(b, n);
   const nodesVectorOffset = b.endVector();
   RecordBatch$1.startBuffersVector(b, buffers.length);
   for (const b_ of buffers.slice().reverse())
     BufferRegion.encode(b, b_);
   const buffersVectorOffset = b.endVector();
   RecordBatch$1.startRecordBatch(b);
-  RecordBatch$1.addLength(b, new Long(recordBatch.length, 0));
+  RecordBatch$1.addLength(b, new Long2(recordBatch.length, 0));
   RecordBatch$1.addNodes(b, nodesVectorOffset);
   RecordBatch$1.addBuffers(b, buffersVectorOffset);
   return RecordBatch$1.endRecordBatch(b);
 }
 function encodeDictionaryBatch(b, dictionaryBatch) {
-  const dataOffset = RecordBatch.encode(b, dictionaryBatch.data);
+  const dataOffset = RecordBatch3.encode(b, dictionaryBatch.data);
   DictionaryBatch$1.startDictionaryBatch(b);
-  DictionaryBatch$1.addId(b, new Long(dictionaryBatch.id, 0));
+  DictionaryBatch$1.addId(b, new Long2(dictionaryBatch.id, 0));
   DictionaryBatch$1.addIsDelta(b, dictionaryBatch.isDelta);
   DictionaryBatch$1.addData(b, dataOffset);
   return DictionaryBatch$1.endDictionaryBatch(b);
 }
 function encodeFieldNode(b, node) {
-  return FieldNode$1.createFieldNode(b, new Long(node.length, 0), new Long(node.nullCount, 0));
+  return FieldNode$1.createFieldNode(b, new Long2(node.length, 0), new Long2(node.nullCount, 0));
 }
 function encodeBufferRegion(b, node) {
-  return Buffer2.createBuffer(b, new Long(node.offset, 0), new Long(node.length, 0));
+  return Buffer.createBuffer(b, new Long2(node.offset, 0), new Long2(node.length, 0));
 }
 const platformIsLittleEndian = (() => {
   const buffer = new ArrayBuffer(2);
-  new DataView(buffer).setInt16(0, 256, true);
+  new DataView(buffer).setInt16(
+    0,
+    256,
+    true
+    /* littleEndian */
+  );
   return new Int16Array(buffer)[0] === 256;
 })();
 const invalidMessageType = (type) => `Expected ${MessageHeader$1[type]} Message in stream, but was null or length 0.`;
@@ -32996,7 +34010,11 @@ class MessageReader {
     if (buf.byteLength < bodyLength) {
       throw new Error(invalidMessageBodyLength(bodyLength, buf.byteLength));
     }
-    return buf.byteOffset % 8 === 0 && buf.byteOffset + buf.byteLength <= buf.buffer.byteLength ? buf : buf.slice();
+    return (
+      /* 1. */
+      buf.byteOffset % 8 === 0 && /* 2. */
+      buf.byteOffset + buf.byteLength <= buf.buffer.byteLength ? buf : buf.slice()
+    );
   }
   readSchema(throwIfNull = false) {
     const type = MessageHeader$1.Schema;
@@ -33021,7 +34039,7 @@ class MessageReader {
     if (buf.byteLength < metadataLength) {
       throw new Error(invalidMessageMetadata(metadataLength, buf.byteLength));
     }
-    return { done: false, value: Message.decode(buf) };
+    return { done: false, value: Message2.decode(buf) };
   }
 }
 class AsyncMessageReader {
@@ -33077,7 +34095,11 @@ class AsyncMessageReader {
       if (buf.byteLength < bodyLength) {
         throw new Error(invalidMessageBodyLength(bodyLength, buf.byteLength));
       }
-      return buf.byteOffset % 8 === 0 && buf.byteOffset + buf.byteLength <= buf.buffer.byteLength ? buf : buf.slice();
+      return (
+        /* 1. */
+        buf.byteOffset % 8 === 0 && /* 2. */
+        buf.byteOffset + buf.byteLength <= buf.buffer.byteLength ? buf : buf.slice()
+      );
     });
   }
   readSchema(throwIfNull = false) {
@@ -33108,7 +34130,7 @@ class AsyncMessageReader {
       if (buf.byteLength < metadataLength) {
         throw new Error(invalidMessageMetadata(metadataLength, buf.byteLength));
       }
-      return { done: false, value: Message.decode(buf) };
+      return { done: false, value: Message2.decode(buf) };
     });
   }
 }
@@ -33125,19 +34147,19 @@ class JSONMessageReader extends MessageReader {
     const { _json } = this;
     if (!this._schema) {
       this._schema = true;
-      const message = Message.fromJSON(_json.schema, MessageHeader$1.Schema);
+      const message = Message2.fromJSON(_json.schema, MessageHeader$1.Schema);
       return { done: false, value: message };
     }
     if (this._dictionaryIndex < _json.dictionaries.length) {
       const batch = _json.dictionaries[this._dictionaryIndex++];
       this._body = batch["data"]["columns"];
-      const message = Message.fromJSON(batch, MessageHeader$1.DictionaryBatch);
+      const message = Message2.fromJSON(batch, MessageHeader$1.DictionaryBatch);
       return { done: false, value: message };
     }
     if (this._batchIndex < _json.batches.length) {
       const batch = _json.batches[this._batchIndex++];
       this._body = batch["columns"];
-      const message = Message.fromJSON(batch, MessageHeader$1.RecordBatch);
+      const message = Message2.fromJSON(batch, MessageHeader$1.RecordBatch);
       return { done: false, value: message };
     }
     this._body = [];
@@ -33268,12 +34290,16 @@ class RecordBatchReader extends ReadableInterop {
   toNodeStream() {
     return streamAdapters.toNodeStream(this.isSync() ? { [Symbol.iterator]: () => this } : { [Symbol.asyncIterator]: () => this }, { objectMode: true });
   }
+  /** @nocollapse */
+  // @ts-ignore
   static throughNode(options) {
     throw new Error(`"throughNode" not available in this environment`);
   }
+  /** @nocollapse */
   static throughDOM(writableStrategy, readableStrategy) {
     throw new Error(`"throughDOM" not available in this environment`);
   }
+  /** @nocollapse */
   static from(source) {
     if (source instanceof RecordBatchReader) {
       return source;
@@ -33290,6 +34316,7 @@ class RecordBatchReader extends ReadableInterop {
     }
     return fromByteStream(new ByteStream(source));
   }
+  /** @nocollapse */
   static readAll(source) {
     if (source instanceof RecordBatchReader) {
       return source.isSync() ? readAllSync(source) : readAllAsync(source);
@@ -33834,24 +34861,8 @@ function tableFromIPC(input) {
 let tile_identifier = 0;
 class Tile {
   constructor(dataset) {
-    __publicField(this, "max_ix", -1);
-    __publicField(this, "key");
-    __publicField(this, "promise");
-    __publicField(this, "download_state");
-    __publicField(this, "_batch");
-    __publicField(this, "parent");
-    __publicField(this, "_table_buffer");
-    __publicField(this, "_children", []);
-    __publicField(this, "_highest_known_ix");
-    __publicField(this, "_min_ix");
-    __publicField(this, "_max_ix");
-    __publicField(this, "dataset");
-    __publicField(this, "_download");
-    __publicField(this, "__schema");
-    __publicField(this, "local_dictionary_lookups");
-    __publicField(this, "_extent");
-    __publicField(this, "numeric_id");
-    __publicField(this, "_buffer_manager");
+    this.max_ix = -1;
+    this._children = [];
     this.promise = Promise.resolve();
     this.download_state = "Unattempted";
     this.key = String(Math.random());
@@ -33877,6 +34888,20 @@ class Tile {
       (_a2 = this._buffer_manager) == null ? void 0 : _a2.release(colname);
       this._batch = add_or_delete_column(this.record_batch, colname, null);
     }
+  }
+  async get_column(colname) {
+    if (this._batch === void 0) {
+      await this.promise;
+    }
+    const existing = this.record_batch.getChild(colname);
+    if (existing) {
+      return existing;
+    }
+    if (this.dataset.transformations[colname]) {
+      await this.apply_transformation(colname);
+      return this.record_batch.getChild(colname);
+    }
+    throw new Error(`Column ${colname} not found`);
   }
   async apply_transformation(name) {
     const transform = this.dataset.transformations[name];
@@ -33996,6 +35021,11 @@ class Tile {
     await this.download();
     return this._schema;
   }
+  /**
+   *
+   * @param callback A function (possibly async) to execute before this cell is ready.
+   * @returns A promise that includes the callback and all previous promises.
+   */
   extend_promise(callback) {
     this.promise = this.promise.then(() => callback());
     return this.promise;
@@ -34081,12 +35111,9 @@ class Tile {
 class QuadTile extends Tile {
   constructor(base_url, key, parent, dataset) {
     super(dataset);
-    __publicField(this, "url");
-    __publicField(this, "key");
-    __publicField(this, "_children", []);
-    __publicField(this, "codes");
-    __publicField(this, "_already_called", false);
-    __publicField(this, "child_locations", []);
+    this._children = [];
+    this._already_called = false;
+    this.child_locations = [];
     this.url = base_url;
     this.parent = parent;
     this.key = key;
@@ -34176,6 +35203,13 @@ class QuadTile extends Tile {
     });
     return this._download;
   }
+  /**
+   * Sometimes it's useful to do operations on batches of tiles. This function
+   * defines a grouping of tiles in the same general region to be operated on.
+   * In general they will have about 80 elements (16 + 64), but the top level
+   * has just 5. (4 + 1). Note a macro tile with the name [2/0/0] does not actually include
+   * the tile [2/0/0] itself, but rather the tiles [4/0/0], [4/1/0], [4/0/1], [4/1/1], [5/0/0] etc.
+   */
   get macrotile() {
     return macrotile(this.key);
   }
@@ -34211,8 +35245,6 @@ class QuadTile extends Tile {
 class ArrowTile extends Tile {
   constructor(table, dataset, batch_num, parent = null) {
     super(dataset);
-    __publicField(this, "batch_num");
-    __publicField(this, "full_tab");
     this.full_tab = table;
     this._batch = table.batches[batch_num];
     this.download_state = "Complete";
@@ -34329,11 +35361,9 @@ function nothing() {
 }
 class Dataset {
   constructor(plot) {
-    __publicField(this, "transformations", {});
-    __publicField(this, "plot");
-    __publicField(this, "extents", {});
-    __publicField(this, "_ix_seed", 0);
-    __publicField(this, "_schema");
+    this.transformations = {};
+    this.extents = {};
+    this._ix_seed = 0;
     this.plot = plot;
   }
   get highest_known_ix() {
@@ -34349,6 +35379,14 @@ class Dataset {
   }
   static from_arrow_table(table, prefs, plot) {
     return new ArrowDataset(table, prefs, plot);
+  }
+  /**
+   *
+   * @param name The name of the column to check for
+   * @returns True if the column exists in the dataset, false otherwise.
+   */
+  has_column(name) {
+    return this.root_tile.record_batch.schema.fields.some((f) => f.name == name) || name in this.transformations;
   }
   delete_column_if_exists(name) {
     this.map((d) => d.delete_column_if_exists(name));
@@ -34406,6 +35444,15 @@ class Dataset {
       }
     }
   }
+  /**
+   * Map a function against all tiles.
+   * It is often useful simply to invoke Dataset.map(d => d) to
+   * get a list of all tiles in the dataset at any moment.
+   *
+   * @param callback A function to apply to each tile.
+   * @param after Whether to perform the function in bottom-up order
+   * @returns A list of the results of the function in an order determined by 'after.'
+   */
   map(callback, after = false) {
     const results = [];
     this.visit((d) => {
@@ -34413,6 +35460,16 @@ class Dataset {
     }, after);
     return results;
   }
+  /**
+     * Invoke a function on all tiles in the dataset that have been downloaded.
+     * The general architecture here is taken from the
+     * d3 quadtree functions. That's why, for example, it doesn't
+     * recurse.
+  
+     * @param callback The function to invoke on each tile.
+     * @param after Whether to execute the visit in bottom-up order. Default false.
+     * @param filter 
+     */
   visit(callback, after = false, filter2 = (x) => true) {
     const stack = [this.root_tile];
     const after_stack = [];
@@ -34444,6 +35501,11 @@ class Dataset {
     this._schema = this.root_tile.record_batch.schema;
     return this.root_tile.record_batch.schema;
   }
+  /**
+   *
+   * @param field_name the name of the column to create
+   * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
+   */
   add_tiled_column(field_name, buffer) {
     const tb = tableFromIPC(buffer);
     const records = {};
@@ -34477,6 +35539,12 @@ class Dataset {
       return array2;
     };
   }
+  /**
+   *
+   * @param ids A list of ids to get, keyed to the value to set them to.
+   * @param field_name The name of the new field to create
+   * @param key_field The column in the dataset to match them against.
+   */
   add_label_identifiers(ids, field_name, key_field = "_id") {
     if (this.transformations[field_name]) {
       throw new Error(
@@ -34492,7 +35560,42 @@ class Dataset {
       );
     };
   }
+  /**
+   * Given an ix, apply a transformation to the point at that index and
+   * return the transformed point (not just the transformation, the whole point)
+   * This applies the transformaation to all other points in the same tile.
+   *
+   * @param transformation The name of the transformation to apply
+   * @param ix The index of the point to transform
+   */
+  async applyTransformationToPoint(transformation, ix) {
+    const matches = this.findPointRaw(ix);
+    if (matches.length == 0) {
+      throw new Error(`No point for ix ${ix}`);
+    }
+    const [tile, row] = matches[0];
+    if (tile.record_batch.getChild(transformation) !== null) {
+      return row;
+    }
+    await tile.apply_transformation(transformation);
+    const ixcol = tile.record_batch.getChild("ix");
+    const mid = bisectLeft([...ixcol.data[0].values], ix);
+    return tile.record_batch.get(mid);
+  }
+  /**
+   *
+   * @param ix The index of the point to get.
+   * @returns A structRowProxy for the point with the given index.
+   */
   findPoint(ix) {
+    return this.findPointRaw(ix).map(([, point]) => point);
+  }
+  /**
+   * Finds the points and tiles that match the passed ix
+   * @param ix The index of the point to get.
+   * @returns A list of [tile, point] pairs that match the index.
+   */
+  findPointRaw(ix) {
     const matches = [];
     this.visit((tile) => {
       if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
@@ -34503,8 +35606,8 @@ class Dataset {
         ix
       );
       const val = tile.record_batch.get(mid);
-      if (val.ix === ix) {
-        matches.push(val);
+      if (val !== null && val.ix === ix) {
+        matches.push([tile, val]);
       }
     });
     return matches;
@@ -34513,8 +35616,7 @@ class Dataset {
 class ArrowDataset extends Dataset {
   constructor(table, prefs, plot) {
     super(plot);
-    __publicField(this, "promise", Promise.resolve());
-    __publicField(this, "root_tile");
+    this.promise = Promise.resolve();
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
   get extent() {
@@ -34530,15 +35632,16 @@ class ArrowDataset extends Dataset {
 class QuadtileSet extends Dataset {
   constructor(base_url, prefs, plot) {
     super(plot);
-    __publicField(this, "_download_queue", /* @__PURE__ */ new Set());
-    __publicField(this, "promise", new Promise(nothing));
-    __publicField(this, "root_tile");
+    this._download_queue = /* @__PURE__ */ new Set();
+    this.promise = new Promise(nothing);
     this.root_tile = new QuadTile(base_url, "0/0/0", null, this, prefs);
     this.promise = this.root_tile.download().then((d) => {
       const schema = this.root_tile.record_batch.schema;
       if (schema.metadata.has("sidecars")) {
+        const cars = schema.metadata.get("sidecars");
+        const parsed = JSON.parse(cars);
         for (const [k, v] of Object.entries(
-          JSON.parse(schema.metadata.get("sidecars"))
+          parsed
         )) {
           this.transformations[k] = async function(tile) {
             const batch = await tile.get_arrow(v);
@@ -34547,7 +35650,7 @@ class QuadtileSet extends Dataset {
               throw new Error(
                 `No column named ${k} in sidecar tile ${batch.schema.fields.map(
                   (f) => f.name
-                )}`
+                ).join(", ")}`
               );
             }
             return column;
@@ -34599,6 +35702,11 @@ class QuadtileSet extends Dataset {
       });
     }
   }
+  /**
+   *
+   * @param field_name the name of the column to create
+   * @param buffer An Arrow IPC Buffer that deserializes to a table with columns('data' and '_tile')
+   */
   add_macrotiled_column(field_name, transformation) {
     const megatile_tasks = {};
     const records = {};
@@ -34748,7 +35856,15 @@ function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
   return updatedFloatArray;
 }
 var dist = {};
-var quickselect = { exports: {} };
+var quickselectExports = {};
+var quickselect = {
+  get exports() {
+    return quickselectExports;
+  },
+  set exports(v) {
+    quickselectExports = v;
+  }
+};
 (function(module, exports) {
   (function(global2, factory) {
     module.exports = factory();
@@ -34808,7 +35924,7 @@ var quickselect = { exports: {} };
 })(quickselect);
 (function(exports) {
   Object.defineProperty(exports, "__esModule", { value: true });
-  var quickselect$1 = quickselect.exports;
+  var quickselect2 = quickselectExports;
   var nodePool = [];
   var freeNode = function(node) {
     return nodePool.push(node);
@@ -34953,7 +36069,7 @@ var quickselect = { exports: {} };
       if (right - left <= n)
         continue;
       mid = left + Math.ceil((right - left) / n / 2) * n;
-      quickselect$1(arr, mid, left, right, compare);
+      quickselect2(arr, mid, left, right, compare);
       stack.push(left, mid, mid, right);
     }
   };
@@ -35376,16 +36492,16 @@ function pixel_ratio(scatterplot) {
 }
 const RECT_DEFAULT_OPACITY = 0;
 class LabelMaker extends Renderer {
+  /**
+   *
+   * @param scatterplot
+   * @param id_raw
+   * @param options
+   */
   constructor(scatterplot, id_raw, options = {}) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
-    __publicField(this, "layers", []);
-    __publicField(this, "ctx");
-    __publicField(this, "tree");
-    __publicField(this, "timer");
-    __publicField(this, "label_key");
-    __publicField(this, "labelgroup");
-    __publicField(this, "hovered");
-    __publicField(this, "options", {});
+    this.layers = [];
+    this.options = {};
     this.options = options;
     this.canvas = scatterplot.elements[2].selectAll("canvas").node();
     const svg = scatterplot.elements[3].selectAll("svg").node();
@@ -35409,6 +36525,11 @@ class LabelMaker extends Renderer {
     );
     this.bind_zoom(scatterplot._renderer.zoom);
   }
+  /**
+   * Start rendering a set of labels.
+   *
+   * @param ticks How many milliseconds until the renderer should be stopped.
+   */
   start(ticks2 = 1e9) {
     if (this.timer) {
       this.timer.stop();
@@ -35425,6 +36546,9 @@ class LabelMaker extends Renderer {
   delete() {
     select(this.labelgroup).remove();
   }
+  /**
+   * Stop the rendering of this set.
+   */
   stop() {
     if (this.timer) {
       this.timer.stop();
@@ -35433,6 +36557,12 @@ class LabelMaker extends Renderer {
       this.timer = void 0;
     }
   }
+  /**
+   *
+   * @param featureset A feature collection of labels to display. Currently each feature must be a Point.
+   * @param label_key The field in each geojson feature that includes the label for the object.
+   * @param size_key The field in each geojson feature that includes the size
+   */
   update(featureset, label_key, size_key) {
     var _a2;
     this.label_key = label_key;
@@ -35609,16 +36739,12 @@ function measure_text(d, pixel_ratio2, margin) {
   };
 }
 class DepthTree extends dist.RBush3D {
+  /*
+  dataSpaceWidth: at zoom level one, how many screen pixels does one x, y unit occupy?
+  */
   constructor(context2, pixel_ratio2, scale_factor = 0.5, zoom2 = [0.1, 1e3], margin = 10) {
     super();
-    __publicField(this, "scale_factor");
-    __publicField(this, "mindepth");
-    __publicField(this, "maxdepth");
-    __publicField(this, "context");
-    __publicField(this, "pixel_ratio");
-    __publicField(this, "rectangle_buffer");
-    __publicField(this, "margin");
-    __publicField(this, "_accessor", (p) => [p.x, p.y]);
+    this._accessor = (p) => [p.x, p.y];
     this.scale_factor = scale_factor;
     this.mindepth = zoom2[0];
     this.maxdepth = zoom2[1];
@@ -35626,6 +36752,12 @@ class DepthTree extends dist.RBush3D {
     this.pixel_ratio = pixel_ratio2;
     this.margin = margin;
   }
+  /**
+   *
+   * @param p1 a point
+   * @param p2 another point
+   * @returns The lowest zoom level at which the two points collide
+   */
   max_collision_depth(p1, p2) {
     const [x12, y12] = this._accessor(p1);
     const [x2, y2] = this._accessor(p2);
@@ -35712,6 +36844,101 @@ class DepthTree extends dist.RBush3D {
     }
   }
 }
+function isIdSelectParam(params) {
+  return params.ids !== void 0;
+}
+function isBooleanColumnParam(params) {
+  return params.field !== void 0;
+}
+class DataSelection {
+  constructor(plot, params) {
+    this.plot = plot;
+    this.dataset = plot.dataset;
+    this.name = params.name;
+    if (isIdSelectParam(params)) {
+      this.add_identifier_column(params.name, params.ids, params.idField);
+    } else if (isBooleanColumnParam(params)) {
+      this.add_boolean_column(params.name, params.field);
+    }
+  }
+  async add_identifier_column(name, codes, key_field) {
+    if (this.dataset.has_column(name)) {
+      throw new Error(`Column ${name} already exists, can't create`);
+    }
+    if (typeof codes[0] === "string") {
+      const matcher2 = stringmatcher(key_field, codes);
+      this.dataset.transformations[name] = matcher2;
+      await this.dataset.root_tile.apply_transformation(name);
+      return this.apply_to_foreground({});
+    } else {
+      throw new Error("Not implemented");
+    }
+  }
+  add_boolean_column(name, field) {
+    throw new Error("Method not implemented.");
+  }
+  apply_to_foreground(params) {
+    const field = this.name;
+    const background_options = {
+      size: [0.5, 10],
+      ...params
+    };
+    return this.plot.plotAPI({
+      background_options,
+      encoding: {
+        foreground: {
+          field,
+          op: "gt",
+          a: 0
+        }
+      }
+    });
+  }
+}
+function stringmatcher(field, matches) {
+  const trie = [];
+  function addToTrie(arr) {
+    let node = trie;
+    for (const byte of arr) {
+      if (!node[byte]) {
+        node[byte] = [];
+      }
+      node = node[byte];
+    }
+    node[256] = [];
+  }
+  const encoder2 = new TextEncoder();
+  for (const str of matches) {
+    const arr = encoder2.encode(str);
+    addToTrie(arr);
+  }
+  return async function(tile) {
+    const col = (await tile.get_column(field)).data[0];
+    const bytes = col.values;
+    const offsets = col.valueOffsets;
+    const results = new Float32Array(tile.record_batch.numRows);
+    function existsInTrie(start2, len) {
+      let node = trie;
+      for (let i = 0; i < len; i++) {
+        const byte = bytes[start2 + i];
+        node = node[byte];
+        if (!node) {
+          return false;
+        }
+      }
+      return node[256] !== void 0;
+    }
+    for (let o = 0; o < tile.record_batch.numRows; o++) {
+      const start2 = offsets[o];
+      const end = offsets[o + 1];
+      if (existsInTrie(start2, end - start2)) {
+        results[o] = 1;
+        console.log("match", { ...tile.record_batch.get(o) });
+      }
+    }
+    return results;
+  };
+}
 const default_background_options = {
   color: "gray",
   opacity: [0.2, 1],
@@ -35720,11 +36947,16 @@ const default_background_options = {
 };
 const default_API_call = {
   zoom_balance: 0.35,
+  // One second transitions
   duration: 1e3,
+  // Not many points.
   max_points: 1e3,
+  // Encoding defaults are handled by the Aesthetic class.
   encoding: {},
   point_size: 1,
+  // base size before aes modifications.
   alpha: 40,
+  // Default screen saturation target.
   background_options: default_background_options,
   zoom_align: "center"
 };
@@ -35747,26 +36979,18 @@ const base_elements = [
   }
 ];
 class Scatterplot {
+  /**
+   * @param selector A DOM selector for the div in which the scatterplot will live.
+   * @param width The width of the scatterplot (in pixels)
+   * @param height The height of the scatterplot (in pixels)
+   */
   constructor(selector2, width, height) {
-    __publicField(this, "_renderer");
-    __publicField(this, "width");
-    __publicField(this, "height");
-    __publicField(this, "_root");
-    __publicField(this, "elements");
-    __publicField(this, "secondary_renderers", {});
-    __publicField(this, "div");
-    __publicField(this, "bound");
-    __publicField(this, "_zoom");
-    __publicField(this, "plot_queue", Promise.resolve(0));
-    __publicField(this, "prefs");
-    __publicField(this, "ready");
-    __publicField(this, "click_handler");
-    __publicField(this, "hooks", {});
-    __publicField(this, "tooltip_handler");
-    __publicField(this, "label_click_handler");
-    __publicField(this, "on_zoom");
-    __publicField(this, "mark_ready", function() {
-    });
+    this.secondary_renderers = {};
+    this.selection_history = [];
+    this.plot_queue = Promise.resolve();
+    this.hooks = {};
+    this.mark_ready = function() {
+    };
     this.bound = false;
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
@@ -35781,6 +37005,11 @@ class Scatterplot {
     this.label_click_handler = new LabelClick(this);
     this.prefs = { ...default_API_call };
   }
+  /**
+   * @param selector A selector for the root element of the deepscatter; must already exist.
+   * @param width Width of the plot, in pixels.
+   * @param height Height of the plot, in pixels.
+   */
   bind(selector2, width, height) {
     this.div = select(selector2).selectAll("div.deepscatter_container").data([1]).join("div").attr("class", "deepscatter_container").style("position", "absolute");
     if (this.div.empty()) {
@@ -35799,6 +37028,22 @@ class Scatterplot {
     }
     this.bound = true;
   }
+  async select_data(params) {
+    const selection2 = new DataSelection(this, params);
+    this.selection_history.push({
+      ref: selection2,
+      name: selection2.name,
+      flushed: false
+    });
+    return selection2;
+  }
+  /**
+   *
+   * @param name The name of the new column to be created. If it already exists, this will throw an error in invocation
+   * @param codes The codes to be assigned labels. This can be either a list of ids (in which case all ids will have the value 1.0 assigned)
+   *   **or** a keyed of values like `{'Rome': 3, 'Vienna': 13}` in which case the numeric values will be used.
+   * @param key_field The field in which to look for the identifiers.
+   */
   add_identifier_column(name, codes, key_field) {
     const true_codes = Array.isArray(codes) ? Object.fromEntries(codes.map((next) => [next, 1])) : codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
@@ -35814,11 +37059,40 @@ class Scatterplot {
       console.error("Broken addition of ", name);
     });
   }
+  /**
+   *
+   * @param features A geojson feature collection containing point labels
+   * @param name A unique key to associate with this labelset. Labels can be enabled or disabled using this key.
+   * @param label_key The text field in which the labels are stored in the geojson object.
+   * @param size_key A field in the dataset to associate with the *size* of the labels.
+   * @param label_options Additional custom passed to the labeller.
+   *
+   * Usage:
+   *
+   * To add a set of labels to your map, create a geojson array of points where
+   * the 'properties' field contains a column to use for labels. E.g., each entry might look like
+   * this. Each feature will be inserted into a label hierarchy to attempt to avoid inclusion.
+   * If the label_key corresponds to the currently active color dimension on your map,
+   * the labels will be drawn with appropriately colored outlines: otherwise, they will
+   * all have a black outline.
+   * **Currently it is necessary that labels be inserted in order**.
+   *
+   *
+   */
   add_labels(features, name, label_key, size_key, options = {}) {
     const labels = new LabelMaker(this, name, options);
     labels.update(features, label_key, size_key);
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
+  }
+  /**
+   * An alias to avoid using the underscored method directly.
+   */
+  get dataset() {
+    if (this._root === void 0) {
+      throw "No dataset has been loaded";
+    }
+    return this._root;
   }
   add_api_label(labelset) {
     const geojson = {
@@ -35872,6 +37146,36 @@ class Scatterplot {
     void this._root.promise.then(() => this.mark_ready());
     return this.ready;
   }
+  /*
+  registerBackgroundMap(url) {
+    if (!this.geojson) {
+      this.geojson = "in progress"
+      d3json(url).then(d => {
+        const holder = new GeoLines(d, this._renderer.regl)
+        this._renderer.geolines = holder
+      })
+    }
+  }
+  */
+  /*
+  registerPolygonMap(definition) {
+    const { file, color } = definition;
+    if (!this.feather_features) {
+      this.feather_features = {};
+      this._renderer.geo_polygons = [];
+    }
+    if (!this.feather_features[file]) {
+      this.feather_features[file] = 'in progress';
+      const promise = fetch(file)
+        .then((response) => response.arrayBuffer())
+        .then((response) => {
+          const table = Table.from(response);
+          const holder = new FeatureHandler(this._renderer.regl, table);
+          this._renderer.geo_polygons.push(holder);
+        });
+    }
+  }
+  */
   visualize_tiles() {
     const map2 = this;
     const ctx = map2.elements[2].selectAll("canvas").node().getContext("2d");
@@ -35974,6 +37278,11 @@ class Scatterplot {
       createEl.remove();
     });
   }
+  /**
+   * Destroy the scatterplot and release all associated resources.
+   * This is necessary because removing a deepscatter instance
+   * will not de-allocate tables from GPU memory.
+   */
   destroy() {
     var _a2, _b2, _c2;
     (_b2 = (_a2 = this._renderer) == null ? void 0 : _a2.regl) == null ? void 0 : _b2.destroy();
@@ -35987,8 +37296,15 @@ class Scatterplot {
         }
       }
     }
-    merge(this.prefs, prefs);
+    lodash_mergeExports(this.prefs, prefs);
   }
+  /**
+   * Hooks provide a mechanism to run arbitrary code after call of plotAPI has resolved.
+   * This is useful for--e.g.--updating a legend only when the plot changes.
+   *
+   * @param name The name of the hook to add.
+   * @param hook A function to run after each plot command.
+   */
   add_hook(name, hook, unsafe = false) {
     if (this.hooks[name] !== void 0 && !unsafe) {
       throw new Error(`Hook ${name} already exists`);
@@ -36014,6 +37330,13 @@ class Scatterplot {
       }
     }
   }
+  /**
+   *
+   *
+   * @param dimension The name of the encoding dimension to access
+   * information about. E.g. ("color", "x", etc.)
+   * @returns
+   */
   dim(dimension) {
     return this._renderer.aes.dim(dimension).current;
   }
@@ -36035,6 +37358,10 @@ class Scatterplot {
   get click_function() {
     return this.click_handler.f;
   }
+  /**
+   * Plots a set of prefs, and returns a promise that resolves
+   * upon the completion of the plot (not including any time for transitions).
+   */
   async plotAPI(prefs) {
     if (prefs === void 0) {
       return;
@@ -36050,6 +37377,18 @@ class Scatterplot {
     }
     return;
   }
+  /**
+   * Get a short head start on transformations. This prevents a flicker
+   * when a new data field needs to be loaded onto the GPU.
+   *
+   * @param prefs The API call to prepare.
+   * @param delay Delay in milliseconds to give the data to get onto the GPU.
+   * 110 ms seems like a decent compromise; barely perceptible to humans as a UI response
+   * time, but enough time
+   * for three animation ticks to run.
+   * @returns A promise that resolves immediately if there's no work to do,
+   * or after the delay if there is.
+   */
   async start_transformations(prefs, delay = 110) {
     return new Promise((resolve) => {
       if (this.prefs.duration < delay) {
@@ -36104,6 +37443,13 @@ class Scatterplot {
       }
     });
   }
+  /**
+   * This is the main plot entry point: it's unsafe to fire multiple
+   * times in parallel because the transition state can get all borked up.
+   * plotAPI wraps it in an await wrapper.
+   *
+   * @param prefs The preferences
+   */
   async unsafe_plotAPI(prefs) {
     var _a2;
     if (prefs === null) {
@@ -36190,6 +37536,10 @@ class Scatterplot {
     }
     return this._root.record_batch;
   }
+  /**
+   * Return the current state of the query. Can be used to save an API
+   * call for use programatically.
+   */
   get query() {
     const p = JSON.parse(JSON.stringify(this.prefs));
     p.zoom = { bbox: this._renderer.zoom.current_corners() };
@@ -36251,9 +37601,6 @@ class Scatterplot {
 }
 class SettableFunction {
   constructor(plot) {
-    __publicField(this, "_f");
-    __publicField(this, "string_rep");
-    __publicField(this, "plot");
     this.string_rep = "";
     this.plot = plot;
   }
@@ -36296,12 +37643,14 @@ class LabelClick extends SettableFunction {
   }
 }
 class ClickFunction extends SettableFunction {
+  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(datum2, plot = void 0) {
     console.log({ ...datum2 });
     return;
   }
 }
 class TooltipHTML extends SettableFunction {
+  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(point, plot = void 0) {
     let output = "<dl>";
     const nope = /* @__PURE__ */ new Set([

@@ -1,4 +1,5 @@
 {
+  "include": ["src/**/*.ts"],
   "compilerOptions": {
     "declaration": true,
     // "lib": ["es2020"],
@@ -9,7 +10,10 @@
     "sourceMap": true,
     "strict": true,
     "target": "es2020",
-    "isolatedModules": true
+    "isolatedModules": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "noEmitOnError": false
   },
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Recommended"

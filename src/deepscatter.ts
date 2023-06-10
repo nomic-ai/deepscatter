@@ -7,12 +7,13 @@ import { ReglRenderer } from './regl_rendering';
 import { Dataset, QuadtileSet } from './Dataset';
 import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
-import { LabelMaker, LabelOptions } from './label_rendering';
+import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
 import { ArrowTile, QuadTile, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
-
+import { DataSelection } from './selection';
+import type {IdSelectParams} from './selection';
 // DOM elements that deepscatter uses.
 const base_elements = [
   {
@@ -33,24 +34,27 @@ const base_elements = [
   },
 ];
 
+
+
 type Hook = () => void;
 /**
  * The core type of the module is a single scatterplot that manages
  * all data and renderering.
  */
 export default class Scatterplot<T extends Tile> {
-  public _renderer: ReglRenderer<T>;
+  public _renderer?: ReglRenderer<T>;
   public width: number;
   public height: number;
-  public _root: Dataset<any>;
+  public _root: Dataset<T>;
   public elements?: Selection<SVGElement, any, any, any>[];
-  public secondary_renderers: Record<string, Renderer> = {};
+  public secondary_renderers: Record<string, Renderer<T>> = {};
+  public selection_history: SelectionRecord[] = [];
   div: Selection<any, any, any, any>;
   bound: boolean;
   //  d3 : Object;
   private _zoom: Zoom;
   // The queue of draw calls are a chain of promises.
-  private plot_queue: Promise<void> = Promise.resolve(0);
+  private plot_queue: Promise<void> = Promise.resolve();
   public prefs: CompletePrefs;
   // Whether the scatterplot has finished loading.
   ready: Promise<void>;
@@ -138,7 +142,17 @@ export default class Scatterplot<T extends Tile> {
     }
     this.bound = true;
   }
-
+  
+  async select_data(params: IdSelectParams) {
+    const selection = new DataSelection(this, params)
+    //await selection.apply_to_foreground({})
+    this.selection_history.push({
+      ref: selection,
+      name: selection.name,
+      flushed: false
+    })
+    return selection
+  }
   /**
    *
    * @param name The name of the new column to be created. If it already exists, this will throw an error in invocation
@@ -213,6 +227,17 @@ export default class Scatterplot<T extends Tile> {
     this.secondary_renderers[name] = labels;
     this.secondary_renderers[name].start();
   }
+
+  /**
+   * An alias to avoid using the underscored method directly.
+   */
+  get dataset() {
+    if (this._root === undefined) {
+      throw 'No dataset has been loaded';
+    }
+    return this._root;
+  }
+
   add_api_label(labelset: Labelset) {
     const geojson: FeatureCollection = {
       type: 'FeatureCollection',

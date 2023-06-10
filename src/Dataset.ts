@@ -71,7 +71,17 @@ export abstract class Dataset<T extends Tile> {
     max_ix: number,
     queue_length: number
   ): void;
-
+  /**
+   *
+   * @param name The name of the column to check for
+   * @returns True if the column exists in the dataset, false otherwise.
+   */
+  has_column(name: string) {
+    return (
+      this.root_tile.record_batch.schema.fields.some((f) => f.name == name) ||
+      name in this.transformations
+    );
+  }
   delete_column_if_exists(name: string) {
     // This is a complicated operation to actually free up memory.
     // Clone the record batches, without this data;
@@ -277,12 +287,46 @@ export abstract class Dataset<T extends Tile> {
   }
 
   /**
+   * Given an ix, apply a transformation to the point at that index and
+   * return the transformed point (not just the transformation, the whole point)
+   * This applies the transformaation to all other points in the same tile.
+   *
+   * @param transformation The name of the transformation to apply
+   * @param ix The index of the point to transform
+   */
+
+  async applyTransformationToPoint(transformation: string, ix: number) {
+    const matches = this.findPointRaw(ix);
+
+    if (matches.length == 0) {
+      throw new Error(`No point for ix ${ix}`);
+    }
+    const [tile, row] = matches[0];
+    // Check if the column exists; if so, return the row.
+    if (tile.record_batch.getChild(transformation) !== null) {
+      return row;
+    }
+    await tile.apply_transformation(transformation);
+    const ixcol = tile.record_batch.getChild('ix') as Vector;
+    const mid = bisectLeft([...ixcol.data[0].values], ix);
+    return tile.record_batch.get(mid);
+  }
+  /**
    *
    * @param ix The index of the point to get.
-   * @returns
+   * @returns A structRowProxy for the point with the given index.
    */
   findPoint(ix: number): StructRowProxy[] {
-    const matches: StructRowProxy[] = [];
+    return this.findPointRaw(ix).map(([, point]) => point);
+  }
+
+  /**
+   * Finds the points and tiles that match the passed ix
+   * @param ix The index of the point to get.
+   * @returns A list of [tile, point] pairs that match the index.
+   */
+  findPointRaw(ix: number): [Tile, StructRowProxy][] {
+    const matches: [Tile, StructRowProxy][] = [];
     this.visit((tile: T) => {
       if (
         !(
@@ -295,12 +339,12 @@ export abstract class Dataset<T extends Tile> {
         return;
       }
       const mid = bisectLeft(
-        [...tile.record_batch.getChild('ix').data[0].values],
+        [...tile.record_batch.getChild('ix')!.data[0].values],
         ix
       );
       const val = tile.record_batch.get(mid);
-      if (val.ix === ix) {
-        matches.push(val);
+      if (val !== null && val.ix === ix) {
+        matches.push([tile, val]);
       }
     });
     return matches;
@@ -345,8 +389,10 @@ export class QuadtileSet extends Dataset<QuadTile> {
     this.promise = this.root_tile.download().then((d) => {
       const schema = this.root_tile.record_batch.schema;
       if (schema.metadata.has('sidecars')) {
+        const cars = schema.metadata.get('sidecars') as string;
+        const parsed = JSON.parse(cars) as Record<string, string>;
         for (const [k, v] of Object.entries(
-          JSON.parse(schema.metadata.get('sidecars')!)!
+          parsed
         )) {
           this.transformations[k] = async function (tile) {
             const batch = await tile.get_arrow(v);
@@ -355,7 +401,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
               throw new Error(
                 `No column named ${k} in sidecar tile ${batch.schema.fields.map(
                   (f) => f.name
-                )}`
+                ).join(', ')}`
               );
             }
             return column;
@@ -589,7 +635,7 @@ export function add_or_delete_column(
  */
 function supplement_identifiers(
   batch: RecordBatch,
-  ids: Record<string, number> | Record<bigint, number>,
+  ids: Record<string, number>,
   field_name: string,
   key_field = '_id'
 ): ArrowBuildable {
