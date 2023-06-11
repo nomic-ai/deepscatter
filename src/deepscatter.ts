@@ -13,7 +13,7 @@ import { ArrowTile, QuadTile, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { DataSelection } from './selection';
-import type {IdSelectParams} from './selection';
+import type { IdSelectParams } from './selection';
 // DOM elements that deepscatter uses.
 const base_elements = [
   {
@@ -33,8 +33,6 @@ const base_elements = [
     nodetype: 'svg',
   },
 ];
-
-
 
 type Hook = () => void;
 /**
@@ -142,16 +140,16 @@ export default class Scatterplot<T extends Tile> {
     }
     this.bound = true;
   }
-  
+
   async select_data(params: IdSelectParams) {
-    const selection = new DataSelection(this, params)
+    const selection = new DataSelection(this, params);
     //await selection.apply_to_foreground({})
     this.selection_history.push({
       ref: selection,
       name: selection.name,
-      flushed: false
-    })
-    return selection
+      flushed: false,
+    });
+    return selection;
   }
   /**
    *

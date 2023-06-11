@@ -51,7 +51,7 @@ declare global {
   interface SelectionRecord {
     ref: DataSelection<any> | null;
     name: string;
-    flushed: boolean;    
+    flushed: boolean;
   }
   // Functions that are defined as strings and executed in JS.
   type LambdaChannel = {

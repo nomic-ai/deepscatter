@@ -391,17 +391,15 @@ export class QuadtileSet extends Dataset<QuadTile> {
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars') as string;
         const parsed = JSON.parse(cars) as Record<string, string>;
-        for (const [k, v] of Object.entries(
-          parsed
-        )) {
+        for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function (tile) {
             const batch = await tile.get_arrow(v);
             const column = batch.getChild(k);
             if (column === null) {
               throw new Error(
-                `No column named ${k} in sidecar tile ${batch.schema.fields.map(
-                  (f) => f.name
-                ).join(', ')}`
+                `No column named ${k} in sidecar tile ${batch.schema.fields
+                  .map((f) => f.name)
+                  .join(', ')}`
               );
             }
             return column;
