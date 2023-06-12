@@ -241,6 +241,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     } else {
       tileSet.download_most_needed_tiles(prefs.max_points, this.max_ix, 5);
     }
+    regl.poll();
     regl.clear({
       color: [0.9, 0.9, 0.93, 0],
       depth: 1,
@@ -500,6 +501,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       height: this.height,
       depth: false,
     });
+
     this.fbos.ping = regl.framebuffer({
       width: this.width,
       height: this.height,
@@ -535,6 +537,20 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
         height: 1,
         depth: false,
       });
+  }
+
+  resize(width: number, height: number): void {
+    super.resize(width, height);
+    this.resize_textures();
+  }
+  
+  resize_textures() {
+    this.fbos.colorpicker?.resize(this.width, this.height);
+    this.fbos.contour?.resize(this.width, this.height);
+    this.fbos.ping?.resize(this.width, this.height);
+    this.fbos.pong?.resize(this.width, this.height);
+    this.fbos.lines?.resize(this.width, this.height);
+    this.fbos.points?.resize(this.width, this.height);
   }
 
   get_image_texture(url: string) {

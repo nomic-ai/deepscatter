@@ -41,8 +41,8 @@ type Hook = () => void;
  */
 export default class Scatterplot<T extends Tile> {
   public _renderer?: ReglRenderer<T>;
-  public width: number;
-  public height: number;
+  private _width;
+  private _height;
   public _root: Dataset<T>;
   public elements?: Selection<SVGElement, any, any, any>[];
   public secondary_renderers: Record<string, Renderer<T>> = {};
@@ -70,13 +70,27 @@ export default class Scatterplot<T extends Tile> {
    * @param width The width of the scatterplot (in pixels)
    * @param height The height of the scatterplot (in pixels)
    */
-  constructor(selector: string, width: number, height: number) {
+  constructor(selector: string, width: number | undefined, height: number | undefined) {
     this.bound = false;
+    if (width === undefined) {
+      width = window.innerWidth;
+      height = window.innerHeight;
+
+      // Permanently bind the scatterplot to the window size.      
+      window.onresize = () => {
+        this.resize(window.innerWidth, window.innerHeight);
+      }
+    }
+      
     if (selector !== undefined) {
       this.bind(selector, width, height);
     }
-    this.width = width;
-    this.height = height;
+    if (width !== undefined) {
+      this._width = width;
+    }
+    if (height !== undefined) {
+      this._height = height;
+    }
     // mark_ready is called when the scatterplot can start drawing..
     this.ready = new Promise((resolve, reject) => {
       this.mark_ready = resolve;
@@ -91,8 +105,44 @@ export default class Scatterplot<T extends Tile> {
    * @param selector A selector for the root element of the deepscatter; must already exist.
    * @param width Width of the plot, in pixels.
    * @param height Height of the plot, in pixels.
-   */
-  bind(selector: string, width: number, height: number) {
+  */
+
+  public resize(width: number, height: number) {
+    // Set the dimensions of the plot.
+    this._width = width;
+    this._height = height;
+    if (this.elements === undefined) {
+      throw 'Must bind plot to DOM element before setting dimensions';
+    }
+    for (const el of this.elements) {
+      el.attr('width', this.width).attr('height', this.height);
+      el.selectAll(".deepscatter-render-canvas").attr('width', this.width).attr('height', this.height);
+
+    }
+    if (this._renderer !== undefined) {
+      this._zoom.resize(this.width, this.height);
+      this._renderer.resize(this.width, this.height);
+    }
+  }
+
+  get width() {
+    return this._width;
+  }
+
+  set width(w: number) {
+    this._width = w;
+    this.resize(w, this.height);
+  }
+
+  get height() {
+    return this._height;
+  }
+  set height(h: number) {
+    this._height = h;
+    this.resize(this.width, h);
+  }
+
+  bind(selector: string, width: number | undefined, height: number | undefined) {
     // Attach a plot to a particular DOM element.
     // Binding is a permanent relationship. Maybe shouldn't be, but is.
 
@@ -113,6 +163,12 @@ export default class Scatterplot<T extends Tile> {
     }
 
     this.elements = [];
+    if (height !== undefined) {
+      this._height = height;
+    }
+    if (width !== undefined) {
+      this._width = width;
+    }
 
     for (const d of base_elements) {
       const container = this.div
@@ -126,8 +182,9 @@ export default class Scatterplot<T extends Tile> {
       const el = container
         .append(d.nodetype)
         .attr('id', d.id)
-        .attr('width', width || window.innerWidth)
-        .attr('height', height || window.innerHeight);
+        .attr("class", "deepscatter-render-canvas")
+        .attr('width', this.width)
+        .attr('height', this.height);
 
       if (d.nodetype === 'svg') {
         // SVG z-order can't be changed on the fly, so we
@@ -290,7 +347,7 @@ export default class Scatterplot<T extends Tile> {
     const ctx = bkgd.node().getContext('2d');
 
     ctx.fillStyle = prefs.background_color || 'rgba(133, 133, 111, .8)';
-    ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
+    ctx.fillRect(0, 0, this.width, this.height);
 
     this._renderer.initialize();
 
@@ -371,7 +428,7 @@ export default class Scatterplot<T extends Tile> {
     // xtimes: the width/height will be this multiplier of screen width.
     // points: pre-download to this depth.
     await this._root.download_to_depth(points);
-    const { width, height } = this._renderer;
+    const { width, height } = this;
     this.plotAPI({ duration: 0 });
     const canvas = document.createElement('canvas');
     canvas.setAttribute('width', (xtimes * width).toString());
@@ -410,10 +467,10 @@ export default class Scatterplot<T extends Tile> {
                 const halfHeight = (height / 2) | 0; // the | 0 keeps the result an int
                 const bytesPerRow = width * 4;
                 // make a temp buffer to hold one row
-                var temp = new Uint8Array(width * 4);
-                for (var y = 0; y < halfHeight; ++y) {
-                  var topOffset = y * bytesPerRow;
-                  var bottomOffset = (height - y - 1) * bytesPerRow;
+                const temp = new Uint8Array(width * 4);
+                for (let y = 0; y < halfHeight; ++y) {
+                  const topOffset = y * bytesPerRow;
+                  const bottomOffset = (height - y - 1) * bytesPerRow;
                   // make copy of a row on the top half
                   temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
                   // copy a row from the bottom half to the top
@@ -430,7 +487,6 @@ export default class Scatterplot<T extends Tile> {
                   width
                 );
                 ctx.putImageData(imageData, width * i, height * j);
-                //                ctx?.strokeRect(width * i, height * j, width, height)
               });
               if (i == xtimes - 1 && j === xtimes - 1) {
                 resolve();
@@ -799,7 +855,7 @@ export default class Scatterplot<T extends Tile> {
 
     for (const contour of contours) {
       context.fillStyle = 'rgba(25, 25, 29, 1)';
-      context.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
+      context.fillRect(0, 0, this.width, this.height);
 
       context.strokeStyle = '#8a0303'; // "rbga(255, 255, 255, 1)"
       context.fillStyle = 'rgba(30, 30, 34, 1)';

@@ -32,8 +32,8 @@ class ImageTile extends BaseTile {
 
     const img = new Image();
 
-    const img_width = datum.img_width;
-    const img_height = datum.img_height;
+    const img_width = datum.img_width as number;
+    const img_height = datum.img_height as number;
     const objectURL = URL.createObjectURL(new Blob([datum._jpeg]));
 
     if (current_position[1] > 4096 - 18 * 2) {

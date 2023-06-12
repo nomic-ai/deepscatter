@@ -20,10 +20,10 @@ export default class Zoom {
     any,
     any
   >;
-  public width: number;
-  public height: number;
+  private _width: number;
+  private _height: number;
   public renderers: Map<string, Renderer>;
-  public tileSet?: QuadtreeRoot;
+  public dataset?: QuadtreeRoot;
   public _timer?: d3.Timer;
   public _scales?: Record<string, d3.ScaleLinear<number, number>>;
   public zoomer?: d3.ZoomBehavior<Element, any>;
@@ -38,8 +38,8 @@ export default class Zoom {
     this.prefs = prefs;
 
     this.svg_element_selection = select(selector);
-    this.width = +this.svg_element_selection.attr('width');
-    this.height = +this.svg_element_selection.attr('height');
+    this._width = plot.width
+    this._height = plot.height
     this.renderers = new Map();
     this.scatterplot = plot;
     // A zoom keeps track of all the renderers
@@ -48,20 +48,45 @@ export default class Zoom {
     this.renderers = new Map();
   }
 
+  get width() {
+    return this._width;
+  }
+
+  get height() {
+    return this._height;
+  }
+  public resize(width: number, height: number) {
+    const {x_, y_} = this.scales();
+    const old_center = [
+      x_.invert(this._width / 2),
+      y_.invert(this._height / 2),
+    ];
+    // Update the extent
+    this.zoomer.extent([
+        [0, 0],
+        [width, height],
+    ]);
+    this._width = width;
+    this._height = height;
+    this.scales(true); // Force rebuild of scales.
+    this.zoom_to(this.transform.k, old_center[0], old_center[1]);
+  }
+
   attach_tiles(tiles: QuadtreeRoot) {
-    this.tileSet = tiles;
-    this.tileSet._zoom = this;
+    this.dataset = tiles;
+    this.dataset._zoom = this;
     return this;
   }
 
   attach_renderer(key: string, renderer: Renderer) {
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
+    // Should just be `this.initialize_zoom(), right?
     renderer.zoom.initialize_zoom();
     return this;
   }
 
-  zoom_to(k: number, x = null, y = null, duration = 4000) {
+  zoom_to(k: number, x :number, y :number, duration = 4000) {
     const scales = this.scales();
     const { svg_element_selection: canvas, zoomer, width, height } = this;
 
@@ -138,10 +163,6 @@ export default class Zoom {
 
     const zoomer = zoom()
       .scaleExtent([1 / 3, 100_000])
-      .extent([
-        [0, 0],
-        [width, height],
-      ])
       .on('zoom', (event) => {
         try {
           document.getElementById('tooltipcircle').remove();
@@ -154,10 +175,10 @@ export default class Zoom {
       });
 
     canvas.call(zoomer);
-
     this.add_mouseover();
 
     this.zoomer = zoomer;
+    this.resize(width, height);
   }
 
   set_highlit_points(data: StructRowProxy[]) {
@@ -284,13 +305,13 @@ export default class Zoom {
 
   data(dataset) {
     if (dataset === undefined) {
-      return this.tileSet;
+      return this.dataset;
     }
-    this.tileSet = dataset;
+    this.dataset = dataset;
     return this;
   }
 
-  scales(equal_units = true): Record<string, ScaleLinear<number, number>> {
+  scales(force = false): Record<string, ScaleLinear<number, number>> {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.
@@ -299,17 +320,17 @@ export default class Zoom {
 
     // equal_units: should a point of x be the same as a point of y?
 
-    if (this._scales) {
+    if (force !== true && this._scales) {
       this._scales.x_ = this.transform.rescaleX(this._scales.x);
       this._scales.y_ = this.transform.rescaleY(this._scales.y);
       return this._scales;
     }
 
     const { width, height } = this;
-    if (this.tileSet === undefined) {
+    if (this.dataset === undefined) {
       throw new Error('Error--scales created before tileSet present.');
     }
-    const { extent } = this.tileSet;
+    const { extent } = this.dataset;
     const scales: Record<string, ScaleLinear<number, number>> = {};
     if (extent === undefined) {
       throw new Error('Error--scales created before extent present.');

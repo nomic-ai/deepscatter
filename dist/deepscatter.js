@@ -5601,15 +5601,36 @@ class Zoom {
   constructor(selector2, prefs, plot) {
     this.prefs = prefs;
     this.svg_element_selection = select(selector2);
-    this.width = +this.svg_element_selection.attr("width");
-    this.height = +this.svg_element_selection.attr("height");
+    this._width = plot.width;
+    this._height = plot.height;
     this.renderers = /* @__PURE__ */ new Map();
     this.scatterplot = plot;
     this.renderers = /* @__PURE__ */ new Map();
   }
+  get width() {
+    return this._width;
+  }
+  get height() {
+    return this._height;
+  }
+  resize(width, height) {
+    const { x_, y_ } = this.scales();
+    const old_center = [
+      x_.invert(this._width / 2),
+      y_.invert(this._height / 2)
+    ];
+    this.zoomer.extent([
+      [0, 0],
+      [width, height]
+    ]);
+    this._width = width;
+    this._height = height;
+    this.scales(true);
+    this.zoom_to(this.transform.k, old_center[0], old_center[1]);
+  }
   attach_tiles(tiles) {
-    this.tileSet = tiles;
-    this.tileSet._zoom = this;
+    this.dataset = tiles;
+    this.dataset._zoom = this;
     return this;
   }
   attach_renderer(key, renderer) {
@@ -5618,7 +5639,7 @@ class Zoom {
     renderer.zoom.initialize_zoom();
     return this;
   }
-  zoom_to(k, x = null, y = null, duration = 4e3) {
+  zoom_to(k, x, y, duration = 4e3) {
     const scales2 = this.scales();
     const { svg_element_selection: canvas, zoomer, width, height } = this;
     const t = identity$3.translate(width / 2, height / 2).scale(k).translate(-scales2.x(x), -scales2.y(y));
@@ -5644,7 +5665,6 @@ class Zoom {
     const scales2 = this.scales();
     let [x02, x12] = corners.x.map(scales2.x);
     let [y02, y12] = corners.y.map(scales2.y);
-    console.log(this.scatterplot.prefs.zoom_align, "AAH");
     if (this.scatterplot.prefs.zoom_align === "right") {
       const aspect_ratio = this.width / this.height;
       const data_aspect_ratio = (x12 - x02) / (y12 - y02);
@@ -5661,10 +5681,7 @@ class Zoom {
   initialize_zoom() {
     const { width, height, svg_element_selection: canvas } = this;
     this.transform = identity$3;
-    const zoomer = zoom().scaleExtent([1 / 3, 1e5]).extent([
-      [0, 0],
-      [width, height]
-    ]).on("zoom", (event) => {
+    const zoomer = zoom().scaleExtent([1 / 3, 1e5]).on("zoom", (event) => {
       var _a2, _b2, _c2;
       try {
         document.getElementById("tooltipcircle").remove();
@@ -5678,6 +5695,7 @@ class Zoom {
     canvas.call(zoomer);
     this.add_mouseover();
     this.zoomer = zoomer;
+    this.resize(width, height);
   }
   set_highlit_points(data) {
     const { x_, y_ } = this.scales();
@@ -5757,22 +5775,22 @@ class Zoom {
   }
   data(dataset) {
     if (dataset === void 0) {
-      return this.tileSet;
+      return this.dataset;
     }
-    this.tileSet = dataset;
+    this.dataset = dataset;
     return this;
   }
-  scales(equal_units = true) {
-    if (this._scales) {
+  scales(force = false) {
+    if (force !== true && this._scales) {
       this._scales.x_ = this.transform.rescaleX(this._scales.x);
       this._scales.y_ = this.transform.rescaleY(this._scales.y);
       return this._scales;
     }
     const { width, height } = this;
-    if (this.tileSet === void 0) {
+    if (this.dataset === void 0) {
       throw new Error("Error--scales created before tileSet present.");
     }
-    const { extent: extent2 } = this.tileSet;
+    const { extent: extent2 } = this.dataset;
     const scales2 = {};
     if (extent2 === void 0) {
       throw new Error("Error--scales created before extent present.");
@@ -15764,10 +15782,28 @@ class Renderer {
       this.holder.node().firstElementChild
     ).node();
     this.dataset = tileSet;
-    this.width = +select(this.canvas).attr("width");
-    this.height = +select(this.canvas).attr("height");
+    this._width = this.scatterplot.width;
+    this._height = this.scatterplot.height;
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
+  }
+  get width() {
+    return this._width;
+  }
+  set width(value) {
+    this._width = value;
+    this.resize(this._width, this._height);
+  }
+  get height() {
+    return this._height;
+  }
+  set height(value) {
+    this._height = value;
+    this.resize(this._width, this._height);
+  }
+  resize(width, height) {
+    this._width = width;
+    this._height = height;
   }
   get discard_share() {
     return 0;
@@ -24464,6 +24500,7 @@ class ReglRenderer extends Renderer {
     } else {
       tileSet.download_most_needed_tiles(prefs.max_points, this.max_ix, 5);
     }
+    regl2.poll();
     regl2.clear({
       color: [0.9, 0.9, 0.93, 0],
       depth: 1
@@ -24705,6 +24742,19 @@ class ReglRenderer extends Renderer {
       height: 1,
       depth: false
     });
+  }
+  resize(width, height) {
+    super.resize(width, height);
+    this.resize_textures();
+  }
+  resize_textures() {
+    var _a2, _b2, _c2, _d2, _e2, _f2;
+    (_a2 = this.fbos.colorpicker) == null ? void 0 : _a2.resize(this.width, this.height);
+    (_b2 = this.fbos.contour) == null ? void 0 : _b2.resize(this.width, this.height);
+    (_c2 = this.fbos.ping) == null ? void 0 : _c2.resize(this.width, this.height);
+    (_d2 = this.fbos.pong) == null ? void 0 : _d2.resize(this.width, this.height);
+    (_e2 = this.fbos.lines) == null ? void 0 : _e2.resize(this.width, this.height);
+    (_f2 = this.fbos.points) == null ? void 0 : _f2.resize(this.width, this.height);
   }
   get_image_texture(url) {
     const { regl: regl2 } = this;
@@ -25282,7 +25332,6 @@ class TileBufferManager {
         );
       }
     }
-    console.log({ column });
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
       const source_buffer = column.data[0];
@@ -35640,17 +35689,13 @@ class QuadtileSet extends Dataset {
       if (schema.metadata.has("sidecars")) {
         const cars = schema.metadata.get("sidecars");
         const parsed = JSON.parse(cars);
-        for (const [k, v] of Object.entries(
-          parsed
-        )) {
+        for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function(tile) {
             const batch = await tile.get_arrow(v);
             const column = batch.getChild(k);
             if (column === null) {
               throw new Error(
-                `No column named ${k} in sidecar tile ${batch.schema.fields.map(
-                  (f) => f.name
-                ).join(", ")}`
+                `No column named ${k} in sidecar tile ${batch.schema.fields.map((f) => f.name).join(", ")}`
               );
             }
             return column;
@@ -36992,11 +37037,22 @@ class Scatterplot {
     this.mark_ready = function() {
     };
     this.bound = false;
+    if (width === void 0) {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      window.onresize = () => {
+        this.resize(window.innerWidth, window.innerHeight);
+      };
+    }
     if (selector2 !== void 0) {
       this.bind(selector2, width, height);
     }
-    this.width = width;
-    this.height = height;
+    if (width !== void 0) {
+      this._width = width;
+    }
+    if (height !== void 0) {
+      this._height = height;
+    }
     this.ready = new Promise((resolve, reject) => {
       this.mark_ready = resolve;
     });
@@ -37009,7 +37065,36 @@ class Scatterplot {
    * @param selector A selector for the root element of the deepscatter; must already exist.
    * @param width Width of the plot, in pixels.
    * @param height Height of the plot, in pixels.
-   */
+  */
+  resize(width, height) {
+    this._width = width;
+    this._height = height;
+    if (this.elements === void 0) {
+      throw "Must bind plot to DOM element before setting dimensions";
+    }
+    for (const el of this.elements) {
+      el.attr("width", this.width).attr("height", this.height);
+      el.selectAll(".deepscatter-render-canvas").attr("width", this.width).attr("height", this.height);
+    }
+    if (this._renderer !== void 0) {
+      this._zoom.resize(this.width, this.height);
+      this._renderer.resize(this.width, this.height);
+    }
+  }
+  get width() {
+    return this._width;
+  }
+  set width(w) {
+    this._width = w;
+    this.resize(w, this.height);
+  }
+  get height() {
+    return this._height;
+  }
+  set height(h) {
+    this._height = h;
+    this.resize(this.width, h);
+  }
   bind(selector2, width, height) {
     this.div = select(selector2).selectAll("div.deepscatter_container").data([1]).join("div").attr("class", "deepscatter_container").style("position", "absolute");
     if (this.div.empty()) {
@@ -37017,9 +37102,15 @@ class Scatterplot {
       throw "Must pass a valid div selector";
     }
     this.elements = [];
+    if (height !== void 0) {
+      this._height = height;
+    }
+    if (width !== void 0) {
+      this._width = width;
+    }
     for (const d of base_elements) {
       const container = this.div.append("div").attr("id", `container-for-${d.id}`).style("position", "absolute").style("top", 0).style("left", 0).style("pointer-events", d.id === "deepscatter-svg" ? "auto" : "none");
-      const el = container.append(d.nodetype).attr("id", d.id).attr("width", width || window.innerWidth).attr("height", height || window.innerHeight);
+      const el = container.append(d.nodetype).attr("id", d.id).attr("class", "deepscatter-render-canvas").attr("width", this.width).attr("height", this.height);
       if (d.nodetype === "svg") {
         el.append("g").attr("id", "mousepoints");
         el.append("g").attr("id", "labelrects");
@@ -37141,7 +37232,7 @@ class Scatterplot {
     const bkgd = select("#container-for-canvas-2d-background").select("canvas");
     const ctx = bkgd.node().getContext("2d");
     ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
-    ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
+    ctx.fillRect(0, 0, this.width, this.height);
     this._renderer.initialize();
     void this._root.promise.then(() => this.mark_ready());
     return this.ready;
@@ -37209,7 +37300,7 @@ class Scatterplot {
   }
   async make_big_png(xtimes = 3, points = 1e7, timeper = 100) {
     await this._root.download_to_depth(points);
-    const { width, height } = this._renderer;
+    const { width, height } = this;
     this.plotAPI({ duration: 0 });
     const canvas = document.createElement("canvas");
     canvas.setAttribute("width", (xtimes * width).toString());
@@ -37242,10 +37333,10 @@ class Scatterplot {
                 );
                 const halfHeight = height / 2 | 0;
                 const bytesPerRow = width * 4;
-                var temp = new Uint8Array(width * 4);
-                for (var y = 0; y < halfHeight; ++y) {
-                  var topOffset = y * bytesPerRow;
-                  var bottomOffset = (height - y - 1) * bytesPerRow;
+                const temp = new Uint8Array(width * 4);
+                for (const y = 0; y < halfHeight; ++y) {
+                  const topOffset = y * bytesPerRow;
+                  const bottomOffset = (height - y - 1) * bytesPerRow;
                   temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
                   pixels.copyWithin(
                     topOffset,
@@ -37551,7 +37642,7 @@ class Scatterplot {
     const context2 = canvas.node().getContext("2d");
     for (const contour of contours) {
       context2.fillStyle = "rgba(25, 25, 29, 1)";
-      context2.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
+      context2.fillRect(0, 0, this.width, this.height);
       context2.strokeStyle = "#8a0303";
       context2.fillStyle = "rgba(30, 30, 34, 1)";
       context2.lineWidth = max([

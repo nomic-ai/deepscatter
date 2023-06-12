@@ -122,8 +122,8 @@ export class Renderer<TileType extends Tile> {
   public holder: d3.Selection<any, any, any, any>;
   public canvas: HTMLCanvasElement;
   public dataset: Dataset<TileType>;
-  public width: number;
-  public height: number;
+  private _width: number;
+  private _height: number;
   public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
   public zoom?: Zoom;
@@ -142,10 +142,29 @@ export class Renderer<TileType extends Tile> {
       this.holder.node().firstElementChild
     ).node() as HTMLCanvasElement;
     this.dataset = tileSet;
-    this.width = +select(this.canvas).attr('width');
-    this.height = +select(this.canvas).attr('height');
+    this._width = this.scatterplot.width
+    this._height = this.scatterplot.height
     this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
+  }
+
+  get width() {
+    return this._width;
+  }
+  set width(value: number) {
+    this._width = value;
+    this.resize(this._width, this._height);
+  }
+  get height() {
+    return this._height;
+  }
+  set height(value: number) {
+    this._height = value;
+    this.resize(this._width, this._height);
+  }
+  resize(width: number, height: number) {
+    this._width = width;
+    this._height = height;
   }
 
   get discard_share() {
