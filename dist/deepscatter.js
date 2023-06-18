@@ -17243,18 +17243,21 @@ void main() {
   
   float depth_size_adjust = (1.0 - ix / (u_maxix));
 
-  // It's ugly on new macs when it jumps straight from one to two for a bunch of points at once.
-  float size_fuzz = exp(ix_to_random(ix, 3.1) * .5 - .25);
-
-  point_size_adjust = exp(log(u_k) * u_zoom_balance) * size_fuzz;// * depth_size_adjust;
+  point_size_adjust = exp(log(u_k) * u_zoom_balance) ;// * depth_size_adjust;
 //  point_size_adjust = exp(log(u_k) * u_zoom_balance);
   gl_PointSize = point_size_adjust * size_multiplier;
+
+  if (gl_PointSize <= 5.1) {
+    // It's ugly on new macs when it jumps straight from one to two for a bunch of points at once.
+    float size_fuzz = exp(ix_to_random(ix, 3.1) * .5 - .25);
+    gl_PointSize *= size_fuzz;
+  }
+
   if (gl_PointSize <= 0.01) {
     gl_Position = discard_me;
     return;
   }
   vec2 jitter = vec2(0., 0.);
-//  
 
   if (plot_actual_position && (u_jitter > 0. || u_last_jitter > 0.)) {
     /* JITTER */
@@ -25352,6 +25355,11 @@ class MultipurposeBufferSet {
       });
     }
     this.pointer = 0;
+    console.log({
+      type: "float",
+      length: this.buffer_size,
+      usage: "dynamic"
+    });
     this.buffers.unshift(
       this.regl.buffer({
         type: "float",

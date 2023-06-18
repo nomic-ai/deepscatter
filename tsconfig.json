@@ -1,8 +1,10 @@
 {
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "compilerOptions": {
+    "declarationMap": true,
     "declaration": true,
-    // "lib": ["es2020"],
     "module": "esnext",
     "moduleResolution": "node",
     "esModuleInterop": true,
@@ -13,7 +15,8 @@
     "isolatedModules": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "emitDeclarationOnly": true,
   },
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Recommended"

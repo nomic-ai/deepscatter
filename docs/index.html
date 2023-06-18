@@ -16,39 +16,44 @@
 <a href="#deep-scatterplots-for-the-web" id="deep-scatterplots-for-the-web" style="color: inherit; text-decoration: none;">
   <h1>Deep Scatterplots for the Web</h1>
 </a>
-<p>This is an evolving library for displaying more points than are ordinarily possible over the web.</p>
+<p>This is a library for allowing interactive visualization of extremely large datasets, in browser.</p>
 <p>It&#39;s fast for three reasons:</p>
 <ol>
 <li>All data is sent in the Apache Arrow <code>feather</code> format, in a
 custom quadtree format that makes it possible to only load
 data as needed on zoom. Feather takes no time to parse in the browser
 once transferred, compresses pretty well, and can be directly copied to the GPU without
-transformation in JS. This is <a href="https://benschmidt.org/post/2020-01-15/2020-01-15-webgpu/">the way of the future.</a></li>
+transformation in JS. This is <a href="https://benschmidt.org/post/2020-01-15/2020-01-15-webgpu/">the way of the future.</a>
+We also now allow custom in-browser calculations on Arrow data.</li>
 <li>Most rendering is done in custom layers using WebGL, with a
 buffer management strategy handled by REGL. This means that
 there are no unnecessary abstractions around points or separate draw calls
-for different objects; a minimum number of buffers are attached for the
+for different objects; a minimum number of buffers are attached for all
 needed points.</li>
 <li>Almost all grammar-of-graphics transforms such are handled on the GPU,
 which allows for interpolated transitions with calculations
 done in parallel.</li>
 </ol>
 <p>It also runs in completely static settings, so you can host a million-point scatterplot over something like Github Pages.</p>
+<p>Deepscatter is the underlying graphics engine for <a href="https://atlas.nomic.ai">Atlas</a>. It is provided under an NC-CC-BY-SA license for all noncommercial use.</p>
 
 <a href="#examples" id="examples" style="color: inherit; text-decoration: none;">
   <h1>Examples</h1>
 </a>
 <ul>
+<li><a href="https://atlas.nomic.ai/map/twitter">Atlas map of 5.5 million tweets</a>. (Nomic)</li>
+<li><a href="https://static.nomic.ai/pubmed.html">Narrative visualization of 20 million biomedical abstracts embedded using T-SNE.</a>. (Collaboration between Nomic and the University of Tübingen).</li>
 <li><a href="https://observablehq.com/@bmschmidt/arxiv">1 million+ documents from arxiv.com</a> rendered inside an Observable notebook. (Ben Schmidt)</li>
 <li><a href="https://all-of-us.benschmidt.org">Every person in the 2010 and 2020 US Censuses</a> displayed in an interactive svelte-kit app. (Ben Schmidt)</li>
-<li><a href="https://situating.us/explore">Newspaper Articles at the Library of Congress from the Reconstruction Era</a>. (By Andromeda Yelton while in residency at the Library of Congress).</li>
+<li><a href="https://situating.us/explore">Newspaper Articles at the Library of Congress from the Reconstruction Era</a>. (Andromeda Yelton while in residency at the Library of Congress).</li>
 </ul>
 
 <a href="#get-help" id="get-help" style="color: inherit; text-decoration: none;">
   <h1>Get help</h1>
 </a>
-<p>Github issues, even low quality ones, are welcom here. There is also a dedicated <a href="https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw">Deepscatter Slack</a> which you are welcome to join.
-I came into doing this stuff from a very non-technical background and welcome people to join with naive questions.</p>
+<p>Github issues, even low quality ones, are welcome here.</p>
+<p>There is also a dedicated <a href="https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw">Deepscatter Slack</a> which you are welcome to join. Nomic maintains a <a href="https://discord.gg/4M2QFmTt2k">discord server</a> that has dedicated Deepscatter and Atlas support channels.</p>
+<p>I came into doing this stuff from a very non-technical background and welcome people to join with naive questions.</p>
 
 <a href="#quick-start" id="quick-start" style="color: inherit; text-decoration: none;">
   <h1>Quick start</h1>
@@ -200,10 +205,27 @@ using, say, <code>arquero</code> or a WASM port of <code>DuckDB</code>.</p>
 <div class="tsd-accordion-details">
 <ul>
 <li class="current selected"><a href="modules.html">deepscatter</a>
-<ul></ul></li></ul></div></details></nav>
-<nav class="tsd-navigation secondary menu-sticky">
 <ul>
-<li class="tsd-kind-class"><a href="classes/default.html" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><rect fill="var(--color-icon-background)" stroke="var(--color-ts-class)" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="6" id="icon-128-path"></rect><path d="M11.898 16.1201C11.098 16.1201 10.466 15.8961 10.002 15.4481C9.53803 15.0001 9.30603 14.3841 9.30603 13.6001V9.64012C9.30603 8.85612 9.53803 8.24012 10.002 7.79212C10.466 7.34412 11.098 7.12012 11.898 7.12012C12.682 7.12012 13.306 7.34812 13.77 7.80412C14.234 8.25212 14.466 8.86412 14.466 9.64012H13.386C13.386 9.14412 13.254 8.76412 12.99 8.50012C12.734 8.22812 12.37 8.09212 11.898 8.09212C11.426 8.09212 11.054 8.22412 10.782 8.48812C10.518 8.75212 10.386 9.13212 10.386 9.62812V13.6001C10.386 14.0961 10.518 14.4801 10.782 14.7521C11.054 15.0161 11.426 15.1481 11.898 15.1481C12.37 15.1481 12.734 15.0161 12.99 14.7521C13.254 14.4801 13.386 14.0961 13.386 13.6001H14.466C14.466 14.3761 14.234 14.9921 13.77 15.4481C13.306 15.8961 12.682 16.1201 11.898 16.1201Z" fill="var(--color-text)" id="icon-128-text"></path></svg>default</a></li></ul></nav></div></div>
+<li class="tsd-kind-module"><a href="modules/Aesthetic.html">Aesthetic</a></li>
+<li class="tsd-kind-module"><a href="modules/AestheticSet.html">Aesthetic<wbr/>Set</a></li>
+<li class="tsd-kind-module"><a href="modules/ColorAesthetic.html">Color<wbr/>Aesthetic</a></li>
+<li class="tsd-kind-module"><a href="modules/Dataset.html">Dataset</a></li>
+<li class="tsd-kind-module"><a href="modules/Image_Tile.html">Image_<wbr/>Tile</a></li>
+<li class="tsd-kind-module"><a href="modules/StatefulAesthetic.html">Stateful<wbr/>Aesthetic</a></li>
+<li class="selected tsd-kind-module"><a href="modules/deepscatter.html">deepscatter</a></li>
+<li class="tsd-kind-module"><a href="modules/defaults.html">defaults</a></li>
+<li class="tsd-kind-module"><a href="modules/duckdb.html">duckdb</a></li>
+<li class="tsd-kind-module"><a href="modules/global.html">global</a>
+<ul>
+<li class="tsd-kind-namespace tsd-parent-kind-module"><a href="modules/global.DS.html">DS</a></li></ul></li>
+<li class="tsd-kind-module"><a href="modules/interaction.html">interaction</a></li>
+<li class="tsd-kind-module"><a href="modules/label_rendering.html">label_<wbr/>rendering</a></li>
+<li class="tsd-kind-module"><a href="modules/regl_rendering.html">regl_<wbr/>rendering</a></li>
+<li class="tsd-kind-module"><a href="modules/rendering.html">rendering</a></li>
+<li class="tsd-kind-module"><a href="modules/selection.html">selection</a></li>
+<li class="tsd-kind-module"><a href="modules/tile.html">tile</a></li>
+<li class="tsd-kind-module"><a href="modules/typing.html">typing</a></li>
+<li class="tsd-kind-module"><a href="modules/util.html">util</a></li></ul></li></ul></div></details></nav></div></div>
 <div class="container tsd-generator">
 <p>Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></div>
 <div class="overlay"></div><script src="assets/main.js"></script></body></html>

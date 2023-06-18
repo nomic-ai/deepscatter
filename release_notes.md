@@ -1,3 +1,7 @@
+# 2.12.1
+
+- More comprehensive type annotations
+- Remove random jitter on point size above 5 pixels.
 # 2.12.0
 
 - Allow accessing dataset at `scatterplot.dataset`, rather than the confusing `scatterplot._root`.
