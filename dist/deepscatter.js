@@ -5644,7 +5644,6 @@ class Zoom {
     const scales2 = this.scales();
     let [x02, x12] = corners.x.map(scales2.x);
     let [y02, y12] = corners.y.map(scales2.y);
-    console.log(this.scatterplot.prefs.zoom_align, "AAH");
     if (this.scatterplot.prefs.zoom_align === "right") {
       const aspect_ratio = this.width / this.height;
       const data_aspect_ratio = (x12 - x02) / (y12 - y02);
@@ -25285,7 +25284,6 @@ class TileBufferManager {
         );
       }
     }
-    console.log({ column });
     if (column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
       const source_buffer = column.data[0];
@@ -25355,11 +25353,6 @@ class MultipurposeBufferSet {
       });
     }
     this.pointer = 0;
-    console.log({
-      type: "float",
-      length: this.buffer_size,
-      usage: "dynamic"
-    });
     this.buffers.unshift(
       this.regl.buffer({
         type: "float",
@@ -35368,15 +35361,28 @@ function children(tile) {
 function nothing() {
 }
 class Dataset {
+  /**
+   * @param plot The plot to which this dataset belongs.
+  **/
   constructor(plot) {
     this.transformations = {};
     this.extents = {};
     this._ix_seed = 0;
     this.plot = plot;
   }
+  /**
+   * The highest known point that deepscatter has seen so far. This is used 
+   * to adjust opacity size.
+   */
   get highest_known_ix() {
     return this.root_tile.highest_known_ix;
   }
+  /**
+   * Attempts to build an Arrow table from all record batches.
+   * If some batches have different transformations applied,
+   * this will error
+   * 
+  **/
   get table() {
     return new Table(
       this.map((d) => d).filter((d) => d.ready).map((d) => d.record_batch)
@@ -35385,6 +35391,14 @@ class Dataset {
   static from_quadfeather(url, prefs, plot) {
     return new QuadtileSet(url, prefs, plot);
   }
+  /**
+   * Generate an ArrowDataset from a single Arrow table.
+   * 
+   * @param table A single Arrow table
+   * @param prefs The API Call to use for renering.
+   * @param plot The Scatterplot to use.
+   * @returns 
+   */
   static from_arrow_table(table, prefs, plot) {
     return new ArrowDataset(table, prefs, plot);
   }
@@ -35648,17 +35662,13 @@ class QuadtileSet extends Dataset {
       if (schema.metadata.has("sidecars")) {
         const cars = schema.metadata.get("sidecars");
         const parsed = JSON.parse(cars);
-        for (const [k, v] of Object.entries(
-          parsed
-        )) {
+        for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function(tile) {
             const batch = await tile.get_arrow(v);
             const column = batch.getChild(k);
             if (column === null) {
               throw new Error(
-                `No column named ${k} in sidecar tile ${batch.schema.fields.map(
-                  (f) => f.name
-                ).join(", ")}`
+                `No column named ${k} in sidecar tile ${batch.schema.fields.map((f) => f.name).join(", ")}`
               );
             }
             return column;
