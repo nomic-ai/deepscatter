@@ -112,7 +112,7 @@ export default class Zoom {
     const scales = this.scales();
     let [x0, x1] = corners.x.map(scales.x);
     let [y0, y1] = corners.y.map(scales.y);
-    console.log(this.scatterplot.prefs.zoom_align, 'AAH');
+
     if (this.scatterplot.prefs.zoom_align === 'right') {
       const aspect_ratio = this.width / this.height;
       const data_aspect_ratio = (x1 - x0) / (y1 - y0);
