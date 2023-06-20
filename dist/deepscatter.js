@@ -35140,7 +35140,12 @@ class QuadTile extends Tile {
     let headers = {};
     if (window.localStorage.getItem("isLoggedIn") === "true") {
       url = url.replace("/public", "");
-      headers = { credentials: "include" };
+      const accessToken = localStorage.getItem('access_token');
+
+      headers = {
+        // credentials: 'include',
+        Authorization: `Bearer ${accessToken}`,
+      };
     }
     if (suffix) {
       url = url.replace(".feather", `.${suffix}.feather`);
