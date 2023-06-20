@@ -1,3 +1,7 @@
+# 2.12.1
+
+- New methods for id selections.
+
 # 2.12.0
 
 - Allow accessing dataset at `scatterplot.dataset`, rather than the confusing `scatterplot._root`.
