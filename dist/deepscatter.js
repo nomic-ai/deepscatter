@@ -35140,20 +35140,28 @@ class QuadTile extends Tile {
     let headers = {};
     if (window.localStorage.getItem("isLoggedIn") === "true") {
       url = url.replace("/public", "");
-      const accessToken = localStorage.getItem('access_token');
-
+      const accessToken = localStorage.getItem("access_token");
       headers = {
         // credentials: 'include',
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`
       };
     }
     if (suffix) {
       url = url.replace(".feather", `.${suffix}.feather`);
     }
-    const request = {
+    let request = {
       method: "GET",
-      ...headers
     };
+    if (window.localStorage.getItem("isLoggedIn") === "true") {
+      const accToken= localStorage.getItem("access_token");
+      request = {
+        method: "GET",
+        headers: {
+          // credentials: 'include',
+          Authorization: `Bearer ${accToken}`
+        }
+      };
+    }
     const response = await fetch(url, request);
     const buffer = await response.arrayBuffer();
     const tb = tableFromIPC(buffer);

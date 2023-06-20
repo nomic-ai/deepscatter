@@ -415,10 +415,19 @@ export class QuadTile extends Tile {
     if (suffix) {
       url = url.replace('.feather', `.${suffix}.feather`);
     }
-    const request: RequestInit = {
+    let request: RequestInit = {
       method: 'GET',
-      ...headers,
     };
+    if (window.localStorage.getItem('isLoggedIn') === 'true') {
+      const accToken = localStorage.getItem('access_token');
+      request = {
+        method: 'GET',
+        headers: {
+          // credentials: 'include',
+          Authorization: `Bearer ${accToken}`,
+        },
+      };
+    }
     const response = await fetch(url, request);
     const buffer = await response.arrayBuffer();
 
