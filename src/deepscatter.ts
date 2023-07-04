@@ -9,12 +9,13 @@ import type { StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
-import { ArrowTile, QuadTile, Tile } from './tile';
+import { ArrowTile, QuadTile, Rectangle, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { DataSelection } from './selection';
 import type { IdSelectParams } from './selection';
 // DOM elements that deepscatter uses.
+
 const base_elements = [
   {
     id: 'canvas-2d-background',
@@ -378,8 +379,8 @@ export default class Scatterplot<T extends Tile> {
     canvas.setAttribute('height', (xtimes * height).toString());
     const ctx = canvas.getContext('2d');
 
-    const corners = this._zoom.current_corners();
-    const current_zoom = this._zoom.transform.k;
+    const corners = this._zoom.current_corners() as Rectangle;
+    const current_zoom = this._zoom.transform!.k;
     const xstep = (corners.x[1] - corners.x[0]) / xtimes;
     const ystep = (corners.y[1] - corners.y[0]) / xtimes;
 

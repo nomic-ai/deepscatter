@@ -15,6 +15,7 @@ import {
   makeVector,
 } from 'apache-arrow';
 
+type APICall = DS.APICall;
 type Key = string;
 
 function nothing() {
@@ -24,6 +25,11 @@ function nothing() {
 type ArrowBuildable = Vector | Float32Array;
 type Transformation<T> = (arg0: T) => ArrowBuildable | Promise<ArrowBuildable>;
 
+/**
+ * A Dataset manages the production and manipulation of tiles. Each plot has a 
+ * single dataset; the dataset handles all transformations around data through 
+ * batchwise operations.
+ */
 export abstract class Dataset<T extends Tile> {
   public transformations: Record<string, Transformation<T>> = {};
   abstract root_tile: T;
@@ -34,16 +40,31 @@ export abstract class Dataset<T extends Tile> {
   private extents: Record<string, [number, number]> = {};
   public _ix_seed = 0;
   public _schema?: Schema;
+
+  /**
+   * @param plot The plot to which this dataset belongs.
+  **/
+
   constructor(plot: Plot) {
     this.plot = plot;
     // If a linear identifier does not exist in the passed data, we add the ix columns in the order that
     // they are passed.
   }
 
+  /**
+   * The highest known point that deepscatter has seen so far. This is used 
+   * to adjust opacity size.
+   */
   get highest_known_ix(): number {
     return this.root_tile.highest_known_ix;
   }
 
+  /**
+   * Attempts to build an Arrow table from all record batches.
+   * If some batches have different transformations applied,
+   * this will error
+   * 
+  **/
   get table(): Table {
     return new Table(
       this.map((d) => d)
@@ -59,6 +80,14 @@ export abstract class Dataset<T extends Tile> {
   ): QuadtileSet {
     return new QuadtileSet(url, prefs, plot);
   }
+  /**
+   * Generate an ArrowDataset from a single Arrow table.
+   * 
+   * @param table A single Arrow table
+   * @param prefs The API Call to use for renering.
+   * @param plot The Scatterplot to use.
+   * @returns 
+   */
   static from_arrow_table(
     table: Table,
     prefs: APICall,
@@ -66,11 +95,13 @@ export abstract class Dataset<T extends Tile> {
   ): ArrowDataset {
     return new ArrowDataset(table, prefs, plot);
   }
+
   abstract download_most_needed_tiles(
     bbox: Rectangle | undefined,
     max_ix: number,
     queue_length: number
   ): void;
+
   /**
    *
    * @param name The name of the column to check for

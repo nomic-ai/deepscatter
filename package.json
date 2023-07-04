@@ -6,19 +6,21 @@
   "files": [
     "dist"
   ],
+  "types": "./dist/deepscatter.d.ts",
   "module": "./dist/deepscatter.js",
   "main": "./dist/deepscatter.umd.cjs",
   "exports": {
     ".": {
       "import": "./dist/deepscatter.js",
-      "require": "./dist/deepscatter.umd.cjs"
+      "require": "./dist/deepscatter.umd.cjs",
+      "types": "./dist/deepscatter.d.ts"
     }
   },
   "scripts": {
     "dev": "vite --port 3344 --host",
-    "format": "prettier --write .",
+    "format": "prettier --write src",
     "build": "vite build",
-    "prepublishOnly": "vite build && typedoc --skipErrorChecking src/deepscatter.ts",
+    "prepublishOnly": "vite build && typedoc --skipErrorChecking src/*",
     "test": "playwright test",
     "lint": "eslint src"
   },

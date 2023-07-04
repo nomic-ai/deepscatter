@@ -38,21 +38,22 @@ type TwoArgumentOp = {
   b: number;
 };
 
-declare global {
+export namespace DS {
   type Newable<T> = { new (...args: any[]): T };
   type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
   type OpChannel = OneArgumentOp | TwoArgumentOp;
-
   interface InitializedScatterplot<T extends Tile> {
     _root: Dataset<T>;
     _renderer: ReglRenderer<T>;
   }
+
 
   interface SelectionRecord {
     ref: DataSelection<any> | null;
     name: string;
     flushed: boolean;
   }
+  
   // Functions that are defined as strings and executed in JS.
   type LambdaChannel = {
     lambda: string;
@@ -319,4 +320,48 @@ declare global {
     arrow_buffer?: Buffer;
   };
   export type TileType = QuadTile | ArrowTile;
+}
+declare global {
+  type Newable<T> = DS.Newable<T>;
+  type Plot = DS.Plot;
+  type OpChannel = DS.OpChannel;
+  type InitializedScatterplot<T extends Tile> = DS.InitializedScatterplot<T>;
+  type SelectionRecord = DS.SelectionRecord;
+  type LambdaChannel = DS.LambdaChannel;
+  type BufferLocation = DS.BufferLocation;
+  type Transform = DS.Transform;
+  type FunctionalChannel = DS.FunctionalChannel;
+  type BackgroundOptions = DS.BackgroundOptions;
+  type ConstantBool = DS.ConstantBool;
+  type ConstantNumber = DS.ConstantNumber;
+  type ConstantColorChannel = DS.ConstantColorChannel;
+  type ConstantChannel = DS.ConstantChannel;
+  interface BasicChannel extends DS.BasicChannel {}
+  type JitterRadiusMethod = DS.JitterRadiusMethod;
+  interface CategoricalChannel extends DS.CategoricalChannel {}
+  type BasicColorChannel = DS.BasicColorChannel;
+  type CategoricalColorChannel = DS.CategoricalColorChannel;
+  type ColorChannel = DS.ColorChannel;
+  type BooleanChannel = DS.BooleanChannel;
+  type RootChannel = DS.RootChannel;
+  type JitterChannel = DS.JitterChannel;
+  type OpArray = DS.OpArray;
+  type Encoding = DS.Encoding;
+  type ColumnTimeLookups = DS.ColumnTimeLookups;
+  type TileKey = DS.TileKey;
+  type PointUpdate = DS.PointUpdate;
+  type ZoomCall = DS.ZoomCall;
+  type Dimension = DS.Dimension;
+  type DataSpec = DS.DataSpec;
+  type onZoomCallback = DS.onZoomCallback;
+  type Label = DS.Label;
+  type URLLabels = DS.URLLabels;
+  type LabelOptions = DS.LabelOptions;
+  type Labelset = DS.Labelset;
+  type Labelcall = DS.Labelcall;
+  type APICall = DS.APICall;
+  type InitialAPICall = DS.InitialAPICall;
+  type CompletePrefs = DS.CompletePrefs;
+  type RenderPrefs = DS.RenderPrefs;
+  type TileType = DS.TileType;
 }
