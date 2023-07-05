@@ -6,31 +6,31 @@ import { mean } from 'd3-array';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type { Renderer } from './rendering';
-import type { QuadtreeRoot } from './tile';
 import { ReglRenderer } from './regl_rendering';
 import { StructRow, StructRowProxy } from 'apache-arrow';
 import { Rectangle } from './tile';
 import { PositionalAesthetic } from './Aesthetic';
-
-export default class Zoom {
-  public prefs: APICall;
+import type { Dataset } from './Dataset';
+import type * as DS from './shared';
+export default class Zoom<T extends DS.Tile> {
+  public prefs: DS.APICall;
   public svg_element_selection: d3.Selection<
     d3.ContainerElement,
-    any,
+    Record<string, any>,
     any,
     any
   >;
   public width: number;
   public height: number;
-  public renderers: Map<string, Renderer>;
-  public tileSet?: QuadtreeRoot;
+  public renderers: Map<string, Renderer<T>>;
+  public tileSet?: Dataset<T>;
   public _timer?: d3.Timer;
   public _scales?: Record<string, d3.ScaleLinear<number, number>>;
-  public zoomer?: d3.ZoomBehavior<Element, any>;
+  public zoomer?: d3.ZoomBehavior<Element, unknown>;
   public transform?: d3.ZoomTransform;
   public _start?: number;
-  public scatterplot: Plot;
-  constructor(selector: string, prefs: APICall, plot: Plot) {
+  public scatterplot: DS.Plot;
+  constructor(selector: string, prefs: DS.APICall, plot: DS.Plot) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
     // also registers events.
@@ -48,20 +48,20 @@ export default class Zoom {
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles: QuadtreeRoot) {
+  attach_tiles(tiles: Dataset<T>) {
     this.tileSet = tiles;
     this.tileSet._zoom = this;
     return this;
   }
 
-  attach_renderer(key: string, renderer: Renderer) {
+  attach_renderer(key: string, renderer: Renderer<T>) {
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
     renderer.zoom.initialize_zoom();
     return this;
   }
 
-  zoom_to(k: number, x = null, y = null, duration = 4000) {
+  zoom_to(k: number, x : number, y : number, duration = 4000) {
     const scales = this.scales();
     const { svg_element_selection: canvas, zoomer, width, height } = this;
 
@@ -74,7 +74,7 @@ export default class Zoom {
   }
 
   html_annotation(points: Array<Record<string, string | number>>) {
-    const div = this.svg_element_selection.node().parentNode.parentNode;
+    const div = this.svg_element_selection.node()!.parentNode!.parentNode;
     let opacity = 0.75;
     if (this.scatterplot.prefs.tooltip_opacity !== undefined) {
       opacity = this.scatterplot.prefs.tooltip_opacity;
@@ -100,7 +100,7 @@ export default class Zoom {
       );
 
     els
-      .html((d) => this.scatterplot.tooltip_html(d.data))
+      .html((d) => this.scatterplot.tooltip_html(d.data, this))
       .style('transform', (d) => {
         const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
         return t;
@@ -111,7 +111,7 @@ export default class Zoom {
     // Zooms to two points.
     const scales = this.scales();
     let [x0, x1] = corners.x.map(scales.x);
-    let [y0, y1] = corners.y.map(scales.y);
+    const [y0, y1] = corners.y.map(scales.y);
 
     if (this.scatterplot.prefs.zoom_align === 'right') {
       const aspect_ratio = this.width / this.height;
@@ -145,7 +145,9 @@ export default class Zoom {
       .on('zoom', (event) => {
         try {
           document.getElementById('tooltipcircle').remove();
-        } catch (error) {}
+        } catch (error) {
+          // console.log(error);
+        }
         this.transform = event.transform;
         this.restart_timer(10 * 1000);
 
@@ -173,8 +175,8 @@ export default class Zoom {
       data: StructRowProxy;
     };
     const annotations: Annotation[] = data.map((d) => ({
-      x: x_(xdim.apply(d)) as number,
-      y: y_(ydim.apply(d)) as number,
+      x: x_(xdim.apply(d)) ,
+      y: y_(ydim.apply(d)) ,
       data: d,
       dx: 0,
       dy: 30,
@@ -202,13 +204,10 @@ export default class Zoom {
         (exit) =>
           exit.call((e) => {
             e.remove();
-            if (this.prefs.exit_function) {
-              this.prefs.exit_function();
-            }
           })
       )
       .on('click', (ev, dd) => {
-        this.scatterplot.click_function(dd);
+        this.scatterplot.click_function(dd, this.scatterplot);
       });
   }
 
@@ -249,13 +248,13 @@ export default class Zoom {
     const { x_, y_ } = scales;
 
     return {
-      x: [x_.invert(0) as number, x_.invert(width) as number],
-      y: [y_.invert(0) as number, y_.invert(height) as number],
+      x: [x_.invert(0) , x_.invert(width) ],
+      y: [y_.invert(0) , y_.invert(height) ],
     };
   }
 
   current_center() {
-    const { x, y } = this.current_corners();
+    const { x, y } = this.current_corners() as Rectangle;
     return [(x[0] + x[1]) / 2, (y[0] + y[1]) / 2];
   }
 
@@ -397,20 +396,20 @@ export default class Zoom {
   }
 }
 
-export function window_transform(x_scale: ScaleLinear, y_scale) {
+export function window_transform(x_scale: ScaleLinear<number, number, never>, y_scale : ScaleLinear<number, number, never>) {
   // width and height are svg parameters; x and y scales project from the data x and y into the
   // the webgl space.
 
   // Given two d3 scales in coordinate space, create two matrices that project from the original
   // space into [-1, 1] webgl space.
 
-  function gap(array) {
+  function gap(array : number[]) {
     // Return the magnitude of a scale.
     return array[1] - array[0];
   }
 
-  const x_mid = mean(x_scale.domain());
-  const y_mid = mean(y_scale.domain());
+  const x_mid = mean(x_scale.domain()) as number;
+  const y_mid = mean(y_scale.domain()) as number;
 
   const xmulti = gap(x_scale.range()) / gap(x_scale.domain());
   const ymulti = gap(y_scale.range()) / gap(y_scale.domain());
@@ -418,8 +417,8 @@ export function window_transform(x_scale: ScaleLinear, y_scale) {
   // translates from data space to scaled space.
   const m1 = [
     // transform by the scale;
-    [xmulti, 0, -xmulti * x_mid + mean(x_scale.range())],
-    [0, ymulti, -ymulti * y_mid + mean(y_scale.range())],
+    [xmulti, 0, -xmulti * x_mid + (mean(x_scale.range()) as number)],
+    [0, ymulti, -ymulti * y_mid + (mean(y_scale.range()) as number)],
     [0, 0, 1],
   ];
   // Note--at the end, you need to multiply by this matrix.

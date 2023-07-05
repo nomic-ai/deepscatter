@@ -5618,7 +5618,7 @@ class Zoom {
     renderer.zoom.initialize_zoom();
     return this;
   }
-  zoom_to(k, x = null, y = null, duration = 4e3) {
+  zoom_to(k, x, y, duration = 4e3) {
     const scales2 = this.scales();
     const { svg_element_selection: canvas, zoomer, width, height } = this;
     const t = identity$3.translate(width / 2, height / 2).scale(k).translate(-scales2.x(x), -scales2.y(y));
@@ -5635,7 +5635,7 @@ class Zoom {
       (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)),
       (exit) => exit.call((e) => e.remove())
     );
-    els.html((d) => this.scatterplot.tooltip_html(d.data)).style("transform", (d) => {
+    els.html((d) => this.scatterplot.tooltip_html(d.data, this)).style("transform", (d) => {
       const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
       return t;
     });
@@ -5643,7 +5643,7 @@ class Zoom {
   zoom_to_bbox(corners, duration = 4e3, buffer = 1.111) {
     const scales2 = this.scales();
     let [x02, x12] = corners.x.map(scales2.x);
-    let [y02, y12] = corners.y.map(scales2.y);
+    const [y02, y12] = corners.y.map(scales2.y);
     if (this.scatterplot.prefs.zoom_align === "right") {
       const aspect_ratio = this.width / this.height;
       const data_aspect_ratio = (x12 - x02) / (y12 - y02);
@@ -5696,12 +5696,9 @@ class Zoom {
       (update) => update.attr("fill", (dd) => this.scatterplot.dim("color").apply(dd)),
       (exit) => exit.call((e) => {
         e.remove();
-        if (this.prefs.exit_function) {
-          this.prefs.exit_function();
-        }
       })
     ).on("click", (ev, dd) => {
-      this.scatterplot.click_function(dd);
+      this.scatterplot.click_function(dd, this.scatterplot);
     });
   }
   set_highlit_point(point) {
@@ -25603,8 +25600,14 @@ const isFetchResponse = (x) => {
   return isObject(x) && isReadableDOMStream(x["body"]);
 };
 const isReadableInterop = (x) => "_getDOMStream" in x && "_getNodeStream" in x;
+const isWritableDOMStream = (x) => {
+  return isObject(x) && isFunction(x["abort"]) && isFunction(x["getWriter"]) && !isReadableInterop(x);
+};
 const isReadableDOMStream = (x) => {
   return isObject(x) && isFunction(x["cancel"]) && isFunction(x["getReader"]) && !isReadableInterop(x);
+};
+const isWritableNodeStream = (x) => {
+  return isObject(x) && isFunction(x["end"]) && isFunction(x["write"]) && isBoolean(x["writable"]) && !isReadableInterop(x);
 };
 const isReadableNodeStream = (x) => {
   return isObject(x) && isFunction(x["read"]) && isFunction(x["pipe"]) && isBoolean(x["readable"]) && !isReadableInterop(x);
@@ -25744,6 +25747,15 @@ function toArrayBufferViewAsyncIterator(ArrayCtor, source) {
   });
 }
 const toUint8ArrayAsyncIterator = (input) => toArrayBufferViewAsyncIterator(Uint8Array, input);
+function rebaseValueOffsets(offset, length, valueOffsets) {
+  if (offset !== 0) {
+    valueOffsets = valueOffsets.slice(0, length + 1);
+    for (let i = -1; ++i <= length; ) {
+      valueOffsets[i] += offset;
+    }
+  }
+  return valueOffsets;
+}
 function compareArrayLike(a, b) {
   let i = 0;
   const n = a.length;
@@ -34849,6 +34861,416 @@ function fromFileHandle(source) {
     return new AsyncRecordBatchStreamReader(new AsyncRecordBatchStreamReaderImpl(file));
   });
 }
+class VectorAssembler extends Visitor {
+  constructor() {
+    super();
+    this._byteLength = 0;
+    this._nodes = [];
+    this._buffers = [];
+    this._bufferRegions = [];
+  }
+  /** @nocollapse */
+  static assemble(...args) {
+    const unwrap = (nodes) => nodes.flatMap((node) => Array.isArray(node) ? unwrap(node) : node instanceof RecordBatch$2 ? node.data.children : node.data);
+    const assembler = new VectorAssembler();
+    assembler.visitMany(unwrap(args));
+    return assembler;
+  }
+  visit(data) {
+    if (data instanceof Vector) {
+      this.visitMany(data.data);
+      return this;
+    }
+    const { type } = data;
+    if (!DataType.isDictionary(type)) {
+      const { length, nullCount } = data;
+      if (length > 2147483647) {
+        throw new RangeError("Cannot write arrays larger than 2^31 - 1 in length");
+      }
+      if (!DataType.isNull(type)) {
+        addBuffer.call(this, nullCount <= 0 ? new Uint8Array(0) : truncateBitmap(data.offset, length, data.nullBitmap));
+      }
+      this.nodes.push(new FieldNode2(length, nullCount));
+    }
+    return super.visit(data);
+  }
+  visitNull(_null) {
+    return this;
+  }
+  visitDictionary(data) {
+    return this.visit(data.clone(data.type.indices));
+  }
+  get nodes() {
+    return this._nodes;
+  }
+  get buffers() {
+    return this._buffers;
+  }
+  get byteLength() {
+    return this._byteLength;
+  }
+  get bufferRegions() {
+    return this._bufferRegions;
+  }
+}
+function addBuffer(values) {
+  const byteLength = values.byteLength + 7 & ~7;
+  this.buffers.push(values);
+  this.bufferRegions.push(new BufferRegion(this._byteLength, byteLength));
+  this._byteLength += byteLength;
+  return this;
+}
+function assembleUnion(data) {
+  const { type, length, typeIds, valueOffsets } = data;
+  addBuffer.call(this, typeIds);
+  if (type.mode === UnionMode$1.Sparse) {
+    return assembleNestedVector.call(this, data);
+  } else if (type.mode === UnionMode$1.Dense) {
+    if (data.offset <= 0) {
+      addBuffer.call(this, valueOffsets);
+      return assembleNestedVector.call(this, data);
+    } else {
+      const maxChildTypeId = typeIds.reduce((x, y) => Math.max(x, y), typeIds[0]);
+      const childLengths = new Int32Array(maxChildTypeId + 1);
+      const childOffsets = new Int32Array(maxChildTypeId + 1).fill(-1);
+      const shiftedOffsets = new Int32Array(length);
+      const unshiftedOffsets = rebaseValueOffsets(-valueOffsets[0], length, valueOffsets);
+      for (let typeId, shift, index = -1; ++index < length; ) {
+        if ((shift = childOffsets[typeId = typeIds[index]]) === -1) {
+          shift = childOffsets[typeId] = unshiftedOffsets[typeId];
+        }
+        shiftedOffsets[index] = unshiftedOffsets[index] - shift;
+        ++childLengths[typeId];
+      }
+      addBuffer.call(this, shiftedOffsets);
+      for (let child, childIndex = -1, numChildren = type.children.length; ++childIndex < numChildren; ) {
+        if (child = data.children[childIndex]) {
+          const typeId = type.typeIds[childIndex];
+          const childLength = Math.min(length, childLengths[typeId]);
+          this.visit(child.slice(childOffsets[typeId], childLength));
+        }
+      }
+    }
+  }
+  return this;
+}
+function assembleBoolVector(data) {
+  let values;
+  if (data.nullCount >= data.length) {
+    return addBuffer.call(this, new Uint8Array(0));
+  } else if ((values = data.values) instanceof Uint8Array) {
+    return addBuffer.call(this, truncateBitmap(data.offset, data.length, values));
+  }
+  return addBuffer.call(this, packBools(data.values));
+}
+function assembleFlatVector(data) {
+  return addBuffer.call(this, data.values.subarray(0, data.length * data.stride));
+}
+function assembleFlatListVector(data) {
+  const { length, values, valueOffsets } = data;
+  const firstOffset = valueOffsets[0];
+  const lastOffset = valueOffsets[length];
+  const byteLength = Math.min(lastOffset - firstOffset, values.byteLength - firstOffset);
+  addBuffer.call(this, rebaseValueOffsets(-valueOffsets[0], length, valueOffsets));
+  addBuffer.call(this, values.subarray(firstOffset, firstOffset + byteLength));
+  return this;
+}
+function assembleListVector(data) {
+  const { length, valueOffsets } = data;
+  if (valueOffsets) {
+    addBuffer.call(this, rebaseValueOffsets(valueOffsets[0], length, valueOffsets));
+  }
+  return this.visit(data.children[0]);
+}
+function assembleNestedVector(data) {
+  return this.visitMany(data.type.children.map((_, i) => data.children[i]).filter(Boolean))[0];
+}
+VectorAssembler.prototype.visitBool = assembleBoolVector;
+VectorAssembler.prototype.visitInt = assembleFlatVector;
+VectorAssembler.prototype.visitFloat = assembleFlatVector;
+VectorAssembler.prototype.visitUtf8 = assembleFlatListVector;
+VectorAssembler.prototype.visitBinary = assembleFlatListVector;
+VectorAssembler.prototype.visitFixedSizeBinary = assembleFlatVector;
+VectorAssembler.prototype.visitDate = assembleFlatVector;
+VectorAssembler.prototype.visitTimestamp = assembleFlatVector;
+VectorAssembler.prototype.visitTime = assembleFlatVector;
+VectorAssembler.prototype.visitDecimal = assembleFlatVector;
+VectorAssembler.prototype.visitList = assembleListVector;
+VectorAssembler.prototype.visitStruct = assembleNestedVector;
+VectorAssembler.prototype.visitUnion = assembleUnion;
+VectorAssembler.prototype.visitInterval = assembleFlatVector;
+VectorAssembler.prototype.visitFixedSizeList = assembleListVector;
+VectorAssembler.prototype.visitMap = assembleListVector;
+class RecordBatchWriter extends ReadableInterop {
+  constructor(options) {
+    super();
+    this._position = 0;
+    this._started = false;
+    this._sink = new AsyncByteQueue();
+    this._schema = null;
+    this._dictionaryBlocks = [];
+    this._recordBatchBlocks = [];
+    this._dictionaryDeltaOffsets = /* @__PURE__ */ new Map();
+    isObject(options) || (options = { autoDestroy: true, writeLegacyIpcFormat: false });
+    this._autoDestroy = typeof options.autoDestroy === "boolean" ? options.autoDestroy : true;
+    this._writeLegacyIpcFormat = typeof options.writeLegacyIpcFormat === "boolean" ? options.writeLegacyIpcFormat : false;
+  }
+  /** @nocollapse */
+  // @ts-ignore
+  static throughNode(options) {
+    throw new Error(`"throughNode" not available in this environment`);
+  }
+  /** @nocollapse */
+  static throughDOM(writableStrategy, readableStrategy) {
+    throw new Error(`"throughDOM" not available in this environment`);
+  }
+  toString(sync = false) {
+    return this._sink.toString(sync);
+  }
+  toUint8Array(sync = false) {
+    return this._sink.toUint8Array(sync);
+  }
+  writeAll(input) {
+    if (isPromise(input)) {
+      return input.then((x) => this.writeAll(x));
+    } else if (isAsyncIterable(input)) {
+      return writeAllAsync(this, input);
+    }
+    return writeAll(this, input);
+  }
+  get closed() {
+    return this._sink.closed;
+  }
+  [Symbol.asyncIterator]() {
+    return this._sink[Symbol.asyncIterator]();
+  }
+  toDOMStream(options) {
+    return this._sink.toDOMStream(options);
+  }
+  toNodeStream(options) {
+    return this._sink.toNodeStream(options);
+  }
+  close() {
+    return this.reset()._sink.close();
+  }
+  abort(reason) {
+    return this.reset()._sink.abort(reason);
+  }
+  finish() {
+    this._autoDestroy ? this.close() : this.reset(this._sink, this._schema);
+    return this;
+  }
+  reset(sink = this._sink, schema = null) {
+    if (sink === this._sink || sink instanceof AsyncByteQueue) {
+      this._sink = sink;
+    } else {
+      this._sink = new AsyncByteQueue();
+      if (sink && isWritableDOMStream(sink)) {
+        this.toDOMStream({ type: "bytes" }).pipeTo(sink);
+      } else if (sink && isWritableNodeStream(sink)) {
+        this.toNodeStream({ objectMode: false }).pipe(sink);
+      }
+    }
+    if (this._started && this._schema) {
+      this._writeFooter(this._schema);
+    }
+    this._started = false;
+    this._dictionaryBlocks = [];
+    this._recordBatchBlocks = [];
+    this._dictionaryDeltaOffsets = /* @__PURE__ */ new Map();
+    if (!schema || !compareSchemas(schema, this._schema)) {
+      if (schema == null) {
+        this._position = 0;
+        this._schema = null;
+      } else {
+        this._started = true;
+        this._schema = schema;
+        this._writeSchema(schema);
+      }
+    }
+    return this;
+  }
+  write(payload) {
+    let schema = null;
+    if (!this._sink) {
+      throw new Error(`RecordBatchWriter is closed`);
+    } else if (payload == null) {
+      return this.finish() && void 0;
+    } else if (payload instanceof Table && !(schema = payload.schema)) {
+      return this.finish() && void 0;
+    } else if (payload instanceof RecordBatch$2 && !(schema = payload.schema)) {
+      return this.finish() && void 0;
+    }
+    if (schema && !compareSchemas(schema, this._schema)) {
+      if (this._started && this._autoDestroy) {
+        return this.close();
+      }
+      this.reset(this._sink, schema);
+    }
+    if (payload instanceof RecordBatch$2) {
+      if (!(payload instanceof _InternalEmptyPlaceholderRecordBatch)) {
+        this._writeRecordBatch(payload);
+      }
+    } else if (payload instanceof Table) {
+      this.writeAll(payload.batches);
+    } else if (isIterable(payload)) {
+      this.writeAll(payload);
+    }
+  }
+  _writeMessage(message, alignment = 8) {
+    const a = alignment - 1;
+    const buffer = Message2.encode(message);
+    const flatbufferSize = buffer.byteLength;
+    const prefixSize = !this._writeLegacyIpcFormat ? 8 : 4;
+    const alignedSize = flatbufferSize + prefixSize + a & ~a;
+    const nPaddingBytes = alignedSize - flatbufferSize - prefixSize;
+    if (message.headerType === MessageHeader$1.RecordBatch) {
+      this._recordBatchBlocks.push(new FileBlock(alignedSize, message.bodyLength, this._position));
+    } else if (message.headerType === MessageHeader$1.DictionaryBatch) {
+      this._dictionaryBlocks.push(new FileBlock(alignedSize, message.bodyLength, this._position));
+    }
+    if (!this._writeLegacyIpcFormat) {
+      this._write(Int32Array.of(-1));
+    }
+    this._write(Int32Array.of(alignedSize - prefixSize));
+    if (flatbufferSize > 0) {
+      this._write(buffer);
+    }
+    return this._writePadding(nPaddingBytes);
+  }
+  _write(chunk) {
+    if (this._started) {
+      const buffer = toUint8Array(chunk);
+      if (buffer && buffer.byteLength > 0) {
+        this._sink.write(buffer);
+        this._position += buffer.byteLength;
+      }
+    }
+    return this;
+  }
+  _writeSchema(schema) {
+    return this._writeMessage(Message2.from(schema));
+  }
+  // @ts-ignore
+  _writeFooter(schema) {
+    return this._writeLegacyIpcFormat ? this._write(Int32Array.of(0)) : this._write(Int32Array.of(-1, 0));
+  }
+  _writeMagic() {
+    return this._write(MAGIC);
+  }
+  _writePadding(nBytes) {
+    return nBytes > 0 ? this._write(new Uint8Array(nBytes)) : this;
+  }
+  _writeRecordBatch(batch) {
+    const { byteLength, nodes, bufferRegions, buffers } = VectorAssembler.assemble(batch);
+    const recordBatch = new RecordBatch3(batch.numRows, nodes, bufferRegions);
+    const message = Message2.from(recordBatch, byteLength);
+    return this._writeDictionaries(batch)._writeMessage(message)._writeBodyBuffers(buffers);
+  }
+  _writeDictionaryBatch(dictionary, id2, isDelta = false) {
+    this._dictionaryDeltaOffsets.set(id2, dictionary.length + (this._dictionaryDeltaOffsets.get(id2) || 0));
+    const { byteLength, nodes, bufferRegions, buffers } = VectorAssembler.assemble(new Vector([dictionary]));
+    const recordBatch = new RecordBatch3(dictionary.length, nodes, bufferRegions);
+    const dictionaryBatch = new DictionaryBatch2(recordBatch, id2, isDelta);
+    const message = Message2.from(dictionaryBatch, byteLength);
+    return this._writeMessage(message)._writeBodyBuffers(buffers);
+  }
+  _writeBodyBuffers(buffers) {
+    let buffer;
+    let size, padding;
+    for (let i = -1, n = buffers.length; ++i < n; ) {
+      if ((buffer = buffers[i]) && (size = buffer.byteLength) > 0) {
+        this._write(buffer);
+        if ((padding = (size + 7 & ~7) - size) > 0) {
+          this._writePadding(padding);
+        }
+      }
+    }
+    return this;
+  }
+  _writeDictionaries(batch) {
+    for (let [id2, dictionary] of batch.dictionaries) {
+      let offset = this._dictionaryDeltaOffsets.get(id2) || 0;
+      if (offset === 0 || (dictionary = dictionary === null || dictionary === void 0 ? void 0 : dictionary.slice(offset)).length > 0) {
+        for (const data of dictionary.data) {
+          this._writeDictionaryBatch(data, id2, offset > 0);
+          offset += data.length;
+        }
+      }
+    }
+    return this;
+  }
+}
+class RecordBatchStreamWriter extends RecordBatchWriter {
+  /** @nocollapse */
+  static writeAll(input, options) {
+    const writer = new RecordBatchStreamWriter(options);
+    if (isPromise(input)) {
+      return input.then((x) => writer.writeAll(x));
+    } else if (isAsyncIterable(input)) {
+      return writeAllAsync(writer, input);
+    }
+    return writeAll(writer, input);
+  }
+}
+class RecordBatchFileWriter extends RecordBatchWriter {
+  /** @nocollapse */
+  static writeAll(input) {
+    const writer = new RecordBatchFileWriter();
+    if (isPromise(input)) {
+      return input.then((x) => writer.writeAll(x));
+    } else if (isAsyncIterable(input)) {
+      return writeAllAsync(writer, input);
+    }
+    return writeAll(writer, input);
+  }
+  constructor() {
+    super();
+    this._autoDestroy = true;
+  }
+  // @ts-ignore
+  _writeSchema(schema) {
+    return this._writeMagic()._writePadding(2);
+  }
+  _writeFooter(schema) {
+    const buffer = Footer_.encode(new Footer_(schema, MetadataVersion$1.V4, this._recordBatchBlocks, this._dictionaryBlocks));
+    return super._writeFooter(schema)._write(buffer)._write(Int32Array.of(buffer.byteLength))._writeMagic();
+  }
+}
+function writeAll(writer, input) {
+  let chunks = input;
+  if (input instanceof Table) {
+    chunks = input.batches;
+    writer.reset(void 0, input.schema);
+  }
+  for (const batch of chunks) {
+    writer.write(batch);
+  }
+  return writer.finish();
+}
+function writeAllAsync(writer, batches) {
+  var batches_1, batches_1_1;
+  var e_1, _a2;
+  return __awaiter(this, void 0, void 0, function* () {
+    try {
+      for (batches_1 = __asyncValues(batches); batches_1_1 = yield batches_1.next(), !batches_1_1.done; ) {
+        const batch = batches_1_1.value;
+        writer.write(batch);
+      }
+    } catch (e_1_1) {
+      e_1 = { error: e_1_1 };
+    } finally {
+      try {
+        if (batches_1_1 && !batches_1_1.done && (_a2 = batches_1.return))
+          yield _a2.call(batches_1);
+      } finally {
+        if (e_1)
+          throw e_1.error;
+      }
+    }
+    return writer.finish();
+  });
+}
 function tableFromIPC(input) {
   const reader = RecordBatchReader.from(input);
   if (isPromise(reader)) {
@@ -34858,6 +35280,9 @@ function tableFromIPC(input) {
     return reader.readAll().then((xs) => new Table(xs));
   }
   return new Table(reader.readAll());
+}
+function tableToIPC(table, type = "stream") {
+  return (type === "stream" ? RecordBatchStreamWriter : RecordBatchFileWriter).writeAll(table).toUint8Array(true);
 }
 let tile_identifier = 0;
 class Tile {
@@ -35137,26 +35562,35 @@ class QuadTile extends Tile {
   }
   async get_arrow(suffix = void 0) {
     let url = `${this.url}/${this.key}.feather`;
-    let headers = {};
-    if (window.localStorage.getItem("isLoggedIn") === "true") {
-      url = url.replace("/public", "");
-      const accessToken = localStorage.getItem('access_token');
-
-      headers = {
-        // credentials: 'include',
-        Authorization: `Bearer ${accessToken}`,
-      };
-    }
     if (suffix) {
       url = url.replace(".feather", `.${suffix}.feather`);
     }
-    const request = {
-      method: "GET",
-      ...headers
-    };
-    const response = await fetch(url, request);
-    const buffer = await response.arrayBuffer();
-    const tb = tableFromIPC(buffer);
+    let tb;
+    let buffer;
+    if (this.dataset.tileProxy !== void 0) {
+      let endpoint = new URL(url).pathname;
+      if (endpoint.match("/public/")) {
+        endpoint = endpoint.replace("/public/", "/");
+      }
+      tb = await this.dataset.tileProxy.apiCall(endpoint);
+      this._table_buffer = tableToIPC(tb);
+    } else {
+      let headers = {};
+      if (window.localStorage.getItem("isLoggedIn") === "true") {
+        url = url.replace("/public", "");
+        const accessToken = localStorage.getItem("access_token");
+        headers = {
+          Authorization: `Bearer ${accessToken}`
+        };
+      }
+      const request = {
+        method: "GET",
+        ...headers
+      };
+      const response = await fetch(url, request);
+      buffer = await response.arrayBuffer();
+      tb = tableFromIPC(buffer);
+    }
     if (tb.batches.length > 1) {
       console.warn(
         `More than one record batch at ${url}; all but first batch will be ignored.`
@@ -35166,7 +35600,7 @@ class QuadTile extends Tile {
     if (suffix === void 0) {
       this.download_state = "Complete";
       this._table_buffer = buffer;
-      this._batch = tableFromIPC(buffer).batches[0];
+      this._batch = tb.batches[0];
     }
     return batch;
   }
@@ -35368,7 +35802,7 @@ function nothing() {
 class Dataset {
   /**
    * @param plot The plot to which this dataset belongs.
-  **/
+   **/
   constructor(plot) {
     this.transformations = {};
     this.extents = {};
@@ -35376,7 +35810,7 @@ class Dataset {
     this.plot = plot;
   }
   /**
-   * The highest known point that deepscatter has seen so far. This is used 
+   * The highest known point that deepscatter has seen so far. This is used
    * to adjust opacity size.
    */
   get highest_known_ix() {
@@ -35386,23 +35820,27 @@ class Dataset {
    * Attempts to build an Arrow table from all record batches.
    * If some batches have different transformations applied,
    * this will error
-   * 
-  **/
+   *
+   **/
   get table() {
     return new Table(
       this.map((d) => d).filter((d) => d.ready).map((d) => d.record_batch)
     );
   }
   static from_quadfeather(url, prefs, plot) {
-    return new QuadtileSet(url, prefs, plot);
+    const options = {};
+    if (plot.tileProxy) {
+      options["tileProxy"] = plot.tileProxy;
+    }
+    return new QuadtileSet(url, prefs, plot, options);
   }
   /**
    * Generate an ArrowDataset from a single Arrow table.
-   * 
+   *
    * @param table A single Arrow table
    * @param prefs The API Call to use for renering.
    * @param plot The Scatterplot to use.
-   * @returns 
+   * @returns
    */
   static from_arrow_table(table, prefs, plot) {
     return new ArrowDataset(table, prefs, plot);
@@ -35420,7 +35858,7 @@ class Dataset {
     delete this.transformations[name];
   }
   domain(dimension, max_ix = 1e6) {
-    var _a2;
+    var _a2, _b2;
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
@@ -35443,7 +35881,7 @@ class Dataset {
       if (dim.type.typeId == 10 && typeof min2 === "string") {
         min2 = Number(new Date(min2));
       }
-      if (dim.type.typeId == 10 && typeof max2 === "string") {
+      if (((_b2 = dim.type) == null ? void 0 : _b2.typeId) == 10 && typeof max2 === "string") {
         max2 = Number(new Date(max2));
       }
       if (typeof max2 === "string") {
@@ -35657,11 +36095,14 @@ class ArrowDataset extends Dataset {
   }
 }
 class QuadtileSet extends Dataset {
-  constructor(base_url, prefs, plot) {
+  constructor(base_url, prefs, plot, options = {}) {
     super(plot);
     this._download_queue = /* @__PURE__ */ new Set();
     this.promise = new Promise(nothing);
-    this.root_tile = new QuadTile(base_url, "0/0/0", null, this, prefs);
+    if (options.tileProxy) {
+      this.tileProxy = options.tileProxy;
+    }
+    this.root_tile = new QuadTile(base_url, "0/0/0", null, this);
     this.promise = this.root_tile.download().then((d) => {
       const schema = this.root_tile.record_batch.schema;
       if (schema.metadata.has("sidecars")) {
@@ -37007,7 +37448,7 @@ class Scatterplot {
    * @param width The width of the scatterplot (in pixels)
    * @param height The height of the scatterplot (in pixels)
    */
-  constructor(selector2, width, height) {
+  constructor(selector2, width, height, options = {}) {
     this.secondary_renderers = {};
     this.selection_history = [];
     this.plot_queue = Promise.resolve();
@@ -37026,6 +37467,9 @@ class Scatterplot {
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.label_click_handler = new LabelClick(this);
+    if (options.tileProxy) {
+      this.tileProxy = options.tileProxy;
+    }
     this.prefs = { ...default_API_call };
   }
   /**

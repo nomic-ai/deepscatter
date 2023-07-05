@@ -6,3 +6,4 @@ dist/tiles
 test-results/
 playwright-report/
 dist/tiles/*
+co2.feather co2.html

@@ -6,10 +6,10 @@ import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
 import type { Tile } from './tile';
-
+import type * as DS from './shared'
 const handler = drag();
 
-function pixel_ratio(scatterplot: Scatterplot): number {
+function pixel_ratio(scatterplot: Scatterplot<any>): number {
   // pixelspace
   const [px1, px2] = scatterplot._zoom.scales().x.range() as [number, number];
   // dataspace
@@ -31,7 +31,7 @@ export class LabelMaker extends Renderer {
   //  public svg: SVGElement;
   public labelgroup: SVGGElement;
   private hovered: undefined | string;
-  public options: LabelOptions = {};
+  public options: DS.LabelOptions = {};
   /**
    *
    * @param scatterplot
@@ -39,9 +39,9 @@ export class LabelMaker extends Renderer {
    * @param options
    */
   constructor(
-    scatterplot: Scatterplot<TileType>,
+    scatterplot: Scatterplot<DS.TileType>,
     id_raw: string,
-    options: LabelOptions = {}
+    options: DS.LabelOptions = {}
   ) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
     this.options = options;

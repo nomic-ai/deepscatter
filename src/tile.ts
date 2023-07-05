@@ -6,6 +6,7 @@ import {
   tableFromIPC,
   RecordBatch,
   StructRowProxy,
+  tableToIPC,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
 import type { Dataset, QuadtileSet } from './Dataset';
@@ -52,6 +53,8 @@ export abstract class Tile {
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
   public _buffer_manager?: TileBufferManager<this>;
+
+  
   constructor(dataset: Dataset<this>) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
@@ -402,27 +405,39 @@ export class QuadTile extends Tile {
     suffix: string | undefined = undefined
   ): Promise<RecordBatch> {
     let url = `${this.url}/${this.key}.feather`;
-    //TODO: Atlas specific code--maybe check for nomic URL too.
-    let headers = {};
-    if (window.localStorage.getItem('isLoggedIn') === 'true') {
-      url = url.replace('/public', '');
-      const accessToken = localStorage.getItem('access_token');
-      headers = {
-        // credentials: 'include',
-        Authorization: `Bearer ${accessToken}`,
-      };
-    }
     if (suffix) {
       url = url.replace('.feather', `.${suffix}.feather`);
     }
-    const request: RequestInit = {
-      method: 'GET',
-      ...headers,
-    };
-    const response = await fetch(url, request);
-    const buffer = await response.arrayBuffer();
+    let tb: Table;
+    let buffer: ArrayBuffer;
 
-    const tb = tableFromIPC(buffer);
+    if (this.dataset.tileProxy !== undefined) { 
+      let endpoint = new URL(url).pathname;
+      // Let the proxy worry about the public/ prefix.
+      if (endpoint.match('/public/')) {
+        endpoint = endpoint.replace('/public/', '/');
+      }
+      tb = await this.dataset.tileProxy.apiCall(endpoint);
+      // Unfortunately necessary to serialize still.
+      this._table_buffer = tableToIPC(tb);
+    } else {
+      //TODO: Remove outdated atlas-specific code.
+      let headers = {};
+      if (window.localStorage.getItem('isLoggedIn') === 'true') {
+        url = url.replace('/public', '');
+        const accessToken = localStorage.getItem('access_token');
+        headers = {
+          Authorization: `Bearer ${accessToken}`,
+        };
+      }
+      const request: RequestInit = {
+        method: 'GET',
+        ...headers,
+      };
+      const response = await fetch(url, request);
+      buffer = await response.arrayBuffer();
+      tb = tableFromIPC(buffer);
+    }
     if (tb.batches.length > 1) {
       console.warn(
         `More than one record batch at ${url}; all but first batch will be ignored.`
@@ -432,7 +447,7 @@ export class QuadTile extends Tile {
     if (suffix === undefined) {
       this.download_state = 'Complete';
       this._table_buffer = buffer;
-      this._batch = tableFromIPC(buffer).batches[0];
+      this._batch = tb.batches[0];
     }
     return batch;
   }

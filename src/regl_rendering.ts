@@ -10,7 +10,7 @@ import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './AestheticSet';
 import { rgb } from 'd3-color';
-
+import type * as DS from './shared'
 import type { Tile } from './tile';
 import REGL from 'regl';
 import { Dataset } from './Dataset';
@@ -151,7 +151,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       update_time: Date.now() - this.most_recent_restart,
       relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
       string_index: 0,
-      prefs: JSON.parse(JSON.stringify(prefs)) as APICall,
+      prefs: JSON.parse(JSON.stringify(prefs)) as DS.APICall,
       color_type: undefined,
       start_time: this.most_recent_restart,
       webgl_scale: this._webgl_scale_history[0],
@@ -1013,7 +1013,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
 
     type time = 'current' | 'last';
     type BufferSummary = {
-      aesthetic: keyof Encoding;
+      aesthetic: keyof DS.Encoding;
       time: time;
       field: string;
     };
@@ -1118,7 +1118,7 @@ export class TileBufferManager<T extends Tile> {
   public tile: T;
   public regl: Regl;
   public renderer: ReglRenderer<T>;
-  public regl_elements: Map<string, BufferLocation | null>;
+  public regl_elements: Map<string, DS.BufferLocation | null>;
 
   constructor(regl: Regl, tile: T, renderer: ReglRenderer<T>) {
     this.tile = tile;
@@ -1150,7 +1150,7 @@ export class TileBufferManager<T extends Tile> {
 
     // We don't allocate buffers for dimensions until they're needed.
     // This code checks what buffers the current plot call is expecting.
-    const needed_dimensions: Set<Dimension> = new Set();
+    const needed_dimensions: Set<DS.Dimension> = new Set();
     for (const [k, v] of renderer.aes) {
       for (const aesthetic of v.states) {
         if (aesthetic.field) {
@@ -1332,7 +1332,7 @@ class MultipurposeBufferSet {
   private buffers: Buffer[];
   public buffer_size: number;
   private pointer: number; // the byte offset to start the next allocation from.
-  private freed_buffers: BufferLocation[] = [];
+  private freed_buffers: DS.BufferLocation[] = [];
   /**
    *
    * @param regl the Regl context we're using.
@@ -1374,7 +1374,7 @@ class MultipurposeBufferSet {
    *
    * @param buff The location of the buffer we're done with.
    */
-  free_block(buff: BufferLocation) {
+  free_block(buff: DS.BufferLocation) {
     this.freed_buffers.push(buff);
   }
 
@@ -1385,7 +1385,7 @@ class MultipurposeBufferSet {
    * @returns
    */
 
-  allocate_block(items: number, bytes_per_item: number): BufferLocation {
+  allocate_block(items: number, bytes_per_item: number): DS.BufferLocation {
     // Call dibs on a block of this buffer.
     // NB size is in **bytes**
 
@@ -1414,13 +1414,13 @@ class MultipurposeBufferSet {
       this.generate_new_buffer();
     }
 
-    const value: BufferLocation = {
+    const value: DS.BufferLocation = {
       // First slot stores the active buffer.
       buffer: this.buffers[0],
       offset: this.pointer,
       stride: bytes_per_item,
       byte_size: items * bytes_per_item,
-    } as BufferLocation;
+    } as DS.BufferLocation;
     this.pointer += items * bytes_per_item;
     return value;
   }

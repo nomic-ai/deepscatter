@@ -10,7 +10,7 @@
     "esModuleInterop": true,
     "noUnusedLocals": true,
     "sourceMap": true,
-    "strict": true,
+    "strict": false,
     "target": "es2020",
     "isolatedModules": true,
     "outDir": "./dist",
