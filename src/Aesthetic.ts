@@ -20,28 +20,29 @@ export const scales = {
   linear: scaleLinear,
   literal: scaleIdentity,
 } as const;
+import type * as DS from './shared.d'
 
 // A channel is usually going to be one of these.
 // Only color channels are different
 type DefaultChannel =
-  | BasicChannel
-  | OpChannel
-  | LambdaChannel
-  | ConstantChannel;
+  | DS.BasicChannel
+  | DS.OpChannel
+  | DS.LambdaChannel
+  | DS.ConstantChannel;
 
 type PossibleGLVals = number | [number, number, number];
 
 export abstract class Aesthetic<
   GlValueType extends PossibleGLVals = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
   JSValueType = number, // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red
-  ChannelType extends RootChannel = DefaultChannel
+  ChannelType extends DS.RootChannel = DefaultChannel
 > {
   public abstract default_range: [number, number];
   public abstract default_constant: JSValueType;
   public _constant?: JSValueType;
   public abstract default_transform: 'log' | 'sqrt' | 'linear' | 'literal';
   public _transform: 'log' | 'sqrt' | 'linear' | 'literal' | undefined;
-  public scatterplot: Plot;
+  public scatterplot: DS.Plot;
   public field: string | null = null;
   public regl: Regl;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
@@ -58,7 +59,7 @@ export abstract class Aesthetic<
   public id: string;
 
   constructor(
-    scatterplot: Plot,
+    scatterplot: DS.Plot,
     regl: Regl,
     dataset: QuadtileSet,
     aesthetic_map: TextureSet
@@ -117,7 +118,7 @@ export abstract class Aesthetic<
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
-    if (this.dataset.root_tile.record_batch) {
+    if (this.dataset?.root_tile?.record_batch) {
       const col = this.dataset.root_tile.record_batch.getChild(this.field);
       if (col === undefined || col === null) {
         throw new Error("Can't find column " + this.field);
@@ -213,7 +214,7 @@ export abstract class Aesthetic<
     return v;
   }
 
-  complete_domain(encoding: BasicChannel) {
+  complete_domain(encoding: DS.BasicChannel) {
     encoding.domain = encoding.domain || this.default_domain;
     return encoding;
   }
@@ -248,9 +249,9 @@ export abstract class Aesthetic<
     }
 
     if (isNumber(encoding)) {
-      const x: ConstantChannel = {
+      const x: ChannelType = {
         constant: encoding,
-      };
+      } as unknown as ChannelType;
       this.current_encoding = x;
       return;
     }
@@ -309,9 +310,9 @@ export abstract class Aesthetic<
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
-    const c = this.dataset.root_tile.record_batch.getChild(this.field);
+    const c = this.dataset.root_tile.record_batch.getChild(this.field) as Vector | null;
     if (c === null) {
-      throw `No column ${this.field} on arrow table for aesthetic`;
+      throw new Error(`No column ${this.field} on arrow table for aesthetic`);
     }
     return c;
   }

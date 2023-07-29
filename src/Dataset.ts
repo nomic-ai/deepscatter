@@ -11,6 +11,9 @@ import {
   tableFromIPC,
   Vector,
   makeVector,
+  Float32,
+  Int64,
+  makeData
 } from 'apache-arrow';
 
 type APICall = DS.APICall;
@@ -19,9 +22,8 @@ type Key = string;
 function nothing() {
   /* do nothing */
 }
-
-type ArrowBuildable = Vector | Float32Array;
-type Transformation<T> = (arg0: T) => ArrowBuildable | Promise<ArrowBuildable>;
+type ArrowBuildable = DS.ArrowBuildable;
+type Transformation<T> = DS.Transformation<T>;
 
 /**
  * A Dataset manages the production and manipulation of tiles. Each plot has a
@@ -116,6 +118,7 @@ export abstract class Dataset<T extends Tile> {
       name in this.transformations
     );
   }
+  
   delete_column_if_exists(name: string) {
     // This is a complicated operation to actually free up memory.
     // Clone the record batches, without this data;
@@ -417,7 +420,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
 export class QuadtileSet extends Dataset<QuadTile> {
   protected _download_queue: Set<Key> = new Set();
   public promise: Promise<void> = new Promise(nothing);
-  root_tile: QuadTile;
+  root_tile: QuadTie;
   constructor(
     base_url: string,
     prefs: APICall,
@@ -528,15 +531,15 @@ export class QuadtileSet extends Dataset<QuadTile> {
     field_name: string,
     transformation: (ids: string[]) => Promise<Uint8Array>
   ): void {
-    const megatile_tasks: Record<string, Promise<void>> = {};
-    const records: Record<string, Float32Array> = {};
+    const macrotile_tasks: Record<string, Promise<void>> = {};
+    const records: Record<string, Float32Array | Uint8Array> = {};
 
     async function get_table(tile: QuadTile) {
       const { key, macrotile } = tile;
-      if (megatile_tasks[macrotile] !== undefined) {
-        return await megatile_tasks[macrotile];
+      if (macrotile_tasks[macrotile] !== undefined) {
+        return await macrotile_tasks[macrotile];
       } else {
-        megatile_tasks[macrotile] = transformation(tile.macro_siblings).then(
+        macrotile_tasks[macrotile] = transformation(tile.macro_siblings).then(
           (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
@@ -547,20 +550,33 @@ export class QuadtileSet extends Dataset<QuadTile> {
                 records[tilename] = values.values.slice(
                   offsets[i],
                   offsets[i + 1]
-                ) as Float32Array;
+                ) as (Float32Array | Uint8Array);
               }
             }
             return;
           }
         );
-        return megatile_tasks[macrotile];
+        return macrotile_tasks[macrotile];
       }
     }
 
     this.transformations[field_name] = async function (tile) {
       await get_table(tile);
       const array = records[tile.key];
-      return array;
+      if (array instanceof Uint8Array) {
+        const v = new Float32Array(array.length);
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          // pop out the bitmask one at a time.
+          const byte = array[i];
+          for (let j = 0; j < 8; j++) {
+            const bit = (byte >> j) & 1;
+            v[i * 8 + j] = bit;
+          }
+        }
+        return v;
+      } else {
+        return array;
+      }
     };
   }
 }
@@ -623,17 +639,24 @@ export function add_or_delete_column(
         throw new Error(`Name ${field.name} already exists, can't add.`);
       }
     }
-    tb[field.name] = batch.getChild(field.name)!.data[0] as Data;
+    tb[field.name] = batch.getChild(field.name)!.data[0];
   }
-
+  if (data === null) {
+    // Then it's dropped.
+    throw new Error(`Name ${field_name} doesn't exist, can't drop.`);
+  }
   if (data === undefined) {
     throw new Error('Must pass data to bind_column');
   }
   if (data !== null) {
-    if (data instanceof Float32Array || data instanceof BigInt64Array) {
-      tb[field_name] = makeVector(data).data[0];
+    if (data instanceof Float32Array) {
+      tb[field_name] = makeVector({ type: new Float32(), data, length: data.length }).data[0];
+    } else if (data instanceof BigInt64Array) {
+      tb[field_name] = makeVector({ type: new Int64(), data, length: data.length }).data[0];
+    } else if (data.data?.length > 0) {
+      tb[field_name] = data.data[0];
     } else {
-      tb[field_name] = data.data[0] as Data;
+      tb[field_name] = data as Data;
     }
   }
 
@@ -662,6 +685,18 @@ export function add_or_delete_column(
       'created by deepscatter',
       new Date().toISOString()
     );
+  }
+  window.state = {
+    new_batch,
+    batch,
+    data,
+    tb
+  }
+  const old_names = batch.schema.fields.map(d => d.name)
+  window.old_batch = batch;
+  window.new_batch = new_batch;
+  for (const name of old_names) {
+    // console.log(name, new_batch.getChild(name))
   }
   return new_batch;
 }
@@ -725,6 +760,5 @@ function supplement_identifiers(
       }
     }
   }
-
   return updatedFloatArray;
 }

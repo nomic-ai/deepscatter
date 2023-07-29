@@ -5,13 +5,7 @@
     <button id="even2">Stable highlight Even</button>
     <button id="b">Clear</button>
     <button id="select-ids">Select ids</button>
-    <input
-      id="input-ids"
-      title="selection"
-      label="selection"
-      type="text"
-      value="1066 1968 2431 10012"
-    />
+    <input id="input-ids" title="selection" label="selection" type="text" value="1066 1968 2431 10012" />
     <button id="select-lots-of-ids">Select lots of ids</button>
     <div id="filter">FILTER:</div>
     <div id="filter2">FILTER2:</div>
@@ -28,7 +22,7 @@
     vectorFromArray,
     Utf8,
   } from 'apache-arrow';
-  const num_batches = 1;
+  const num_batches = 2;
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
@@ -242,6 +236,10 @@
   document
     .getElementById('select-lots-of-ids')
     .addEventListener('click', () => {
+      const ids = [];
+      for (let i = 0; i < 1000; i += 1) {
+        ids.push(Math.floor(Math.random() * 2 ** 16).toString());
+      }
       console.log({ ids });
       plot.select_data({
         name: Math.random().toString(36),

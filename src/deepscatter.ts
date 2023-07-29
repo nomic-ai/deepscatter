@@ -13,8 +13,8 @@ import { ArrowTile, QuadTile, Rectangle, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { DataSelection } from './selection';
-import type { IdSelectParams } from './selection';
-import type * as DS from './shared'
+import type { BooleanColumnParams, FunctionSelectParams, IdSelectParams } from './selection';
+import type * as DS from './shared.d'
 // DOM elements that deepscatter uses.
 
 const base_elements = [
@@ -48,7 +48,7 @@ export default class Scatterplot<T extends Tile> {
   public _root?: Dataset<T>;
   public elements?: Selection<SVGElement, any, any, any>[];
   public secondary_renderers: Record<string, Renderer<T>> = {};
-  public selection_history: DS.SelectionRecord[] = [];
+  public selection_history: DS.SelectionRecord<T>[] = [];
   public tileProxy?: DS.TileProxy;
   div: Selection<any, any, any, any>;
   bound: boolean;
@@ -90,7 +90,7 @@ export default class Scatterplot<T extends Tile> {
     if (options.tileProxy) {
       this.tileProxy = options.tileProxy;
     }
-    this.prefs = { ...default_API_call };
+    this.prefs = { ...default_API_call } as DS.CompletePrefs;
   }
 
   /**
@@ -147,11 +147,14 @@ export default class Scatterplot<T extends Tile> {
     this.bound = true;
   }
 
-  async select_data(params: IdSelectParams) {
-    const selection = new DataSelection(this, params);
-    //await selection.apply_to_foreground({})
+  async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams) {
+    console.log("SELECTING")
+    const selection = new DataSelection<T>(this, params);
+    console.log("AWAITING")
+    await selection.ready;
+    console.log("HELOOOO")
     this.selection_history.push({
-      ref: selection,
+      selection,
       name: selection.name,
       flushed: false,
     });
@@ -169,12 +172,11 @@ export default class Scatterplot<T extends Tile> {
     codes:
       | string[]
       | bigint[]
-      | Record<string, number>
-      | Record<bigint, number>,
+      | Record<string, number>,
     key_field: string
   ) {
     const true_codes: Record<string, number> = Array.isArray(codes)
-      ? Object.fromEntries(codes.map((next) => [next, 1]))
+      ? Object.fromEntries(codes.map((next : string | bigint) => [next, 1]))
       : codes;
     this._root.add_label_identifiers(true_codes, name, key_field);
   }

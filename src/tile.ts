@@ -40,13 +40,13 @@ export abstract class Tile {
   download_state: string;
   public _batch?: RecordBatch;
   parent: this | null;
-  _table_buffer?: ArrayBuffer;
   public _children: Array<this> = [];
   public _highest_known_ix?: number;
   public _min_ix?: number;
   public _max_ix?: number;
   public dataset: Dataset<this>;
   public _download?: Promise<void>;
+  public ready: boolean;
   __schema?: schema_entry[];
   local_dictionary_lookups?: Map<string, any>;
   public _extent?: { x: MinMax; y: MinMax };
@@ -62,6 +62,7 @@ export abstract class Tile {
     this.key = String(Math.random());
     this.parent = null;
     this.dataset = dataset;
+    this.ready = false;
     if (dataset === undefined) {
       throw new Error('No dataset provided');
     }
@@ -230,9 +231,6 @@ export abstract class Tile {
       return this._batch;
     }
     // Constitute table if there's a present buffer.
-    if (this._table_buffer && this._table_buffer.byteLength > 0) {
-      return (this._batch = tableFromIPC(this._table_buffer).batches[0]);
-    }
     throw new Error('Attempted to access table on tile without table buffer.');
   }
 
@@ -261,15 +259,6 @@ export abstract class Tile {
     return this.promise;
   }
 
-  get ready(): boolean {
-    // The flag for readiness is whether there is
-    // an arraybuffer at this._table_buffer
-
-    // Unlike 'promise,' this returns asychronously
-    return (
-      this._table_buffer !== undefined && this._table_buffer.byteLength > 0
-    );
-  }
 
   protected get _schema() {
     // Infer datatypes from the first file.
@@ -412,14 +401,14 @@ export class QuadTile extends Tile {
     let buffer: ArrayBuffer;
 
     if (this.dataset.tileProxy !== undefined) { 
-      let endpoint = new URL(url).pathname;
-      // Let the proxy worry about the public/ prefix.
-      if (endpoint.match('/public/')) {
-        endpoint = endpoint.replace('/public/', '/');
-      }
-      tb = await this.dataset.tileProxy.apiCall(endpoint);
-      // Unfortunately necessary to serialize still.
-      this._table_buffer = tableToIPC(tb);
+      const endpoint = new URL(url).pathname;
+      const bytes = await this.dataset.tileProxy.apiCall(endpoint, 
+        "GET", 
+        null,
+        null,
+        {octetStreamAsUint8 : true}
+        );
+      tb = tableFromIPC(bytes);
     } else {
       //TODO: Remove outdated atlas-specific code.
       let headers = {};
@@ -446,7 +435,6 @@ export class QuadTile extends Tile {
     const batch = tb.batches[0];
     if (suffix === undefined) {
       this.download_state = 'Complete';
-      this._table_buffer = buffer;
       this._batch = tb.batches[0];
     }
     return batch;
@@ -467,6 +455,7 @@ export class QuadTile extends Tile {
 
     this._download = this.get_arrow()
       .then((batch) => {
+        this.ready = true;
         const metadata = batch.schema.metadata;
         const extent = metadata.get('extent');
         if (extent) {
@@ -602,6 +591,7 @@ export class ArrowTile extends Tile {
     this._min_ix = Number(row_1.ix);
     this.highest_known_ix = Number(this.max_ix);
     this.create_children();
+    this.ready = true;
   }
   create_children() {
     let ix = this.batch_num * 4;
@@ -629,11 +619,7 @@ export class ArrowTile extends Tile {
   download(): Promise<RecordBatch> {
     return Promise.resolve(this._batch);
   }
-
-  get ready(): boolean {
-    // Arrow tables are always ready.
-    return true;
-  }
+  
 }
 
 type Point = [number, number];
@@ -642,7 +628,6 @@ export function p_in_rect(p: Point, rect: Rectangle | undefined) {
   if (rect === undefined) {
     return true;
   }
-  const c = rect;
   return (
     p[0] < rect.x[1] && p[0] > rect.x[0] && p[1] < rect.y[1] && p[1] > rect.y[0]
   );

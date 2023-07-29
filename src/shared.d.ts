@@ -1,4 +1,4 @@
-import type { Table } from 'apache-arrow';
+import type { StructRowProxy, Table, Vector } from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
 import type { ArrowDataset } from './Dataset';
@@ -7,7 +7,7 @@ import type { Tile, QuadTile, ArrowTile } from './tile';
 import type Scatterplot from './deepscatter';
 import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
-import { DataSelection } from './selection';
+//import { DataSelection } from './selection';
 
 export type {
   Renderer,
@@ -53,7 +53,7 @@ interface InitializedScatterplot<T extends Tile> {
  *
  */
 export interface TileProxy {
-  apiCall: (endpoint: string) => Promise<Table>;
+  apiCall: (endpoint: string, method : "GET", d1 : unknown, d2 : unknown , options : Record<string, boolean | string | number> ) => Promise<Uint8Array>;
 }
 
 export type ScatterplotOptions = {
@@ -63,8 +63,161 @@ export type QuadtileOptions = {
   tileProxy?: TileProxy;
 };
 
-export interface SelectionRecord {
-  ref: DataSelection<any> | null;
+
+/**
+ * Interface representing the selection of a Scatter plot.
+ * It holds information about the selected data points.
+ *
+ * @template T - A Tile set.
+ */
+export interface ScatterSelection<T extends Tile> {
+
+  /**
+   * name: The name of the selection. This will be used as the colun
+   * name in the Arrow record batches and are necessary for users 
+   * to define so that they can use the selection in subsequent 
+   * plotAPI calls to apply aesthetics to the selection.
+   * 
+   * They must be globally unique in the session.
+   * 
+   * e.g. 'search: fish', '54-abcdf', 'selection at 07:34:12',
+   * 'selección compuesta número 1'
+   * 
+   */
+
+  name: string;
+
+  /**
+   * Optionally, a user-defined for defining.
+   * 
+   * If you're using this, I recommend defining your own application 
+   * schema but I'm not going to force you throw type hints right now
+   * because, you know. I'm not a monster.
+   * 
+   * e.g.: ['search', 'lasso', 'random', 'cherry-pick']
+   * 
+   */
+  type?: string;
+
+
+  /**
+   * The cursor is an index that points to the current position
+   * within the selected points in the Scatter plot.
+   */
+  cursor: number;
+
+  /**
+   * The total number of points in the selection.
+   * It is used to know the size of the selected data.
+   */
+  selectionSize: number; 
+
+  /**
+   * The total number of points that have been evaluated for the selection.
+   * 
+   * This is supplied because deepscatter doesn't evaluate functions on tiles
+   * untile they are loaded.
+   */
+  evaluationSetSize: number;
+
+  /**
+   * The total number of points in the set. At present, always a light wrapper around
+   * the total number of points in the dataset.
+   */
+  totalSetSize: number;
+
+  /**
+   * Has the selection run on all tiles in the dataset?
+  */
+  complete: boolean;
+
+  /**
+   * 
+   * Ensures that the selection has been evaluated on all
+   * tiles loaded in the dataset. This is useful if, for example,
+   * your selection represents a search, and you are zoomed in on 
+   * one portion of the map; this will immediately execute the search
+   * (subject to delays to avoid blocking the main thread) on all tiles
+   * that have been fetched even if out of the viewport.
+   * 
+   * Resolves upon completion.
+   */
+  applyToAllLoadedTiles(): Promise<void>;
+
+  /**
+   * 
+   * Downloads all unloaded tiles in the dataset and applies the 
+   * transformation to them. Use with care! For > 10,000,000 point
+   * datasets, if called from Europe this may cause the transatlantic fiber-optic internet backbone 
+   * cables to melt.
+   */
+
+  applyToAllTiles(): Promise<void>;
+
+  /**
+   * 
+   * A function that combines two selections into a third
+   * selection that is the union of the two.
+   */
+  union?(other: ScatterSelection<T>): ScatterSelection<T>;
+
+  /**
+   * 
+   * A function that combines two selections into a third
+   * selection that is the intersection of the two. Note--for more complicated
+   * queries than simple intersection/union, use the (not yet defined)
+   * disjunctive normal form constructor.
+   */
+
+  intersection?(other: ScatterSelection<T>): ScatterSelection<T>;
+
+  /**
+   * 
+   * The deepscatter transformation that will be applied to 
+   * tiles to test if they are members of the set. Transformations
+   * can apply any type of function; here we assume that they are floats
+   * (because WebGL 1.0 can't handle anything else)
+   * and that 0 represents exclusion and 1 represents inclusion.
+   * 
+   * This constraint is not enforced by the type system.
+   */
+
+  transformation: Transformation<T>;
+
+  /**
+   * NOT IMPLEMENTED YET
+   * 
+   * A set of indexes that affects the ordering of the selection.
+   * 
+   */
+
+  ordering?: number[];
+
+  /**
+   * 
+  tiles: T[]; // The tiles that have been evaluated for the selection.
+
+  /**
+   * 
+  * returns the ith element of the selection
+   * 
+   * @param i.
+   */
+  get(i: number) : StructRowProxy;
+
+  /**
+   * Returns a bitmask from each tile, identified by their keys.
+   * Used for efficiently persisting a selection for later use.
+   */
+  bitmask: Record<string, Uint8Array>;
+}
+
+// TODO: implement this.
+export type DNFmaker<T extends Tile> = (args: [ScatterSelection<T>[]]) => ScatterSelection<T>;
+
+
+export interface SelectionRecord<T extends Tile>  {
+  selection: ScatterSelection<T> | null;
   name: string;
   flushed: boolean;
 }
@@ -161,6 +314,22 @@ export type JitterRadiusMethod =
 export interface CategoricalChannel {
   field: string;
 }
+
+export type ArrowBuildable = Vector | Float32Array;
+
+/**
+ * A transformation is a batchwise operation that can be used to construct
+ * a new column in the data table. It runs asynchronously so that it
+ * can make network calls: it's defined as a recordbatch -> column operation
+ * rather than a point -> value operation for speed.
+ * 
+ * If the resulting vector or float32array is not the same length as 
+ * inputTile.record_batch.numRows, it will fail catastrophically.
+ * This is not a guarantee I know how to enforce in the type system.
+ */
+export type Transformation<T> = (inputTile: T) => ArrowBuildable | Promise<ArrowBuildable>;
+
+export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array>;
 
 export type BasicColorChannel = BasicChannel & {
   range?: string[] | string;
