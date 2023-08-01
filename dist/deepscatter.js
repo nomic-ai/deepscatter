@@ -36862,6 +36862,26 @@ class DataSelection {
     }
   }
   /**
+   * Advances the cursor (the currently selected point) by a given number of rows.
+   * steps forward or backward. Wraps from the beginning to the end.
+   * 
+   * @param by the number of rows to move the cursor by
+   * 
+   * @returns the selection, for chaining
+   */
+  async moveCursor(by) {
+    this.cursor += by;
+    if (this.cursor >= this.selectionSize) {
+      this.cursor = this.cursor % this.selectionSize;
+    }
+    if (this.cursor < 0) {
+      this.cursor = this.selectionSize + this.cursor;
+    }
+    return this;
+  }
+  async remove_points(name, ixes) {
+  }
+  /**
    * 
    * @param name the name for the column to assign in the dataset.
    * @param tileFunction The transformation to apply
@@ -36910,6 +36930,9 @@ class DataSelection {
    * @param i the index of the row to get
    */
   get(i) {
+    if (i === void 0) {
+      i = this.cursor;
+    }
     if (i > this.selectionSize) {
       throw new Error(`Index ${i} out of bounds for selection of size ${this.selectionSize}`);
     }
@@ -36950,6 +36973,14 @@ class DataSelection {
     if (options.plot_after) {
       return this.apply_to_foreground({});
     }
+  }
+  addPoints(name, field, ids) {
+    console.warn("UNIMPLEMENTED");
+    return this;
+  }
+  removePoints(name, field, ids) {
+    console.warn("UNIMPLEMENTED");
+    return this;
   }
   async add_boolean_column(name, field) {
     throw new Error("Method not implemented.");

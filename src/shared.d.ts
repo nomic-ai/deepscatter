@@ -199,17 +199,48 @@ export interface ScatterSelection<T extends Tile> {
 
   /**
    * 
-  * returns the ith element of the selection
+   * returns the ith element of the selection; if undefined,
+   * returns the element at the current cursor.
    * 
    * @param i.
    */
-  get(i: number) : StructRowProxy;
+  get(i: number | undefined) : StructRowProxy;
 
   /**
    * Returns a bitmask from each tile, identified by their keys.
    * Used for efficiently persisting a selection for later use.
    */
   bitmask: Record<string, Uint8Array>;
+
+
+  /**
+    * Returns a new selection that is the union of this selection
+    * and all the points in the supplied array. 
+    *
+    * @param ids - An array of ids to add to the selection.
+    * @param field - The column storing the ids.
+    * @param name - The name of the new selection.
+    *   
+    * @returns A new selection that is the union of this selection
+    * and all the points in the supplied array.
+    *   
+  */
+  addPoints(name: string, field: string, ids: string[] | number[] | bigint[]): ScatterSelection<T>;
+
+  /**
+   * Returns a new selection that is the current selection,
+   * minus all the points in the supplied array.
+   * 
+   * @param ids - An array of ids to remove from the selection.
+   * @param field - The column storing the ids.
+   * @param name - The name of the new selection.
+   * 
+   * @returns A new selection that is the current selection,
+   * minus all the points in the supplied array.
+   * 
+  */
+  removePoints(name: string, field: string, ids: string[] | number[] | bigint[]): ScatterSelection<T>;
+  
 }
 
 // TODO: implement this.

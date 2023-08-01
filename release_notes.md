@@ -1,5 +1,9 @@
-# 2.12.1
-- New methods for id selections.
+# 2.13
+- Introduce new 'selection' fundamental; selections allow
+  managing a variety of common operations on sets of points,
+  including iteration, creation of a column from a list of ids,
+  and (WIP) unioning, intersection, and other operations on 
+  arrow columns and bitmasks.
 - More comprehensive type annotations
 - Remove random jitter on point size above 5 pixels.
 # 2.12.0

@@ -67,8 +67,15 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
   dataset: Dataset<T>;
   plot: Scatterplot<T>;
   name: string;
+  /**
+   * Has the selection been applied to the dataset 
+   * (does *not* mean it has been applied to all points.)
+   */
   ready: Promise<void>;
   cursor: number = 0;
+  /**
+   * Has the selection completely evaluated?
+   */
   complete: boolean = false;
   selectionSize: number = 0;
   evaluationSetSize: number = 0;
@@ -101,6 +108,28 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
       console.log('adding function column', params.name, params.tileFunction)
       this.add_function_column(params.name, params.tileFunction).then(markReady);
     }
+  }
+  
+  /**
+   * Advances the cursor (the currently selected point) by a given number of rows.
+   * steps forward or backward. Wraps from the beginning to the end.
+   * 
+   * @param by the number of rows to move the cursor by
+   * 
+   * @returns the selection, for chaining
+   */
+  async moveCursor(by: number) {
+    this.cursor += by;
+    if (this.cursor >= this.selectionSize) {
+      this.cursor = this.cursor % this.selectionSize;
+    }
+    if (this.cursor < 0) {
+      this.cursor = this.selectionSize + this.cursor;
+    }
+    return this
+  }
+  async remove_points(name, ixes: BigInt[]) : Promise<DataSelection<T>> {
+    
   }
 
   /**
@@ -159,7 +188,10 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
    * 
    * @param i the index of the row to get
    */
-  get(i) : StructRowProxy {
+  get(i: number | undefined) : StructRowProxy {
+    if (i === undefined) {
+      i = this.cursor;
+    }
     if (i > this.selectionSize) {
       throw new Error(`Index ${i} out of bounds for selection of size ${this.selectionSize}`);
     }
@@ -208,6 +240,15 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     }
   }
 
+  addPoints(name: string, field: string, ids: string[] | number[] | bigint[]): DS.ScatterSelection<T> {
+    console.warn("UNIMPLEMENTED")
+    return this
+  }
+
+  removePoints(name: string, field: string, ids: number[] | string[] | bigint[]): DS.ScatterSelection<T> {
+    console.warn("UNIMPLEMENTED")
+    return this
+  }
 
   async add_boolean_column(name: string, field: string): Promise<void> {
     throw new Error('Method not implemented.');
@@ -264,6 +305,7 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
   }
 }
 
+  
 function bigintmatcher<T extends Tile>(field: string, matches: bigint[]) {
   const matchings = new Set(matches);
   return async function (tile: T) {
