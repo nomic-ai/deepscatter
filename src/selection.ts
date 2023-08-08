@@ -3,6 +3,7 @@ import Scatterplot from './deepscatter';
 import { Tile } from './tile';
 import type * as DS from './shared.d'
 import { StructRowProxy } from 'apache-arrow';
+import { bisectLeft } from 'd3-array';
 interface SelectParams {
   foreground?: boolean;
   batchCallback?: (t: Tile) => Promise<void>;
@@ -42,7 +43,7 @@ function isBooleanColumnParam(
 }
 export interface FunctionSelectParams extends SelectParams {
   name: string;
-  tileFunction: (t: Tile) => Promise<Float32Array>;
+  tileFunction: (t: Tile) => Promise<Float32Array> | Promise<Uint8Array>;
 }
 
 function isFunctionSelectParam(
@@ -118,7 +119,7 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
    * 
    * @returns the selection, for chaining
    */
-  async moveCursor(by: number) {
+  moveCursor(by: number) {
     this.cursor += by;
     if (this.cursor >= this.selectionSize) {
       this.cursor = this.cursor % this.selectionSize;
@@ -128,8 +129,46 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     }
     return this
   }
-  async remove_points(name, ixes: BigInt[]) : Promise<DataSelection<T>> {
-    
+
+  remove_points(name, ixes: BigInt[]) : DataSelection<T> {
+    return this.add_or_remove_points(name, ixes, 'remove')
+  }
+
+  add_points(name, ixes: BigInt[]) : DataSelection<T> {
+    return this.add_or_remove_points(name, ixes, 'add')
+  }
+
+  private add_or_remove_points(name, ixes: BigInt[], which : 'add' | 'remove') {
+    const tileFunction = async (tile: T) => {
+      // First, get the current version of the tile.
+      let value = (await tile.get_column(this.name)).toArray() as Float32Array;
+      // Then locate the ix column and look for matches.
+      const ixcol = tile.record_batch.getChild('ix').data[0].values as BigUint64Array;
+      for (let ix of ixes) {
+        // Since ix is ordered, we can do a fast binary search to see if the 
+        // point is there--no need for a full scan.
+        const mid = bisectLeft([...ixcol], ix);
+        const val = tile.record_batch.get(mid);
+        // We have to check that there's actually a match,
+        // because the binary search identifies where it *would* be.
+        if (val !== null && val.ix === ix) {
+          // Copy the buffer so we don't overwrite the old one.
+          value = new Float32Array(value)
+          // Set the specific value.
+          if (which === 'add') {
+            value[mid] = 1
+          } else {
+            value[mid] = 0
+          }
+        }
+      }
+      return value;
+    }
+    const selection = new DataSelection(this.plot, {
+      name,
+      tileFunction
+    })
+    return selection;
   }
 
   /**
@@ -196,13 +235,16 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
       throw new Error(`Index ${i} out of bounds for selection of size ${this.selectionSize}`);
     }
     let currentOffset = 0;
-    let relevantTile : T;
+    let relevantTile : T = undefined;
     for (let match_length of this.match_count) {
       if (i < currentOffset + match_length) {
         relevantTile = this.tiles[i];
         break;
       }
       currentOffset += match_length;
+    }
+    if (relevantTile === undefined) {
+      return null;
     }
     const column = relevantTile.record_batch.getChild(this.name).toArray() as Float32Array;
     const offset = i - currentOffset;
@@ -228,11 +270,11 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     }
     if (typeof codes[0] === 'string') {
       const matcher = stringmatcher(key_field, codes as string[]);
-      this.dataset.transformations[name] = matcher;
+      this.plot.dataset.transformations[name] = this.wrapWithSelectionMetadata(matcher);
       await this.dataset.root_tile.apply_transformation(name);
     } else if (typeof(codes[0]) === 'bigint') {
       const matcher = bigintmatcher(key_field, codes as bigint[]);
-      this.dataset.transformations[name] = matcher;
+      this.plot.dataset.transformations[name] = this.wrapWithSelectionMetadata(matcher);
       await this.dataset.root_tile.apply_transformation(name);
     }
     if (options.plot_after) {

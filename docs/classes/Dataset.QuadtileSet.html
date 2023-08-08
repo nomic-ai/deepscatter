@@ -17,8 +17,8 @@
 <li><a href="Dataset.QuadtileSet.html">QuadtileSet</a></li></ul>
 <h1>Class QuadtileSet</h1></div>
 <section class="tsd-panel tsd-comment">
-<div class="tsd-comment tsd-typography"><p>A Dataset manages the production and manipulation of tiles. Each plot has a 
-single dataset; the dataset handles all transformations around data through 
+<div class="tsd-comment tsd-typography"><p>A Dataset manages the production and manipulation of tiles. Each plot has a
+single dataset; the dataset handles all transformations around data through
 batchwise operations.</p>
 </div></section>
 <section class="tsd-panel tsd-hierarchy">
@@ -28,7 +28,7 @@ batchwise operations.</p>
 <ul class="tsd-hierarchy">
 <li><span class="target">QuadtileSet</span></li></ul></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L412">src/Dataset.ts:412</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L420">src/Dataset.ts:420</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-index-accordion" open><summary class="tsd-accordion-summary tsd-index-summary">
@@ -46,6 +46,7 @@ batchwise operations.</p>
 <a href="Dataset.QuadtileSet.html#plot" class="tsd-index-link tsd-kind-property tsd-parent-kind-class tsd-is-protected tsd-is-inherited"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>plot</span></a>
 <a href="Dataset.QuadtileSet.html#promise" class="tsd-index-link tsd-kind-property tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>promise</span></a>
 <a href="Dataset.QuadtileSet.html#root_tile" class="tsd-index-link tsd-kind-property tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>root_<wbr/>tile</span></a>
+<a href="Dataset.QuadtileSet.html#tileProxy" class="tsd-index-link tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>tile<wbr/>Proxy?</span></a>
 <a href="Dataset.QuadtileSet.html#transformations" class="tsd-index-link tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>transformations</span></a>
 </div></section>
 <section class="tsd-index-section">
@@ -81,7 +82,7 @@ batchwise operations.</p>
 <section class="tsd-panel tsd-member tsd-kind-constructor tsd-parent-kind-class"><a id="constructor" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>constructor</span><a href="#constructor" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" id="icon-anchor-a"></path><path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" id="icon-anchor-b"></path><path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" id="icon-anchor-c"></path></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-constructor tsd-parent-kind-class">
-<li class="tsd-signature tsd-anchor-link" id="constructor.new_QuadtileSet">new <wbr/>Quadtile<wbr/>Set<span class="tsd-signature-symbol">(</span>base_url<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, prefs<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">APICall</span>, plot<span class="tsd-signature-symbol">: </span><a href="../types/global.DS.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="Dataset.QuadtileSet.html" class="tsd-signature-type" data-tsd-kind="Class">QuadtileSet</a><a href="#constructor.new_QuadtileSet" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="constructor.new_QuadtileSet">new <wbr/>Quadtile<wbr/>Set<span class="tsd-signature-symbol">(</span>base_url<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, prefs<span class="tsd-signature-symbol">: </span><a href="../types/shared.APICall.html" class="tsd-signature-type" data-tsd-kind="Type alias">APICall</a>, plot<span class="tsd-signature-symbol">: </span><a href="../types/shared.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a>, options<span class="tsd-signature-symbol">?: </span><a href="../types/shared.QuadtileOptions.html" class="tsd-signature-type" data-tsd-kind="Type alias">QuadtileOptions</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="Dataset.QuadtileSet.html" class="tsd-signature-type" data-tsd-kind="Class">QuadtileSet</a><a href="#constructor.new_QuadtileSet" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -89,88 +90,96 @@ batchwise operations.</p>
 <li>
 <h5>base_url: <span class="tsd-signature-type">string</span></h5></li>
 <li>
-<h5>prefs: <span class="tsd-signature-type">APICall</span></h5></li>
+<h5>prefs: <a href="../types/shared.APICall.html" class="tsd-signature-type" data-tsd-kind="Type alias">APICall</a></h5></li>
 <li>
-<h5>plot: <a href="../types/global.DS.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></h5></li></ul></div>
+<h5>plot: <a href="../types/shared.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></h5></li>
+<li>
+<h5>options: <a href="../types/shared.QuadtileOptions.html" class="tsd-signature-type" data-tsd-kind="Type alias">QuadtileOptions</a><span class="tsd-signature-symbol"> = {}</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="Dataset.QuadtileSet.html" class="tsd-signature-type" data-tsd-kind="Class">QuadtileSet</a></h4><aside class="tsd-sources">
 <p>Overrides <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#constructor">constructor</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L417">src/Dataset.ts:417</a></li></ul></aside></li></ul></section></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L424">src/Dataset.ts:424</a></li></ul></aside></li></ul></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Properties</h2>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-protected"><a id="_download_queue" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagProtected">Protected</code> <span>_download_<wbr/>queue</span><a href="#_download_queue" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">_download_<wbr/>queue<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Set</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol"> = ...</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L413">src/Dataset.ts:413</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L421">src/Dataset.ts:421</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><a id="_ix_seed" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>_ix_<wbr/>seed</span><a href="#_ix_seed" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">_ix_<wbr/>seed<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0</span></div><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#_ix_seed">_ix_seed</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L41">src/Dataset.ts:41</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L41">src/Dataset.ts:41</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><a id="_schema" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagOptional">Optional</code> <span>_schema</span><a href="#_schema" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">_schema<span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Schema</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></div><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#_schema">_schema</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L42">src/Dataset.ts:42</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L42">src/Dataset.ts:42</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-protected tsd-is-inherited"><a id="plot" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagProtected">Protected</code> <span>plot</span><a href="#plot" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<div class="tsd-signature">plot<span class="tsd-signature-symbol">:</span> <a href="../types/global.DS.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></div><aside class="tsd-sources">
+<div class="tsd-signature">plot<span class="tsd-signature-symbol">:</span> <a href="../types/shared.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></div><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#plot">plot</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L36">src/Dataset.ts:36</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L36">src/Dataset.ts:36</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="promise" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>promise</span><a href="#promise" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">promise<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol"> = ...</span></div><aside class="tsd-sources">
 <p>Overrides <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#promise">promise</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L414">src/Dataset.ts:414</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L422">src/Dataset.ts:422</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="root_tile" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>root_<wbr/>tile</span><a href="#root_tile" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<div class="tsd-signature">root_<wbr/>tile<span class="tsd-signature-symbol">:</span> <a href="tile.QuadTile.html" class="tsd-signature-type" data-tsd-kind="Class">QuadTile</a></div><aside class="tsd-sources">
+<div class="tsd-signature">root_<wbr/>tile<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">QuadTie</span></div><aside class="tsd-sources">
 <p>Overrides <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#root_tile">root_tile</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L415">src/Dataset.ts:415</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L423">src/Dataset.ts:423</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><a id="tileProxy" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagOptional">Optional</code> <span>tile<wbr/>Proxy</span><a href="#tileProxy" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<div class="tsd-signature">tile<wbr/>Proxy<span class="tsd-signature-symbol">?:</span> <a href="../interfaces/shared.TileProxy.html" class="tsd-signature-type" data-tsd-kind="Interface">TileProxy</a></div><aside class="tsd-sources">
+<p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#tileProxy">tileProxy</a></p>
+<ul>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L43">src/Dataset.ts:43</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><a id="transformations" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>transformations</span><a href="#transformations" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">transformations<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">Transformation</span><span class="tsd-signature-symbol">&lt;</span><a href="tile.QuadTile.html" class="tsd-signature-type" data-tsd-kind="Class">QuadTile</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol"> = {}</span></div><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#transformations">transformations</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L34">src/Dataset.ts:34</a></li></ul></aside></section></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L34">src/Dataset.ts:34</a></li></ul></aside></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Accessors</h2>
 <section class="tsd-panel tsd-member tsd-kind-accessor tsd-parent-kind-class"><a id="extent" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>extent</span><a href="#extent" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-accessor tsd-parent-kind-class">
-<li class="tsd-signature" id="extent.extent-1"><span class="tsd-signature-symbol">get</span> extent<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a></li>
+<li class="tsd-signature" id="extent.extent-1"><span class="tsd-signature-symbol">get</span> extent<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span></li>
 <li class="tsd-description">
-<h4 class="tsd-returns-title">Returns <a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">any</span></h4><aside class="tsd-sources">
 <p>Overrides Dataset.extent</p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L448">src/Dataset.ts:448</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L463">src/Dataset.ts:463</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-accessor tsd-parent-kind-class tsd-is-inherited"><a id="highest_known_ix" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>highest_<wbr/>known_<wbr/>ix</span><a href="#highest_known_ix" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-accessor tsd-parent-kind-class tsd-is-inherited">
 <li class="tsd-signature" id="highest_known_ix.highest_known_ix-1"><span class="tsd-signature-symbol">get</span> highest_known_ix<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></li>
 <li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>The highest known point that deepscatter has seen so far. This is used 
+<div class="tsd-comment tsd-typography"><p>The highest known point that deepscatter has seen so far. This is used
 to adjust opacity size.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <p>Inherited from Dataset.highest_known_ix</p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L58">src/Dataset.ts:58</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L59">src/Dataset.ts:59</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-accessor tsd-parent-kind-class"><a id="ready" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>ready</span><a href="#ready" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-accessor tsd-parent-kind-class">
-<li class="tsd-signature" id="ready.ready-1"><span class="tsd-signature-symbol">get</span> ready<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></li>
+<li class="tsd-signature" id="ready.ready-1"><span class="tsd-signature-symbol">get</span> ready<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span></li>
 <li class="tsd-description">
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">any</span></h4><aside class="tsd-sources">
 <p>Overrides Dataset.ready</p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L445">src/Dataset.ts:445</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L460">src/Dataset.ts:460</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-accessor tsd-parent-kind-class tsd-is-inherited"><a id="table" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>table</span><a href="#table" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-accessor tsd-parent-kind-class tsd-is-inherited">
@@ -183,7 +192,7 @@ this will error</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Table</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from Dataset.table</p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L68">src/Dataset.ts:68</a></li></ul></aside></li></ul></section></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L69">src/Dataset.ts:69</a></li></ul></aside></li></ul></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Methods</h2>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="add_label_identifiers" class="tsd-anchor"></a>
@@ -209,7 +218,7 @@ this will error</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#add_label_identifiers">add_label_identifiers</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L300">src/Dataset.ts:300</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L306">src/Dataset.ts:306</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="add_macrotiled_column" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>add_<wbr/>macrotiled_<wbr/>column</span><a href="#add_macrotiled_column" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -237,11 +246,11 @@ this will error</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Uint8Array</span><span class="tsd-signature-symbol">&gt;</span></h4></li></ul></li></ul></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L515">src/Dataset.ts:515</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L530">src/Dataset.ts:530</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="add_sparse_identifiers" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>add_<wbr/>sparse_<wbr/>identifiers</span><a href="#add_sparse_identifiers" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
-<li class="tsd-signature tsd-anchor-link" id="add_sparse_identifiers.add_sparse_identifiers-1">add_<wbr/>sparse_<wbr/>identifiers<span class="tsd-signature-symbol">(</span>field_name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, ids<span class="tsd-signature-symbol">: </span><a href="../types/global.DS.PointUpdate.html" class="tsd-signature-type" data-tsd-kind="Type alias">PointUpdate</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span><a href="#add_sparse_identifiers.add_sparse_identifiers-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="add_sparse_identifiers.add_sparse_identifiers-1">add_<wbr/>sparse_<wbr/>identifiers<span class="tsd-signature-symbol">(</span>field_name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, ids<span class="tsd-signature-symbol">: </span><a href="../types/shared.PointUpdate.html" class="tsd-signature-type" data-tsd-kind="Type alias">PointUpdate</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span><a href="#add_sparse_identifiers.add_sparse_identifiers-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -249,11 +258,11 @@ this will error</p>
 <li>
 <h5>field_name: <span class="tsd-signature-type">string</span></h5></li>
 <li>
-<h5>ids: <a href="../types/global.DS.PointUpdate.html" class="tsd-signature-type" data-tsd-kind="Type alias">PointUpdate</a></h5></li></ul></div>
+<h5>ids: <a href="../types/shared.PointUpdate.html" class="tsd-signature-type" data-tsd-kind="Type alias">PointUpdate</a></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#add_sparse_identifiers">add_sparse_identifiers</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L280">src/Dataset.ts:280</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L286">src/Dataset.ts:286</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="add_tiled_column" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>add_<wbr/>tiled_<wbr/>column</span><a href="#add_tiled_column" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -273,11 +282,11 @@ this will error</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#add_tiled_column">add_tiled_column</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L259">src/Dataset.ts:259</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L265">src/Dataset.ts:265</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="applyTransformationToPoint" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>apply<wbr/>Transformation<wbr/>To<wbr/>Point</span><a href="#applyTransformationToPoint" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
-<li class="tsd-signature tsd-anchor-link" id="applyTransformationToPoint.applyTransformationToPoint-1">apply<wbr/>Transformation<wbr/>To<wbr/>Point<span class="tsd-signature-symbol">(</span>transformation<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, ix<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">null</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span><a href="#applyTransformationToPoint.applyTransformationToPoint-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="applyTransformationToPoint.applyTransformationToPoint-1">apply<wbr/>Transformation<wbr/>To<wbr/>Point<span class="tsd-signature-symbol">(</span>transformation<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, ix<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span><a href="#applyTransformationToPoint.applyTransformationToPoint-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Given an ix, apply a transformation to the point at that index and
 return the transformed point (not just the transformation, the whole point)
@@ -294,10 +303,10 @@ This applies the transformaation to all other points in the same tile.</p>
 <h5>ix: <span class="tsd-signature-type">number</span></h5>
 <div class="tsd-comment tsd-typography"><p>The index of the point to transform</p>
 </div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">null</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#applyTransformationToPoint">applyTransformationToPoint</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L329">src/Dataset.ts:329</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L335">src/Dataset.ts:335</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="delete_column_if_exists" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>delete_<wbr/>column_<wbr/>if_<wbr/>exists</span><a href="#delete_column_if_exists" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -311,7 +320,7 @@ This applies the transformaation to all other points in the same tile.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#delete_column_if_exists">delete_column_if_exists</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L116">src/Dataset.ts:116</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L122">src/Dataset.ts:122</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="domain" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>domain</span><a href="#domain" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -327,17 +336,17 @@ This applies the transformaation to all other points in the same tile.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">[</span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">]</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#domain">domain</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L126">src/Dataset.ts:126</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L132">src/Dataset.ts:132</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="download_most_needed_tiles" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>download_<wbr/>most_<wbr/>needed_<wbr/>tiles</span><a href="#download_most_needed_tiles" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
-<li class="tsd-signature tsd-anchor-link" id="download_most_needed_tiles.download_most_needed_tiles-1">download_<wbr/>most_<wbr/>needed_<wbr/>tiles<span class="tsd-signature-symbol">(</span>bbox<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a>, max_ix<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span>, queue_length<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span><a href="#download_most_needed_tiles.download_most_needed_tiles-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="download_most_needed_tiles.download_most_needed_tiles-1">download_<wbr/>most_<wbr/>needed_<wbr/>tiles<span class="tsd-signature-symbol">(</span>bbox<span class="tsd-signature-symbol">: </span><a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a>, max_ix<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span>, queue_length<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span><a href="#download_most_needed_tiles.download_most_needed_tiles-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li>
-<h5>bbox: <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a></h5></li>
+<h5>bbox: <a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a></h5></li>
 <li>
 <h5>max_ix: <span class="tsd-signature-type">number</span></h5></li>
 <li>
@@ -345,7 +354,7 @@ This applies the transformaation to all other points in the same tile.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Overrides <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#download_most_needed_tiles">download_most_needed_tiles</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L456">src/Dataset.ts:456</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L471">src/Dataset.ts:471</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="download_to_depth" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>download_<wbr/>to_<wbr/>depth</span><a href="#download_to_depth" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -358,7 +367,7 @@ This applies the transformaation to all other points in the same tile.</p>
 <h5>max_ix: <span class="tsd-signature-type">any</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L452">src/Dataset.ts:452</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L467">src/Dataset.ts:467</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="findPoint" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>find<wbr/>Point</span><a href="#findPoint" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -377,7 +386,7 @@ This applies the transformaation to all other points in the same tile.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#findPoint">findPoint</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L350">src/Dataset.ts:350</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L356">src/Dataset.ts:356</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="findPointRaw" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>find<wbr/>Point<wbr/>Raw</span><a href="#findPointRaw" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -397,7 +406,7 @@ This applies the transformaation to all other points in the same tile.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-symbol">[</span><a href="tile.Tile.html" class="tsd-signature-type" data-tsd-kind="Class">Tile</a><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">]</span><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#findPointRaw">findPointRaw</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L359">src/Dataset.ts:359</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L365">src/Dataset.ts:365</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="has_column" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>has_<wbr/>column</span><a href="#has_column" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -416,7 +425,7 @@ This applies the transformaation to all other points in the same tile.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#has_column">has_column</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L110">src/Dataset.ts:110</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L115">src/Dataset.ts:115</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="map" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>map</span><a href="#map" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -458,23 +467,23 @@ get a list of all tiles in the dataset at any moment.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type" data-tsd-kind="Type parameter">U</span><span class="tsd-signature-symbol">[]</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#map">map</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L195">src/Dataset.ts:195</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L201">src/Dataset.ts:201</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="points" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>points</span><a href="#points" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
-<li class="tsd-signature tsd-anchor-link" id="points.points-1">points<span class="tsd-signature-symbol">(</span>bbox<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a>, max_ix<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Generator</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span><a href="#points.points-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="points.points-1">points<span class="tsd-signature-symbol">(</span>bbox<span class="tsd-signature-symbol">: </span><a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a>, max_ix<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Generator</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span><a href="#points.points-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li>
-<h5>bbox: <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a></h5></li>
+<h5>bbox: <a href="../types/tile.Rectangle.html" class="tsd-signature-type" data-tsd-kind="Type alias">Rectangle</a></h5></li>
 <li>
 <h5>max_ix: <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 1e99</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Generator</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Generator</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#points">points</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L165">src/Dataset.ts:165</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L171">src/Dataset.ts:171</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="schema" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>schema</span><a href="#schema" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -483,7 +492,7 @@ get a list of all tiles in the dataset at any moment.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Schema</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#schema">schema</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L245">src/Dataset.ts:245</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L251">src/Dataset.ts:251</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="visit" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>visit</span><a href="#visit" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
@@ -532,11 +541,11 @@ recurse.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#visit">visit</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L214">src/Dataset.ts:214</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L220">src/Dataset.ts:220</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="from_arrow_table" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>from_<wbr/>arrow_<wbr/>table</span><a href="#from_arrow_table" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
-<li class="tsd-signature tsd-anchor-link" id="from_arrow_table.from_arrow_table-1">from_<wbr/>arrow_<wbr/>table<span class="tsd-signature-symbol">(</span>table<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Table</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span>, prefs<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">APICall</span>, plot<span class="tsd-signature-symbol">: </span><a href="../types/global.DS.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="Dataset.ArrowDataset.html" class="tsd-signature-type" data-tsd-kind="Class">ArrowDataset</a><a href="#from_arrow_table.from_arrow_table-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="from_arrow_table.from_arrow_table-1">from_<wbr/>arrow_<wbr/>table<span class="tsd-signature-symbol">(</span>table<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Table</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span>, prefs<span class="tsd-signature-symbol">: </span><a href="../types/shared.APICall.html" class="tsd-signature-type" data-tsd-kind="Type alias">APICall</a>, plot<span class="tsd-signature-symbol">: </span><a href="../types/shared.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="Dataset.ArrowDataset.html" class="tsd-signature-type" data-tsd-kind="Class">ArrowDataset</a><a href="#from_arrow_table.from_arrow_table-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-comment tsd-typography"><p>Generate an ArrowDataset from a single Arrow table.</p>
 
@@ -549,21 +558,21 @@ recurse.</p>
 <div class="tsd-comment tsd-typography"><p>A single Arrow table</p>
 </div></li>
 <li>
-<h5>prefs: <span class="tsd-signature-type">APICall</span></h5>
+<h5>prefs: <a href="../types/shared.APICall.html" class="tsd-signature-type" data-tsd-kind="Type alias">APICall</a></h5>
 <div class="tsd-comment tsd-typography"><p>The API Call to use for renering.</p>
 </div></li>
 <li>
-<h5>plot: <a href="../types/global.DS.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></h5>
+<h5>plot: <a href="../types/shared.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></h5>
 <div class="tsd-comment tsd-typography"><p>The Scatterplot to use.</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="Dataset.ArrowDataset.html" class="tsd-signature-type" data-tsd-kind="Class">ArrowDataset</a></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#from_arrow_table">from_arrow_table</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L91">src/Dataset.ts:91</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L96">src/Dataset.ts:96</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-inherited"><a id="from_quadfeather" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagStatic">Static</code> <span>from_<wbr/>quadfeather</span><a href="#from_quadfeather" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-inherited">
-<li class="tsd-signature tsd-anchor-link" id="from_quadfeather.from_quadfeather-1">from_<wbr/>quadfeather<span class="tsd-signature-symbol">(</span>url<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, prefs<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">APICall</span>, plot<span class="tsd-signature-symbol">: </span><a href="../types/global.DS.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="Dataset.QuadtileSet.html" class="tsd-signature-type" data-tsd-kind="Class">QuadtileSet</a><a href="#from_quadfeather.from_quadfeather-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="from_quadfeather.from_quadfeather-1">from_<wbr/>quadfeather<span class="tsd-signature-symbol">(</span>url<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, prefs<span class="tsd-signature-symbol">: </span><a href="../types/shared.APICall.html" class="tsd-signature-type" data-tsd-kind="Type alias">APICall</a>, plot<span class="tsd-signature-symbol">: </span><a href="../types/shared.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="Dataset.QuadtileSet.html" class="tsd-signature-type" data-tsd-kind="Class">QuadtileSet</a><a href="#from_quadfeather.from_quadfeather-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -571,13 +580,13 @@ recurse.</p>
 <li>
 <h5>url: <span class="tsd-signature-type">string</span></h5></li>
 <li>
-<h5>prefs: <span class="tsd-signature-type">APICall</span></h5></li>
+<h5>prefs: <a href="../types/shared.APICall.html" class="tsd-signature-type" data-tsd-kind="Type alias">APICall</a></h5></li>
 <li>
-<h5>plot: <a href="../types/global.DS.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></h5></li></ul></div>
+<h5>plot: <a href="../types/shared.Plot.html" class="tsd-signature-type" data-tsd-kind="Type alias">Plot</a></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="Dataset.QuadtileSet.html" class="tsd-signature-type" data-tsd-kind="Class">QuadtileSet</a></h4><aside class="tsd-sources">
 <p>Inherited from <a href="Dataset.Dataset.html">Dataset</a>.<a href="Dataset.Dataset.html#from_quadfeather">from_quadfeather</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/840cb00/src/Dataset.ts#L76">src/Dataset.ts:76</a></li></ul></aside></li></ul></section></section></div>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/79d06b3/src/Dataset.ts#L77">src/Dataset.ts:77</a></li></ul></aside></li></ul></section></section></div>
 <div class="col-4 col-menu menu-sticky-wrap menu-highlight">
 <div class="tsd-navigation settings">
 <details class="tsd-index-accordion"><summary class="tsd-accordion-summary">
@@ -608,14 +617,12 @@ recurse.</p>
 <li class="tsd-kind-module"><a href="../modules/deepscatter.html">deepscatter</a></li>
 <li class="tsd-kind-module"><a href="../modules/defaults.html">defaults</a></li>
 <li class="tsd-kind-module"><a href="../modules/duckdb.html">duckdb</a></li>
-<li class="tsd-kind-module"><a href="../modules/global.html">global</a>
-<ul>
-<li class="tsd-kind-namespace tsd-parent-kind-module"><a href="../modules/global.DS.html">DS</a></li></ul></li>
 <li class="tsd-kind-module"><a href="../modules/interaction.html">interaction</a></li>
 <li class="tsd-kind-module"><a href="../modules/label_rendering.html">label_<wbr/>rendering</a></li>
 <li class="tsd-kind-module"><a href="../modules/regl_rendering.html">regl_<wbr/>rendering</a></li>
 <li class="tsd-kind-module"><a href="../modules/rendering.html">rendering</a></li>
 <li class="tsd-kind-module"><a href="../modules/selection.html">selection</a></li>
+<li class="tsd-kind-module"><a href="../modules/shared.html">shared</a></li>
 <li class="tsd-kind-module"><a href="../modules/tile.html">tile</a></li>
 <li class="tsd-kind-module"><a href="../modules/typing.html">typing</a></li>
 <li class="tsd-kind-module"><a href="../modules/util.html">util</a></li></ul></li></ul></div></details></nav>
@@ -630,6 +637,7 @@ recurse.</p>
 <li class="tsd-kind-property tsd-parent-kind-class tsd-is-protected tsd-is-inherited"><a href="Dataset.QuadtileSet.html#plot" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>plot</a></li>
 <li class="tsd-kind-property tsd-parent-kind-class"><a href="Dataset.QuadtileSet.html#promise" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>promise</a></li>
 <li class="tsd-kind-property tsd-parent-kind-class"><a href="Dataset.QuadtileSet.html#root_tile" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>root_<wbr/>tile</a></li>
+<li class="tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><a href="Dataset.QuadtileSet.html#tileProxy" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>tile<wbr/>Proxy?</a></li>
 <li class="tsd-kind-property tsd-parent-kind-class tsd-is-inherited"><a href="Dataset.QuadtileSet.html#transformations" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>transformations</a></li>
 <li class="tsd-kind-accessor tsd-parent-kind-class"><a href="Dataset.QuadtileSet.html#extent" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-262144-path"></use><use href="#icon-262144-text"></use></svg>extent</a></li>
 <li class="tsd-kind-accessor tsd-parent-kind-class tsd-is-inherited"><a href="Dataset.QuadtileSet.html#highest_known_ix" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-262144-path"></use><use href="#icon-262144-text"></use></svg>highest_<wbr/>known_<wbr/>ix</a></li>

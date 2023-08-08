@@ -36869,7 +36869,7 @@ class DataSelection {
    * 
    * @returns the selection, for chaining
    */
-  async moveCursor(by) {
+  moveCursor(by) {
     this.cursor += by;
     if (this.cursor >= this.selectionSize) {
       this.cursor = this.cursor % this.selectionSize;
@@ -36879,7 +36879,35 @@ class DataSelection {
     }
     return this;
   }
-  async remove_points(name, ixes) {
+  remove_points(name, ixes) {
+    return this.add_or_remove_points(name, ixes, "remove");
+  }
+  add_points(name, ixes) {
+    return this.add_or_remove_points(name, ixes, "add");
+  }
+  add_or_remove_points(name, ixes, which) {
+    const tileFunction = async (tile) => {
+      let value = (await tile.get_column(this.name)).toArray();
+      const ixcol = tile.record_batch.getChild("ix").data[0].values;
+      for (let ix of ixes) {
+        const mid = bisectLeft([...ixcol], ix);
+        const val = tile.record_batch.get(mid);
+        if (val !== null && val.ix === ix) {
+          value = new Float32Array(value);
+          if (which === "add") {
+            value[mid] = 1;
+          } else {
+            value[mid] = 0;
+          }
+        }
+      }
+      return value;
+    };
+    const selection2 = new DataSelection(this.plot, {
+      name,
+      tileFunction
+    });
+    return selection2;
   }
   /**
    * 
@@ -36937,13 +36965,16 @@ class DataSelection {
       throw new Error(`Index ${i} out of bounds for selection of size ${this.selectionSize}`);
     }
     let currentOffset = 0;
-    let relevantTile;
+    let relevantTile = void 0;
     for (let match_length of this.match_count) {
       if (i < currentOffset + match_length) {
         relevantTile = this.tiles[i];
         break;
       }
       currentOffset += match_length;
+    }
+    if (relevantTile === void 0) {
+      return null;
     }
     const column = relevantTile.record_batch.getChild(this.name).toArray();
     const offset = i - currentOffset;
@@ -36963,11 +36994,11 @@ class DataSelection {
     }
     if (typeof codes[0] === "string") {
       const matcher2 = stringmatcher(key_field, codes);
-      this.dataset.transformations[name] = matcher2;
+      this.plot.dataset.transformations[name] = this.wrapWithSelectionMetadata(matcher2);
       await this.dataset.root_tile.apply_transformation(name);
     } else if (typeof codes[0] === "bigint") {
       const matcher2 = bigintmatcher(key_field, codes);
-      this.dataset.transformations[name] = matcher2;
+      this.plot.dataset.transformations[name] = this.wrapWithSelectionMetadata(matcher2);
       await this.dataset.root_tile.apply_transformation(name);
     }
     if (options.plot_after) {
