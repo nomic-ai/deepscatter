@@ -205,6 +205,7 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
         }
       }
       this.match_count.push(matches);
+      this.tiles.push(tile);
       this.selectionSize += matches;
       this.evaluationSetSize += batch.numRows;
 
@@ -236,11 +237,13 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     }
     let currentOffset = 0;
     let relevantTile : T = undefined;
+    let current_tile_ix = 0;
     for (let match_length of this.match_count) {
       if (i < currentOffset + match_length) {
-        relevantTile = this.tiles[i];
+        relevantTile = this.tiles[current_tile_ix];
         break;
       }
+      current_tile_ix += 1
       currentOffset += match_length;
     }
     if (relevantTile === undefined) {
@@ -257,8 +260,9 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
         ix_in_match++;
       }
     }
-    
+    throw new Error(`unable to locate point ${i}`)
   }
+
   async add_identifier_column(
     name: string, 
     codes: string[] | bigint[] | number[],
