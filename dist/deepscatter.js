@@ -36939,6 +36939,7 @@ class DataSelection {
         }
       }
       this.match_count.push(matches);
+      this.tiles.push(tile);
       this.selectionSize += matches;
       this.evaluationSetSize += batch.numRows;
       return array2;
@@ -36966,11 +36967,13 @@ class DataSelection {
     }
     let currentOffset = 0;
     let relevantTile = void 0;
+    let current_tile_ix = 0;
     for (let match_length of this.match_count) {
       if (i < currentOffset + match_length) {
-        relevantTile = this.tiles[i];
+        relevantTile = this.tiles[current_tile_ix];
         break;
       }
+      current_tile_ix += 1;
       currentOffset += match_length;
     }
     if (relevantTile === void 0) {
@@ -36987,6 +36990,7 @@ class DataSelection {
         ix_in_match++;
       }
     }
+    throw new Error(`unable to locate point ${i}`);
   }
   async add_identifier_column(name, codes, key_field, options = {}) {
     if (this.dataset.has_column(name)) {
