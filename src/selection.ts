@@ -34,8 +34,6 @@ export interface BooleanColumnParams extends SelectParams {
   field: string;
 }
 
-
-
 function isBooleanColumnParam(
   params: Record<string, any>
 ): params is BooleanColumnParams {
@@ -81,6 +79,25 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
   selectionSize: number = 0;
   evaluationSetSize: number = 0;
   tiles: T[] = [];
+  private events: { [key: string]: Array<(args) => void> } = {};
+
+  /**
+   * 
+   * @param event an internally dispatched event.
+   * @param listener a function to call back. It takes
+   * as an argument the `tile` ]]]
+   */
+  on(event: string, listener: (args: any) => void): void {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(listener);
+  }
+  private dispatch(event: string, args: any): void {
+    if (this.events[event]) {
+      this.events[event].forEach(listener => listener(args));
+    }
+  }
 
   // The match count is the number of matches **per tile**;
   // used to access numbers by index.
@@ -100,13 +117,11 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     this.ready = new Promise((resolve, reject) => {
       markReady = resolve;
     })
-    console.log('Creating selection', {plot, params})
     if (isIdSelectParam(params)) {
       this.add_identifier_column(params.name, params.ids, params.idField).then(markReady);
     } else if (isBooleanColumnParam(params)) {
       this.add_boolean_column(params.name, params.field).then(markReady);
     } else if (isFunctionSelectParam(params)) {
-      console.log('adding function column', params.name, params.tileFunction)
       this.add_function_column(params.name, params.tileFunction).then(markReady);
     }
   }
@@ -130,16 +145,46 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     return this
   }
 
-  remove_points(name, ixes: BigInt[]) : DataSelection<T> {
+  async removePoints(name, ixes: BigInt[]) : Promise<DataSelection<T>> {
     return this.add_or_remove_points(name, ixes, 'remove')
   }
 
-  add_points(name, ixes: BigInt[]) : DataSelection<T> {
+  // Non-editable behavior: 
+  // if a single point is added, will also adjust the cursor.
+  async addPoints(name, ixes: BigInt[]) : Promise<DataSelection<T>> {
     return this.add_or_remove_points(name, ixes, 'add')
   }
 
-  private add_or_remove_points(name, ixes: BigInt[], which : 'add' | 'remove') {
+  /**
+   * Returns all the data points in the selection, limited to 
+   * data currently on the screen.
+   * 
+   * @param fields A list of fields in the data to export.
+   */
+  async export(fields: string[], format : "json" = "json") {
+    /*
+    This would have benefits, but might fetch data we don't actually need.
+
+    const preparation = []
+    for (const field of fields) {
+      for (const tile of this.tiles) {
+        preparation.push(tile.get_column(field))
+      }
+    }
+    await Promise.all(preparation)
+    */
+   const columns = Object.fromEntries(fields.map(field => [field, []]))
+   for (let row of this) {
+      for (let field of fields) {
+        columns[field].push(row[field])
+      }
+   }
+   return columns
+  }
+
+  private async add_or_remove_points(name, ixes: BigInt[], which : 'add' | 'remove') {
     const tileFunction = async (tile: T) => {
+      await this.ready;
       // First, get the current version of the tile.
       let value = (await tile.get_column(this.name)).toArray() as Float32Array;
       // Then locate the ix column and look for matches.
@@ -157,7 +202,24 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
           // Set the specific value.
           if (which === 'add') {
             value[mid] = 1
+            if (ixes.length === 1) {
+              // For single additions, we also move the cursor to the
+              // newly added point.
+              console.log("YEP YEP YEP")
+              // First, we count the number of matches already seen
+              this.cursor = this.match_count.reduce((a, b) => a + b, 0);
+
+              // Then we add the number of points earlier on the current tile.
+              for (let i = 0; i < mid; i++) {
+                if (value[i] > 0) {
+                  console.log({ix})
+                  this.cursor += 1;
+                }
+              }
+              console.log("CURSOR", this.cursor)
+            }
           } else {
+            // If deleting, we set it to zero.
             value[mid] = 0
           }
         }
@@ -168,6 +230,11 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
       name,
       tileFunction
     })
+    await selection.ready;
+    for (const tile of this.tiles) {
+      // This one we actually apply. We'll see if that gets to be slow.
+      await tile.get_column(name);
+    }
     return selection;
   }
 
@@ -208,14 +275,19 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
       this.tiles.push(tile);
       this.selectionSize += matches;
       this.evaluationSetSize += batch.numRows;
-
+      // DANGER! Possible race condition. Although the tile loaded
+      // dispatches here, it may take a millisecond or two
+      // before the actual assignment has happened in the recordbatch.
+      this.dispatch("tile loaded", tile);
       return array;
     }
   }
 
+  /**
+   * The total number of points in the dataset.
+   */
   get totalSetSize() {
-    return 1e6;
-    //return this.dataset.root_tile.metadata;
+    return this.dataset.highest_known_ix;
   }
   
   /**
@@ -263,6 +335,18 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     throw new Error(`unable to locate point ${i}`)
   }
 
+  // Iterate over the points in raw order.
+  *[Symbol.iterator]() {
+    for (let tile of this.tiles) {
+      const column = tile.record_batch.getChild(this.name).toArray() as Float32Array;
+      for (let i = 0; i < column.length; i++) {
+        if (column[i] > 0) {
+          yield tile.record_batch.get(i)
+        }
+      }
+    }
+  }
+
   async add_identifier_column(
     name: string, 
     codes: string[] | bigint[] | number[],
@@ -280,20 +364,12 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
       const matcher = bigintmatcher(key_field, codes as bigint[]);
       this.plot.dataset.transformations[name] = this.wrapWithSelectionMetadata(matcher);
       await this.dataset.root_tile.apply_transformation(name);
+    } else {
+      console.error("Unable to match type", typeof(codes[0]))
     }
     if (options.plot_after) {
       return this.apply_to_foreground({});
     }
-  }
-
-  addPoints(name: string, field: string, ids: string[] | number[] | bigint[]): DS.ScatterSelection<T> {
-    console.warn("UNIMPLEMENTED")
-    return this
-  }
-
-  removePoints(name: string, field: string, ids: number[] | string[] | bigint[]): DS.ScatterSelection<T> {
-    console.warn("UNIMPLEMENTED")
-    return this
   }
 
   async add_boolean_column(name: string, field: string): Promise<void> {

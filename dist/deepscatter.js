@@ -36841,6 +36841,7 @@ class DataSelection {
     this.selectionSize = 0;
     this.evaluationSetSize = 0;
     this.tiles = [];
+    this.events = {};
     this.match_count = [];
     this._bitmask = {};
     this.plot = plot;
@@ -36851,14 +36852,29 @@ class DataSelection {
     this.ready = new Promise((resolve, reject) => {
       markReady = resolve;
     });
-    console.log("Creating selection", { plot, params });
     if (isIdSelectParam(params)) {
       this.add_identifier_column(params.name, params.ids, params.idField).then(markReady);
     } else if (isBooleanColumnParam(params)) {
       this.add_boolean_column(params.name, params.field).then(markReady);
     } else if (isFunctionSelectParam(params)) {
-      console.log("adding function column", params.name, params.tileFunction);
       this.add_function_column(params.name, params.tileFunction).then(markReady);
+    }
+  }
+  /**
+   * 
+   * @param event an internally dispatched event.
+   * @param listener a function to call back. It takes
+   * as an argument the `tile` ]]]
+   */
+  on(event, listener) {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(listener);
+  }
+  dispatch(event, args) {
+    if (this.events[event]) {
+      this.events[event].forEach((listener) => listener(args));
     }
   }
   /**
@@ -36879,14 +36895,32 @@ class DataSelection {
     }
     return this;
   }
-  remove_points(name, ixes) {
+  async removePoints(name, ixes) {
     return this.add_or_remove_points(name, ixes, "remove");
   }
-  add_points(name, ixes) {
+  // Non-editable behavior: 
+  // if a single point is added, will also adjust the cursor.
+  async addPoints(name, ixes) {
     return this.add_or_remove_points(name, ixes, "add");
   }
-  add_or_remove_points(name, ixes, which) {
+  /**
+   * Returns all the data points in the selection, limited to 
+   * data currently on the screen.
+   * 
+   * @param fields A list of fields in the data to export.
+   */
+  async export(fields, format2 = "json") {
+    const columns = Object.fromEntries(fields.map((field) => [field, []]));
+    for (let row of this) {
+      for (let field of fields) {
+        columns[field].push(row[field]);
+      }
+    }
+    return columns;
+  }
+  async add_or_remove_points(name, ixes, which) {
     const tileFunction = async (tile) => {
+      await this.ready;
       let value = (await tile.get_column(this.name)).toArray();
       const ixcol = tile.record_batch.getChild("ix").data[0].values;
       for (let ix of ixes) {
@@ -36896,6 +36930,17 @@ class DataSelection {
           value = new Float32Array(value);
           if (which === "add") {
             value[mid] = 1;
+            if (ixes.length === 1) {
+              console.log("YEP YEP YEP");
+              this.cursor = this.match_count.reduce((a, b) => a + b, 0);
+              for (let i = 0; i < mid; i++) {
+                if (value[i] > 0) {
+                  console.log({ ix });
+                  this.cursor += 1;
+                }
+              }
+              console.log("CURSOR", this.cursor);
+            }
           } else {
             value[mid] = 0;
           }
@@ -36907,6 +36952,10 @@ class DataSelection {
       name,
       tileFunction
     });
+    await selection2.ready;
+    for (const tile of this.tiles) {
+      await tile.get_column(name);
+    }
     return selection2;
   }
   /**
@@ -36942,11 +36991,15 @@ class DataSelection {
       this.tiles.push(tile);
       this.selectionSize += matches;
       this.evaluationSetSize += batch.numRows;
+      this.dispatch("tile loaded", tile);
       return array2;
     };
   }
+  /**
+   * The total number of points in the dataset.
+   */
   get totalSetSize() {
-    return 1e6;
+    return this.dataset.highest_known_ix;
   }
   /**
    * 
@@ -36992,6 +37045,17 @@ class DataSelection {
     }
     throw new Error(`unable to locate point ${i}`);
   }
+  // Iterate over the points in raw order.
+  *[Symbol.iterator]() {
+    for (let tile of this.tiles) {
+      const column = tile.record_batch.getChild(this.name).toArray();
+      for (let i = 0; i < column.length; i++) {
+        if (column[i] > 0) {
+          yield tile.record_batch.get(i);
+        }
+      }
+    }
+  }
   async add_identifier_column(name, codes, key_field, options = {}) {
     if (this.dataset.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
@@ -37004,18 +37068,12 @@ class DataSelection {
       const matcher2 = bigintmatcher(key_field, codes);
       this.plot.dataset.transformations[name] = this.wrapWithSelectionMetadata(matcher2);
       await this.dataset.root_tile.apply_transformation(name);
+    } else {
+      console.error("Unable to match type", typeof codes[0]);
     }
     if (options.plot_after) {
       return this.apply_to_foreground({});
     }
-  }
-  addPoints(name, field, ids) {
-    console.warn("UNIMPLEMENTED");
-    return this;
-  }
-  removePoints(name, field, ids) {
-    console.warn("UNIMPLEMENTED");
-    return this;
   }
   async add_boolean_column(name, field) {
     throw new Error("Method not implemented.");
@@ -37211,11 +37269,8 @@ class Scatterplot {
     this.bound = true;
   }
   async select_data(params) {
-    console.log("SELECTING");
     const selection2 = new DataSelection(this, params);
-    console.log("AWAITING");
     await selection2.ready;
-    console.log("HELOOOO");
     this.selection_history.push({
       selection: selection2,
       name: selection2.name,

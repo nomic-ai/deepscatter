@@ -148,11 +148,8 @@ export default class Scatterplot<T extends Tile> {
   }
 
   async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams) {
-    console.log("SELECTING")
     const selection = new DataSelection<T>(this, params);
-    console.log("AWAITING")
     await selection.ready;
-    console.log("HELOOOO")
     this.selection_history.push({
       selection,
       name: selection.name,
