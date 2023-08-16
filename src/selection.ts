@@ -85,7 +85,7 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
    * 
    * @param event an internally dispatched event.
    * @param listener a function to call back. It takes
-   * as an argument the `tile` ]]]
+   * as an argument the `tile` that was just added.
    */
   on(event: string, listener: (args: any) => void): void {
     if (!this.events[event]) {
@@ -183,7 +183,10 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
   }
 
   private async add_or_remove_points(name, ixes: BigInt[], which : 'add' | 'remove') {
+    let newCursor = 0;
+    let tileOfMatch = undefined;
     const tileFunction = async (tile: T) => {
+      newCursor = -1;
       await this.ready;
       // First, get the current version of the tile.
       let value = (await tile.get_column(this.name)).toArray() as Float32Array;
@@ -203,20 +206,18 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
           if (which === 'add') {
             value[mid] = 1
             if (ixes.length === 1) {
+              tileOfMatch = tile.key;
               // For single additions, we also move the cursor to the
               // newly added point.
-              console.log("YEP YEP YEP")
-              // First, we count the number of matches already seen
-              this.cursor = this.match_count.reduce((a, b) => a + b, 0);
-
-              // Then we add the number of points earlier on the current tile.
+              // First we see the number of points earlier on the current tile.
+              let offset_in_tile = 0;
               for (let i = 0; i < mid; i++) {
                 if (value[i] > 0) {
-                  console.log({ix})
-                  this.cursor += 1;
+                  offset_in_tile += 1;
                 }
               }
-              console.log("CURSOR", this.cursor)
+              // Then, we count the number of matches already seen
+              newCursor = offset_in_tile;
             }
           } else {
             // If deleting, we set it to zero.
@@ -229,6 +230,21 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     const selection = new DataSelection(this.plot, {
       name,
       tileFunction
+    })
+
+    selection.on('tile loaded', () => {
+      // The new cursor gets moved when we encounter a singleton
+      if (newCursor >= 0) {
+        selection.cursor = newCursor;
+        for (let i = 0; i < selection.tiles.length; i++) {
+          const tile = selection.tiles[i]
+          if (tile.key === tileOfMatch) {
+            // Don't add the full number of matches here.
+            break
+          }
+          selection.cursor += this.match_count[i];
+        }
+      }
     })
     await selection.ready;
     for (const tile of this.tiles) {

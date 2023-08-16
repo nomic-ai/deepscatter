@@ -36864,7 +36864,7 @@ class DataSelection {
    * 
    * @param event an internally dispatched event.
    * @param listener a function to call back. It takes
-   * as an argument the `tile` ]]]
+   * as an argument the `tile` that was just added.
    */
   on(event, listener) {
     if (!this.events[event]) {
@@ -36919,7 +36919,10 @@ class DataSelection {
     return columns;
   }
   async add_or_remove_points(name, ixes, which) {
+    let newCursor = 0;
+    let tileOfMatch = void 0;
     const tileFunction = async (tile) => {
+      newCursor = -1;
       await this.ready;
       let value = (await tile.get_column(this.name)).toArray();
       const ixcol = tile.record_batch.getChild("ix").data[0].values;
@@ -36931,15 +36934,14 @@ class DataSelection {
           if (which === "add") {
             value[mid] = 1;
             if (ixes.length === 1) {
-              console.log("YEP YEP YEP");
-              this.cursor = this.match_count.reduce((a, b) => a + b, 0);
+              tileOfMatch = tile.key;
+              let offset_in_tile = 0;
               for (let i = 0; i < mid; i++) {
                 if (value[i] > 0) {
-                  console.log({ ix });
-                  this.cursor += 1;
+                  offset_in_tile += 1;
                 }
               }
-              console.log("CURSOR", this.cursor);
+              newCursor = offset_in_tile;
             }
           } else {
             value[mid] = 0;
@@ -36951,6 +36953,18 @@ class DataSelection {
     const selection2 = new DataSelection(this.plot, {
       name,
       tileFunction
+    });
+    selection2.on("tile loaded", () => {
+      if (newCursor >= 0) {
+        selection2.cursor = newCursor;
+        for (let i = 0; i < selection2.tiles.length; i++) {
+          const tile = selection2.tiles[i];
+          if (tile.key === tileOfMatch) {
+            break;
+          }
+          selection2.cursor += this.match_count[i];
+        }
+      }
     });
     await selection2.ready;
     for (const tile of this.tiles) {
