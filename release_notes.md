@@ -1,4 +1,8 @@
-# 2.13
+# 2.13.1
+
+- Publish type definitions. at dist/deepscatter.d.ts
+
+# 2.13.0
 - Introduce new 'selection' fundamental; selections allow
   managing a variety of common operations on sets of points,
   including iteration, creation of a column from a list of ids,
