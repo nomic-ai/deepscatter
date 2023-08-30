@@ -7,14 +7,12 @@ import { bisectLeft } from 'd3-array';
 interface SelectParams {
   foreground?: boolean;
   batchCallback?: (t: Tile) => Promise<void>;
-  instant?: boolean;
 }
 
 
 export const defaultSelectionParams: SelectParams = {
   foreground: true,
   batchCallback: (t: Tile) => Promise.resolve(),
-  instant: false,
 };
 
 export interface IdSelectParams extends SelectParams {
@@ -103,8 +101,6 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
   // used to access numbers by index.
 
   match_count: number[] = [];
-
-  private _bitmask : Record<string, Uint8Array> = {};
 
   constructor(
     plot: Scatterplot<T>,
@@ -391,37 +387,10 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
   async add_boolean_column(name: string, field: string): Promise<void> {
     throw new Error('Method not implemented.');
   }
+  
+  combine(other: DataSelection<T>, operation: "AND" | "OR" | "AND NOT" | "XOR",  name: string): DataSelection<T> {
+    
 
-  /**
-   * Get the bitmask for this selection. This is a map from tile key to
-   * Uint8Array, where each byte represents 8 rows in the tile. The bits
-   * are set to 1 if the row is selected, 0 otherwise.
-   */
-  get bitmask() {
-    const promises = [];
-    for (let tile of this.dataset.map(tile => tile)) {
-      // Don't redefine; selections are immutable.
-      if (this._bitmask[tile.key]) {
-        continue;
-      }
-      // Placeholder to prevent multiple application--a zero-length array
-      // indicates 'in process'
-      this._bitmask[tile.key] = new Uint8Array(0);
-      const p = tile.get_column(this.name).then(col => {
-        const values = col.data[0].values as Float32Array;
-        const bitmask = new Uint8Array(Math.ceil(tile.record_batch.numRows / 8));
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
-          const bit = i % 8;
-          const byte = Math.floor(i / 8);
-          // set the byte to itself OR-equalsed with the bit value popped
-          // into the appropriate place.
-          bitmask[byte] |= (values[i] > 0 ? 1 : 0) << bit;
-        }
-
-      })
-      promises.push(p);
-    }
-    return Promise.all(promises).then(() => this._bitmask);
   }
 
   apply_to_foreground(params: DS.BackgroundOptions): Promise<void> {
@@ -442,7 +411,6 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     });
   }
 }
-
   
 function bigintmatcher<T extends Tile>(field: string, matches: bigint[]) {
   const matchings = new Set(matches);

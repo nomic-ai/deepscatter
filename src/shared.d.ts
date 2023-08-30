@@ -7,6 +7,7 @@ import type { Tile, QuadTile, ArrowTile } from './tile';
 import type Scatterplot from './deepscatter';
 import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
+import { Bool } from 'apache-arrow';
 //import { DataSelection } from './selection';
 
 export type {
@@ -272,7 +273,7 @@ type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
 type FunctionalChannel = LambdaChannel | OpChannel;
 
-type BackgroundOptions = {
+export type BackgroundOptions = {
   // The color of background points. Hex codes or HTML
   // colors are accepted.
   color?: string;
@@ -360,7 +361,7 @@ export type ArrowBuildable = Vector | Float32Array;
  */
 export type Transformation<T> = (inputTile: T) => ArrowBuildable | Promise<ArrowBuildable>;
 
-export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array>;
+export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Vector<Bool> | Promise<Vector<Bool>>;
 
 export type BasicColorChannel = BasicChannel & {
   range?: string[] | string;

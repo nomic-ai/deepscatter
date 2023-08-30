@@ -147,6 +147,31 @@ export default class Scatterplot<T extends Tile> {
     this.bound = true;
   }
 
+  /**
+   * Creates a new selection from a set of parameters, and immediately applies it to the plot.
+   * @param params A set of parameters defining a selection. 
+  */
+  async select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration=this.prefs.duration) {
+    const selection = await this.select_data(params)
+    await selection.ready
+    await this.plotAPI({ 
+      duration,
+      encoding: {
+        foreground: {
+          field: selection.name,
+          op: 'eq',
+          a: 1
+        }
+      }
+     })
+  }
+  /**
+   * 
+   * @param params A set of parameters for selecting data based on ids, a boolean column, or a function.
+   * @returns A DataSelection object that can be used to extend the selection.
+   * 
+   * See `select_and_plot` for a method that will select data and plot it.
+   */
   async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams) {
     const selection = new DataSelection<T>(this, params);
     await selection.ready;

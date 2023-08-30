@@ -1,4 +1,9 @@
-# 2.13.1
+# 2.13.3
+
+Add `select_and_plot` shortcut on `Deepscatter` object to plot a selection immediately
+on creation.
+ 
+# 2.13.2
 
 - Publish type definitions. at dist/deepscatter.d.ts
 

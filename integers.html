@@ -22,7 +22,7 @@
     vectorFromArray,
     Utf8,
   } from 'apache-arrow';
-  const num_batches = 2;
+  const num_batches = 1;
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
@@ -230,7 +230,8 @@
       .value.split(' ')
       .filter((d) => d);
     console.log({ ids });
-    plot.select_data({ name: Math.random().toString(36), ids, idField: '_id' });
+    const name = Math.random().toString(36);
+    plot.select_and_plot({ name, ids, idField: '_id' });
   });
 
   document
@@ -241,8 +242,9 @@
         ids.push(Math.floor(Math.random() * 2 ** 16).toString());
       }
       console.log({ ids });
-      plot.select_data({
-        name: Math.random().toString(36),
+      const name = Math.random().toString(36);
+      plot.select_and_plot({
+        name,
         ids,
         idField: '_id',
       });
@@ -270,5 +272,9 @@
     left: 0;
     padding: 20px;
     z-index: 199;
+  }
+
+  .tooltip {
+    transform: translate(-50%, -100%);
   }
 </style>

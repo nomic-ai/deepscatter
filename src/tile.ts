@@ -395,6 +395,9 @@ export class QuadTile extends Tile {
   ): Promise<RecordBatch> {
     let url = `${this.url}/${this.key}.feather`;
     if (suffix) {
+      // 3/4/3
+      // suffix: 'text'
+      // 3/4/3.text.feather
       url = url.replace('.feather', `.${suffix}.feather`);
     }
     let tb: Table;
@@ -402,6 +405,8 @@ export class QuadTile extends Tile {
 
     if (this.dataset.tileProxy !== undefined) { 
       const endpoint = new URL(url).pathname;
+      // This method apiCall is crafted to match the 
+      // ts-nomic package.
       const bytes = await this.dataset.tileProxy.apiCall(endpoint, 
         "GET", 
         null,

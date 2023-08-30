@@ -24332,7 +24332,7 @@ class ReglRenderer extends Renderer {
         ];
       })
     ];
-    this.initialize();
+    void this.initialize();
     this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
   }
   get buffers() {
@@ -24449,6 +24449,9 @@ class ReglRenderer extends Renderer {
     });
     this._renderer(prop_list);
   }
+  /**
+   * Actions that run on a single animation tick.
+   */
   tick() {
     const { prefs } = this;
     const { regl: regl2, tileSet } = this;
@@ -25259,14 +25262,13 @@ class TileBufferManager {
     return this.tile.record_batch.numRows;
   }
   async create_buffer_data(key) {
-    var _a2;
     const { tile } = this;
     if (!tile.ready) {
       throw new Error("Tile table not present.");
     }
     let column = tile.record_batch.getChild(key);
     if (!column) {
-      const transformation = await tile.dataset.transformations[key];
+      const transformation = tile.dataset.transformations[key];
       if (transformation !== void 0) {
         await tile.apply_transformation(key);
         column = tile.record_batch.getChild(key);
@@ -25282,17 +25284,29 @@ class TileBufferManager {
         );
       }
     }
-    if (column.type.typeId !== 3) {
+    if (column.data.length !== 1) {
+      throw new Error(
+        `Column ${key} has ${column.data.length} buffers, not 1.`
+      );
+    }
+    if (!column.type || !column.type.typeId) {
+      throw new Error(`Column ${key} has no type.`);
+    }
+    if (!column.type || column.type.typeId !== 3) {
       const buffer = new Float32Array(tile.record_batch.numRows);
       const source_buffer = column.data[0];
-      if (column.type.dictionary) {
+      if (column.type["dictionary"]) {
         for (let i = 0; i < tile.record_batch.numRows; i++) {
           buffer[i] = source_buffer.values[i] - 2047;
+        }
+      } else if (column.type.typeId === 6) {
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = column.get(i) ? 1 : 0;
         }
       } else if (source_buffer.stride === 2 && column.type.typeId === 10) {
         const copy2 = new Int32Array(source_buffer.values).buffer;
         const view64 = new BigInt64Array(copy2);
-        const timetype = (_a2 = column == null ? void 0 : column.type) == null ? void 0 : _a2.unit;
+        const timetype = column.type.unit;
         const divisor = timetype === 0 ? 1e-3 : timetype === 1 ? 1 : timetype === 2 ? 1e3 : timetype === 3 ? 1e6 : 42;
         if (divisor === 42) {
           throw new Error(`Unknown time type ${timetype}`);
@@ -36843,7 +36857,6 @@ class DataSelection {
     this.tiles = [];
     this.events = {};
     this.match_count = [];
-    this._bitmask = {};
     this.plot = plot;
     this.dataset = plot.dataset;
     this.name = params.name;
@@ -37092,30 +37105,7 @@ class DataSelection {
   async add_boolean_column(name, field) {
     throw new Error("Method not implemented.");
   }
-  /**
-   * Get the bitmask for this selection. This is a map from tile key to
-   * Uint8Array, where each byte represents 8 rows in the tile. The bits
-   * are set to 1 if the row is selected, 0 otherwise.
-   */
-  get bitmask() {
-    const promises = [];
-    for (let tile of this.dataset.map((tile2) => tile2)) {
-      if (this._bitmask[tile.key]) {
-        continue;
-      }
-      this._bitmask[tile.key] = new Uint8Array(0);
-      const p = tile.get_column(this.name).then((col) => {
-        const values = col.data[0].values;
-        const bitmask = new Uint8Array(Math.ceil(tile.record_batch.numRows / 8));
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
-          const bit = i % 8;
-          const byte = Math.floor(i / 8);
-          bitmask[byte] |= (values[i] > 0 ? 1 : 0) << bit;
-        }
-      });
-      promises.push(p);
-    }
-    return Promise.all(promises).then(() => this._bitmask);
+  combine(other, operation, name) {
   }
   apply_to_foreground(params) {
     const field = this.name;
@@ -37282,6 +37272,31 @@ class Scatterplot {
     }
     this.bound = true;
   }
+  /**
+   * Creates a new selection from a set of parameters, and immediately applies it to the plot.
+   * @param params A set of parameters defining a selection. 
+  */
+  async select_and_plot(params, duration = this.prefs.duration) {
+    const selection2 = await this.select_data(params);
+    await selection2.ready;
+    await this.plotAPI({
+      duration,
+      encoding: {
+        foreground: {
+          field: selection2.name,
+          op: "eq",
+          a: 1
+        }
+      }
+    });
+  }
+  /**
+   * 
+   * @param params A set of parameters for selecting data based on ids, a boolean column, or a function.
+   * @returns A DataSelection object that can be used to extend the selection.
+   * 
+   * See `select_and_plot` for a method that will select data and plot it.
+   */
   async select_data(params) {
     const selection2 = new DataSelection(this, params);
     await selection2.ready;
