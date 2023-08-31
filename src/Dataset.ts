@@ -85,6 +85,8 @@ export abstract class Dataset<T extends Tile> {
     }
     return new QuadtileSet(url, prefs, plot, options);
   }
+
+
   /**
    * Generate an ArrowDataset from a single Arrow table.
    *

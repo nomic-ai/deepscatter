@@ -13,7 +13,7 @@ import { ArrowTile, QuadTile, Rectangle, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { DataSelection } from './selection';
-import type { BooleanColumnParams, FunctionSelectParams, IdSelectParams } from './selection';
+import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
 import type * as DS from './shared.d'
 // DOM elements that deepscatter uses.
 
@@ -172,7 +172,7 @@ export default class Scatterplot<T extends Tile> {
    * 
    * See `select_and_plot` for a method that will select data and plot it.
    */
-  async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams) {
+  async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams<T>) {
     const selection = new DataSelection<T>(this, params);
     await selection.ready;
     this.selection_history.push({

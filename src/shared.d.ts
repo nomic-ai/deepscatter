@@ -8,6 +8,7 @@ import type Scatterplot from './deepscatter';
 import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
 import { Bool } from 'apache-arrow';
+import type { DataSelection } from './selection';
 //import { DataSelection } from './selection';
 
 export type {
@@ -64,192 +65,8 @@ export type QuadtileOptions = {
   tileProxy?: TileProxy;
 };
 
-
-/**
- * Interface representing the selection of a Scatter plot.
- * It holds information about the selected data points.
- *
- * @template T - A Tile set.
- */
-export interface ScatterSelection<T extends Tile> {
-
-  /**
-   * name: The name of the selection. This will be used as the colun
-   * name in the Arrow record batches and are necessary for users 
-   * to define so that they can use the selection in subsequent 
-   * plotAPI calls to apply aesthetics to the selection.
-   * 
-   * They must be globally unique in the session.
-   * 
-   * e.g. 'search: fish', '54-abcdf', 'selection at 07:34:12',
-   * 'selección compuesta número 1'
-   * 
-   */
-
-  name: string;
-
-  /**
-   * Optionally, a user-defined for defining.
-   * 
-   * If you're using this, I recommend defining your own application 
-   * schema but I'm not going to force you throw type hints right now
-   * because, you know. I'm not a monster.
-   * 
-   * e.g.: ['search', 'lasso', 'random', 'cherry-pick']
-   * 
-   */
-  type?: string;
-
-
-  /**
-   * The cursor is an index that points to the current position
-   * within the selected points in the Scatter plot.
-   */
-  cursor: number;
-
-  /**
-   * The total number of points in the selection.
-   * It is used to know the size of the selected data.
-   */
-  selectionSize: number; 
-
-  /**
-   * The total number of points that have been evaluated for the selection.
-   * 
-   * This is supplied because deepscatter doesn't evaluate functions on tiles
-   * untile they are loaded.
-   */
-  evaluationSetSize: number;
-
-  /**
-   * The total number of points in the set. At present, always a light wrapper around
-   * the total number of points in the dataset.
-   */
-  totalSetSize: number;
-
-  /**
-   * Has the selection run on all tiles in the dataset?
-  */
-  complete: boolean;
-
-  /**
-   * 
-   * Ensures that the selection has been evaluated on all
-   * tiles loaded in the dataset. This is useful if, for example,
-   * your selection represents a search, and you are zoomed in on 
-   * one portion of the map; this will immediately execute the search
-   * (subject to delays to avoid blocking the main thread) on all tiles
-   * that have been fetched even if out of the viewport.
-   * 
-   * Resolves upon completion.
-   */
-  applyToAllLoadedTiles(): Promise<void>;
-
-  /**
-   * 
-   * Downloads all unloaded tiles in the dataset and applies the 
-   * transformation to them. Use with care! For > 10,000,000 point
-   * datasets, if called from Europe this may cause the transatlantic fiber-optic internet backbone 
-   * cables to melt.
-   */
-
-  applyToAllTiles(): Promise<void>;
-
-  /**
-   * 
-   * A function that combines two selections into a third
-   * selection that is the union of the two.
-   */
-  union?(other: ScatterSelection<T>): ScatterSelection<T>;
-
-  /**
-   * 
-   * A function that combines two selections into a third
-   * selection that is the intersection of the two. Note--for more complicated
-   * queries than simple intersection/union, use the (not yet defined)
-   * disjunctive normal form constructor.
-   */
-
-  intersection?(other: ScatterSelection<T>): ScatterSelection<T>;
-
-  /**
-   * 
-   * The deepscatter transformation that will be applied to 
-   * tiles to test if they are members of the set. Transformations
-   * can apply any type of function; here we assume that they are floats
-   * (because WebGL 1.0 can't handle anything else)
-   * and that 0 represents exclusion and 1 represents inclusion.
-   * 
-   * This constraint is not enforced by the type system.
-   */
-
-  transformation: Transformation<T>;
-
-  /**
-   * NOT IMPLEMENTED YET
-   * 
-   * A set of indexes that affects the ordering of the selection.
-   * 
-   */
-
-  ordering?: number[];
-
-  /**
-   * 
-  tiles: T[]; // The tiles that have been evaluated for the selection.
-
-  /**
-   * 
-   * returns the ith element of the selection; if undefined,
-   * returns the element at the current cursor.
-   * 
-   * @param i.
-   */
-  get(i: number | undefined) : StructRowProxy;
-
-  /**
-   * Returns a bitmask from each tile, identified by their keys.
-   * Used for efficiently persisting a selection for later use.
-   */
-  bitmask: Record<string, Uint8Array>;
-
-
-  /**
-    * Returns a new selection that is the union of this selection
-    * and all the points in the supplied array. 
-    *
-    * @param ids - An array of ids to add to the selection.
-    * @param field - The column storing the ids.
-    * @param name - The name of the new selection.
-    *   
-    * @returns A new selection that is the union of this selection
-    * and all the points in the supplied array.
-    *   
-  */
-  addPoints(name: string, field: string, ids: string[] | number[] | bigint[]): ScatterSelection<T>;
-
-  /**
-   * Returns a new selection that is the current selection,
-   * minus all the points in the supplied array.
-   * 
-   * @param ids - An array of ids to remove from the selection.
-   * @param field - The column storing the ids.
-   * @param name - The name of the new selection.
-   * 
-   * @returns A new selection that is the current selection,
-   * minus all the points in the supplied array.
-   * 
-  */
-  removePoints(name: string, field: string, ids: string[] | number[] | bigint[]): ScatterSelection<T>;
-  
-}
-
-// TODO: implement this.
-export type DNFmaker<T extends Tile> = (args: [ScatterSelection<T>[]]) => ScatterSelection<T>;
-
-
 export interface SelectionRecord<T extends Tile>  {
-  selection: ScatterSelection<T> | null;
+  selection: DataSelection<T> | null;
   name: string;
   flushed: boolean;
 }
@@ -347,7 +164,10 @@ export interface CategoricalChannel {
   field: string;
 }
 
-export type ArrowBuildable = Vector | Float32Array;
+// An arrow buildable vector is something returned that can be placed onto the scatterplot.
+// Float32Arrays will be dropped straight onto the GPU; other types while be cast
+// to Float32Array before going there.
+export type ArrowBuildable = Vector | Float32Array | Uint8Array;
 
 /**
  * A transformation is a batchwise operation that can be used to construct
@@ -361,7 +181,7 @@ export type ArrowBuildable = Vector | Float32Array;
  */
 export type Transformation<T> = (inputTile: T) => ArrowBuildable | Promise<ArrowBuildable>;
 
-export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Vector<Bool> | Promise<Vector<Bool>>;
+export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>;
 
 export type BasicColorChannel = BasicChannel & {
   range?: string[] | string;
