@@ -5,7 +5,7 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
-import type { StructRowProxy } from 'apache-arrow';
+import { tableFromIPC, type StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
@@ -57,8 +57,12 @@ export default class Scatterplot<T extends Tile> {
   // The queue of draw calls are a chain of promises.
   private plot_queue: Promise<void> = Promise.resolve();
   public prefs: DS.CompletePrefs;
-  // Whether the scatterplot has finished loading.
+
+  /**
+   * Has the scatterplot completed its initial load of the data?
+   */
   ready: Promise<void>;
+
   public click_handler: ClickFunction;
   private hooks: Record<string, Hook> = {};
   public tooltip_handler: TooltipHTML;
@@ -89,6 +93,9 @@ export default class Scatterplot<T extends Tile> {
     this.label_click_handler = new LabelClick(this);
     if (options.tileProxy) {
       this.tileProxy = options.tileProxy;
+    }
+    if (options.dataset) {
+      void this.load_dataset(options.dataset)
     }
     this.prefs = { ...default_API_call } as DS.CompletePrefs;
   }
@@ -182,6 +189,7 @@ export default class Scatterplot<T extends Tile> {
     });
     return selection;
   }
+
   /**
    *
    * @param name The name of the new column to be created. If it already exists, this will throw an error in invocation
@@ -261,7 +269,7 @@ export default class Scatterplot<T extends Tile> {
    */
   get dataset() {
     if (this._root === undefined) {
-      throw 'No dataset has been loaded';
+      throw new Error('No dataset has been loaded');
     }
     return this._root;
   }
@@ -292,15 +300,27 @@ export default class Scatterplot<T extends Tile> {
     );
   }
 
-  async reinitialize() {
-    const { prefs } = this;
-    if (prefs.source_url !== undefined) {
-      this._root = Dataset.from_quadfeather(prefs.source_url, prefs, this);
-    } else if (prefs.arrow_table !== undefined) {
-      this._root = Dataset.from_arrow_table(prefs.arrow_table, prefs, this);
+
+  async load_dataset(
+    params: DS.DataSpec
+  ) : Promise<DS.Dataset<T>> {
+    if (params.source_url !== undefined) {
+      this._root = Dataset.from_quadfeather(params.source_url, this as unknown as Scatterplot<QuadTile>) as unknown as Dataset<T>;
+    } else if (params.arrow_table !== undefined) {
+      this._root = Dataset.from_arrow_table(params.arrow_table, this as unknown as Scatterplot<ArrowTile>) as unknown as Dataset<T>;
+    } else if (params.arrow_buffer !== undefined) {
+      const tb = tableFromIPC(params.arrow_buffer);
+      this._root = Dataset.from_arrow_table(tb, this as unknown as Scatterplot<ArrowTile>) as unknown as Dataset<T>;
     } else {
       throw new Error('No source_url or arrow_table specified');
     }
+    await this._root.ready;
+    return this._root;
+  }
+
+  async reinitialize() {
+    const { prefs } = this;
+
     await this._root.ready;
 
     this._renderer = new ReglRenderer(
@@ -316,14 +336,13 @@ export default class Scatterplot<T extends Tile> {
 
     // Needs the zoom built as well.
 
-    const bkgd = select('#container-for-canvas-2d-background').select('canvas');
+    const bkgd = select('#container-for-canvas-2d-background').select('canvas') as Selection<HTMLCanvasElement, unknown, HTMLDivElement, HTMLCanvasElement>;
     const ctx = bkgd.node().getContext('2d');
 
-    ctx.fillStyle = prefs.background_color || 'rgba(133, 133, 111, .8)';
+    ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
-    this._renderer.initialize();
-
+    void this._renderer.initialize();
     void this._root.promise.then(() => this.mark_ready());
     return this.ready;
   }
@@ -400,16 +419,16 @@ export default class Scatterplot<T extends Tile> {
     // Run starting at no zoom.
     // xtimes: the width/height will be this multiplier of screen width.
     // points: pre-download to this depth.
-    await this._root.download_to_depth(points);
+    await this.dataset.download_to_depth(points);
     const { width, height } = this._renderer;
-    this.plotAPI({ duration: 0 });
+    void this.plotAPI({ duration: 0 });
     const canvas = document.createElement('canvas');
     canvas.setAttribute('width', (xtimes * width).toString());
     canvas.setAttribute('height', (xtimes * height).toString());
     const ctx = canvas.getContext('2d');
 
-    const corners = this._zoom.current_corners() as Rectangle;
-    const current_zoom = this._zoom.transform!.k;
+    const corners = this._zoom.current_corners();
+    const current_zoom = this._zoom.transform.k;
     const xstep = (corners.x[1] - corners.x[0]) / xtimes;
     const ystep = (corners.y[1] - corners.y[0]) / xtimes;
 
@@ -683,17 +702,17 @@ export default class Scatterplot<T extends Tile> {
    * times in parallel because the transition state can get all borked up.
    * plotAPI wraps it in an await wrapper.
    *
-   * @param prefs The preferences
+   * @param prefs An API call.
    */
   private async unsafe_plotAPI(prefs: DS.APICall): Promise<void> {
     if (prefs === null) {
       return;
     }
     if (prefs.click_function) {
-      this.click_function = Function('datum', prefs.click_function);
+      this.click_function = Function('datum', prefs.click_function) as unknown as ClickFunction;
     }
     if (prefs.tooltip_html) {
-      this.tooltip_html = Function('datum', prefs.tooltip_html);
+      this.tooltip_html = Function('datum', prefs.tooltip_html) as unknown as TooltipHTML;
     }
     if (prefs.background_options) {
       // these two numbers can be set either on fg/bg or just on fg
@@ -716,12 +735,16 @@ export default class Scatterplot<T extends Tile> {
 
     this.update_prefs(prefs);
 
-    // Some things have to be done *before* we can actually run this;
-    // this is a spot to defer the tasks.
-
-    const tasks = [];
-
     if (this._root === undefined) {
+      const { source_url, arrow_table, arrow_buffer } = (prefs as DS.InitialAPICall);
+      const dataSpec = { source_url, arrow_table, arrow_buffer } as DS.DataSpec;
+      if (Object.values(dataSpec).filter((x) => x !== undefined).length !== 1) {
+        throw new Error('The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer');
+      }
+      await this.load_dataset(dataSpec);
+    }
+
+    if (this._zoom === undefined) {
       await this.reinitialize();
     }
 
@@ -744,8 +767,6 @@ export default class Scatterplot<T extends Tile> {
       }
     }
     */
-
-    await this._root.promise;
 
     this._renderer.render_props.apply_prefs(this.prefs);
 
@@ -805,19 +826,19 @@ export default class Scatterplot<T extends Tile> {
     this._zoom.restart_timer(60_000);
   }
 
-  async root_table() {
+  get root_batch() {
     if (!this._root) {
-      return false;
+      throw new Error('No dataset has been loaded');
     }
-    return this._root.record_batch;
+    return this.dataset.root_tile.record_batch;
   }
 
   /**
    * Return the current state of the query. Can be used to save an API
    * call for use programatically.
    */
-  get query() {
-    const p = JSON.parse(JSON.stringify(this.prefs));
+  get query() : DS.APICall {
+    const p = JSON.parse(JSON.stringify(this.prefs)) as DS.APICall;
     p.zoom = { bbox: this._renderer.zoom.current_corners() };
     return p;
   }

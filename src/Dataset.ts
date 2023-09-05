@@ -15,6 +15,7 @@ import {
   Int64,
   makeData
 } from 'apache-arrow';
+import Scatterplot from './deepscatter';
 
 type APICall = DS.APICall;
 type Key = string;
@@ -60,6 +61,9 @@ export abstract class Dataset<T extends Tile> {
     return this.root_tile.highest_known_ix;
   }
 
+  download_to_depth(max_ix: number) {
+    return Promise.resolve()
+  }
   /**
    * Attempts to build an Arrow table from all record batches.
    * If some batches have different transformations applied,
@@ -76,14 +80,13 @@ export abstract class Dataset<T extends Tile> {
 
   static from_quadfeather(
     url: string,
-    prefs: APICall,
     plot: DS.Plot
   ): QuadtileSet {
     const options = {};
     if (plot.tileProxy) {
       options['tileProxy'] = plot.tileProxy;
     }
-    return new QuadtileSet(url, prefs, plot, options);
+    return new QuadtileSet(url, plot, options);
   }
 
 
@@ -97,10 +100,9 @@ export abstract class Dataset<T extends Tile> {
    */
   static from_arrow_table(
     table: Table,
-    prefs: APICall,
     plot: DS.Plot
   ): ArrowDataset {
-    return new ArrowDataset(table, prefs, plot);
+    return new ArrowDataset(table, plot);
   }
 
   abstract download_most_needed_tiles(
@@ -394,7 +396,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   public promise: Promise<void> = Promise.resolve();
   public root_tile: ArrowTile;
 
-  constructor(table: Table, prefs: APICall, plot: DS.Plot) {
+  constructor(table: Table, plot: Scatterplot<ArrowTile>) {
     super(plot);
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
@@ -408,9 +410,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   }
 
   download_most_needed_tiles(
-    bbox: Rectangle | undefined,
-    max_ix: number,
-    queue_length: number
+    ...args: unknown[]
   ): void {
     // Definitionally, they're already there if using an Arrow table.
     return undefined;
@@ -421,11 +421,10 @@ export class ArrowDataset extends Dataset<ArrowTile> {
 
 export class QuadtileSet extends Dataset<QuadTile> {
   protected _download_queue: Set<Key> = new Set();
-  public promise: Promise<void> = new Promise(nothing);
-  root_tile: QuadTie;
+  public promise: Promise<void>;
+  root_tile: QuadTile;
   constructor(
     base_url: string,
-    prefs: APICall,
     plot: DS.Plot,
     options: DS.QuadtileOptions = {}
   ) {
@@ -434,10 +433,12 @@ export class QuadtileSet extends Dataset<QuadTile> {
       this.tileProxy = options.tileProxy;
     }
     this.root_tile = new QuadTile(base_url, '0/0/0', null, this);
-    this.promise = this.root_tile.download().then((d) => {
+    const download = this.root_tile.download();
+    this.promise = download.then(
+      (d) => {
       const schema = this.root_tile.record_batch.schema;
       if (schema.metadata.has('sidecars')) {
-        const cars = schema.metadata.get('sidecars') as string;
+        const cars = schema.metadata.get('sidecars');
         const parsed = JSON.parse(cars) as Record<string, string>;
         for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function (tile) {
@@ -462,11 +463,17 @@ export class QuadtileSet extends Dataset<QuadTile> {
   get ready() {
     return this.root_tile.download();
   }
+
   get extent() {
     return this.root_tile.extent;
   }
 
-  async download_to_depth(max_ix) {
+  /**
+   * Ensures that all the tiles in a dataset are downloaded that include 
+   * datapoints of index less than or equal to max_ix.
+   * @param max_ix the depth to download to.
+   */
+  async download_to_depth(max_ix: number) {
     await this.root_tile.download_to_depth(max_ix);
   }
 

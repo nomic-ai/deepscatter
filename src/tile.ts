@@ -447,7 +447,7 @@ export class QuadTile extends Tile {
 
   async download(): Promise<void> {
     // This should only be called once per tile.
-    if (this._download) {
+    if (this._download !== undefined) {
       return this._download;
     }
 
@@ -458,7 +458,7 @@ export class QuadTile extends Tile {
     this._already_called = true;
     this.download_state = 'In progress';
 
-    this._download = this.get_arrow()
+    return this._download = this.get_arrow()
       .then((batch) => {
         this.ready = true;
         const metadata = batch.schema.metadata;
@@ -468,10 +468,12 @@ export class QuadTile extends Tile {
         }
 
         const children = metadata.get('children');
+
         if (children) {
           this.child_locations = JSON.parse(children) as string[];
         }
         const ixes = batch.getChild('ix');
+
         if (ixes === null) {
           throw 'No ix column in table';
         }
@@ -490,7 +492,6 @@ export class QuadTile extends Tile {
         console.warn(error);
         throw error;
       });
-    return this._download;
   }
 
   /**

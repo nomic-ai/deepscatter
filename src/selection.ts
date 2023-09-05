@@ -173,7 +173,7 @@ export class Bitmask {
     const bit = i % 8;
     this.mask[byte] |= 1 << bit;
   }
-  
+
   and(other : Bitmask) {
     const result = new Bitmask(this.length);
     for (let i = 0; i < this.mask.length; i++) {
@@ -181,6 +181,7 @@ export class Bitmask {
     }
     return result;
   }
+
   or(other : Bitmask) {
     const result = new Bitmask(this.length);
     for (let i = 0; i < this.mask.length; i++) {
@@ -188,6 +189,7 @@ export class Bitmask {
     }
     return result;
   }
+
   xor(other : Bitmask) {
     const result = new Bitmask(this.length);
     for (let i = 0; i < this.mask.length; i++) {
@@ -195,6 +197,7 @@ export class Bitmask {
     }
     return result;
   }
+  
   not() {
     const result = new Bitmask(this.length);
     for (let i = 0; i < this.mask.length; i++) {

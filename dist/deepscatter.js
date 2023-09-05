@@ -35106,7 +35106,7 @@ class QuadTile extends Tile {
     return batch;
   }
   async download() {
-    if (this._download) {
+    if (this._download !== void 0) {
       return this._download;
     }
     if (this._already_called) {
@@ -35114,7 +35114,7 @@ class QuadTile extends Tile {
     }
     this._already_called = true;
     this.download_state = "In progress";
-    this._download = this.get_arrow().then((batch) => {
+    return this._download = this.get_arrow().then((batch) => {
       this.ready = true;
       const metadata = batch.schema.metadata;
       const extent2 = metadata.get("extent");
@@ -35143,7 +35143,6 @@ class QuadTile extends Tile {
       console.warn(error);
       throw error;
     });
-    return this._download;
   }
   /**
    * Sometimes it's useful to do operations on batches of tiles. This function
@@ -35297,8 +35296,6 @@ function children(tile) {
   }
   return children2;
 }
-function nothing() {
-}
 class Dataset {
   /**
    * @param plot The plot to which this dataset belongs.
@@ -35316,6 +35313,9 @@ class Dataset {
   get highest_known_ix() {
     return this.root_tile.highest_known_ix;
   }
+  download_to_depth(max_ix) {
+    return Promise.resolve();
+  }
   /**
    * Attempts to build an Arrow table from all record batches.
    * If some batches have different transformations applied,
@@ -35327,12 +35327,12 @@ class Dataset {
       this.map((d) => d).filter((d) => d.ready).map((d) => d.record_batch)
     );
   }
-  static from_quadfeather(url, prefs, plot) {
+  static from_quadfeather(url, plot) {
     const options = {};
     if (plot.tileProxy) {
       options["tileProxy"] = plot.tileProxy;
     }
-    return new QuadtileSet(url, prefs, plot, options);
+    return new QuadtileSet(url, plot, options);
   }
   /**
    * Generate an ArrowDataset from a single Arrow table.
@@ -35342,8 +35342,8 @@ class Dataset {
    * @param plot The Scatterplot to use.
    * @returns
    */
-  static from_arrow_table(table, prefs, plot) {
-    return new ArrowDataset(table, prefs, plot);
+  static from_arrow_table(table, plot) {
+    return new ArrowDataset(table, plot);
   }
   /**
    *
@@ -35579,7 +35579,7 @@ class Dataset {
   }
 }
 class ArrowDataset extends Dataset {
-  constructor(table, prefs, plot) {
+  constructor(table, plot) {
     super(plot);
     this.promise = Promise.resolve();
     this.root_tile = new ArrowTile(table, this, 0, plot);
@@ -35590,38 +35590,40 @@ class ArrowDataset extends Dataset {
   get ready() {
     return Promise.resolve();
   }
-  download_most_needed_tiles(bbox, max_ix, queue_length) {
+  download_most_needed_tiles(...args) {
     return void 0;
   }
 }
 class QuadtileSet extends Dataset {
-  constructor(base_url, prefs, plot, options = {}) {
+  constructor(base_url, plot, options = {}) {
     super(plot);
     this._download_queue = /* @__PURE__ */ new Set();
-    this.promise = new Promise(nothing);
     if (options.tileProxy) {
       this.tileProxy = options.tileProxy;
     }
     this.root_tile = new QuadTile(base_url, "0/0/0", null, this);
-    this.promise = this.root_tile.download().then((d) => {
-      const schema = this.root_tile.record_batch.schema;
-      if (schema.metadata.has("sidecars")) {
-        const cars = schema.metadata.get("sidecars");
-        const parsed = JSON.parse(cars);
-        for (const [k, v] of Object.entries(parsed)) {
-          this.transformations[k] = async function(tile) {
-            const batch = await tile.get_arrow(v);
-            const column = batch.getChild(k);
-            if (column === null) {
-              throw new Error(
-                `No column named ${k} in sidecar tile ${batch.schema.fields.map((f) => f.name).join(", ")}`
-              );
-            }
-            return column;
-          };
+    const download = this.root_tile.download();
+    this.promise = download.then(
+      (d) => {
+        const schema = this.root_tile.record_batch.schema;
+        if (schema.metadata.has("sidecars")) {
+          const cars = schema.metadata.get("sidecars");
+          const parsed = JSON.parse(cars);
+          for (const [k, v] of Object.entries(parsed)) {
+            this.transformations[k] = async function(tile) {
+              const batch = await tile.get_arrow(v);
+              const column = batch.getChild(k);
+              if (column === null) {
+                throw new Error(
+                  `No column named ${k} in sidecar tile ${batch.schema.fields.map((f) => f.name).join(", ")}`
+                );
+              }
+              return column;
+            };
+          }
         }
       }
-    });
+    );
   }
   get ready() {
     return this.root_tile.download();
@@ -35629,6 +35631,11 @@ class QuadtileSet extends Dataset {
   get extent() {
     return this.root_tile.extent;
   }
+  /**
+   * Ensures that all the tiles in a dataset are downloaded that include 
+   * datapoints of index less than or equal to max_ix.
+   * @param max_ix the depth to download to.
+   */
   async download_to_depth(max_ix) {
     await this.root_tile.download_to_depth(max_ix);
   }
@@ -36845,18 +36852,117 @@ function isIdSelectParam(params) {
 function isBooleanColumnParam(params) {
   return params.field !== void 0;
 }
+function isCompositeSelectParam(params) {
+  return params.composition !== void 0;
+}
+function isComposition(elems) {
+  if (elems === void 0)
+    throw new Error("Undefined composition");
+  if (!elems)
+    return false;
+  if (!elems.length)
+    return false;
+  const op = elems[0];
+  return ["AND", "OR", "XOR", "NOT"].indexOf(op) > -1;
+}
+async function extractBitmask(tile, arg) {
+  if (isComposition(arg)) {
+    return applyCompositeFunctionToTile(tile, arg);
+  } else {
+    const column = tile.get_column(arg.name);
+    return Bitmask.from_arrow(await column);
+  }
+}
+async function applyCompositeFunctionToTile(tile, args) {
+  if (isUnarySelectParam(args)) {
+    const bitmask = await extractBitmask(tile, args[1]);
+    if (args[0] === "NOT") {
+      return bitmask.not();
+    } else {
+      throw new Error("Unknown unary operation");
+    }
+  }
+  const [op, arg1, arg2] = args;
+  const bitmask1 = await extractBitmask(tile, arg1);
+  const bitmask2 = await extractBitmask(tile, arg2);
+  if (op === "AND") {
+    return bitmask1.and(bitmask2);
+  } else if (op === "OR") {
+    return bitmask1.or(bitmask2);
+  } else if (op === "XOR") {
+    return bitmask1.xor(bitmask2);
+  } else {
+    throw new Error("Unknown binary operation");
+  }
+}
+function isUnarySelectParam(params) {
+  const things = /* @__PURE__ */ new Set(["NOT"]);
+  return things.has(params[0]);
+}
 function isFunctionSelectParam(params) {
   return params.tileFunction !== void 0;
 }
+class Bitmask {
+  constructor(length, mask) {
+    this.length = length;
+    this.mask = mask || new Uint8Array(Math.ceil(length / 8));
+  }
+  static from_arrow(vector) {
+    const mask = vector.data[0].values;
+    return new Bitmask(vector.length, mask);
+  }
+  to_arrow() {
+    return new Vector([
+      makeData({
+        type: new Bool$1(),
+        data: this.mask,
+        length: this.length
+      })
+    ]);
+  }
+  set(i) {
+    const byte = Math.floor(i / 8);
+    const bit = i % 8;
+    this.mask[byte] |= 1 << bit;
+  }
+  and(other) {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = this.mask[i] & other.mask[i];
+    }
+    return result;
+  }
+  or(other) {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = this.mask[i] | other.mask[i];
+    }
+    return result;
+  }
+  xor(other) {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = this.mask[i] ^ other.mask[i];
+    }
+    return result;
+  }
+  not() {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = ~this.mask[i];
+    }
+    return result;
+  }
+}
 class DataSelection {
   constructor(plot, params) {
+    this.match_count = [];
     this.cursor = 0;
     this.complete = false;
     this.selectionSize = 0;
     this.evaluationSetSize = 0;
     this.tiles = [];
     this.events = {};
-    this.match_count = [];
     this.plot = plot;
     this.dataset = plot.dataset;
     this.name = params.name;
@@ -36871,6 +36977,12 @@ class DataSelection {
       this.add_boolean_column(params.name, params.field).then(markReady);
     } else if (isFunctionSelectParam(params)) {
       this.add_function_column(params.name, params.tileFunction).then(markReady);
+    } else if (isCompositeSelectParam(params)) {
+      const { name, composition } = params;
+      this.add_function_column(name, async (tile) => {
+        const bitmask = await applyCompositeFunctionToTile(tile, composition);
+        return bitmask.to_arrow();
+      }).then(markReady);
     }
   }
   /**
@@ -36889,6 +37001,54 @@ class DataSelection {
     if (this.events[event]) {
       this.events[event].forEach((listener) => listener(args));
     }
+  }
+  /**
+   * 
+   * Ensures that the selection has been evaluated on all
+   * tiles loaded in the dataset. This is useful if, for example,
+   * your selection represents a search, and you are zoomed in on 
+   * one portion of the map; this will immediately execute the search
+   * (subject to delays to avoid blocking the main thread) on all tiles
+   * that have been fetched even if out of the viewport.
+   * 
+   * Resolves upon completion.
+   */
+  applyToAllLoadedTiles() {
+    throw new Error("Method not implemented.");
+  }
+  /**
+   * 
+   * Downloads all unloaded tiles in the dataset and applies the 
+   * transformation to them. Use with care! For > 10,000,000 point
+   * datasets, if called from Europe this may cause the transatlantic fiber-optic internet backbone 
+   * cables to melt.
+   */
+  applyToAllTiles() {
+    throw new Error("Method not implemented.");
+  }
+  /**
+   * 
+   * A function that combines two selections into a third
+   * selection that is the union of the two.
+   */
+  union(other, name) {
+    return new DataSelection(this.plot, {
+      name: name || this.name + " union " + other.name,
+      composition: ["OR", this, other]
+    });
+  }
+  /**
+   * 
+   * A function that combines two selections into a third
+   * selection that is the intersection of the two. Note--for more complicated
+   * queries than simple intersection/union, use the (not yet defined)
+   * disjunctive normal form constructor.
+   */
+  intersection(other, name) {
+    return new DataSelection(this.plot, {
+      name: name || this.name + " intersection " + other.name,
+      composition: ["AND", this, other]
+    });
   }
   /**
    * Advances the cursor (the currently selected point) by a given number of rows.
@@ -36985,6 +37145,9 @@ class DataSelection {
     }
     return selection2;
   }
+  get ordering() {
+    throw new Error("Method not implemented.");
+  }
   /**
    * 
    * @param name the name for the column to assign in the dataset.
@@ -37009,8 +37172,9 @@ class DataSelection {
       const array2 = await functionToApply(tile);
       const batch = tile.record_batch;
       let matches = 0;
+      console.log({ array: array2 });
       for (let i = 0; i < batch.numRows; i++) {
-        if (array2[i] > 0) {
+        if (array2["get"] && array2["get"](i) || array2[i]) {
           matches++;
         }
       }
@@ -37023,7 +37187,8 @@ class DataSelection {
     };
   }
   /**
-   * The total number of points in the dataset.
+   * The total number of points in the set. At present, always a light wrapper around
+   * the total number of points in the dataset.
    */
   get totalSetSize() {
     return this.dataset.highest_known_ix;
@@ -37059,11 +37224,11 @@ class DataSelection {
     if (relevantTile === void 0) {
       return null;
     }
-    const column = relevantTile.record_batch.getChild(this.name).toArray();
+    const column = relevantTile.record_batch.getChild(this.name);
     const offset = i - currentOffset;
     let ix_in_match = 0;
     for (let j = 0; j < column.length; j++) {
-      if (column[j] > 0) {
+      if (column.get(j)) {
         if (ix_in_match === offset) {
           return relevantTile.record_batch.get(j);
         }
@@ -37075,9 +37240,9 @@ class DataSelection {
   // Iterate over the points in raw order.
   *[Symbol.iterator]() {
     for (let tile of this.tiles) {
-      const column = tile.record_batch.getChild(this.name).toArray();
+      const column = tile.record_batch.getChild(this.name);
       for (let i = 0; i < column.length; i++) {
-        if (column[i] > 0) {
+        if (column.get(i)) {
           yield tile.record_batch.get(i);
         }
       }
@@ -37105,8 +37270,6 @@ class DataSelection {
   async add_boolean_column(name, field) {
     throw new Error("Method not implemented.");
   }
-  combine(other, operation, name) {
-  }
   apply_to_foreground(params) {
     const field = this.name;
     const background_options = {
@@ -37130,14 +37293,17 @@ function bigintmatcher(field, matches) {
   return async function(tile) {
     const col = (await tile.get_column(field)).data[0];
     const values = col.values;
-    const results = new Float32Array(tile.record_batch.numRows);
+    const bitmask = new Bitmask(tile.record_batch.numRows);
     for (let i = 0; i < tile.record_batch.numRows; i++) {
-      results[i] = matchings.has(values[i]) ? 1 : 0;
+      matchings.has(values[i]) && bitmask.set(i);
     }
-    return results;
+    return bitmask.to_arrow();
   };
 }
 function stringmatcher(field, matches) {
+  if (field === void 0) {
+    throw new Error("Field must be defined");
+  }
   const trie = [];
   function addToTrie(arr) {
     let node = trie;
@@ -37158,7 +37324,7 @@ function stringmatcher(field, matches) {
     const col = (await tile.get_column(field)).data[0];
     const bytes = col.values;
     const offsets = col.valueOffsets;
-    const results = new Float32Array(tile.record_batch.numRows);
+    const bitmask = new Bitmask(tile.record_batch.numRows);
     function existsInTrie(start2, len) {
       let node = trie;
       for (let i = 0; i < len; i++) {
@@ -37174,10 +37340,10 @@ function stringmatcher(field, matches) {
       const start2 = offsets[o];
       const end = offsets[o + 1];
       if (existsInTrie(start2, end - start2)) {
-        results[o] = 1;
+        bitmask.set(o);
       }
     }
-    return results;
+    return bitmask.to_arrow();
   };
 }
 const default_background_options = {
@@ -37246,6 +37412,9 @@ class Scatterplot {
     this.label_click_handler = new LabelClick(this);
     if (options.tileProxy) {
       this.tileProxy = options.tileProxy;
+    }
+    if (options.dataset) {
+      void this.load_dataset(options.dataset);
     }
     this.prefs = { ...default_API_call };
   }
@@ -37360,7 +37529,7 @@ class Scatterplot {
    */
   get dataset() {
     if (this._root === void 0) {
-      throw "No dataset has been loaded";
+      throw new Error("No dataset has been loaded");
     }
     return this._root;
   }
@@ -37389,15 +37558,23 @@ class Scatterplot {
       labelset.options || {}
     );
   }
-  async reinitialize() {
-    const { prefs } = this;
-    if (prefs.source_url !== void 0) {
-      this._root = Dataset.from_quadfeather(prefs.source_url, prefs, this);
-    } else if (prefs.arrow_table !== void 0) {
-      this._root = Dataset.from_arrow_table(prefs.arrow_table, prefs, this);
+  async load_dataset(params) {
+    if (params.source_url !== void 0) {
+      this._root = Dataset.from_quadfeather(params.source_url, this);
+    } else if (params.arrow_table !== void 0) {
+      this._root = Dataset.from_arrow_table(params.arrow_table, this);
+    } else if (params.arrow_buffer !== void 0) {
+      const tb = tableFromIPC(params.arrow_buffer);
+      this._root = Dataset.from_arrow_table(tb, this);
     } else {
       throw new Error("No source_url or arrow_table specified");
     }
+    await this._root.ready;
+    return this._root;
+  }
+  async reinitialize() {
+    var _a2;
+    const { prefs } = this;
     await this._root.ready;
     this._renderer = new ReglRenderer(
       "#container-for-webgl-canvas",
@@ -37410,9 +37587,9 @@ class Scatterplot {
     this._zoom.initialize_zoom();
     const bkgd = select("#container-for-canvas-2d-background").select("canvas");
     const ctx = bkgd.node().getContext("2d");
-    ctx.fillStyle = prefs.background_color || "rgba(133, 133, 111, .8)";
+    ctx.fillStyle = (_a2 = prefs.background_color) != null ? _a2 : "rgba(133, 133, 111, .8)";
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
-    this._renderer.initialize();
+    void this._renderer.initialize();
     void this._root.promise.then(() => this.mark_ready());
     return this.ready;
   }
@@ -37478,9 +37655,9 @@ class Scatterplot {
     setTimeout(() => ctx.clearRect(0, 0, 1e4, 1e4), 17 * 400);
   }
   async make_big_png(xtimes = 3, points = 1e7, timeper = 100) {
-    await this._root.download_to_depth(points);
+    await this.dataset.download_to_depth(points);
     const { width, height } = this._renderer;
-    this.plotAPI({ duration: 0 });
+    void this.plotAPI({ duration: 0 });
     const canvas = document.createElement("canvas");
     canvas.setAttribute("width", (xtimes * width).toString());
     canvas.setAttribute("height", (xtimes * height).toString());
@@ -37718,7 +37895,7 @@ class Scatterplot {
    * times in parallel because the transition state can get all borked up.
    * plotAPI wraps it in an await wrapper.
    *
-   * @param prefs The preferences
+   * @param prefs An API call.
    */
   async unsafe_plotAPI(prefs) {
     var _a2;
@@ -37744,12 +37921,19 @@ class Scatterplot {
     }
     this.update_prefs(prefs);
     if (this._root === void 0) {
+      const { source_url, arrow_table, arrow_buffer } = prefs;
+      const dataSpec = { source_url, arrow_table, arrow_buffer };
+      if (Object.values(dataSpec).filter((x) => x !== void 0).length !== 1) {
+        throw new Error("The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer");
+      }
+      await this.load_dataset(dataSpec);
+    }
+    if (this._zoom === void 0) {
       await this.reinitialize();
     }
     if (prefs.basemap_gleofeather) {
       prefs.polygons = [{ file: prefs.basemap_gleofeather }];
     }
-    await this._root.promise;
     this._renderer.render_props.apply_prefs(this.prefs);
     const { width, height } = this;
     this.update_prefs(prefs);
@@ -37800,11 +37984,11 @@ class Scatterplot {
     }
     this._zoom.restart_timer(6e4);
   }
-  async root_table() {
+  get root_batch() {
     if (!this._root) {
-      return false;
+      throw new Error("No dataset has been loaded");
     }
-    return this._root.record_batch;
+    return this.dataset.root_tile.record_batch;
   }
   /**
    * Return the current state of the query. Can be used to save an API

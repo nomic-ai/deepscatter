@@ -2,14 +2,14 @@ import { Selection } from 'd3-selection';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset } from './Dataset';
-import type { StructRowProxy } from 'apache-arrow';
+import { type StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
 import { QuadTile, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { DataSelection } from './selection';
-import type { BooleanColumnParams, FunctionSelectParams, IdSelectParams } from './selection';
+import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
 import type * as DS from './shared.d';
 declare type Hook = () => void;
 /**
@@ -30,6 +30,9 @@ export default class Scatterplot<T extends Tile> {
     _zoom: Zoom<T>;
     private plot_queue;
     prefs: DS.CompletePrefs;
+    /**
+     * Has the scatterplot completed its initial load of the data?
+     */
     ready: Promise<void>;
     click_handler: ClickFunction;
     private hooks;
@@ -61,7 +64,7 @@ export default class Scatterplot<T extends Tile> {
      *
      * See `select_and_plot` for a method that will select data and plot it.
      */
-    select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams): Promise<DataSelection<T>>;
+    select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams<T>): Promise<DataSelection<T>>;
     /**
      *
      * @param name The name of the new column to be created. If it already exists, this will throw an error in invocation
@@ -97,6 +100,7 @@ export default class Scatterplot<T extends Tile> {
      */
     get dataset(): Dataset<T>;
     add_api_label(labelset: DS.Labelset): void;
+    load_dataset(params: DS.DataSpec): Promise<DS.Dataset<T>>;
     reinitialize(): Promise<void>;
     visualize_tiles(): void;
     make_big_png(xtimes?: number, points?: number, timeper?: number): Promise<void>;
@@ -154,15 +158,15 @@ export default class Scatterplot<T extends Tile> {
      * times in parallel because the transition state can get all borked up.
      * plotAPI wraps it in an await wrapper.
      *
-     * @param prefs The preferences
+     * @param prefs An API call.
      */
     private unsafe_plotAPI;
-    root_table(): Promise<any>;
+    get root_batch(): import("apache-arrow").RecordBatch<any>;
     /**
      * Return the current state of the query. Can be used to save an API
      * call for use programatically.
      */
-    get query(): any;
+    get query(): DS.APICall;
     drawContours(contours: any, drawTo: any): void;
     sample_points(n?: number): Record<string, number | string>[];
     contours(aes: any): void;

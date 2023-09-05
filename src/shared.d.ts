@@ -43,6 +43,7 @@ type TwoArgumentOp = {
 type Newable<T> = { new (...args: any[]): T };
 export type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
+
 interface InitializedScatterplot<T extends Tile> {
   _root: Dataset<T>;
   _renderer: ReglRenderer<T>;
@@ -60,7 +61,9 @@ export interface TileProxy {
 
 export type ScatterplotOptions = {
   tileProxy?: TileProxy;
+  dataset?: DataSpec;
 };
+
 export type QuadtileOptions = {
   tileProxy?: TileProxy;
 };
@@ -100,13 +103,14 @@ export type BackgroundOptions = {
   // describes the foreground and background separately.
   opacity?: number | [number, number];
 
-  // A multiplier against the point's size. Default 0.66.
-  // A single value describes the background; an array
-  // describes the foreground and background separately.
-
+  /**
+   * A multiplier against the point's size. Default 0.66.
+   * A single value describes the background; an array
+   * describes the foreground and background separately.
+  */
   size?: number | [number, number];
 
-  // Whether the background points should respond on mouseover.
+  // Whether the background points sho`uld respond on mouseover.
   mouseover?: boolean;
 };
 
@@ -118,6 +122,10 @@ export type ConstantNumber = {
   constant: number;
 };
 
+/**
+ * A constant color channel must be represented as a string that 
+ * is valid HTML. (`blue`, `#EEFF00`, etc.)
+ */
 export type ConstantColorChannel = {
   constant: string;
 };
@@ -265,9 +273,17 @@ export type Dimension = keyof Encoding;
 // 2. A URL to a Quadtile source.
 // 3. An array buffer that contains a serialized Table.
 
-type DataSpec = Record<string, never> &
+/**
+ * A DataSpec is a record that describes how to load data into the
+ * scatterplot. It can be one of three things:
+ * 1. A URL to a quadtile source.
+ * 2. An Arrow Table object. (Use this with care! Minor differences in JS Apache Arrow builds 
+ * can cause this to fail in deeply confusing ways.)
+ * 3. A Uint8Array containing a serialized Arrow Table. (This is safer than passing an Arrow Table.)
+ */
+export type DataSpec = Record<string, never> &
   (
-    | { source_url?: never; arrow_table?: never; arrow_buffer: ArrayBuffer }
+    | { source_url?: never; arrow_table?: never; arrow_buffer: Uint8Array }
     | { source_url: string; arrow_table?: never; arrow_buffer?: never }
     | { source_url?: never; arrow_table: Table; arrow_buffer?: never }
   );
@@ -323,6 +339,7 @@ export type APICall = {
   /** A function defind as a string that takes implied argument 'datum' */
   click_function?: string;
 
+  background_color?: string;
   //
   encoding?: Encoding;
   labels?: Labelcall;
@@ -331,7 +348,7 @@ export type APICall = {
   zoom_align?: undefined | 'right' | 'left' | 'top' | 'bottom' | 'center';
 };
 
-type InitialAPICall = APICall & {
+export type InitialAPICall = APICall & {
   encoding: Encoding;
 } & DataSpec;
 
