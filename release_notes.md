@@ -9,6 +9,7 @@
 - New `Bitmask` type wrapping Boolean arrays on batches
 - Support combining of multiple selections into new selection using
   fast `AND`, `OR`, `NOT`, and `XOR` operations.
+- Avoid race condition in multiple calls to the same selector.
 
 # 2.13.3
 

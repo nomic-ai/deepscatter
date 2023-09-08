@@ -24209,7 +24209,7 @@ class AestheticSet {
     if (encoding === void 0) {
       encoding = {};
     }
-    if (encoding.filter1) {
+    if (encoding["filter1"] !== void 0) {
       throw new Error('filter1 is not supported; just say "filter"');
     }
     this.interpret_position(encoding);
@@ -34793,6 +34793,7 @@ class Tile {
   constructor(dataset) {
     this.max_ix = -1;
     this._children = [];
+    this.transformation_holder = {};
     this.promise = Promise.resolve();
     this.download_state = "Unattempted";
     this.key = String(Math.random());
@@ -34835,15 +34836,20 @@ class Tile {
     throw new Error(`Column ${colname} not found`);
   }
   async apply_transformation(name) {
+    if (this.transformation_holder[name] !== void 0) {
+      return this.transformation_holder[name];
+    }
     const transform = this.dataset.transformations[name];
     if (transform === void 0) {
       throw new Error(`Transformation ${name} is not defined`);
     }
-    const transformed = await transform(this);
-    if (transformed === void 0) {
-      throw new Error(`Transformation ${name} failed`);
-    }
-    this._batch = add_or_delete_column(this.record_batch, name, transformed);
+    this.transformation_holder[name] = Promise.resolve(transform(this)).then((transformed) => {
+      if (transformed === void 0) {
+        throw new Error(`Transformation ${name} failed`);
+      }
+      this._batch = add_or_delete_column(this.record_batch, name, transformed);
+    });
+    return this.transformation_holder[name];
   }
   add_column(name, data) {
     this._batch = add_or_delete_column(this.record_batch, name, data);
@@ -35392,7 +35398,9 @@ class Dataset {
       }
     }
     return this.extents[dimension] = extent([
-      ...this.table.getChild(dimension)
+      ...new Vector(
+        this.map((d) => d.record_batch.getChild(dimension)).filter((d) => d !== null)
+      )
     ]);
   }
   *points(bbox, max_ix = 1e99) {
@@ -35591,7 +35599,7 @@ class ArrowDataset extends Dataset {
     return Promise.resolve();
   }
   download_most_needed_tiles(...args) {
-    return void 0;
+    return;
   }
 }
 class QuadtileSet extends Dataset {

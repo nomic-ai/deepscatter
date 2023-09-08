@@ -45,6 +45,7 @@ export declare abstract class Tile {
     download(): void;
     delete_column_if_exists(colname: string): void;
     get_column(colname: string): Promise<Vector>;
+    private transformation_holder;
     apply_transformation(name: string): Promise<void>;
     add_column(name: string, data: Float32Array): RecordBatch<any>;
     is_visible(max_ix: number, viewport_limits: Rectangle | undefined): boolean;
