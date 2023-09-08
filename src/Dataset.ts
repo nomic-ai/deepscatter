@@ -168,8 +168,9 @@ export abstract class Dataset<T extends Tile> {
       }
     }
     return (this.extents[dimension] = extent([
-      ...this.table.getChild(dimension),
-    ]));
+      ...new Vector(this.map(d => 
+        d.record_batch.getChild(dimension)).filter(d => d !== null)
+      )]))
   }
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {
@@ -413,7 +414,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
     ...args: unknown[]
   ): void {
     // Definitionally, they're already there if using an Arrow table.
-    return undefined;
+    return;
   }
 }
 

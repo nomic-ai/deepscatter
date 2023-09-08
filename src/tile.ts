@@ -124,7 +124,7 @@ export abstract class Tile {
         }
         this._batch = add_or_delete_column(this.record_batch, name, transformed);
       })
-      
+    return this.transformation_holder[name];
   }
 
   add_column(name: string, data: Float32Array) {
