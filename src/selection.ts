@@ -529,8 +529,6 @@ export class DataSelection<T extends Tile> {
       const array = await functionToApply(tile);
       const batch = tile.record_batch;
       let matches = 0;
-      console.log({array})
-
       for (let i = 0; i < batch.numRows; i++) {
         if ((array['get'] && array['get'](i)) || array[i])  {
           matches++;
