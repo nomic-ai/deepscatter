@@ -330,7 +330,13 @@ export class DataSelection<T extends Tile> {
    * Resolves upon completion.
    */
   applyToAllLoadedTiles(): Promise<void> {
-    throw new Error('Method not implemented.');
+    return Promise.all(this.dataset.map(tile => {
+      // Checks that it's loaded.
+      if (tile.ready) {
+        // triggers creation of the dataset column as a side-effect.
+        return tile.get_column(this.name);
+      }
+    })).then(() => {})
   }
 
   /**
