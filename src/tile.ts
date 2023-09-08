@@ -100,21 +100,31 @@ export abstract class Tile {
     }
     if (this.dataset.transformations[colname]) {
       await this.apply_transformation(colname);
-      return this.record_batch.getChild(colname) as Vector;
+      return this.record_batch.getChild(colname);
     }
     throw new Error(`Column ${colname} not found`);
   }
 
+  private transformation_holder : Record<string, Promise<void>> = {};
+
   async apply_transformation(name: string): Promise<void> {
+    if (this.transformation_holder[name] !== undefined) {
+      return this.transformation_holder[name];
+    }
     const transform = this.dataset.transformations[name];
     if (transform === undefined) {
       throw new Error(`Transformation ${name} is not defined`);
     }
-    const transformed = await transform(this);
-    if (transformed === undefined) {
-      throw new Error(`Transformation ${name} failed`);
-    }
-    this._batch = add_or_delete_column(this.record_batch, name, transformed);
+
+    this.transformation_holder[name] = Promise
+      .resolve(transform(this))
+      .then((transformed) => {
+        if (transformed === undefined) {
+          throw new Error(`Transformation ${name} failed`);
+        }
+        this._batch = add_or_delete_column(this.record_batch, name, transformed);
+      })
+      
   }
 
   add_column(name: string, data: Float32Array) {
