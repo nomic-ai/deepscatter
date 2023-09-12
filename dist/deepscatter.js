@@ -37022,7 +37022,12 @@ class DataSelection {
    * Resolves upon completion.
    */
   applyToAllLoadedTiles() {
-    throw new Error("Method not implemented.");
+    return Promise.all(this.dataset.map((tile) => {
+      if (tile.ready) {
+        return tile.get_column(this.name);
+      }
+    })).then(() => {
+    });
   }
   /**
    * 
@@ -37180,7 +37185,6 @@ class DataSelection {
       const array2 = await functionToApply(tile);
       const batch = tile.record_batch;
       let matches = 0;
-      console.log({ array: array2 });
       for (let i = 0; i < batch.numRows; i++) {
         if (array2["get"] && array2["get"](i) || array2[i]) {
           matches++;

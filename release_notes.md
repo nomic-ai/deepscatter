@@ -1,7 +1,7 @@
 # 2.14.0
 
 - Update dataset methods to allow instantiating from an arrow table represented
-  as a Uint8Array, which is simpler to do and avoids version conflicts.
+  as a Uint8Array, which is simpler and avoids some conflicts in Apache Arrow versions.
 - Allow creating a dataset in the constructor, before the initial plotAPI call,
   which allows more
   precise staging of data and allows access to most dataset capabilities without binding to the DOM.
@@ -10,7 +10,7 @@
 - Support combining of multiple selections into new selection using
   fast `AND`, `OR`, `NOT`, and `XOR` operations.
 - Avoid race condition in multiple calls to the same selector.
-
+- Add applyToAllLoadedTiles method to selections.
 # 2.13.3
 
 Add `select_and_plot` shortcut on `Deepscatter` object to plot a selection immediately
