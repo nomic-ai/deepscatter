@@ -32,7 +32,6 @@ export declare abstract class Tile {
     _download?: Promise<void>;
     ready: boolean;
     __schema?: schema_entry[];
-    local_dictionary_lookups?: Map<string, any>;
     _extent?: {
         x: MinMax;
         y: MinMax;
@@ -41,7 +40,6 @@ export declare abstract class Tile {
     _buffer_manager?: TileBufferManager<this>;
     constructor(dataset: Dataset<this>);
     get children(): this[];
-    get dictionary_lookups(): any;
     download(): void;
     delete_column_if_exists(colname: string): void;
     get_column(colname: string): Promise<Vector>;
@@ -95,7 +93,7 @@ export declare class QuadTile extends Tile {
 export declare class ArrowTile extends Tile {
     batch_num: number;
     full_tab: Table;
-    constructor(table: Table, dataset: Dataset<ArrowTile>, batch_num: number, parent?: any);
+    constructor(table: Table, dataset: Dataset<ArrowTile>, batch_num: number, parent?: null | ArrowTile);
     create_children(): void;
     download(): Promise<RecordBatch>;
 }

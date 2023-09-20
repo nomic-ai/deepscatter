@@ -40,7 +40,7 @@ type TwoArgumentOp = {
   b: number;
 };
 
-type Newable<T> = { new (...args: any[]): T };
+export type Newable<T> = { new (...args: any[]): T };
 export type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
 
@@ -89,7 +89,7 @@ export type BufferLocation = {
   byte_size: number; // in bytes;
 };
 
-type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
+export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
 type FunctionalChannel = LambdaChannel | OpChannel;
 
@@ -370,6 +370,6 @@ export type CompletePrefs = APICall & {
 
 type RenderPrefs = CompletePrefs & {
   arrow_table?: Table;
-  arrow_buffer?: Buffer;
+  //arrow_buffer?: Buffer;
 };
 export type TileType = QuadTile | ArrowTile;

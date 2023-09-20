@@ -149,7 +149,7 @@ export default class Scatterplot<T extends Tile> {
         el.append('g').attr('id', 'mousepoints');
         el.append('g').attr('id', 'labelrects');
       }
-      this.elements.push(container);
+      this.elements.push(container as unknown as Selection<SVGSetElement, any, any, any>);
     }
     this.bound = true;
   }
@@ -383,17 +383,16 @@ export default class Scatterplot<T extends Tile> {
      * Draws a set of rectangles to the screen to illustrate the currently
      * loaded tiles. Useful for debugging and illustration.
      */
-    const map = this;
-    const ctx = map.elements[2].selectAll('canvas').node().getContext('2d');
+    const ctx = this.elements[2].selectAll('canvas').node().getContext('2d') as CanvasRenderingContext2D;
 
     ctx.clearRect(0, 0, 10_000, 10_000);
-    const { x_, y_ } = map._zoom.scales();
+    const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = '#888888';
-    const tiles = map._root.map((t: Tile) => t);
-    for (const i of range(13)) {
+    const tiles = this._root.map((t: T) => t);
+    for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
-          if (tile.codes[0] != i) {
+          if (!tile.codes || tile.codes[0] != i) {
             continue;
           }
           if (!tile.extent) {
@@ -428,7 +427,6 @@ export default class Scatterplot<T extends Tile> {
     const ctx = canvas.getContext('2d');
 
     const corners = this._zoom.current_corners();
-    const current_zoom = this._zoom.transform.k;
     const xstep = (corners.x[1] - corners.x[0]) / xtimes;
     const ystep = (corners.y[1] - corners.y[0]) / xtimes;
 
@@ -966,7 +964,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
         lambda: `d => d === '${feature.properties[labelset.label_key]}'`,
       };
     }
-    const thisis = this;
     void this.plot.plotAPI({
       encoding: { filter },
     });

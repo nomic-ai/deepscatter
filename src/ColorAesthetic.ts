@@ -1,4 +1,6 @@
 import { Aesthetic, scales } from './Aesthetic';
+import type * as DS from './shared.d'
+
 import type { Regl, Texture2D } from 'regl';
 import { range as arange, extent, shuffler } from 'd3-array';
 import { isConstantChannel, isOpChannel } from './typing';
@@ -144,16 +146,16 @@ okabe();
 export class Color extends Aesthetic<
   [number, number, number],
   string,
-  ColorChannel
+  DS.ColorChannel
 > {
   _constant = '#CC5500';
   public texture_type = 'uint8';
   public default_constant = '#CC5500';
-  default_transform: Transform = 'linear';
+  default_transform: DS.Transform = 'linear';
   get default_range(): [number, number] {
     return [0, 1];
   }
-  current_encoding: null | ColorChannel = null;
+  current_encoding: null | DS.ColorChannel = null;
   default_data(): Uint8Array {
     return color_palettes.viridis;
   }
@@ -166,9 +168,7 @@ export class Color extends Aesthetic<
     if (this._scale) {
       return this._scale;
     }
-    const scale = scales[this.transform]()
-      .domain(this.domain)
-      .range(this.range);
+
     const range = this.range;
 
     function capitalize(r: string) {
@@ -231,7 +231,7 @@ export class Color extends Aesthetic<
     this.aesthetic_map.set_color(this.id, this.texture_buffer);
   }
 
-  update(encoding: ColorChannel) {
+  update(encoding: DS.ColorChannel) {
     super.update(encoding);
     this.current_encoding = encoding;
     if (encoding === null) {
@@ -295,8 +295,7 @@ export class Color extends Aesthetic<
       return;
     }
     if (range.length === this.aesthetic_map.texture_size * 4) {
-      console.warn('SETTING FULL RANGE IS DEPRECATED,');
-      this.texture_buffer.set(range);
+      throw new Error('SETTING FULL RANGE IS DEPRECATED')
     }
     console.error(`request range of ${range} for color ${this.field} unknown`);
   }

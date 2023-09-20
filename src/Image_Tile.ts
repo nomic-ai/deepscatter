@@ -1,3 +1,4 @@
+/*
 class ImageTile extends BaseTile {
   constructor(regl) {
     super();
@@ -73,3 +74,4 @@ class ImageTile extends BaseTile {
     }
   }
 }
+*/

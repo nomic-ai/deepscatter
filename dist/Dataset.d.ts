@@ -57,7 +57,7 @@ export declare abstract class Dataset<T extends Tile> {
     has_column(name: string): boolean;
     delete_column_if_exists(name: string): void;
     domain(dimension: string, max_ix?: number): [number, number];
-    points(bbox: Rectangle | undefined, max_ix?: number): Generator<any, void, unknown>;
+    points(bbox: Rectangle | undefined, max_ix?: number): Generator<StructRowProxy<any>, void, unknown>;
     /**
      * Map a function against all tiles.
      * It is often useful simply to invoke Dataset.map(d => d) to

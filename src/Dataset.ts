@@ -154,28 +154,29 @@ export abstract class Dataset<T extends Tile> {
         max = JSON.parse(mmax) as number | string;
       }
       // Can pass min, max as strings for dates.
-      if (dim.type.typeId == 10 && typeof min === 'string') {
+      if (dim.type.typeId === 10 && typeof min === 'string') {
         min = Number(new Date(min));
       }
-      if (dim.type?.typeId == 10 && typeof max === 'string') {
+      if (dim.type.typeId === 10 && typeof max === 'string') {
         max = Number(new Date(max));
       }
       if (typeof max === 'string') {
         throw new Error('Failed to parse min-max as numbers');
       }
       if (min !== undefined) {
-        return (this.extents[dimension] = [min as number, max as number]);
+        return (this.extents[dimension] = [min as number, max]);
       }
     }
     return (this.extents[dimension] = extent([
       ...new Vector(this.map(d => 
-        d.record_batch.getChild(dimension)).filter(d => d !== null)
+        d.record_batch?.getChild(dimension)).filter(d => d !== null)
+        .filter(d => d !== undefined)
       )]))
   }
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {
     const stack: T[] = [this.root_tile];
-    let current;
+    let current : T;
     while ((current = stack.shift())) {
       if (
         current.download_state == 'Complete' &&

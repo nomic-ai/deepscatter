@@ -7,7 +7,8 @@ import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Dataset, QuadtileSet } from './Dataset';
-
+import type * as DS from './shared.d'
+import { Table } from 'apache-arrow';
 class PlotSetting {
   start: number;
   value: number;
@@ -77,7 +78,7 @@ class RenderProps {
     this.foregroundSize = new PlotSetting(1, 'geometric');
     this.backgroundSize = new PlotSetting(1, 'geometric');
   }
-  apply_prefs(prefs: CompletePrefs) {
+  apply_prefs(prefs: DS.CompletePrefs) {
     const { duration } = prefs;
     this.maxPoints.update(prefs.max_points, duration);
     this.targetOpacity.update(prefs.alpha, duration);
@@ -126,9 +127,9 @@ export class Renderer<TileType extends Tile> {
   public height: number;
   public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
-  public zoom?: Zoom;
+  public zoom?: Zoom<TileType>;
   public aes?: AestheticSet<TileType>;
-  public _zoom?: Zoom;
+  public _zoom?: Zoom<TileType>;
   public _initializations: Promise<void>[] = [];
   public render_props: RenderProps = new RenderProps();
   constructor(
@@ -158,11 +159,11 @@ export class Renderer<TileType extends Tile> {
    * Render prefs are scatterplot prefs, but for a single tile
    * instead of for a whole table.
    */
-  get prefs(): RenderPrefs {
-    const p = { ...this.scatterplot.prefs } as RenderPrefs;
+  get prefs() {
+    const p = { ...this.scatterplot.prefs } as DS.CompletePrefs & {arrow_table?: Table };
     // Delete the arrow stuff b/c serializing it is crazy expensive.
     p.arrow_table = undefined;
-    p.arrow_buffer = undefined;
+    // p.arrow_buffer = undefined;
     return p;
   }
 
