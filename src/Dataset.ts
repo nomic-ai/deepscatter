@@ -214,7 +214,7 @@ export abstract class Dataset<T extends Tile> {
       }
     }
     return (this.extents[dimension] = extent([
-      ...new Vector(this.map(d => 
+      ...new Vector(this.map(d => d).filter(d => d.ready).map( d =>
         d.record_batch.getChild(dimension)).filter(d => d !== null)
       )]))
   }
