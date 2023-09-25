@@ -1,4 +1,4 @@
-import type { StructRowProxy, Table, Vector } from 'apache-arrow';
+import type { Dictionary, Float, Float32, Int, Int16, Int32, Int8, StructRowProxy, Table, Utf8, Vector } from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
 import type { ArrowDataset } from './Dataset';
@@ -39,6 +39,9 @@ type TwoArgumentOp = {
   a: number;
   b: number;
 };
+
+
+export type PointFunction = (p : StructRowProxy) => number
 
 type Newable<T> = { new (...args: any[]): T };
 export type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
@@ -161,22 +164,24 @@ export interface BasicChannel {
 }
 
 export type JitterRadiusMethod =
-  | 'None'
-  | 'spiral'
-  | 'uniform'
-  | 'normal'
-  | 'circle'
-  | 'time';
+  | 'None' // 
+  | 'spiral' // animates along a log spiral.
+  | 'uniform' // static jitters around a central point.
+  | 'normal' // static jitters around a central point biased towards the middle.
+  | 'circle' // animates a circle around the point.
+  | 'time'; // lapses the point in and out of view.
 
 export interface CategoricalChannel {
   field: string;
 }
 
+type ArrowInt = Int8 | Int16 | Int32;
+
 // An arrow buildable vector is something returned that can be placed onto the scatterplot.
 // Float32Arrays will be dropped straight onto the GPU; other types while be cast
 // to Float32Array before going there.
-export type ArrowBuildable = Vector | Float32Array | Uint8Array;
 
+export type ArrowBuildable = Vector<Bool | Float | Int | Dictionary<Utf8, ArrowInt>> | Float32Array | Uint8Array;
 /**
  * A transformation is a batchwise operation that can be used to construct
  * a new column in the data table. It runs asynchronously so that it
@@ -184,12 +189,12 @@ export type ArrowBuildable = Vector | Float32Array | Uint8Array;
  * rather than a point -> value operation for speed.
  * 
  * If the resulting vector or float32array is not the same length as 
- * inputTile.record_batch.numRows, it will fail catastrophically.
+ * inputTile.record_batch.numRows, it will fail in an undefined way.
  * This is not a guarantee I know how to enforce in the type system.
  */
 export type Transformation<T> = (inputTile: T) => ArrowBuildable | Promise<ArrowBuildable>;
 
-export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>;
+export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
 
 export type BasicColorChannel = BasicChannel & {
   range?: string[] | string;
@@ -218,14 +223,6 @@ export type RootChannel =
   | LambdaChannel;
 
 export type JitterChannel = RootChannel & {
-  /**
-   * Jitter channels have a method.
-   * 'spiral' animates along a log spiral.
-   * 'uniform' jitters around a central point.
-   * 'normal' jitters around a central point biased towards the middle.
-   * 'circle' animates a circle around the point.
-   * 'time' lapses the point in and out of view.
-   */
   method: JitterRadiusMethod;
 };
 
@@ -339,8 +336,11 @@ export type APICall = {
   /** A function defind as a string that takes implied argument 'datum' */
   click_function?: string;
 
+  // The color of the screen background.
   background_color?: string;
-  //
+
+  // 
+  transformations: Record<string, string>;
   encoding?: Encoding;
   labels?: Labelcall;
   background_options?: BackgroundOptions;

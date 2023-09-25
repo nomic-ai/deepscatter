@@ -328,7 +328,8 @@ export class DataSelection<T extends Tile> {
    * that have been fetched even if out of the viewport.
    * 
    * Resolves upon completion.
-   */
+  */
+
   applyToAllLoadedTiles(): Promise<void> {
     return Promise.all(this.dataset.map(tile => {
       // Checks that it's loaded.
@@ -503,7 +504,6 @@ export class DataSelection<T extends Tile> {
     }
     return selection;
   }
-
 
   get ordering() {
     throw new Error('Method not implemented.');
