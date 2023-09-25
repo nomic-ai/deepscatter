@@ -141,7 +141,7 @@ export declare class DataSelection<T extends Tile> {
      * that have been fetched even if out of the viewport.
      *
      * Resolves upon completion.
-     */
+    */
     applyToAllLoadedTiles(): Promise<void>;
     /**
      *

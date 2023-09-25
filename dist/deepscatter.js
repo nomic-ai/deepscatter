@@ -35319,6 +35319,48 @@ class Dataset {
   get highest_known_ix() {
     return this.root_tile.highest_known_ix;
   }
+  /**
+   * This allows creation of a new column in your chart.
+   * 
+   * A few thngs to be aware of: the point function may be run millions of times.
+   * For best performance, you should not wrap complicated
+   * logic in this: instead, generate any data structures outside the function.
+   * 
+   * name: the name to identify the new column in the data.
+   * pointFunction: a function that runs on a single row of data. It accepts a single
+   * argument, the data point to be transformed: technically this is a StructRowProxy
+   * on the underlying Arrow frame, but for most purposes you can treat it as a dict.
+   * The point is read-only--you cannot change attributes.
+   * 
+   * For example: suppose you have a ['lat', 'long'] column in your data and want to create a
+   * new set of geo coordinates for your data. You can run the following.
+   * {
+   * const scale = d3.geoMollweide().extent([-20, -20, 20, 20])
+   * scatterplot.register_transformation('mollweide_x', datum => {
+   *  return scale([datum.long, datum.lat])[0]
+   * })
+   * scatterplot.register_transformation('mollweide_y', datum => {
+   *  return scale([datum.long, datum.lat])[1]
+   * })
+   * }
+   * 
+   * Note some constraints: the scale is created *outside* the functions, to avoid the 
+   * overhead of instantiating it every time; and the x and y coordinates are created separately
+   * with separate function calls, because it's not possible to assign to both x and y simultaneously. 
+   */
+  register_transformation(name, pointFunction, prerequisites = []) {
+    const transform = async (tile) => {
+      await Promise.all(prerequisites.map((key) => tile.get_column(key)));
+      const returnVal = new Float32Array(tile.record_batch.numRows);
+      let i = 0;
+      for (const row of tile.record_batch) {
+        returnVal[i] = pointFunction(row);
+        i++;
+      }
+      return returnVal;
+    };
+    this.transformations[name] = transform;
+  }
   download_to_depth(max_ix) {
     return Promise.resolve();
   }
@@ -35399,7 +35441,7 @@ class Dataset {
     }
     return this.extents[dimension] = extent([
       ...new Vector(
-        this.map((d) => d.record_batch.getChild(dimension)).filter((d) => d !== null)
+        this.map((d) => d).filter((d) => d.ready).map((d) => d.record_batch.getChild(dimension)).filter((d) => d !== null)
       )
     ]);
   }
@@ -37020,7 +37062,7 @@ class DataSelection {
    * that have been fetched even if out of the viewport.
    * 
    * Resolves upon completion.
-   */
+  */
   applyToAllLoadedTiles() {
     return Promise.all(this.dataset.map((tile) => {
       if (tile.ready) {
@@ -37939,6 +37981,17 @@ class Scatterplot {
         throw new Error("The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer");
       }
       await this.load_dataset(dataSpec);
+    }
+    if (prefs.transformations) {
+      console.log(prefs);
+      for (const [k, v] of Object.entries(prefs.transformations)) {
+        const func = Function("datum", v);
+        if (!this.dataset.transformations[k]) {
+          this.dataset.register_transformation(k, func);
+        } else {
+          console.log("Already", k, v);
+        }
+      }
     }
     if (this._zoom === void 0) {
       await this.reinitialize();

@@ -1,5 +1,7 @@
 # 2.14.0
 
+- Allow defining transformation functions by points, not just record batches, for convenience.
+- Fix for bugs in domains.
 - Update dataset methods to allow instantiating from an arrow table represented
   as a Uint8Array, which is simpler and avoids some conflicts in Apache Arrow versions.
 - Allow creating a dataset in the constructor, before the initial plotAPI call,
