@@ -6,6 +6,7 @@ import type { Dataset, QuadtileSet } from './Dataset';
 import { StatefulAesthetic } from './StatefulAesthetic';
 import { Aesthetic } from './Aesthetic';
 import type { Tile } from './tile';
+import { Encoding } from './shared';
 
 export class AestheticSet<TileType extends Tile> {
   public tileSet: Dataset<TileType>;
@@ -114,7 +115,7 @@ export class AestheticSet<TileType extends Tile> {
       // keeping something other than the encoding.
       encoding = {};
     }
-    if (encoding.filter1) {
+    if (encoding['filter1'] !== undefined) {
       throw new Error('filter1 is not supported; just say "filter"');
     }
     // Overwrite position fields.
@@ -150,7 +151,7 @@ export class TextureSet {
   public set_one_d(id: string, value: number[] | Uint8Array | Float32Array) {
     // id: a unique identifier for the specific aesthetic.
     // value: the array to stash onto the texture.
-    let offset;
+    let offset : number;
     const { offsets } = this;
     if (offsets[id]) {
       offset = offsets[id];

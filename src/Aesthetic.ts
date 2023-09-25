@@ -205,8 +205,8 @@ export abstract class Aesthetic<
     this.aesthetic_map.set_one_d(this.id, this.texture_buffer);
   }
 
-  convert_string_encoding(channel: string): BasicChannel {
-    const v: BasicChannel = {
+  convert_string_encoding(channel: string): DS.BasicChannel {
+    const v: DS.BasicChannel = {
       field: channel,
       domain: this.default_domain,
       range: this.default_range,

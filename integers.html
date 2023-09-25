@@ -10,6 +10,7 @@
     <div id="filter">FILTER:</div>
     <div id="filter2">FILTER2:</div>
     <div id="foreground">FOREGROUND:</div>
+    <div id="categorical">CATEGORICAL:</div>
   </div>
   <div id="deepscatter"></div>
 </body>
@@ -21,6 +22,11 @@
     RecordBatch,
     vectorFromArray,
     Utf8,
+    Int8,
+    Int16,
+    Int32,
+    Dictionary,
+    makeVector
   } from 'apache-arrow';
   const num_batches = 1;
   window.RecordBatch = RecordBatch;
@@ -169,6 +175,60 @@
         id.appendChild(button);
       }
     }
+    const id = document.getElementById("categorical");
+    const button = document.createElement('button');
+    button.textContent = `Color by lowest prime factor`;
+
+    plot.ready.then(() => {
+      plot._root.promise.then(dataset => {
+        [2, 3, 5, 7, 11, 13, 17, 19].map(prime => {
+          if (plot.dataset.transformations[`products of ${prime}`] === undefined) {
+            bindproductsOf(prime)
+          }
+        })
+      })
+    })
+    button.addEventListener('click', function () {
+      plot.dataset.transformations['lowest_prime'] = async function (tile) {
+        const factors = {}
+        const primes = [2, 3, 5, 7, 11, 13, 17];
+        const labels = ["NA", "2", "3", "5", "7", "11", "13", "seventeen"]
+        const indices = new Int8Array(tile.record_batch.numRows);
+        const lookups = []
+        for (const prime of primes) {
+          lookups.push(await tile.get_column(`products of ${prime}`))
+        }
+        outer: for (let i = 0; i < tile.record_batch.numRows; i++) {
+          for (let j = 0; j < lookups.length; j++) {
+            if (i < 10) {
+              //            console.log(i, j, lookups[j].get(i))
+            }
+            if (lookups[j].get(i) > 0) {
+              indices[i] = j + 1
+              continue outer
+            }
+          }
+        }
+        console.log("YOOHOO")
+        console.log({ indices, labels })
+        const dicto = dictionaryFromArrays(indices, labels)
+        console.log({ dicto })
+        console.log(dicto.length, dicto.toArray())
+        return dicto
+      }
+      plot.plotAPI({
+        encoding: {
+          color: {
+            field: "lowest_prime",
+            range: "category10"
+          }
+        }
+      })
+    })
+
+    id.appendChild(button);
+
+
   });
   window.plot = plot;
   const functions = {
@@ -178,7 +238,7 @@
   };
 
   function bindproductsOf(n) {
-    plot._root.transformations[`products of ${n}`] = function (tile) {
+    plot.dataset.transformations[`products of ${n}`] = function (tile) {
       const integers = tile.record_batch.getChild('integers');
       window.integers = integers;
       const output = new Float32Array(integers.length);
@@ -191,7 +251,6 @@
       }
       return output;
     };
-    const matches = [...Array(n).keys()].filter((x) => x % 2 === 0);
   }
   const done = new Set();
   function highlight(key) {
@@ -263,6 +322,32 @@
     .addEventListener('click', () =>
       plot.plotAPI({ encoding: { foreground: null, size: {} } })
     );
+
+
+  function dictionaryFromArrays(indices, labels) {
+    const labelsArrow = vectorFromArray(labels, new Utf8());
+    let t;
+    if (indices[Symbol.toStringTag] === `Int8Array`) {
+      t = new Int8()
+    } else if (indices[Symbol.toStringTag] === `Int16Array`) {
+      t = new Int16()
+    } else if (indices[Symbol.toStringTag] === `Int32Array`) {
+      t = new Int32()
+    } else {
+      console.log(indices[Symbol.toStringTag])
+      throw new Error("values must be an array of signed integers, 32 bit or smaller.")
+    }
+    console.log({ indices }, indices.length)
+    const type = new Dictionary(labelsArrow.type, t, 0, false);
+    const returnval = makeVector({
+      type,
+      length: indices.length,
+      nullCount: 0,
+      data: indices,
+      dictionary: labelsArrow,
+    });
+    return returnval
+  }
 </script>
 
 <style>

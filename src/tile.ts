@@ -100,21 +100,31 @@ export abstract class Tile {
     }
     if (this.dataset.transformations[colname]) {
       await this.apply_transformation(colname);
-      return this.record_batch.getChild(colname) as Vector;
+      return this.record_batch.getChild(colname);
     }
     throw new Error(`Column ${colname} not found`);
   }
 
+  private transformation_holder : Record<string, Promise<void>> = {};
+
   async apply_transformation(name: string): Promise<void> {
+    if (this.transformation_holder[name] !== undefined) {
+      return this.transformation_holder[name];
+    }
     const transform = this.dataset.transformations[name];
     if (transform === undefined) {
       throw new Error(`Transformation ${name} is not defined`);
     }
-    const transformed = await transform(this);
-    if (transformed === undefined) {
-      throw new Error(`Transformation ${name} failed`);
-    }
-    this._batch = add_or_delete_column(this.record_batch, name, transformed);
+
+    this.transformation_holder[name] = Promise
+      .resolve(transform(this))
+      .then((transformed) => {
+        if (transformed === undefined) {
+          throw new Error(`Transformation ${name} failed`);
+        }
+        this._batch = add_or_delete_column(this.record_batch, name, transformed);
+      })
+    return this.transformation_holder[name];
   }
 
   add_column(name: string, data: Float32Array) {
@@ -447,7 +457,7 @@ export class QuadTile extends Tile {
 
   async download(): Promise<void> {
     // This should only be called once per tile.
-    if (this._download) {
+    if (this._download !== undefined) {
       return this._download;
     }
 
@@ -458,7 +468,7 @@ export class QuadTile extends Tile {
     this._already_called = true;
     this.download_state = 'In progress';
 
-    this._download = this.get_arrow()
+    return this._download = this.get_arrow()
       .then((batch) => {
         this.ready = true;
         const metadata = batch.schema.metadata;
@@ -468,10 +478,12 @@ export class QuadTile extends Tile {
         }
 
         const children = metadata.get('children');
+
         if (children) {
           this.child_locations = JSON.parse(children) as string[];
         }
         const ixes = batch.getChild('ix');
+
         if (ixes === null) {
           throw 'No ix column in table';
         }
@@ -490,7 +502,6 @@ export class QuadTile extends Tile {
         console.warn(error);
         throw error;
       });
-    return this._download;
   }
 
   /**

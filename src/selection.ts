@@ -2,21 +2,22 @@ import { Dataset } from './Dataset';
 import Scatterplot from './deepscatter';
 import { Tile } from './tile';
 import type * as DS from './shared.d'
-import { StructRowProxy } from 'apache-arrow';
+import { Bool, StructRowProxy, Vector, makeData } from 'apache-arrow';
 import { bisectLeft } from 'd3-array';
 interface SelectParams {
+  name: string;
   foreground?: boolean;
   batchCallback?: (t: Tile) => Promise<void>;
 }
 
 
 export const defaultSelectionParams: SelectParams = {
+  name: 'unnamed selection',
   foreground: true,
   batchCallback: (t: Tile) => Promise.resolve(),
 };
 
 export interface IdSelectParams extends SelectParams {
-  name: string;
   ids: string[] | number[] | bigint[];
   idField: string;
 }
@@ -28,8 +29,11 @@ function isIdSelectParam(
 }
 
 export interface BooleanColumnParams extends SelectParams {
-  name: string;
   field: string;
+}
+
+export interface CompositionSelectParams<T extends Tile> extends SelectParams {
+  composition: Composition<T>
 }
 
 function isBooleanColumnParam(
@@ -37,9 +41,90 @@ function isBooleanColumnParam(
 ): params is BooleanColumnParams {
   return params.field !== undefined;
 }
+
+/**
+[
+  "AND"
+  selection1,
+  [
+    "OR",
+    selection2,
+    [
+      "NOT",
+      selection3
+    ]
+  ]
+]
+ */
+// type PluralOperations = "ANY" | "ALL" | "NONE"
+type BinaryOperation = "AND" | "OR" | "XOR"
+type UnaryOperation = "NOT"
+
+
+type CompArgs<T extends Tile> = DataSelection<T> | Composition<T>
+type Composition<T extends Tile> = [UnaryOperation, CompArgs<T> ] | [BinaryOperation, CompArgs<T>, CompArgs<T>]
+export interface CompositeSelectParams<T extends Tile> extends SelectParams {
+  composition: Composition<T>
+}
+
+function isCompositeSelectParam(
+  params: Record<string, any>
+): params is CompositeSelectParams<T> {
+  return params.composition !== undefined;
+}
+
+function isComposition<T extends Tile>(
+  elems: any
+): elems is Composition<T> {
+  if (elems === undefined) throw new Error("Undefined composition")
+  if (!elems) return false
+  if (!elems.length) return false
+  const op= elems[0];
+  return ["AND", "OR", "XOR", "NOT"].indexOf(op) > -1;
+}
+
+async function extractBitmask<T extends Tile>(tile : T, arg: CompArgs<T>) : Promise<Bitmask> {
+  if (isComposition(arg)) {
+    return applyCompositeFunctionToTile(tile, arg)
+  } else {
+    const column = tile.get_column((arg as DataSelection<T>).name) as Promise<Vector<Bool>>;
+    return Bitmask.from_arrow(await column)
+  }
+}
+
+async function applyCompositeFunctionToTile<T extends Tile>(tile : T, args : Composition<T>) : Promise<Bitmask> {
+  if (isUnarySelectParam(args)) {
+    const bitmask = await extractBitmask(tile, args[1])
+    if (args[0] === "NOT") {
+      return bitmask.not()
+    } else {
+      throw new Error("Unknown unary operation")
+    }
+  }
+  const [op, arg1, arg2] = args;
+  const bitmask1 = await extractBitmask(tile, arg1)
+  const bitmask2 = await extractBitmask(tile, arg2)
+if (op === "AND") {
+    return bitmask1.and(bitmask2)
+  } else if (op === "OR") {
+    return bitmask1.or(bitmask2)
+  } else if (op === "XOR") {
+    return bitmask1.xor(bitmask2)
+  } else {
+    throw new Error("Unknown binary operation")
+  }
+}
+
 export interface FunctionSelectParams extends SelectParams {
   name: string;
-  tileFunction: (t: Tile) => Promise<Float32Array> | Promise<Uint8Array>;
+  tileFunction: (t: Tile) => Promise<Vector<Bool>> | Promise<Uint8Array>;
+}
+
+function isUnarySelectParam(
+  params
+) : params is UnaryOperation {
+  const things = new Set(["NOT"])
+  return things.has(params[0])
 }
 
 function isFunctionSelectParam(
@@ -60,24 +145,160 @@ type IdentifierOptions = {
  * more than once a second or so.
  */
 
-export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
+export class Bitmask {
+  public mask : Uint8Array;
+  public length : number;
+
+  constructor(length : number, mask? : Uint8Array) {
+    this.length = length;
+    this.mask = mask || new Uint8Array(Math.ceil(length / 8));
+  }
+
+  static from_arrow(vector: Vector<Bool>) : Bitmask {
+    const mask = vector.data[0].values;
+    return new Bitmask(vector.length, mask);
+  }
+
+  to_arrow() {
+    return new Vector([
+      makeData({
+      type: new Bool(),
+      data: this.mask,
+      length: this.length
+    })])
+  }
+
+  set(i : number) {
+    const byte = Math.floor(i / 8);
+    const bit = i % 8;
+    this.mask[byte] |= 1 << bit;
+  }
+
+  and(other : Bitmask) {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = this.mask[i] & other.mask[i];
+    }
+    return result;
+  }
+
+  or(other : Bitmask) {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = this.mask[i] | other.mask[i];
+    }
+    return result;
+  }
+
+  xor(other : Bitmask) {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = this.mask[i] ^ other.mask[i];
+    }
+    return result;
+  }
+  
+  not() {
+    const result = new Bitmask(this.length);
+    for (let i = 0; i < this.mask.length; i++) {
+      result.mask[i] = ~this.mask[i];
+    }
+    return result;
+  }
+}
+export class DataSelection<T extends Tile> {
   dataset: Dataset<T>;
   plot: Scatterplot<T>;
+  // The match count is the number of matches **per tile**;
+  // used to access numbers by index.
+
+  match_count: number[] = [];
+
+  /**
+   * name: The name of the selection. This will be used as the colun
+   * name in the Arrow record batches and are necessary for users 
+   * to define so that they can use the selection in subsequent 
+   * plotAPI calls to apply aesthetics to the selection.
+   * 
+   * They must be globally unique in the session.
+   * 
+   * e.g. 'search: fish', '54-abcdf', 'selection at 07:34:12',
+   * 'selección compuesta número 1'
+   * 
+   */
   name: string;
   /**
    * Has the selection been applied to the dataset 
    * (does *not* mean it has been applied to all points.)
    */
   ready: Promise<void>;
-  cursor: number = 0;
   /**
-   * Has the selection completely evaluated?
+   * The cursor is an index that points to the current position
+   * within the selected points in the Scatter plot.
    */
+  cursor: number = 0;
+
+  /**
+   * Has the selection run on all tiles in the dataset?
+  */
   complete: boolean = false;
+
+  /**
+   * The total number of points in the selection.
+   * It is used to know the size of the selected data.
+   */
   selectionSize: number = 0;
+
+  /**
+   * The total number of points that have been evaluated for the selection.
+   * 
+   * This is supplied because deepscatter doesn't evaluate functions on tiles
+   * untile they are loaded.
+   */
   evaluationSetSize: number = 0;
   tiles: T[] = [];
+
+  /**
+   * Optionally, a user-defined for defining.
+   * 
+   * If you're using this, I recommend defining your own application 
+   * schema but I'm not going to force you throw type hints right now
+   * because, you know. I'm not a monster.
+   * 
+   * e.g.: ['search', 'lasso', 'random', 'cherry-pick']
+   * 
+   */
+  type?: string;
   private events: { [key: string]: Array<(args) => void> } = {};
+
+  constructor(
+    plot: Scatterplot<T>,
+    params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams
+  ) {
+    this.plot = plot;
+    this.dataset = plot.dataset as Dataset<T>;
+    this.name = params.name;
+    let markReady = function() {}
+    this.ready = new Promise((resolve, reject) => {
+      markReady = resolve;
+    })
+    if (isIdSelectParam(params)) {
+      this.add_identifier_column(params.name, params.ids, params.idField).then(markReady);
+    } else if (isBooleanColumnParam(params)) {
+      this.add_boolean_column(params.name, params.field).then(markReady);
+    } else if (isFunctionSelectParam(params)) {
+      this.add_function_column(params.name, params.tileFunction).then(markReady);
+    } else if (isCompositeSelectParam(params)) {
+
+      const {name, composition} = params;
+      this.add_function_column(name, async (tile : T) => {
+        const bitmask = await applyCompositeFunctionToTile(tile, composition)
+        return bitmask.to_arrow()
+      }).then(markReady)
+    }
+  }
+
+
 
   /**
    * 
@@ -97,31 +318,65 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     }
   }
 
-  // The match count is the number of matches **per tile**;
-  // used to access numbers by index.
+  /**
+   * 
+   * Ensures that the selection has been evaluated on all
+   * tiles loaded in the dataset. This is useful if, for example,
+   * your selection represents a search, and you are zoomed in on 
+   * one portion of the map; this will immediately execute the search
+   * (subject to delays to avoid blocking the main thread) on all tiles
+   * that have been fetched even if out of the viewport.
+   * 
+   * Resolves upon completion.
+  */
 
-  match_count: number[] = [];
-
-  constructor(
-    plot: Scatterplot<T>,
-    params: IdSelectParams | BooleanColumnParams | FunctionSelectParams
-  ) {
-    this.plot = plot;
-    this.dataset = plot.dataset as Dataset<T>;
-    this.name = params.name;
-    let markReady = function() {}
-    this.ready = new Promise((resolve, reject) => {
-      markReady = resolve;
-    })
-    if (isIdSelectParam(params)) {
-      this.add_identifier_column(params.name, params.ids, params.idField).then(markReady);
-    } else if (isBooleanColumnParam(params)) {
-      this.add_boolean_column(params.name, params.field).then(markReady);
-    } else if (isFunctionSelectParam(params)) {
-      this.add_function_column(params.name, params.tileFunction).then(markReady);
-    }
+  applyToAllLoadedTiles(): Promise<void> {
+    return Promise.all(this.dataset.map(tile => {
+      // Checks that it's loaded.
+      if (tile.ready) {
+        // triggers creation of the dataset column as a side-effect.
+        return tile.get_column(this.name);
+      }
+    })).then(() => {})
   }
-  
+
+  /**
+   * 
+   * Downloads all unloaded tiles in the dataset and applies the 
+   * transformation to them. Use with care! For > 10,000,000 point
+   * datasets, if called from Europe this may cause the transatlantic fiber-optic internet backbone 
+   * cables to melt.
+   */
+
+  applyToAllTiles(): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+
+  /**
+   * 
+   * A function that combines two selections into a third
+   * selection that is the union of the two.
+   */
+  union(other: DataSelection<T>, name: string | undefined): DataSelection<T> {
+    return new DataSelection(this.plot, {
+      name: name || this.name + " union " + other.name,
+      composition: ["OR", this, other]
+    })
+  }
+
+  /**
+   * 
+   * A function that combines two selections into a third
+   * selection that is the intersection of the two. Note--for more complicated
+   * queries than simple intersection/union, use the (not yet defined)
+   * disjunctive normal form constructor.
+   */
+  intersection(other: DataSelection<T>, name: string | undefined): DataSelection<T> {
+    return new DataSelection(this.plot, {
+      name: name || this.name + " intersection " + other.name,
+      composition: ["AND", this, other]
+    })
+  }
   /**
    * Advances the cursor (the currently selected point) by a given number of rows.
    * steps forward or backward. Wraps from the beginning to the end.
@@ -250,17 +505,20 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     return selection;
   }
 
+  get ordering() {
+    throw new Error('Method not implemented.');
+  }
   /**
    * 
    * @param name the name for the column to assign in the dataset.
    * @param tileFunction The transformation to apply
    */
-  async add_function_column(name: string, tileFunction: (t: T) => Float32Array): Promise<void> {
+  async add_function_column(name: string, tileFunction: DS.BoolTransformation<T>): Promise<void> {
     if (this.dataset.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
     }
     this.plot.dataset.transformations[name] = this.wrapWithSelectionMetadata(tileFunction);
-    // Await the application to the root tile, which may be necessary 
+    // Await the application to the root tile, which may be necessary
     await this.dataset.root_tile.apply_transformation(name);
   }
 
@@ -273,13 +531,12 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
    */
 
   private wrapWithSelectionMetadata(functionToApply : DS.BoolTransformation<T>) : DS.BoolTransformation<T> {
-    
     return async (tile : T) => {
       const array = await functionToApply(tile);
       const batch = tile.record_batch;
       let matches = 0;
       for (let i = 0; i < batch.numRows; i++) {
-        if (array[i] > 0) {
+        if ((array['get'] && array['get'](i)) || array[i])  {
           matches++;
         }
       }
@@ -292,11 +549,12 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
       // before the actual assignment has happened in the recordbatch.
       this.dispatch("tile loaded", tile);
       return array;
-    }
+    };
   }
 
   /**
-   * The total number of points in the dataset.
+   * The total number of points in the set. At present, always a light wrapper around
+   * the total number of points in the dataset.
    */
   get totalSetSize() {
     return this.dataset.highest_known_ix;
@@ -333,11 +591,11 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     if (relevantTile === undefined) {
       return null;
     }
-    const column = relevantTile.record_batch.getChild(this.name).toArray() as Float32Array;
+    const column = relevantTile.record_batch.getChild(this.name) as Vector<Bool>;
     const offset = i - currentOffset;
     let ix_in_match = 0;
     for (let j = 0; j < column.length; j++) {
-      if (column[j] > 0) {
+      if (column.get(j)) {
         if (ix_in_match === offset) {
           return relevantTile.record_batch.get(j);
         }
@@ -350,9 +608,9 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
   // Iterate over the points in raw order.
   *[Symbol.iterator]() {
     for (let tile of this.tiles) {
-      const column = tile.record_batch.getChild(this.name).toArray() as Float32Array;
+      const column = tile.record_batch.getChild(this.name) as Vector<Bool>;
       for (let i = 0; i < column.length; i++) {
-        if (column[i] > 0) {
+        if (column.get(i)) {
           yield tile.record_batch.get(i)
         }
       }
@@ -388,11 +646,6 @@ export class DataSelection<T extends Tile> implements DS.ScatterSelection<T> {
     throw new Error('Method not implemented.');
   }
   
-  combine(other: DataSelection<T>, operation: "AND" | "OR" | "AND NOT" | "XOR",  name: string): DataSelection<T> {
-    
-
-  }
-
   apply_to_foreground(params: DS.BackgroundOptions): Promise<void> {
     const field = this.name;
     const background_options: DS.BackgroundOptions = {
@@ -417,11 +670,11 @@ function bigintmatcher<T extends Tile>(field: string, matches: bigint[]) {
   return async function (tile: T) {
     const col = (await tile.get_column(field)).data[0];
     const values = col.values as bigint[];
-    const results = new Float32Array(tile.record_batch.numRows);
+    const bitmask = new Bitmask(tile.record_batch.numRows);
     for (let i = 0; i < tile.record_batch.numRows; i++) {
-      results[i] = matchings.has(values[i]) ? 1 : 0;
+      matchings.has(values[i]) && bitmask.set(i);
     }
-    return results;
+    return bitmask.to_arrow();
   }
 }
 
@@ -448,6 +701,9 @@ function bigintmatcher<T extends Tile>(field: string, matches: bigint[]) {
  * @returns 
  */
 function stringmatcher<T extends Tile>(field: string, matches: string[]) {
+  if (field===undefined) {
+    throw new Error("Field must be defined")
+  }
   // Initialize an empty array for the root of the trie
   type TrieArray = (TrieArray | undefined)[];
 
@@ -490,8 +746,8 @@ function stringmatcher<T extends Tile>(field: string, matches: string[]) {
     // length as the 'all' array,
     // initialized to 0.
 
-    const results = new Float32Array(tile.record_batch.numRows);
-
+    //const results = new Float32Array(tile.record_batch.numRows);
+    const bitmask = new Bitmask(tile.record_batch.numRows);
     // Function to check if a slice of 'all' Uint8Array exists in the trie
     function existsInTrie(start: number, len: number) {
       let node = trie;
@@ -513,9 +769,9 @@ function stringmatcher<T extends Tile>(field: string, matches: string[]) {
       const end = offsets[o + 1];
       // If the slice exists in the trie, set the corresponding index in the results to 1
       if (existsInTrie(start, end - start)) {
-        results[o] = 1;
+        bitmask.set(o);
       }
     }
-    return results; // Return the results
+    return bitmask.to_arrow(); // Return the results
   };
 }

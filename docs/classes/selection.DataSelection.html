@@ -15,14 +15,7 @@
 <li><a href="../modules.html">deepscatter</a></li>
 <li><a href="../modules/selection.html">selection</a></li>
 <li><a href="selection.DataSelection.html">DataSelection</a></li></ul>
-<h1>Class DataSelection&lt;T&gt;</h1></div>
-<section class="tsd-panel tsd-comment">
-<div class="tsd-comment tsd-typography"><p>A DataSelection is a set of data that the user is working with.
-It is copied into the underlying Arrow files and available to the GPU,
-so it should not be abused; as a rule of thumb, it&#39;s OK to create
-these in response to user interactions but it shouldn&#39;t be done
-more than once a second or so.</p>
-</div></section> 
+<h1>Class DataSelection&lt;T&gt;</h1></div> 
 <section class="tsd-panel tsd-type-parameters">
 <h4>Type Parameters</h4>
 <ul class="tsd-type-parameters">
@@ -31,13 +24,9 @@ more than once a second or so.</p>
 <section class="tsd-panel tsd-hierarchy">
 <h4>Hierarchy</h4>
 <ul class="tsd-hierarchy">
-<li><span class="target">DataSelection</span></li></ul></section>
-<section class="tsd-panel">
-<h4>Implements</h4>
-<ul class="tsd-hierarchy">
-<li><a href="../interfaces/shared.ScatterSelection.html" class="tsd-signature-type" data-tsd-kind="Interface">ScatterSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></li></ul></section><aside class="tsd-sources">
+<li><span class="target">DataSelection</span></li></ul></section><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L63">src/selection.ts:63</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L209">src/selection.ts:209</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-index-accordion" open><summary class="tsd-accordion-summary tsd-index-summary">
@@ -60,10 +49,12 @@ more than once a second or so.</p>
 <a href="selection.DataSelection.html#ready" class="tsd-index-link tsd-kind-property tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>ready</span></a>
 <a href="selection.DataSelection.html#selectionSize" class="tsd-index-link tsd-kind-property tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>selection<wbr/>Size</span></a>
 <a href="selection.DataSelection.html#tiles" class="tsd-index-link tsd-kind-property tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>tiles</span></a>
+<a href="selection.DataSelection.html#type" class="tsd-index-link tsd-kind-property tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg><span>type?</span></a>
 </div></section>
 <section class="tsd-index-section">
 <h3 class="tsd-index-heading">Accessors</h3>
-<div class="tsd-index-list"><a href="selection.DataSelection.html#totalSetSize" class="tsd-index-link tsd-kind-accessor tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><rect fill="var(--color-icon-background)" stroke="#FF4D4D" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="12" id="icon-262144-path"></rect><path d="M8.85 16L11.13 7.24H12.582L14.85 16H13.758L13.182 13.672H10.53L9.954 16H8.85ZM10.746 12.76H12.954L12.282 10.06C12.154 9.548 12.054 9.12 11.982 8.776C11.91 8.432 11.866 8.208 11.85 8.104C11.834 8.208 11.79 8.432 11.718 8.776C11.646 9.12 11.546 9.544 11.418 10.048L10.746 12.76Z" fill="var(--color-text)" id="icon-262144-text"></path></svg><span>total<wbr/>Set<wbr/>Size</span></a>
+<div class="tsd-index-list"><a href="selection.DataSelection.html#ordering" class="tsd-index-link tsd-kind-accessor tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><rect fill="var(--color-icon-background)" stroke="#FF4D4D" stroke-width="1.5" x="1" y="1" width="22" height="22" rx="12" id="icon-262144-path"></rect><path d="M8.85 16L11.13 7.24H12.582L14.85 16H13.758L13.182 13.672H10.53L9.954 16H8.85ZM10.746 12.76H12.954L12.282 10.06C12.154 9.548 12.054 9.12 11.982 8.776C11.91 8.432 11.866 8.208 11.85 8.104C11.834 8.208 11.79 8.432 11.718 8.776C11.646 9.12 11.546 9.544 11.418 10.048L10.746 12.76Z" fill="var(--color-text)" id="icon-262144-text"></path></svg><span>ordering</span></a>
+<a href="selection.DataSelection.html#totalSetSize" class="tsd-index-link tsd-kind-accessor tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-262144-path"></use><use href="#icon-262144-text"></use></svg><span>total<wbr/>Set<wbr/>Size</span></a>
 </div></section>
 <section class="tsd-index-section">
 <h3 class="tsd-index-heading">Methods</h3>
@@ -73,14 +64,17 @@ more than once a second or so.</p>
 <a href="selection.DataSelection.html#add_function_column" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>add_<wbr/>function_<wbr/>column</span></a>
 <a href="selection.DataSelection.html#add_identifier_column" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>add_<wbr/>identifier_<wbr/>column</span></a>
 <a href="selection.DataSelection.html#add_or_remove_points" class="tsd-index-link tsd-kind-method tsd-parent-kind-class tsd-is-private"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>add_<wbr/>or_<wbr/>remove_<wbr/>points</span></a>
+<a href="selection.DataSelection.html#applyToAllLoadedTiles" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>apply<wbr/>To<wbr/>All<wbr/>Loaded<wbr/>Tiles</span></a>
+<a href="selection.DataSelection.html#applyToAllTiles" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>apply<wbr/>To<wbr/>All<wbr/>Tiles</span></a>
 <a href="selection.DataSelection.html#apply_to_foreground" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>apply_<wbr/>to_<wbr/>foreground</span></a>
-<a href="selection.DataSelection.html#combine" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>combine</span></a>
 <a href="selection.DataSelection.html#dispatch" class="tsd-index-link tsd-kind-method tsd-parent-kind-class tsd-is-private"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>dispatch</span></a>
 <a href="selection.DataSelection.html#export" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>export</span></a>
 <a href="selection.DataSelection.html#get" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>get</span></a>
+<a href="selection.DataSelection.html#intersection" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>intersection</span></a>
 <a href="selection.DataSelection.html#moveCursor" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>move<wbr/>Cursor</span></a>
 <a href="selection.DataSelection.html#on" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>on</span></a>
 <a href="selection.DataSelection.html#removePoints" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>remove<wbr/>Points</span></a>
+<a href="selection.DataSelection.html#union" class="tsd-index-link tsd-kind-method tsd-parent-kind-class"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>union</span></a>
 <a href="selection.DataSelection.html#wrapWithSelectionMetadata" class="tsd-index-link tsd-kind-method tsd-parent-kind-class tsd-is-private"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg><span>wrap<wbr/>With<wbr/>Selection<wbr/>Metadata</span></a>
 </div></section></div></details></section></section>
 <section class="tsd-panel-group tsd-member-group">
@@ -88,7 +82,7 @@ more than once a second or so.</p>
 <section class="tsd-panel tsd-member tsd-kind-constructor tsd-parent-kind-class"><a id="constructor" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>constructor</span><a href="#constructor" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" id="icon-anchor-a"></path><path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" id="icon-anchor-b"></path><path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" id="icon-anchor-c"></path></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-constructor tsd-parent-kind-class">
-<li class="tsd-signature tsd-anchor-link" id="constructor.new_DataSelection">new <wbr/>Data<wbr/>Selection<span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">(</span>plot<span class="tsd-signature-symbol">: </span><a href="deepscatter.default.html" class="tsd-signature-type" data-tsd-kind="Class">default</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span>, params<span class="tsd-signature-symbol">: </span><a href="../interfaces/selection.IdSelectParams.html" class="tsd-signature-type" data-tsd-kind="Interface">IdSelectParams</a><span class="tsd-signature-symbol"> | </span><a href="../interfaces/selection.BooleanColumnParams.html" class="tsd-signature-type" data-tsd-kind="Interface">BooleanColumnParams</a><span class="tsd-signature-symbol"> | </span><a href="../interfaces/selection.FunctionSelectParams.html" class="tsd-signature-type" data-tsd-kind="Interface">FunctionSelectParams</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><a href="#constructor.new_DataSelection" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="constructor.new_DataSelection">new <wbr/>Data<wbr/>Selection<span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">(</span>plot<span class="tsd-signature-symbol">: </span><a href="deepscatter.default.html" class="tsd-signature-type" data-tsd-kind="Class">default</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span>, params<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><a href="#constructor.new_DataSelection" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <section class="tsd-panel tsd-type-parameters">
 <h4>Type Parameters</h4>
@@ -101,34 +95,32 @@ more than once a second or so.</p>
 <li>
 <h5>plot: <a href="deepscatter.default.html" class="tsd-signature-type" data-tsd-kind="Class">default</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h5></li>
 <li>
-<h5>params: <a href="../interfaces/selection.IdSelectParams.html" class="tsd-signature-type" data-tsd-kind="Interface">IdSelectParams</a><span class="tsd-signature-symbol"> | </span><a href="../interfaces/selection.BooleanColumnParams.html" class="tsd-signature-type" data-tsd-kind="Interface">BooleanColumnParams</a><span class="tsd-signature-symbol"> | </span><a href="../interfaces/selection.FunctionSelectParams.html" class="tsd-signature-type" data-tsd-kind="Interface">FunctionSelectParams</a></h5></li></ul></div>
+<h5>params: <span class="tsd-signature-type">any</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L105">src/selection.ts:105</a></li></ul></aside></li></ul></section></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L274">src/selection.ts:274</a></li></ul></aside></li></ul></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Properties</h2>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="complete" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>complete</span><a href="#complete" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">complete<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> = false</span></div>
-<div class="tsd-comment tsd-typography"><p>Has the selection completely evaluated?</p>
+<div class="tsd-comment tsd-typography"><p>Has the selection run on all tiles in the dataset?</p>
 </div><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#complete">complete</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L76">src/selection.ts:76</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L244">src/selection.ts:244</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="cursor" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>cursor</span><a href="#cursor" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">cursor<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0</span></div>
 <div class="tsd-comment tsd-typography"><p>The cursor is an index that points to the current position
 within the selected points in the Scatter plot.</p>
 </div><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#cursor">cursor</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L72">src/selection.ts:72</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L239">src/selection.ts:239</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="dataset" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>dataset</span><a href="#dataset" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">dataset<span class="tsd-signature-symbol">:</span> <a href="Dataset.Dataset.html" class="tsd-signature-type" data-tsd-kind="Class">Dataset</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L64">src/selection.ts:64</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L210">src/selection.ts:210</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="evaluationSetSize" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>evaluation<wbr/>Set<wbr/>Size</span><a href="#evaluationSetSize" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">evaluation<wbr/>Set<wbr/>Size<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0</span></div>
@@ -136,9 +128,8 @@ within the selected points in the Scatter plot.</p>
 <p>This is supplied because deepscatter doesn&#39;t evaluate functions on tiles
 untile they are loaded.</p>
 </div><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#evaluationSetSize">evaluationSetSize</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L78">src/selection.ts:78</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L258">src/selection.ts:258</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class tsd-is-private"><a id="events" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagPrivate">Private</code> <span>events</span><a href="#events" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">events<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{ </span><br/><span>    </span>[key: <span class="tsd-signature-type">string</span>]<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">; </span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol"> = {}</span></div>
@@ -148,12 +139,12 @@ untile they are loaded.</p>
 <li class="tsd-parameter-index-signature">
 <h5><span class="tsd-signature-symbol">[</span>key: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">]: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">[]</span></h5></li></ul></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L80">src/selection.ts:80</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L272">src/selection.ts:272</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="match_count" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>match_<wbr/>count</span><a href="#match_count" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">match_<wbr/>count<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> = []</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L103">src/selection.ts:103</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L215">src/selection.ts:215</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="name" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>name</span><a href="#name" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">name<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
@@ -165,14 +156,13 @@ plotAPI calls to apply aesthetics to the selection.</p>
 <p>e.g. &#39;search: fish&#39;, &#39;54-abcdf&#39;, &#39;selection at 07:34:12&#39;,
 &#39;selección compuesta número 1&#39;</p>
 </div><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#name">name</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L66">src/selection.ts:66</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L229">src/selection.ts:229</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="plot" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>plot</span><a href="#plot" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">plot<span class="tsd-signature-symbol">:</span> <a href="deepscatter.default.html" class="tsd-signature-type" data-tsd-kind="Class">default</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L65">src/selection.ts:65</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L211">src/selection.ts:211</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="ready" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>ready</span><a href="#ready" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">ready<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></div>
@@ -180,34 +170,52 @@ plotAPI calls to apply aesthetics to the selection.</p>
 (does <em>not</em> mean it has been applied to all points.)</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L71">src/selection.ts:71</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L234">src/selection.ts:234</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="selectionSize" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>selection<wbr/>Size</span><a href="#selectionSize" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">selection<wbr/>Size<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> = 0</span></div>
 <div class="tsd-comment tsd-typography"><p>The total number of points in the selection.
 It is used to know the size of the selected data.</p>
 </div><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#selectionSize">selectionSize</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L77">src/selection.ts:77</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L250">src/selection.ts:250</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="tiles" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>tiles</span><a href="#tiles" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <div class="tsd-signature">tiles<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> = []</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L79">src/selection.ts:79</a></li></ul></aside></section></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L259">src/selection.ts:259</a></li></ul></aside></section>
+<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-class"><a id="type" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagOptional">Optional</code> <span>type</span><a href="#type" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<div class="tsd-signature">type<span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
+<div class="tsd-comment tsd-typography"><p>Optionally, a user-defined for defining.</p>
+<p>If you&#39;re using this, I recommend defining your own application 
+schema but I&#39;m not going to force you throw type hints right now
+because, you know. I&#39;m not a monster.</p>
+<p>e.g.: [&#39;search&#39;, &#39;lasso&#39;, &#39;random&#39;, &#39;cherry-pick&#39;]</p>
+</div><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L271">src/selection.ts:271</a></li></ul></aside></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Accessors</h2>
+<section class="tsd-panel tsd-member tsd-kind-accessor tsd-parent-kind-class"><a id="ordering" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>ordering</span><a href="#ordering" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-kind-accessor tsd-parent-kind-class">
+<li class="tsd-signature" id="ordering.ordering-1"><span class="tsd-signature-symbol">get</span> ordering<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+<li class="tsd-description">
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L508">src/selection.ts:508</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-accessor tsd-parent-kind-class"><a id="totalSetSize" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>total<wbr/>Set<wbr/>Size</span><a href="#totalSetSize" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-accessor tsd-parent-kind-class">
 <li class="tsd-signature" id="totalSetSize.totalSetSize-1"><span class="tsd-signature-symbol">get</span> totalSetSize<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></li>
 <li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>The total number of points in the dataset.</p>
+<div class="tsd-comment tsd-typography"><p>The total number of points in the set. At present, always a light wrapper around
+the total number of points in the dataset.</p>
 </div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#totalSetSize">totalSetSize</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L301">src/selection.ts:301</a></li></ul></aside></li></ul></section></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L559">src/selection.ts:559</a></li></ul></aside></li></ul></section></section>
 <section class="tsd-panel-group tsd-member-group">
 <h2>Methods</h2>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="_iterator_" class="tsd-anchor"></a>
@@ -217,33 +225,22 @@ It is used to know the size of the selected data.</p>
 <li class="tsd-description">
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Generator</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L351">src/selection.ts:351</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L609">src/selection.ts:609</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="addPoints" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>add<wbr/>Points</span><a href="#addPoints" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
 <li class="tsd-signature tsd-anchor-link" id="addPoints.addPoints-1">add<wbr/>Points<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span>, ixes<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">BigInt</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span><a href="#addPoints.addPoints-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Returns a new selection that is the union of this selection
-and all the points in the supplied array.</p>
-
-<h3>Returns</h3><p>A new selection that is the union of this selection
-and all the points in the supplied array.</p>
-</div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li>
-<h5>name: <span class="tsd-signature-type">any</span></h5>
-<div class="tsd-comment tsd-typography"><p>The name of the new selection.</p>
-</div></li>
+<h5>name: <span class="tsd-signature-type">any</span></h5></li>
 <li>
-<h5>ixes: <span class="tsd-signature-type">BigInt</span><span class="tsd-signature-symbol">[]</span></h5>
-<div class="tsd-comment tsd-typography"><p>The column storing the ids.</p>
-</div></li></ul></div>
+<h5>ixes: <span class="tsd-signature-type">BigInt</span><span class="tsd-signature-symbol">[]</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#addPoints">addPoints</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L150">src/selection.ts:150</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L405">src/selection.ts:405</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="add_boolean_column" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>add_<wbr/>boolean_<wbr/>column</span><a href="#add_boolean_column" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -258,11 +255,11 @@ and all the points in the supplied array.</p>
 <h5>field: <span class="tsd-signature-type">string</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L387">src/selection.ts:387</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L645">src/selection.ts:645</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="add_function_column" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>add_<wbr/>function_<wbr/>column</span><a href="#add_function_column" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
-<li class="tsd-signature tsd-anchor-link" id="add_function_column.add_function_column-1">add_<wbr/>function_<wbr/>column<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, tileFunction<span class="tsd-signature-symbol">: </span><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span>t<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">Float32Array</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#add_function_column.add_function_column-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-signature tsd-anchor-link" id="add_function_column.add_function_column-1">add_<wbr/>function_<wbr/>column<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, tileFunction<span class="tsd-signature-symbol">: </span><a href="../types/shared.BoolTransformation.html" class="tsd-signature-type" data-tsd-kind="Type alias">BoolTransformation</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#add_function_column.add_function_column-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
@@ -272,23 +269,12 @@ and all the points in the supplied array.</p>
 <div class="tsd-comment tsd-typography"><p>the name for the column to assign in the dataset.</p>
 </div></li>
 <li>
-<h5>tileFunction: <span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">(</span>t<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol"> =&gt; </span><span class="tsd-signature-type">Float32Array</span><span class="tsd-signature-symbol">)</span></h5>
+<h5>tileFunction: <a href="../types/shared.BoolTransformation.html" class="tsd-signature-type" data-tsd-kind="Type alias">BoolTransformation</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h5>
 <div class="tsd-comment tsd-typography"><p>The transformation to apply</p>
-</div>
-<ul class="tsd-parameters">
-<li class="tsd-parameter-signature">
-<ul class="tsd-signatures tsd-kind-type-literal">
-<li class="tsd-signature"><span class="tsd-signature-symbol">(</span>t<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Float32Array</span></li>
-<li class="tsd-description">
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5>t: <span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Float32Array</span></h4></li></ul></li></ul></li></ul></div>
+</div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L258">src/selection.ts:258</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L516">src/selection.ts:516</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="add_identifier_column" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>add_<wbr/>identifier_<wbr/>column</span><a href="#add_identifier_column" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -307,7 +293,7 @@ and all the points in the supplied array.</p>
 <h5>options: <span class="tsd-signature-type">IdentifierOptions</span><span class="tsd-signature-symbol"> = {}</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L362">src/selection.ts:362</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L620">src/selection.ts:620</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-private"><a id="add_or_remove_points" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagPrivate">Private</code> <span>add_<wbr/>or_<wbr/>remove_<wbr/>points</span><a href="#add_or_remove_points" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-private">
@@ -324,7 +310,36 @@ and all the points in the supplied array.</p>
 <h5>which: <span class="tsd-signature-type">&quot;add&quot;</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">&quot;remove&quot;</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">any</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L181">src/selection.ts:181</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L436">src/selection.ts:436</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="applyToAllLoadedTiles" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>apply<wbr/>To<wbr/>All<wbr/>Loaded<wbr/>Tiles</span><a href="#applyToAllLoadedTiles" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+<li class="tsd-signature tsd-anchor-link" id="applyToAllLoadedTiles.applyToAllLoadedTiles-1">apply<wbr/>To<wbr/>All<wbr/>Loaded<wbr/>Tiles<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#applyToAllLoadedTiles.applyToAllLoadedTiles-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Ensures that the selection has been evaluated on all
+tiles loaded in the dataset. This is useful if, for example,
+your selection represents a search, and you are zoomed in on 
+one portion of the map; this will immediately execute the search
+(subject to delays to avoid blocking the main thread) on all tiles
+that have been fetched even if out of the viewport.</p>
+<p>Resolves upon completion.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L333">src/selection.ts:333</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="applyToAllTiles" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>apply<wbr/>To<wbr/>All<wbr/>Tiles</span><a href="#applyToAllTiles" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+<li class="tsd-signature tsd-anchor-link" id="applyToAllTiles.applyToAllTiles-1">apply<wbr/>To<wbr/>All<wbr/>Tiles<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span><a href="#applyToAllTiles.applyToAllTiles-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>Downloads all unloaded tiles in the dataset and applies the 
+transformation to them. Use with care! For &gt; 10,000,000 point
+datasets, if called from Europe this may cause the transatlantic fiber-optic internet backbone 
+cables to melt.</p>
+</div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L351">src/selection.ts:351</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="apply_to_foreground" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>apply_<wbr/>to_<wbr/>foreground</span><a href="#apply_to_foreground" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -337,24 +352,7 @@ and all the points in the supplied array.</p>
 <h5>params: <a href="../types/shared.BackgroundOptions.html" class="tsd-signature-type" data-tsd-kind="Type alias">BackgroundOptions</a></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L396">src/selection.ts:396</a></li></ul></aside></li></ul></section>
-<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="combine" class="tsd-anchor"></a>
-<h3 class="tsd-anchor-link"><span>combine</span><a href="#combine" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
-<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
-<li class="tsd-signature tsd-anchor-link" id="combine.combine-1">combine<span class="tsd-signature-symbol">(</span>other<span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span>, operation<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">&quot;AND&quot;</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">&quot;OR&quot;</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">&quot;AND NOT&quot;</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">&quot;XOR&quot;</span>, name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><a href="#combine.combine-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
-<li class="tsd-description">
-<div class="tsd-parameters">
-<h4 class="tsd-parameters-title">Parameters</h4>
-<ul class="tsd-parameter-list">
-<li>
-<h5>other: <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h5></li>
-<li>
-<h5>operation: <span class="tsd-signature-type">&quot;AND&quot;</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">&quot;OR&quot;</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">&quot;AND NOT&quot;</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">&quot;XOR&quot;</span></h5></li>
-<li>
-<h5>name: <span class="tsd-signature-type">string</span></h5></li></ul></div>
-<h4 class="tsd-returns-title">Returns <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
-<ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L391">src/selection.ts:391</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L649">src/selection.ts:649</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-private"><a id="dispatch" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagPrivate">Private</code> <span>dispatch</span><a href="#dispatch" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-private">
@@ -369,7 +367,7 @@ and all the points in the supplied array.</p>
 <h5>args: <span class="tsd-signature-type">any</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L94">src/selection.ts:94</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L315">src/selection.ts:315</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="export" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>export</span><a href="#export" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -389,7 +387,7 @@ data currently on the screen.</p>
 <h5>format: <span class="tsd-signature-type">&quot;json&quot;</span><span class="tsd-signature-symbol"> = &quot;json&quot;</span></h5></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-symbol">{ </span><br/><span>    </span>[k: <span class="tsd-signature-type">string</span>]<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">T</span><span class="tsd-signature-symbol">; </span><br/><span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L160">src/selection.ts:160</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L415">src/selection.ts:415</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="get" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>get</span><a href="#get" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -409,9 +407,28 @@ tile until we find the nth match.</p>
 <div class="tsd-comment tsd-typography"><p>the index of the row to get</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">StructRowProxy</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#get">get</a></p>
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L315">src/selection.ts:315</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L573">src/selection.ts:573</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="intersection" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>intersection</span><a href="#intersection" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+<li class="tsd-signature tsd-anchor-link" id="intersection.intersection-1">intersection<span class="tsd-signature-symbol">(</span>other<span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span>, name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><a href="#intersection.intersection-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>A function that combines two selections into a third
+selection that is the intersection of the two. Note--for more complicated
+queries than simple intersection/union, use the (not yet defined)
+disjunctive normal form constructor.</p>
+</div>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li>
+<h5>other: <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h5></li>
+<li>
+<h5>name: <span class="tsd-signature-type">string</span></h5></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L374">src/selection.ts:374</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="moveCursor" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>move<wbr/>Cursor</span><a href="#moveCursor" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -431,7 +448,7 @@ steps forward or backward. Wraps from the beginning to the end.</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L133">src/selection.ts:133</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L388">src/selection.ts:388</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="on" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>on</span><a href="#on" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
@@ -462,33 +479,40 @@ as an argument the <code>tile</code> that was just added.</p>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4></li></ul></li></ul></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L88">src/selection.ts:88</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L309">src/selection.ts:309</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="removePoints" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><span>remove<wbr/>Points</span><a href="#removePoints" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
 <li class="tsd-signature tsd-anchor-link" id="removePoints.removePoints-1">remove<wbr/>Points<span class="tsd-signature-symbol">(</span>name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span>, ixes<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">BigInt</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span><a href="#removePoints.removePoints-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
 <li class="tsd-description">
-<div class="tsd-comment tsd-typography"><p>Returns a new selection that is the current selection,
-minus all the points in the supplied array.</p>
-
-<h3>Returns</h3><p>A new selection that is the current selection,
-minus all the points in the supplied array.</p>
+<div class="tsd-parameters">
+<h4 class="tsd-parameters-title">Parameters</h4>
+<ul class="tsd-parameter-list">
+<li>
+<h5>name: <span class="tsd-signature-type">any</span></h5></li>
+<li>
+<h5>ixes: <span class="tsd-signature-type">BigInt</span><span class="tsd-signature-symbol">[]</span></h5></li></ul></div>
+<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
+<ul>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L399">src/selection.ts:399</a></li></ul></aside></li></ul></section>
+<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class"><a id="union" class="tsd-anchor"></a>
+<h3 class="tsd-anchor-link"><span>union</span><a href="#union" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
+<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class">
+<li class="tsd-signature tsd-anchor-link" id="union.union-1">union<span class="tsd-signature-symbol">(</span>other<span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span>, name<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><a href="#union.union-1" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></li>
+<li class="tsd-description">
+<div class="tsd-comment tsd-typography"><p>A function that combines two selections into a third
+selection that is the union of the two.</p>
 </div>
 <div class="tsd-parameters">
 <h4 class="tsd-parameters-title">Parameters</h4>
 <ul class="tsd-parameter-list">
 <li>
-<h5>name: <span class="tsd-signature-type">any</span></h5>
-<div class="tsd-comment tsd-typography"><p>The name of the new selection.</p>
-</div></li>
+<h5>other: <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h5></li>
 <li>
-<h5>ixes: <span class="tsd-signature-type">BigInt</span><span class="tsd-signature-symbol">[]</span></h5>
-<div class="tsd-comment tsd-typography"><p>The column storing the ids.</p>
-</div></li></ul></div>
-<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
-<p>Implementation of <a href="../interfaces/shared.ScatterSelection.html">ScatterSelection</a>.<a href="../interfaces/shared.ScatterSelection.html#removePoints">removePoints</a></p>
+<h5>name: <span class="tsd-signature-type">string</span></h5></li></ul></div>
+<h4 class="tsd-returns-title">Returns <a href="selection.DataSelection.html" class="tsd-signature-type" data-tsd-kind="Class">DataSelection</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L144">src/selection.ts:144</a></li></ul></aside></li></ul></section>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L360">src/selection.ts:360</a></li></ul></aside></li></ul></section>
 <section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-private"><a id="wrapWithSelectionMetadata" class="tsd-anchor"></a>
 <h3 class="tsd-anchor-link"><code class="tsd-tag ts-flagPrivate">Private</code> <span>wrap<wbr/>With<wbr/>Selection<wbr/>Metadata</span><a href="#wrapWithSelectionMetadata" aria-label="Permalink" class="tsd-anchor-icon"><svg class="icon icon-tabler icon-tabler-link" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-anchor-a"></use><use href="#icon-anchor-b"></use><use href="#icon-anchor-c"></use></svg></a></h3>
 <ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-private">
@@ -506,7 +530,7 @@ for the various count variables.</p>
 </div></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="../types/shared.BoolTransformation.html" class="tsd-signature-type" data-tsd-kind="Type alias">BoolTransformation</a><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type" data-tsd-kind="Type parameter">T</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/6afb129/src/selection.ts#L275">src/selection.ts:275</a></li></ul></aside></li></ul></section></section></div>
+<li>Defined in <a href="https://github.com/nomic-ai/deepscatter/blob/ba86668/src/selection.ts#L533">src/selection.ts:533</a></li></ul></aside></li></ul></section></section></div>
 <div class="col-4 col-menu menu-sticky-wrap menu-highlight">
 <div class="tsd-navigation settings">
 <details class="tsd-index-accordion"><summary class="tsd-accordion-summary">
@@ -562,6 +586,8 @@ for the various count variables.</p>
 <li class="tsd-kind-property tsd-parent-kind-class"><a href="selection.DataSelection.html#ready" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>ready</a></li>
 <li class="tsd-kind-property tsd-parent-kind-class"><a href="selection.DataSelection.html#selectionSize" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>selection<wbr/>Size</a></li>
 <li class="tsd-kind-property tsd-parent-kind-class"><a href="selection.DataSelection.html#tiles" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>tiles</a></li>
+<li class="tsd-kind-property tsd-parent-kind-class"><a href="selection.DataSelection.html#type" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-1024-path"></use><use href="#icon-1024-text"></use></svg>type?</a></li>
+<li class="tsd-kind-accessor tsd-parent-kind-class"><a href="selection.DataSelection.html#ordering" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-262144-path"></use><use href="#icon-262144-text"></use></svg>ordering</a></li>
 <li class="tsd-kind-accessor tsd-parent-kind-class"><a href="selection.DataSelection.html#totalSetSize" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-262144-path"></use><use href="#icon-262144-text"></use></svg>total<wbr/>Set<wbr/>Size</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#_iterator_" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>[iterator]</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#addPoints" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>add<wbr/>Points</a></li>
@@ -569,14 +595,17 @@ for the various count variables.</p>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#add_function_column" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>add_<wbr/>function_<wbr/>column</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#add_identifier_column" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>add_<wbr/>identifier_<wbr/>column</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class tsd-is-private"><a href="selection.DataSelection.html#add_or_remove_points" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>add_<wbr/>or_<wbr/>remove_<wbr/>points</a></li>
+<li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#applyToAllLoadedTiles" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>apply<wbr/>To<wbr/>All<wbr/>Loaded<wbr/>Tiles</a></li>
+<li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#applyToAllTiles" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>apply<wbr/>To<wbr/>All<wbr/>Tiles</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#apply_to_foreground" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>apply_<wbr/>to_<wbr/>foreground</a></li>
-<li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#combine" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>combine</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class tsd-is-private"><a href="selection.DataSelection.html#dispatch" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>dispatch</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#export" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>export</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#get" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>get</a></li>
+<li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#intersection" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>intersection</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#moveCursor" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>move<wbr/>Cursor</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#on" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>on</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#removePoints" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>remove<wbr/>Points</a></li>
+<li class="tsd-kind-method tsd-parent-kind-class"><a href="selection.DataSelection.html#union" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>union</a></li>
 <li class="tsd-kind-method tsd-parent-kind-class tsd-is-private"><a href="selection.DataSelection.html#wrapWithSelectionMetadata" class="tsd-index-link"><svg class="tsd-kind-icon" width="24" height="24" viewBox="0 0 24 24"><use href="#icon-2048-path"></use><use href="#icon-2048-text"></use></svg>wrap<wbr/>With<wbr/>Selection<wbr/>Metadata</a></li></ul></li></ul></nav></div></div>
 <div class="container tsd-generator">
 <p>Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></div>

@@ -15,6 +15,7 @@ import {
   Int64,
   makeData
 } from 'apache-arrow';
+import Scatterplot from './deepscatter';
 
 type APICall = DS.APICall;
 type Key = string;
@@ -61,6 +62,55 @@ export abstract class Dataset<T extends Tile> {
   }
 
   /**
+   * This allows creation of a new column in your chart.
+   * 
+   * A few thngs to be aware of: the point function may be run millions of times.
+   * For best performance, you should not wrap complicated
+   * logic in this: instead, generate any data structures outside the function.
+   * 
+   * name: the name to identify the new column in the data.
+   * pointFunction: a function that runs on a single row of data. It accepts a single
+   * argument, the data point to be transformed: technically this is a StructRowProxy
+   * on the underlying Arrow frame, but for most purposes you can treat it as a dict.
+   * The point is read-only--you cannot change attributes.
+   * 
+   * For example: suppose you have a ['lat', 'long'] column in your data and want to create a
+   * new set of geo coordinates for your data. You can run the following.
+   * {
+   * const scale = d3.geoMollweide().extent([-20, -20, 20, 20])
+   * scatterplot.register_transformation('mollweide_x', datum => {
+   *  return scale([datum.long, datum.lat])[0]
+   * })
+   * scatterplot.register_transformation('mollweide_y', datum => {
+   *  return scale([datum.long, datum.lat])[1]
+   * })
+   * }
+   * 
+   * Note some constraints: the scale is created *outside* the functions, to avoid the 
+   * overhead of instantiating it every time; and the x and y coordinates are created separately
+   * with separate function calls, because it's not possible to assign to both x and y simultaneously. 
+   */
+
+  register_transformation(name: string, pointFunction : DS.PointFunction, prerequisites : string[] = []) {
+    const transform : Transformation<T> = async(tile : T) => {
+      // 
+      await Promise.all(prerequisites.map(key => tile.get_column(key)))
+      const returnVal = new Float32Array(tile.record_batch.numRows)
+      let i = 0;
+      for (const row of tile.record_batch) {
+        returnVal[i] = pointFunction(row)
+        i++;
+      }
+      return returnVal
+    }
+
+    this.transformations[name] = transform;
+  }
+
+  download_to_depth(max_ix: number) {
+    return Promise.resolve()
+  }
+  /**
    * Attempts to build an Arrow table from all record batches.
    * If some batches have different transformations applied,
    * this will error
@@ -76,15 +126,16 @@ export abstract class Dataset<T extends Tile> {
 
   static from_quadfeather(
     url: string,
-    prefs: APICall,
     plot: DS.Plot
   ): QuadtileSet {
     const options = {};
     if (plot.tileProxy) {
       options['tileProxy'] = plot.tileProxy;
     }
-    return new QuadtileSet(url, prefs, plot, options);
+    return new QuadtileSet(url, plot, options);
   }
+
+
   /**
    * Generate an ArrowDataset from a single Arrow table.
    *
@@ -95,10 +146,9 @@ export abstract class Dataset<T extends Tile> {
    */
   static from_arrow_table(
     table: Table,
-    prefs: APICall,
     plot: DS.Plot
   ): ArrowDataset {
-    return new ArrowDataset(table, prefs, plot);
+    return new ArrowDataset(table, plot);
   }
 
   abstract download_most_needed_tiles(
@@ -164,8 +214,9 @@ export abstract class Dataset<T extends Tile> {
       }
     }
     return (this.extents[dimension] = extent([
-      ...this.table.getChild(dimension),
-    ]));
+      ...new Vector(this.map(d => d).filter(d => d.ready).map( d =>
+        d.record_batch.getChild(dimension)).filter(d => d !== null)
+      )]))
   }
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {
@@ -392,7 +443,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   public promise: Promise<void> = Promise.resolve();
   public root_tile: ArrowTile;
 
-  constructor(table: Table, prefs: APICall, plot: DS.Plot) {
+  constructor(table: Table, plot: Scatterplot<ArrowTile>) {
     super(plot);
     this.root_tile = new ArrowTile(table, this, 0, plot);
   }
@@ -406,12 +457,10 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   }
 
   download_most_needed_tiles(
-    bbox: Rectangle | undefined,
-    max_ix: number,
-    queue_length: number
+    ...args: unknown[]
   ): void {
     // Definitionally, they're already there if using an Arrow table.
-    return undefined;
+    return;
   }
 }
 
@@ -419,11 +468,10 @@ export class ArrowDataset extends Dataset<ArrowTile> {
 
 export class QuadtileSet extends Dataset<QuadTile> {
   protected _download_queue: Set<Key> = new Set();
-  public promise: Promise<void> = new Promise(nothing);
-  root_tile: QuadTie;
+  public promise: Promise<void>;
+  root_tile: QuadTile;
   constructor(
     base_url: string,
-    prefs: APICall,
     plot: DS.Plot,
     options: DS.QuadtileOptions = {}
   ) {
@@ -432,10 +480,12 @@ export class QuadtileSet extends Dataset<QuadTile> {
       this.tileProxy = options.tileProxy;
     }
     this.root_tile = new QuadTile(base_url, '0/0/0', null, this);
-    this.promise = this.root_tile.download().then((d) => {
+    const download = this.root_tile.download();
+    this.promise = download.then(
+      (d) => {
       const schema = this.root_tile.record_batch.schema;
       if (schema.metadata.has('sidecars')) {
-        const cars = schema.metadata.get('sidecars') as string;
+        const cars = schema.metadata.get('sidecars');
         const parsed = JSON.parse(cars) as Record<string, string>;
         for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function (tile) {
@@ -460,11 +510,17 @@ export class QuadtileSet extends Dataset<QuadTile> {
   get ready() {
     return this.root_tile.download();
   }
+
   get extent() {
     return this.root_tile.extent;
   }
 
-  async download_to_depth(max_ix) {
+  /**
+   * Ensures that all the tiles in a dataset are downloaded that include 
+   * datapoints of index less than or equal to max_ix.
+   * @param max_ix the depth to download to.
+   */
+  async download_to_depth(max_ix: number) {
     await this.root_tile.download_to_depth(max_ix);
   }
 
@@ -656,7 +712,7 @@ export function add_or_delete_column(
     } else if (data.data?.length > 0) {
       tb[field_name] = data.data[0];
     } else {
-      tb[field_name] = data as Data;
+      tb[field_name] = data as Data
     }
   }
 

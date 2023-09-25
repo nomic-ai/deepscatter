@@ -1,4 +1,4 @@
-import type { StructRowProxy, Table, Vector } from 'apache-arrow';
+import type { Dictionary, Float, Float32, Int, Int16, Int32, Int8, StructRowProxy, Table, Utf8, Vector } from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
 import type { ArrowDataset } from './Dataset';
@@ -8,6 +8,7 @@ import type Scatterplot from './deepscatter';
 import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
 import { Bool } from 'apache-arrow';
+import type { DataSelection } from './selection';
 //import { DataSelection } from './selection';
 
 export type {
@@ -39,9 +40,13 @@ type TwoArgumentOp = {
   b: number;
 };
 
+
+export type PointFunction = (p : StructRowProxy) => number
+
 type Newable<T> = { new (...args: any[]): T };
 export type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
+
 interface InitializedScatterplot<T extends Tile> {
   _root: Dataset<T>;
   _renderer: ReglRenderer<T>;
@@ -59,197 +64,15 @@ export interface TileProxy {
 
 export type ScatterplotOptions = {
   tileProxy?: TileProxy;
+  dataset?: DataSpec;
 };
+
 export type QuadtileOptions = {
   tileProxy?: TileProxy;
 };
 
-
-/**
- * Interface representing the selection of a Scatter plot.
- * It holds information about the selected data points.
- *
- * @template T - A Tile set.
- */
-export interface ScatterSelection<T extends Tile> {
-
-  /**
-   * name: The name of the selection. This will be used as the colun
-   * name in the Arrow record batches and are necessary for users 
-   * to define so that they can use the selection in subsequent 
-   * plotAPI calls to apply aesthetics to the selection.
-   * 
-   * They must be globally unique in the session.
-   * 
-   * e.g. 'search: fish', '54-abcdf', 'selection at 07:34:12',
-   * 'selección compuesta número 1'
-   * 
-   */
-
-  name: string;
-
-  /**
-   * Optionally, a user-defined for defining.
-   * 
-   * If you're using this, I recommend defining your own application 
-   * schema but I'm not going to force you throw type hints right now
-   * because, you know. I'm not a monster.
-   * 
-   * e.g.: ['search', 'lasso', 'random', 'cherry-pick']
-   * 
-   */
-  type?: string;
-
-
-  /**
-   * The cursor is an index that points to the current position
-   * within the selected points in the Scatter plot.
-   */
-  cursor: number;
-
-  /**
-   * The total number of points in the selection.
-   * It is used to know the size of the selected data.
-   */
-  selectionSize: number; 
-
-  /**
-   * The total number of points that have been evaluated for the selection.
-   * 
-   * This is supplied because deepscatter doesn't evaluate functions on tiles
-   * untile they are loaded.
-   */
-  evaluationSetSize: number;
-
-  /**
-   * The total number of points in the set. At present, always a light wrapper around
-   * the total number of points in the dataset.
-   */
-  totalSetSize: number;
-
-  /**
-   * Has the selection run on all tiles in the dataset?
-  */
-  complete: boolean;
-
-  /**
-   * 
-   * Ensures that the selection has been evaluated on all
-   * tiles loaded in the dataset. This is useful if, for example,
-   * your selection represents a search, and you are zoomed in on 
-   * one portion of the map; this will immediately execute the search
-   * (subject to delays to avoid blocking the main thread) on all tiles
-   * that have been fetched even if out of the viewport.
-   * 
-   * Resolves upon completion.
-   */
-  applyToAllLoadedTiles(): Promise<void>;
-
-  /**
-   * 
-   * Downloads all unloaded tiles in the dataset and applies the 
-   * transformation to them. Use with care! For > 10,000,000 point
-   * datasets, if called from Europe this may cause the transatlantic fiber-optic internet backbone 
-   * cables to melt.
-   */
-
-  applyToAllTiles(): Promise<void>;
-
-  /**
-   * 
-   * A function that combines two selections into a third
-   * selection that is the union of the two.
-   */
-  union?(other: ScatterSelection<T>): ScatterSelection<T>;
-
-  /**
-   * 
-   * A function that combines two selections into a third
-   * selection that is the intersection of the two. Note--for more complicated
-   * queries than simple intersection/union, use the (not yet defined)
-   * disjunctive normal form constructor.
-   */
-
-  intersection?(other: ScatterSelection<T>): ScatterSelection<T>;
-
-  /**
-   * 
-   * The deepscatter transformation that will be applied to 
-   * tiles to test if they are members of the set. Transformations
-   * can apply any type of function; here we assume that they are floats
-   * (because WebGL 1.0 can't handle anything else)
-   * and that 0 represents exclusion and 1 represents inclusion.
-   * 
-   * This constraint is not enforced by the type system.
-   */
-
-  transformation: Transformation<T>;
-
-  /**
-   * NOT IMPLEMENTED YET
-   * 
-   * A set of indexes that affects the ordering of the selection.
-   * 
-   */
-
-  ordering?: number[];
-
-  /**
-   * 
-  tiles: T[]; // The tiles that have been evaluated for the selection.
-
-  /**
-   * 
-   * returns the ith element of the selection; if undefined,
-   * returns the element at the current cursor.
-   * 
-   * @param i.
-   */
-  get(i: number | undefined) : StructRowProxy;
-
-  /**
-   * Returns a bitmask from each tile, identified by their keys.
-   * Used for efficiently persisting a selection for later use.
-   */
-  bitmask: Record<string, Uint8Array>;
-
-
-  /**
-    * Returns a new selection that is the union of this selection
-    * and all the points in the supplied array. 
-    *
-    * @param ids - An array of ids to add to the selection.
-    * @param field - The column storing the ids.
-    * @param name - The name of the new selection.
-    *   
-    * @returns A new selection that is the union of this selection
-    * and all the points in the supplied array.
-    *   
-  */
-  addPoints(name: string, field: string, ids: string[] | number[] | bigint[]): ScatterSelection<T>;
-
-  /**
-   * Returns a new selection that is the current selection,
-   * minus all the points in the supplied array.
-   * 
-   * @param ids - An array of ids to remove from the selection.
-   * @param field - The column storing the ids.
-   * @param name - The name of the new selection.
-   * 
-   * @returns A new selection that is the current selection,
-   * minus all the points in the supplied array.
-   * 
-  */
-  removePoints(name: string, field: string, ids: string[] | number[] | bigint[]): ScatterSelection<T>;
-  
-}
-
-// TODO: implement this.
-export type DNFmaker<T extends Tile> = (args: [ScatterSelection<T>[]]) => ScatterSelection<T>;
-
-
 export interface SelectionRecord<T extends Tile>  {
-  selection: ScatterSelection<T> | null;
+  selection: DataSelection<T> | null;
   name: string;
   flushed: boolean;
 }
@@ -283,13 +106,14 @@ export type BackgroundOptions = {
   // describes the foreground and background separately.
   opacity?: number | [number, number];
 
-  // A multiplier against the point's size. Default 0.66.
-  // A single value describes the background; an array
-  // describes the foreground and background separately.
-
+  /**
+   * A multiplier against the point's size. Default 0.66.
+   * A single value describes the background; an array
+   * describes the foreground and background separately.
+  */
   size?: number | [number, number];
 
-  // Whether the background points should respond on mouseover.
+  // Whether the background points sho`uld respond on mouseover.
   mouseover?: boolean;
 };
 
@@ -301,6 +125,10 @@ export type ConstantNumber = {
   constant: number;
 };
 
+/**
+ * A constant color channel must be represented as a string that 
+ * is valid HTML. (`blue`, `#EEFF00`, etc.)
+ */
 export type ConstantColorChannel = {
   constant: string;
 };
@@ -336,19 +164,24 @@ export interface BasicChannel {
 }
 
 export type JitterRadiusMethod =
-  | 'None'
-  | 'spiral'
-  | 'uniform'
-  | 'normal'
-  | 'circle'
-  | 'time';
+  | 'None' // 
+  | 'spiral' // animates along a log spiral.
+  | 'uniform' // static jitters around a central point.
+  | 'normal' // static jitters around a central point biased towards the middle.
+  | 'circle' // animates a circle around the point.
+  | 'time'; // lapses the point in and out of view.
 
 export interface CategoricalChannel {
   field: string;
 }
 
-export type ArrowBuildable = Vector | Float32Array;
+type ArrowInt = Int8 | Int16 | Int32;
 
+// An arrow buildable vector is something returned that can be placed onto the scatterplot.
+// Float32Arrays will be dropped straight onto the GPU; other types while be cast
+// to Float32Array before going there.
+
+export type ArrowBuildable = Vector<Bool | Float | Int | Dictionary<Utf8, ArrowInt>> | Float32Array | Uint8Array;
 /**
  * A transformation is a batchwise operation that can be used to construct
  * a new column in the data table. It runs asynchronously so that it
@@ -356,12 +189,12 @@ export type ArrowBuildable = Vector | Float32Array;
  * rather than a point -> value operation for speed.
  * 
  * If the resulting vector or float32array is not the same length as 
- * inputTile.record_batch.numRows, it will fail catastrophically.
+ * inputTile.record_batch.numRows, it will fail in an undefined way.
  * This is not a guarantee I know how to enforce in the type system.
  */
 export type Transformation<T> = (inputTile: T) => ArrowBuildable | Promise<ArrowBuildable>;
 
-export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Vector<Bool> | Promise<Vector<Bool>>;
+export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
 
 export type BasicColorChannel = BasicChannel & {
   range?: string[] | string;
@@ -390,14 +223,6 @@ export type RootChannel =
   | LambdaChannel;
 
 export type JitterChannel = RootChannel & {
-  /**
-   * Jitter channels have a method.
-   * 'spiral' animates along a log spiral.
-   * 'uniform' jitters around a central point.
-   * 'normal' jitters around a central point biased towards the middle.
-   * 'circle' animates a circle around the point.
-   * 'time' lapses the point in and out of view.
-   */
   method: JitterRadiusMethod;
 };
 
@@ -445,9 +270,17 @@ export type Dimension = keyof Encoding;
 // 2. A URL to a Quadtile source.
 // 3. An array buffer that contains a serialized Table.
 
-type DataSpec = Record<string, never> &
+/**
+ * A DataSpec is a record that describes how to load data into the
+ * scatterplot. It can be one of three things:
+ * 1. A URL to a quadtile source.
+ * 2. An Arrow Table object. (Use this with care! Minor differences in JS Apache Arrow builds 
+ * can cause this to fail in deeply confusing ways.)
+ * 3. A Uint8Array containing a serialized Arrow Table. (This is safer than passing an Arrow Table.)
+ */
+export type DataSpec = Record<string, never> &
   (
-    | { source_url?: never; arrow_table?: never; arrow_buffer: ArrayBuffer }
+    | { source_url?: never; arrow_table?: never; arrow_buffer: Uint8Array }
     | { source_url: string; arrow_table?: never; arrow_buffer?: never }
     | { source_url?: never; arrow_table: Table; arrow_buffer?: never }
   );
@@ -503,7 +336,11 @@ export type APICall = {
   /** A function defind as a string that takes implied argument 'datum' */
   click_function?: string;
 
-  //
+  // The color of the screen background.
+  background_color?: string;
+
+  // 
+  transformations: Record<string, string>;
   encoding?: Encoding;
   labels?: Labelcall;
   background_options?: BackgroundOptions;
@@ -511,7 +348,7 @@ export type APICall = {
   zoom_align?: undefined | 'right' | 'left' | 'top' | 'bottom' | 'center';
 };
 
-type InitialAPICall = APICall & {
+export type InitialAPICall = APICall & {
   encoding: Encoding;
 } & DataSpec;
 
