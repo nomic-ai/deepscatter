@@ -13,7 +13,11 @@ import {
   makeVector,
   Float32,
   Int64,
-  makeData
+  makeData,
+  Field,
+  List,
+  Int,
+  Float
 } from 'apache-arrow';
 import Scatterplot from './deepscatter';
 
@@ -59,6 +63,52 @@ export abstract class Dataset<T extends Tile> {
    */
   get highest_known_ix(): number {
     return this.root_tile.highest_known_ix;
+  }
+
+  /**
+   * This allows creation of a new column in your chart.
+   * 
+   * A few thngs to be aware of: the point function may be run millions of times.
+   * For best performance, you should not wrap complicated
+   * logic in this: instead, generate any data structures outside the function.
+   * 
+   * name: the name to identify the new column in the data.
+   * pointFunction: a function that runs on a single row of data. It accepts a single
+   * argument, the data point to be transformed: technically this is a StructRowProxy
+   * on the underlying Arrow frame, but for most purposes you can treat it as a dict.
+   * The point is read-only--you cannot change attributes.
+   * 
+   * For example: suppose you have a ['lat', 'long'] column in your data and want to create a
+   * new set of geo coordinates for your data. You can run the following.
+   * {
+   * const scale = d3.geoMollweide().extent([-20, -20, 20, 20])
+   * scatterplot.register_transformation('mollweide_x', datum => {
+   *  return scale([datum.long, datum.lat])[0]
+   * })
+   * scatterplot.register_transformation('mollweide_y', datum => {
+   *  return scale([datum.long, datum.lat])[1]
+   * })
+   * }
+   * 
+   * Note some constraints: the scale is created *outside* the functions, to avoid the 
+   * overhead of instantiating it every time; and the x and y coordinates are created separately
+   * with separate function calls, because it's not possible to assign to both x and y simultaneously. 
+   */
+
+  register_transformation(name: string, pointFunction : DS.PointFunction, prerequisites : string[] = []) {
+    const transform : Transformation<T> = async(tile : T) => {
+      // 
+      await Promise.all(prerequisites.map(key => tile.get_column(key)))
+      const returnVal = new Float32Array(tile.record_batch.numRows)
+      let i = 0;
+      for (const row of tile.record_batch) {
+        returnVal[i] = pointFunction(row)
+        i++;
+      }
+      return returnVal
+    }
+
+    this.transformations[name] = transform;
   }
 
   download_to_depth(max_ix: number) {
@@ -137,7 +187,7 @@ export abstract class Dataset<T extends Tile> {
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
-    const dim = this._schema?.fields.find((d) => d.name === dimension);
+    const dim = this._schema?.fields.find((d) => d.name === dimension) as Field<DS.SupportedArrowTypes>;
     if (dim !== undefined) {
       let min: number | string | undefined = undefined;
       let max: number | string | undefined = undefined;
@@ -272,14 +322,18 @@ export abstract class Dataset<T extends Tile> {
     const tb = tableFromIPC(buffer);
     const records: Record<string, Float32Array> = {};
     for (const batch of tb.batches) {
-      const offsets = batch.getChild('data')!.data[0].valueOffsets;
-      const values = batch.getChild('data')!.data[0].children[0];
+      const data = batch.getChild('data').data[0];
+      if (data === null) {throw new Error('tiled columns must contain "data" field.')}
+      const offsets = data.valueOffsets ;
+      const values = data.children[0] as Data<List<Float32>>;
       for (let i = 0; i < batch.data.length; i++) {
         const tilename = batch.getChild('_tile').get(i) as string;
         records[tilename] = values.values.slice(
           offsets[i],
           offsets[i + 1]
-        ) as Float32Array;
+        // Type coercion necessary because Float[]
+        // and the backing Float32Array are not recognized as equivalent.
+        ) as unknown as Float32Array;
       }
     }
     this.transformations[field_name] = function (tile) {
@@ -332,7 +386,8 @@ export abstract class Dataset<T extends Tile> {
   /**
    * Given an ix, apply a transformation to the point at that index and
    * return the transformed point (not just the transformation, the whole point)
-   * This applies the transformaation to all other points in the same tile.
+   * As a side-effect, this applies the transformaation to all other
+   * points in the same tile.
    *
    * @param transformation The name of the transformation to apply
    * @param ix The index of the point to transform
@@ -344,14 +399,12 @@ export abstract class Dataset<T extends Tile> {
     if (matches.length == 0) {
       throw new Error(`No point for ix ${ix}`);
     }
-    const [tile, row] = matches[0];
+    const [tile, row, mid] = matches[0];
     // Check if the column exists; if so, return the row.
     if (tile.record_batch.getChild(transformation) !== null) {
       return row;
     }
     await tile.apply_transformation(transformation);
-    const ixcol = tile.record_batch.getChild('ix');
-    const mid = bisectLeft([...ixcol.data[0].values], ix);
     return tile.record_batch.get(mid);
   }
   /**
@@ -368,8 +421,8 @@ export abstract class Dataset<T extends Tile> {
    * @param ix The index of the point to get.
    * @returns A list of [tile, point] pairs that match the index.
    */
-  findPointRaw(ix: number): [Tile, StructRowProxy][] {
-    const matches: [Tile, StructRowProxy][] = [];
+  findPointRaw(ix: number): [Tile, StructRowProxy, number][] {
+    const matches: [Tile, StructRowProxy, number][] = [];
     this.visit((tile: T) => {
       if (
         !(
@@ -381,13 +434,11 @@ export abstract class Dataset<T extends Tile> {
       ) {
         return;
       }
-      const mid = bisectLeft(
-        [...tile.record_batch.getChild('ix')!.data[0].values],
-        ix
-      );
+      const ixcol = tile.record_batch.getChild('ix') as Vector<Int>;
+      const mid = bisectLeft(ixcol.toArray() as ArrayLike<number>, ix);
       const val = tile.record_batch.get(mid);
       if (val !== null && val.ix === ix) {
-        matches.push([tile, val]);
+        matches.push([tile, val, mid]);
       }
     });
     return matches;
@@ -546,7 +597,7 @@ export class QuadtileSet extends Dataset<QuadTile> {
     const records: Record<string, Float32Array | Uint8Array> = {};
 
     async function get_table(tile: QuadTile) {
-      const { key, macrotile } = tile;
+      const { macrotile } = tile;
       if (macrotile_tasks[macrotile] !== undefined) {
         return await macrotile_tasks[macrotile];
       } else {
@@ -554,8 +605,9 @@ export class QuadtileSet extends Dataset<QuadTile> {
           (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
-              const offsets = batch.getChild('data')!.data[0].valueOffsets;
-              const values = batch.getChild('data')!.data[0].children[0];
+              const data = batch.getChild('data') as Vector<List<Float>>
+              const offsets = data.data[0].valueOffsets;
+              const values = data.data[0].children[0] ;
               for (let i = 0; i < batch.data.length; i++) {
                 const tilename = batch.getChild('_tile').get(i) as string;
                 records[tilename] = values.values.slice(
@@ -650,11 +702,12 @@ export function add_or_delete_column(
         throw new Error(`Name ${field.name} already exists, can't add.`);
       }
     }
-    tb[field.name] = batch.getChild(field.name)!.data[0];
+    const current = batch.getChild(field.name);
+    const coldata = current.data[0] as Data;
+    tb[field.name] = coldata;
   }
   if (data === null) {
-    // Then it's dropped.
-    throw new Error(`Name ${field_name} doesn't exist, can't drop.`);
+    // should have already happened.
   }
   if (data === undefined) {
     throw new Error('Must pass data to bind_column');
@@ -667,7 +720,7 @@ export function add_or_delete_column(
     } else if (data.data?.length > 0) {
       tb[field_name] = data.data[0];
     } else {
-      tb[field_name] = data as Data;
+      tb[field_name] = data as Data
     }
   }
 
@@ -684,6 +737,7 @@ export function add_or_delete_column(
         newfield.metadata.set(k, v);
       }
     } else if (data !== null) {
+      // OK to be null, that means it should have been deleted.
       throw new Error('Error!');
     }
   }

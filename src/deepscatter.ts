@@ -712,6 +712,7 @@ export default class Scatterplot<T extends Tile> {
     if (prefs.tooltip_html) {
       this.tooltip_html = Function('datum', prefs.tooltip_html) as unknown as TooltipHTML;
     }
+
     if (prefs.background_options) {
       // these two numbers can be set either on fg/bg or just on fg
       if (
@@ -742,6 +743,18 @@ export default class Scatterplot<T extends Tile> {
       await this.load_dataset(dataSpec);
     }
 
+    if (prefs.transformations) {
+      console.log(prefs)
+      for (const [k, v] of Object.entries(prefs.transformations)) {
+        const func = Function('datum', v) as unknown as DS.PointFunction;
+        if (!this.dataset.transformations[k]) {
+          this.dataset.register_transformation(k, func)
+        } else {
+          console.log("Already", k, v)
+        }
+      }
+    }
+    
     if (this._zoom === undefined) {
       await this.reinitialize();
     }
