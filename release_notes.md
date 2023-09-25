@@ -1,8 +1,11 @@
 # 2.14.0
 
+- Allow defining transformation functions by points, not just record batches, for convenience.
+- Fix for bugs in domains.
 - Update dataset methods to allow instantiating from an arrow table represented
   as a Uint8Array, which is simpler and avoids some conflicts in Apache Arrow versions.
-- Allow creating a dataset in the constructor, before the initial plotAPI call,
+- Allow creating a dataset in the constructor, before the initial
+  plotAPI call,
   which allows more
   precise staging of data and allows access to most dataset capabilities without binding to the DOM.
 - Support for Arrow Boolean types in transformations/selections.
@@ -19,6 +22,7 @@ on creation.
 # 2.13.2
 
 - Publish type definitions. at dist/deepscatter.d.ts
+  and adjacent files.
 
 # 2.13.0
 - Introduce new 'selection' fundamental; selections allow

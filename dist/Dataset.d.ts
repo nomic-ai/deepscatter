@@ -30,6 +30,36 @@ export declare abstract class Dataset<T extends Tile> {
      * to adjust opacity size.
      */
     get highest_known_ix(): number;
+    /**
+     * This allows creation of a new column in your chart.
+     *
+     * A few thngs to be aware of: the point function may be run millions of times.
+     * For best performance, you should not wrap complicated
+     * logic in this: instead, generate any data structures outside the function.
+     *
+     * name: the name to identify the new column in the data.
+     * pointFunction: a function that runs on a single row of data. It accepts a single
+     * argument, the data point to be transformed: technically this is a StructRowProxy
+     * on the underlying Arrow frame, but for most purposes you can treat it as a dict.
+     * The point is read-only--you cannot change attributes.
+     *
+     * For example: suppose you have a ['lat', 'long'] column in your data and want to create a
+     * new set of geo coordinates for your data. You can run the following.
+     * {
+     * const scale = d3.geoMollweide().extent([-20, -20, 20, 20])
+     * scatterplot.register_transformation('mollweide_x', datum => {
+     *  return scale([datum.long, datum.lat])[0]
+     * })
+     * scatterplot.register_transformation('mollweide_y', datum => {
+     *  return scale([datum.long, datum.lat])[1]
+     * })
+     * }
+     *
+     * Note some constraints: the scale is created *outside* the functions, to avoid the
+     * overhead of instantiating it every time; and the x and y coordinates are created separately
+     * with separate function calls, because it's not possible to assign to both x and y simultaneously.
+     */
+    register_transformation(name: string, pointFunction: DS.PointFunction, prerequisites?: string[]): void;
     download_to_depth(max_ix: number): Promise<void>;
     /**
      * Attempts to build an Arrow table from all record batches.
@@ -97,7 +127,8 @@ export declare abstract class Dataset<T extends Tile> {
     /**
      * Given an ix, apply a transformation to the point at that index and
      * return the transformed point (not just the transformation, the whole point)
-     * This applies the transformaation to all other points in the same tile.
+     * As a side-effect, this applies the transformaation to all other
+     * points in the same tile.
      *
      * @param transformation The name of the transformation to apply
      * @param ix The index of the point to transform
@@ -114,7 +145,7 @@ export declare abstract class Dataset<T extends Tile> {
      * @param ix The index of the point to get.
      * @returns A list of [tile, point] pairs that match the index.
      */
-    findPointRaw(ix: number): [Tile, StructRowProxy][];
+    findPointRaw(ix: number): [Tile, StructRowProxy, number][];
 }
 export declare class ArrowDataset extends Dataset<ArrowTile> {
     promise: Promise<void>;

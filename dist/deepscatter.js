@@ -15775,7 +15775,6 @@ class Renderer {
   get prefs() {
     const p = { ...this.scatterplot.prefs };
     p.arrow_table = void 0;
-    p.arrow_buffer = void 0;
     return p;
   }
   get alpha() {
@@ -22876,6 +22875,7 @@ const scales = {
 };
 class Aesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
+    this._transform = "linear";
     this.field = null;
     this._texture_buffer = null;
     this.partner = null;
@@ -22910,9 +22910,7 @@ class Aesthetic {
       return this._scale;
     }
     if (this.is_dictionary()) {
-      console.warn("Dictionary scales only supported for colors");
-      const scale2 = ordinal().domain(this.domain);
-      return this._scale = scale2.range(this.range);
+      throw new Error("Dictionary scales only supported for colors");
     }
     const scale = scales[this.transform]();
     scale.domain(this.domain).range(this.range);
@@ -23016,6 +23014,7 @@ class Aesthetic {
     this._scale = void 0;
   }
   update(encoding) {
+    var _a2;
     if (encoding === void 0) {
       console.warn("Should never be calling update with undefined.");
       return;
@@ -23066,7 +23065,7 @@ class Aesthetic {
       this._domain = encoding.domain;
       this._range = encoding.range;
     }
-    this._transform = encoding.transform || void 0;
+    this._transform = (_a2 = encoding.transform) != null ? _a2 : void 0;
   }
   encode_for_textures(range2) {
     const { texture_size } = this.aesthetic_map;
@@ -23255,7 +23254,15 @@ class BooleanAesthetic extends Aesthetic {
       return this.apply_op(point, channel);
     }
     if (isConstantChannel(channel)) {
-      return channel.constant !== 0;
+      if (channel.constant === 0) {
+        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers");
+        return false;
+      }
+      if (channel.constant === 1) {
+        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers");
+        return true;
+      }
+      return channel.constant;
     }
     if (isLambdaChannel(channel)) {
       if (this._func === void 0) {
@@ -23301,8 +23308,8 @@ class Foreground extends BooleanAesthetic {
   constructor() {
     super(...arguments);
     this.current_encoding = null;
-    this._constant = 1;
-    this.default_constant = 1;
+    this._constant = true;
+    this.default_constant = true;
     this.default_range = [0, 1];
     this.default_transform = "literal";
   }
@@ -23317,8 +23324,8 @@ class Filter extends BooleanAesthetic {
   constructor() {
     super(...arguments);
     this.current_encoding = null;
-    this._constant = 1;
-    this.default_constant = 1;
+    this._constant = true;
+    this.default_constant = true;
     this.default_transform = "literal";
     this.default_range = [0, 1];
   }
@@ -23960,7 +23967,6 @@ class Color extends Aesthetic {
     if (this._scale) {
       return this._scale;
     }
-    scales[this.transform]().domain(this.domain).range(this.range);
     const range2 = this.range;
     function capitalize(r) {
       if (r === "ylorrd") {
@@ -23969,14 +23975,14 @@ class Color extends Aesthetic {
       return r.charAt(0).toUpperCase() + r.slice(1);
     }
     if (this.is_dictionary()) {
-      const scale2 = ordinal().domain(this.domain);
+      const scale = ordinal().domain(this.domain);
       if (typeof range2 === "string" && schemes[range2]) {
         if (this.column.data[0].dictionary === null) {
           throw new Error("Dictionary is null");
         }
-        return this._scale = scale2.range(schemes[range2]).domain(this.column.data[0].dictionary.toArray());
+        return this._scale = scale.range(schemes[range2]).domain(this.column.data[0].dictionary.toArray());
       } else {
-        return this._scale = scale2.range(this.range);
+        return this._scale = scale.range(this.range);
       }
     }
     if (typeof range2 == "string") {
@@ -24067,8 +24073,7 @@ class Color extends Aesthetic {
       return;
     }
     if (range2.length === this.aesthetic_map.texture_size * 4) {
-      console.warn("SETTING FULL RANGE IS DEPRECATED,");
-      this.texture_buffer.set(range2);
+      throw new Error("SETTING FULL RANGE IS DEPRECATED");
     }
     console.error(`request range of ${range2} for color ${this.field} unknown`);
   }
@@ -34808,9 +34813,6 @@ class Tile {
   get children() {
     return this._children;
   }
-  get dictionary_lookups() {
-    return this.dataset.dictionary_lookups;
-  }
   download() {
     throw new Error("Not implemented");
   }
@@ -34889,32 +34891,7 @@ class Tile {
         }
       }
     } else {
-      let children2 = this.children.map((tile) => {
-        const f = {
-          t: tile,
-          iterator: tile.points(bounding, sorted),
-          next: void 0
-        };
-        f.next = f.iterator.next();
-        return f;
-      });
-      children2 = children2.filter((d) => {
-        var _a2;
-        return (_a2 = d == null ? void 0 : d.next) == null ? void 0 : _a2.value;
-      });
-      while (children2.length > 0) {
-        let mindex = 0;
-        for (let i = 1; i < children2.length; i++) {
-          if (children2[i].next.value.ix < children2[mindex].next.value.ix) {
-            mindex = i;
-          }
-        }
-        yield children2[mindex].next.value;
-        children2[mindex].next = children2[mindex].iterator.next();
-        if (children2[mindex].next.done) {
-          children2 = children2.splice(mindex, 1);
-        }
-      }
+      throw new Error("Sorted iteration not supported");
     }
   }
   forEach(callback) {
@@ -34952,7 +34929,8 @@ class Tile {
     return 0;
   }
   async schema() {
-    await this.download();
+    this.download();
+    await this.promise;
     return this._schema;
   }
   /**
@@ -35235,6 +35213,7 @@ class ArrowTile extends Tile {
     while (++ix <= this.batch_num * 4 + 4) {
       if (ix < this.full_tab.batches.length) {
         this._children.push(
+          // TODO: fix type
           new ArrowTile(this.full_tab, this.dataset, ix, this)
         );
       }
@@ -35319,6 +35298,48 @@ class Dataset {
   get highest_known_ix() {
     return this.root_tile.highest_known_ix;
   }
+  /**
+   * This allows creation of a new column in your chart.
+   * 
+   * A few thngs to be aware of: the point function may be run millions of times.
+   * For best performance, you should not wrap complicated
+   * logic in this: instead, generate any data structures outside the function.
+   * 
+   * name: the name to identify the new column in the data.
+   * pointFunction: a function that runs on a single row of data. It accepts a single
+   * argument, the data point to be transformed: technically this is a StructRowProxy
+   * on the underlying Arrow frame, but for most purposes you can treat it as a dict.
+   * The point is read-only--you cannot change attributes.
+   * 
+   * For example: suppose you have a ['lat', 'long'] column in your data and want to create a
+   * new set of geo coordinates for your data. You can run the following.
+   * {
+   * const scale = d3.geoMollweide().extent([-20, -20, 20, 20])
+   * scatterplot.register_transformation('mollweide_x', datum => {
+   *  return scale([datum.long, datum.lat])[0]
+   * })
+   * scatterplot.register_transformation('mollweide_y', datum => {
+   *  return scale([datum.long, datum.lat])[1]
+   * })
+   * }
+   * 
+   * Note some constraints: the scale is created *outside* the functions, to avoid the 
+   * overhead of instantiating it every time; and the x and y coordinates are created separately
+   * with separate function calls, because it's not possible to assign to both x and y simultaneously. 
+   */
+  register_transformation(name, pointFunction, prerequisites = []) {
+    const transform = async (tile) => {
+      await Promise.all(prerequisites.map((key) => tile.get_column(key)));
+      const returnVal = new Float32Array(tile.record_batch.numRows);
+      let i = 0;
+      for (const row of tile.record_batch) {
+        returnVal[i] = pointFunction(row);
+        i++;
+      }
+      return returnVal;
+    };
+    this.transformations[name] = transform;
+  }
   download_to_depth(max_ix) {
     return Promise.resolve();
   }
@@ -35364,7 +35385,7 @@ class Dataset {
     delete this.transformations[name];
   }
   domain(dimension, max_ix = 1e6) {
-    var _a2, _b2;
+    var _a2;
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
@@ -35384,10 +35405,10 @@ class Dataset {
       if (mmax) {
         max2 = JSON.parse(mmax);
       }
-      if (dim.type.typeId == 10 && typeof min2 === "string") {
+      if (dim.type.typeId === 10 && typeof min2 === "string") {
         min2 = Number(new Date(min2));
       }
-      if (((_b2 = dim.type) == null ? void 0 : _b2.typeId) == 10 && typeof max2 === "string") {
+      if (dim.type.typeId === 10 && typeof max2 === "string") {
         max2 = Number(new Date(max2));
       }
       if (typeof max2 === "string") {
@@ -35399,7 +35420,7 @@ class Dataset {
     }
     return this.extents[dimension] = extent([
       ...new Vector(
-        this.map((d) => d.record_batch.getChild(dimension)).filter((d) => d !== null)
+        this.map((d) => d).filter((d) => d.ready).map((d) => d.record_batch.getChild(dimension)).filter((d) => d !== null)
       )
     ]);
   }
@@ -35483,13 +35504,19 @@ class Dataset {
     const tb = tableFromIPC(buffer);
     const records = {};
     for (const batch of tb.batches) {
-      const offsets = batch.getChild("data").data[0].valueOffsets;
-      const values = batch.getChild("data").data[0].children[0];
+      const data = batch.getChild("data").data[0];
+      if (data === null) {
+        throw new Error('tiled columns must contain "data" field.');
+      }
+      const offsets = data.valueOffsets;
+      const values = data.children[0];
       for (let i = 0; i < batch.data.length; i++) {
         const tilename = batch.getChild("_tile").get(i);
         records[tilename] = values.values.slice(
           offsets[i],
           offsets[i + 1]
+          // Type coercion necessary because Float[]
+          // and the backing Float32Array are not recognized as equivalent.
         );
       }
     }
@@ -35536,7 +35563,8 @@ class Dataset {
   /**
    * Given an ix, apply a transformation to the point at that index and
    * return the transformed point (not just the transformation, the whole point)
-   * This applies the transformaation to all other points in the same tile.
+   * As a side-effect, this applies the transformaation to all other
+   * points in the same tile.
    *
    * @param transformation The name of the transformation to apply
    * @param ix The index of the point to transform
@@ -35546,13 +35574,11 @@ class Dataset {
     if (matches.length == 0) {
       throw new Error(`No point for ix ${ix}`);
     }
-    const [tile, row] = matches[0];
+    const [tile, row, mid] = matches[0];
     if (tile.record_batch.getChild(transformation) !== null) {
       return row;
     }
     await tile.apply_transformation(transformation);
-    const ixcol = tile.record_batch.getChild("ix");
-    const mid = bisectLeft([...ixcol.data[0].values], ix);
     return tile.record_batch.get(mid);
   }
   /**
@@ -35574,13 +35600,11 @@ class Dataset {
       if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
         return;
       }
-      const mid = bisectLeft(
-        [...tile.record_batch.getChild("ix").data[0].values],
-        ix
-      );
+      const ixcol = tile.record_batch.getChild("ix");
+      const mid = bisectLeft(ixcol.toArray(), ix);
       const val = tile.record_batch.get(mid);
       if (val !== null && val.ix === ix) {
-        matches.push([tile, val]);
+        matches.push([tile, val, mid]);
       }
     });
     return matches;
@@ -35690,7 +35714,7 @@ class QuadtileSet extends Dataset {
     const macrotile_tasks = {};
     const records = {};
     async function get_table(tile) {
-      const { key, macrotile: macrotile2 } = tile;
+      const { macrotile: macrotile2 } = tile;
       if (macrotile_tasks[macrotile2] !== void 0) {
         return await macrotile_tasks[macrotile2];
       } else {
@@ -35698,8 +35722,9 @@ class QuadtileSet extends Dataset {
           (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
-              const offsets = batch.getChild("data").data[0].valueOffsets;
-              const values = batch.getChild("data").data[0].children[0];
+              const data = batch.getChild("data");
+              const offsets = data.data[0].valueOffsets;
+              const values = data.data[0].children[0];
               for (let i = 0; i < batch.data.length; i++) {
                 const tilename = batch.getChild("_tile").get(i);
                 records[tilename] = values.values.slice(
@@ -35769,10 +35794,9 @@ function add_or_delete_column(batch, field_name, data) {
         throw new Error(`Name ${field.name} already exists, can't add.`);
       }
     }
-    tb[field.name] = batch.getChild(field.name).data[0];
-  }
-  if (data === null) {
-    throw new Error(`Name ${field_name} doesn't exist, can't drop.`);
+    const current = batch.getChild(field.name);
+    const coldata = current.data[0];
+    tb[field.name] = coldata;
   }
   if (data === void 0) {
     throw new Error("Must pass data to bind_column");
@@ -37020,7 +37044,7 @@ class DataSelection {
    * that have been fetched even if out of the viewport.
    * 
    * Resolves upon completion.
-   */
+  */
   applyToAllLoadedTiles() {
     return Promise.all(this.dataset.map((tile) => {
       if (tile.ready) {
@@ -37636,16 +37660,15 @@ class Scatterplot {
   }
   */
   visualize_tiles() {
-    const map2 = this;
-    const ctx = map2.elements[2].selectAll("canvas").node().getContext("2d");
+    const ctx = this.elements[2].selectAll("canvas").node().getContext("2d");
     ctx.clearRect(0, 0, 1e4, 1e4);
-    const { x_, y_ } = map2._zoom.scales();
+    const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = "#888888";
-    const tiles = map2._root.map((t) => t);
-    for (const i of range(13)) {
+    const tiles = this._root.map((t) => t);
+    for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
-          if (tile.codes[0] != i) {
+          if (!tile.codes || tile.codes[0] != i) {
             continue;
           }
           if (!tile.extent) {
@@ -37675,7 +37698,6 @@ class Scatterplot {
     canvas.setAttribute("height", (xtimes * height).toString());
     const ctx = canvas.getContext("2d");
     const corners = this._zoom.current_corners();
-    this._zoom.transform.k;
     const xstep = (corners.x[1] - corners.x[0]) / xtimes;
     const ystep = (corners.y[1] - corners.y[0]) / xtimes;
     const p = new Promise((resolve, reject) => {
@@ -37939,6 +37961,17 @@ class Scatterplot {
         throw new Error("The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer");
       }
       await this.load_dataset(dataSpec);
+    }
+    if (prefs.transformations) {
+      console.log(prefs);
+      for (const [k, v] of Object.entries(prefs.transformations)) {
+        const func = Function("datum", v);
+        if (!this.dataset.transformations[k]) {
+          this.dataset.register_transformation(k, func);
+        } else {
+          console.log("Already", k, v);
+        }
+      }
     }
     if (this._zoom === void 0) {
       await this.reinitialize();
