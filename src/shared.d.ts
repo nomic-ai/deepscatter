@@ -183,7 +183,7 @@ export type SupportedArrowTypes = Bool | Float | Int | Dictionary<Utf8, ArrowInt
 // Float32Arrays will be dropped straight onto the GPU; other types while be cast
 // to Float32Array before going there.
 
-export type ArrowBuildable = Vector<Bool | Float | Int | Dictionary<Utf8, ArrowInt>> | Float32Array | Uint8Array;
+export type ArrowBuildable = Vector<SupportedArrowTypes> | Float32Array | Uint8Array;
 /**
  * A transformation is a batchwise operation that can be used to construct
  * a new column in the data table. It runs asynchronously so that it
@@ -342,7 +342,7 @@ export type APICall = {
   background_color?: string;
 
   // 
-  transformations: Record<string, string>;
+  transformations?: Record<string, string>;
   encoding?: Encoding;
   labels?: Labelcall;
   background_options?: BackgroundOptions;

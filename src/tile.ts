@@ -6,7 +6,6 @@ import {
   tableFromIPC,
   RecordBatch,
   StructRowProxy,
-  tableToIPC,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
 import type { Dataset, QuadtileSet } from './Dataset';
@@ -44,7 +43,7 @@ export abstract class Tile {
   public _highest_known_ix?: number;
   public _min_ix?: number;
   public _max_ix?: number;
-  public dataset: Dataset<this>;
+  public dataset: Dataset<Tile>;
   public _download?: Promise<void>;
   public ready: boolean;
   __schema?: schema_entry[];
@@ -52,9 +51,10 @@ export abstract class Tile {
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
   public _buffer_manager?: TileBufferManager<this>;
+  abstract codes: [number, number, number];
 
   
-  constructor(dataset: Dataset<this>) {
+  constructor(dataset: Dataset<Tile>) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
@@ -560,6 +560,7 @@ export class QuadTile extends Tile {
 export class ArrowTile extends Tile {
   batch_num: number;
   full_tab: Table;
+  codes: [number, number, number];
   constructor(
     table: Table,
     dataset: Dataset<ArrowTile>,
@@ -571,6 +572,7 @@ export class ArrowTile extends Tile {
     this._batch = table.batches[batch_num];
     this.download_state = 'Complete';
     this.batch_num = batch_num;
+    this.codes = [0, parent === null ? -1 : parent.batch_num, batch_num]
     // On arrow tables, it's reasonable to just add a new index by order.
     if (this._batch.getChild('ix') === null) {
       console.warn('Manually setting ix');

@@ -13,20 +13,19 @@ import {
   makeVector,
   Float32,
   Int64,
-  makeData,
   Field,
   List,
   Int,
-  Float
+  Float,
+  Utf8,
+  Uint64,
+  Type,
+  Uint8
 } from 'apache-arrow';
 import Scatterplot from './deepscatter';
 
-type APICall = DS.APICall;
 type Key = string;
 
-function nothing() {
-  /* do nothing */
-}
 type ArrowBuildable = DS.ArrowBuildable;
 type Transformation<T> = DS.Transformation<T>;
 
@@ -43,6 +42,7 @@ export abstract class Dataset<T extends Tile> {
   abstract get extent(): Rectangle;
   abstract promise: Promise<void>;
   private extents: Record<string, [number, number]> = {};
+  // A 3d identifier for the tile. Usually [z, x, y]
   public _ix_seed = 0;
   public _schema?: Schema;
   public tileProxy?: DS.TileProxy;
@@ -150,7 +150,7 @@ export abstract class Dataset<T extends Tile> {
    */
   static from_arrow_table(
     table: Table,
-    plot: DS.Plot
+    plot: Scatterplot<ArrowTile>
   ): ArrowDataset {
     return new ArrowDataset(table, plot);
   }
@@ -447,10 +447,9 @@ export abstract class Dataset<T extends Tile> {
 export class ArrowDataset extends Dataset<ArrowTile> {
   public promise: Promise<void> = Promise.resolve();
   public root_tile: ArrowTile;
-
   constructor(table: Table, plot: Scatterplot<ArrowTile>) {
     super(plot);
-    this.root_tile = new ArrowTile(table, this, 0, plot);
+    this.root_tile = new ArrowTile(table, this, 0);
   }
 
   get extent() {
@@ -593,9 +592,9 @@ export class QuadtileSet extends Dataset<QuadTile> {
     transformation: (ids: string[]) => Promise<Uint8Array>
   ): void {
     const macrotile_tasks: Record<string, Promise<void>> = {};
-    const records: Record<string, Float32Array | Uint8Array> = {};
+    const records: Record<string, ArrowBuildable> = {};
 
-    async function get_table(tile: QuadTile) {
+    async function get_table(tile: QuadTile)  {
       const { macrotile } = tile;
       if (macrotile_tasks[macrotile] !== undefined) {
         return await macrotile_tasks[macrotile];
@@ -604,15 +603,10 @@ export class QuadtileSet extends Dataset<QuadTile> {
           (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
-              const data = batch.getChild('data') as Vector<List<Float>>
-              const offsets = data.data[0].valueOffsets;
-              const values = data.data[0].children[0] ;
+              const data = batch.getChild('data') as Vector<List<DS.SupportedArrowTypes>>
               for (let i = 0; i < batch.data.length; i++) {
                 const tilename = batch.getChild('_tile').get(i) as string;
-                records[tilename] = values.values.slice(
-                  offsets[i],
-                  offsets[i + 1]
-                ) as (Float32Array | Uint8Array);
+                records[tilename] = data.get(i)
               }
             }
             return;
@@ -716,10 +710,14 @@ export function add_or_delete_column(
       tb[field_name] = makeVector({ type: new Float32(), data, length: data.length }).data[0];
     } else if (data instanceof BigInt64Array) {
       tb[field_name] = makeVector({ type: new Int64(), data, length: data.length }).data[0];
-    } else if (data.data?.length > 0) {
+    } else if (data instanceof Uint8Array) {
+      tb[field_name] = makeVector({ type: new Uint8(), data, length: data.length }).data[0];
+    } else if ((data as Vector<DS.SupportedArrowTypes>).data.length > 0) {
       tb[field_name] = data.data[0];
     } else {
-      tb[field_name] = data as Data
+      console.warn(`Unknown data format object passed to add or remove columns--treating as Data, but this behavior is deprecated`, data)
+      // Stopgap--maybe somewhere there are 
+      tb[field_name] = data as unknown as Data
     }
   }
 
@@ -750,18 +748,6 @@ export function add_or_delete_column(
       new Date().toISOString()
     );
   }
-  window.state = {
-    new_batch,
-    batch,
-    data,
-    tb
-  }
-  const old_names = batch.schema.fields.map(d => d.name)
-  window.old_batch = batch;
-  window.new_batch = new_batch;
-  for (const name of old_names) {
-    // console.log(name, new_batch.getChild(name))
-  }
   return new_batch;
 }
 
@@ -783,27 +769,22 @@ function supplement_identifiers(
   // A quick lookup before performing a costly string decode.
   const updatedFloatArray = new Float32Array(batch.numRows);
 
-  const kfield = batch.getChild(key_field);
+  const kfield = batch.getChild(key_field) as Vector<Utf8 | Int64 | Uint64>;
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
   }
 
-  let keytype = 'string';
-  if (kfield?.type?.typeId === 2) {
-    keytype = 'bigint';
-  }
-
-  if (keytype === 'bigint') {
+  if (kfield.type.typeId === Type.Int64 || kfield.type.typeId === Type.Uint64) {
     for (let i = 0; i < batch.numRows; i++) {
       // the object coerces bigints to strings. We just live with that.
       const value = ids[String(kfield.get(i))];
       if (value !== undefined) {
-        updatedFloatArray[i] = value as number;
+        updatedFloatArray[i] = value;
       }
     }
     return updatedFloatArray;
   }
-
+  // 
   const hashtab = new Set();
 
   for (const item of Object.keys(ids)) {
@@ -815,7 +796,7 @@ function supplement_identifiers(
   const values = kfield.data[0].values;
   // For every identifier, look if it's in the id array.
   for (let i = 0; i < batch.numRows; i++) {
-    const code = values.slice(offsets[i], offsets[i + 1]);
+    const code = values.slice(offsets[i], offsets[i + 1]) as Uint8Array;
     const shortversion: string = code.slice(0, 4).join('');
     if (hashtab.has(shortversion)) {
       const stringtime = String.fromCharCode(...code);

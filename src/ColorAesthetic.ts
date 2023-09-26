@@ -19,6 +19,7 @@ import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 const palette_size = 4096;
 import { randomLcg } from 'd3-random';
+import { Dictionary, Int, Int32, Utf8, Vector } from 'apache-arrow';
 /*function to_buffer(data: number[] | number[][]) {
   output.set(data.flat());
   return output;
@@ -181,12 +182,14 @@ export class Color extends Aesthetic<
     if (this.is_dictionary()) {
       const scale = scaleOrdinal().domain(this.domain);
       if (typeof range === 'string' && schemes[range]) {
-        if (this.column.data[0].dictionary === null) {
+        const dictionary = this.column.data[0].dictionary as Vector<Utf8>;
+        if (dictionary === null) {
           throw new Error('Dictionary is null');
         }
-        return (this._scale = scale
+        const keys = dictionary.toArray() as unknown as string[];
+        return (this._scale = scaleOrdinal()
           .range(schemes[range])
-          .domain(this.column.data[0].dictionary.toArray()));
+          .domain(keys));
       } else {
         return (this._scale = scale.range(this.range));
       }
