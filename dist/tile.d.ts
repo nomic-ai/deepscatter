@@ -28,7 +28,7 @@ export declare abstract class Tile {
     _highest_known_ix?: number;
     _min_ix?: number;
     _max_ix?: number;
-    dataset: Dataset<this>;
+    dataset: Dataset<Tile>;
     _download?: Promise<void>;
     ready: boolean;
     __schema?: schema_entry[];
@@ -38,7 +38,8 @@ export declare abstract class Tile {
     };
     numeric_id: number;
     _buffer_manager?: TileBufferManager<this>;
-    constructor(dataset: Dataset<this>);
+    abstract codes: [number, number, number];
+    constructor(dataset: Dataset<Tile>);
     get children(): this[];
     download(): void;
     delete_column_if_exists(colname: string): void;
@@ -93,6 +94,7 @@ export declare class QuadTile extends Tile {
 export declare class ArrowTile extends Tile {
     batch_num: number;
     full_tab: Table;
+    codes: [number, number, number];
     constructor(table: Table, dataset: Dataset<ArrowTile>, batch_num: number, parent?: null | ArrowTile);
     create_children(): void;
     download(): Promise<RecordBatch>;

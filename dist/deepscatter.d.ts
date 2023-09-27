@@ -129,12 +129,12 @@ export default class Scatterplot<T extends Tile> {
      * @returns
      */
     dim(dimension: string): ConcreteAesthetic;
-    set tooltip_html(func: (datum: StructRowProxy<any>, plot: any) => string);
-    get tooltip_html(): (datum: StructRowProxy<any>, plot: any) => string;
+    set tooltip_html(func: (datum: StructRowProxy<any>, plot: Scatterplot<QuadTile>) => string);
+    get tooltip_html(): (datum: StructRowProxy<any>, plot: Scatterplot<QuadTile>) => string;
     set label_click(func: any);
     get label_click(): any;
-    set click_function(func: (datum: StructRowProxy<any>, plot: any) => void);
-    get click_function(): (datum: StructRowProxy<any>, plot: any) => void;
+    set click_function(func: (datum: StructRowProxy<any>, plot: Scatterplot<QuadTile>) => void);
+    get click_function(): (datum: StructRowProxy<any>, plot: Scatterplot<QuadTile>) => void;
     /**
      * Plots a set of prefs, and returns a promise that resolves
      * upon the completion of the plot (not including any time for transitions).
@@ -177,11 +177,11 @@ export default class Scatterplot<T extends Tile> {
 declare abstract class SettableFunction<FuncType, ArgType = StructRowProxy, Tiletype extends Tile = QuadTile> {
     _f: undefined | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType);
     string_rep: string;
-    abstract default: (datum: ArgType, plot: Scatterplot | undefined) => FuncType;
-    plot: Scatterplot;
-    constructor(plot: Scatterplot);
-    get f(): (datum: ArgType, plot: Scatterplot) => FuncType;
-    set f(f: string | ((datum: ArgType, plot: Scatterplot) => FuncType));
+    plot: Scatterplot<Tiletype>;
+    constructor(plot: Scatterplot<Tiletype>);
+    abstract default(datum: ArgType, plot: Scatterplot<Tiletype> | undefined): FuncType;
+    get f(): (datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType;
+    set f(f: string | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType));
 }
 import type { GeoJsonProperties } from 'geojson';
 declare class LabelClick extends SettableFunction<void, GeoJsonProperties> {

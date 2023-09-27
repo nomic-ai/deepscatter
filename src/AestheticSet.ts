@@ -4,9 +4,9 @@ import { ConcreteAesthetic, dimensions } from './StatefulAesthetic';
 import type Scatterplot from './deepscatter';
 import type { Dataset, QuadtileSet } from './Dataset';
 import { StatefulAesthetic } from './StatefulAesthetic';
-import { Aesthetic } from './Aesthetic';
+import type { Aesthetic } from './Aesthetic';
 import type { Tile } from './tile';
-import { Encoding } from './shared';
+import type { Encoding } from './shared.d';
 
 export class AestheticSet<TileType extends Tile> {
   public tileSet: Dataset<TileType>;
@@ -14,7 +14,7 @@ export class AestheticSet<TileType extends Tile> {
   public regl: Regl;
   public encoding: Encoding = {};
   public position_interpolation: boolean;
-  private store: Record<string, StatefulAesthetic>;
+  private store: Record<string, StatefulAesthetic<any>>;
   public aesthetic_map: TextureSet;
   constructor(
     scatterplot: Scatterplot<TileType>,
@@ -32,6 +32,8 @@ export class AestheticSet<TileType extends Tile> {
 
   public dim(aesthetic: keyof typeof dimensions) {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
+    // Used for things like 'what color would this point be?'
+
     if (this.store[aesthetic]) {
       return this.store[aesthetic];
     }
@@ -90,7 +92,7 @@ export class AestheticSet<TileType extends Tile> {
               transform: 'literal',
             };
           } else {
-            const field = encoding[p];
+            const field = encoding[p] as string;
             encoding[`x${suffix}`] = {
               field: `${field}.x`,
               transform: 'literal',

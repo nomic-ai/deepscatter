@@ -99,32 +99,6 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     return this;
   }
 
-  /* 
-  apply_webgl_scale() {
-  // Should probably be attached to AestheticSet, not to this class.
-
-  // The webgl transform can either be 'literal', in which case it uses
-  // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
-  // in which case it has to calculate off of the x and y dimensions.
-
-    this._use_scale_to_download_tiles = true;
-    if (
-      (this.aes.encoding.x.transform && this.aes.encoding.x.transform !== 'literal')
-    || (this.aes.encoding.y.transform && this.aes.encoding.y.transform !== 'literal')
-    ) {
-      const webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat();
-      this._webgl_scale_history.unshift(webglscale);
-      this._use_scale_to_download_tiles = false;
-    } else {
-      if (!this._webgl_scale_history) {
-        this._webgl_scale_history = [];
-      }
-      // Use the default linked to the coordinates used to build the tree.
-      this._webgl_scale_history.unshift(this.default_webgl_scale);
-    }
-  }
-  */
-
   get props() {
     // Stuff needed for regl.
 
@@ -136,7 +110,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       buffer_num_to_variable,
       variable_to_buffer_num,
     } = this;
-    const { transform } = this.zoom as Zoom;
+    const { transform } = this.zoom;
     const props = {
       // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },

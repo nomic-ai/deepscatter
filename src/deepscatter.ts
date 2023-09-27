@@ -14,7 +14,7 @@ import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { DataSelection } from './selection';
 import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
-import type * as DS from './shared.d'
+import type * as DS from './shared.d';
 // DOM elements that deepscatter uses.
 
 const base_elements = [
@@ -982,7 +982,7 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
       feature.__activated = true;
       filter = {
         field: labelset.label_key,
-        lambda: `d => d === '${feature.properties[labelset.label_key!]}'`,
+        lambda: `d => d === '${feature.properties[labelset.label_key]}'`,
       };
     }
     void this.plot.plotAPI({

@@ -77,7 +77,7 @@ export declare abstract class Dataset<T extends Tile> {
      * @param plot The Scatterplot to use.
      * @returns
      */
-    static from_arrow_table(table: Table, plot: DS.Plot): ArrowDataset;
+    static from_arrow_table(table: Table, plot: Scatterplot<ArrowTile>): ArrowDataset;
     abstract download_most_needed_tiles(bbox: Rectangle | undefined, max_ix: number, queue_length: number): void;
     /**
      *
