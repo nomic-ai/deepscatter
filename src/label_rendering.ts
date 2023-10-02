@@ -494,10 +494,10 @@ class DepthTree extends RBush3D {
     const [x, y] = this.accessor(point);
     const { pixel_height, pixel_width } = point;
     const p: P3d = {
-      minX: x - pixel_width / zoom / 2,
-      maxX: x + pixel_width / zoom / 2,
-      minY: y - pixel_height / zoom / 2,
-      maxY: y + pixel_height / zoom / 2,
+      minX: x - pixel_width / zoom / 4,
+      maxX: x + pixel_width / zoom / 4,
+      minY: y - pixel_height / zoom / 4,
+      maxY: y + pixel_height / zoom / 4,
       minZ: zoom,
       maxZ: maxZ || this.maxdepth,
       data: point /*{
@@ -526,6 +526,7 @@ class DepthTree extends RBush3D {
     } else {
       measured = point;
     }
+    mindepth = mindepth + Math.random() * 0.25 * 2
     const p3d = this.to3d(measured, mindepth, this.maxdepth);
     if (!this.collides(p3d)) {
       if (mindepth <= this.mindepth) {
