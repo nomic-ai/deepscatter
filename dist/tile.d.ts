@@ -1,5 +1,5 @@
 import { Table, Vector, RecordBatch, StructRowProxy } from 'apache-arrow';
-import type { Dataset, QuadtileSet } from './Dataset';
+import type { Dataset, QuadtileDataset } from './Dataset';
 declare type MinMax = [number, number];
 export declare type Rectangle = {
     x: MinMax;
@@ -75,7 +75,7 @@ export declare class QuadTile extends Tile {
     codes: [number, number, number];
     _already_called: boolean;
     child_locations: string[];
-    constructor(base_url: string, key: string, parent: QuadTile | null, dataset: QuadtileSet);
+    constructor(base_url: string, key: string, parent: QuadTile | null, dataset: QuadtileDataset);
     get extent(): Rectangle;
     download_to_depth(max_ix: number): Promise<void>;
     get_arrow(suffix?: string | undefined): Promise<RecordBatch>;

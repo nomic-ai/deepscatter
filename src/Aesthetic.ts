@@ -10,7 +10,7 @@ import {
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
 import { isOpChannel, isLambdaChannel, isConstantChannel } from './typing';
-import type { QuadtileSet } from './Dataset';
+import type { QuadtileDataset } from './Dataset';
 import { Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
@@ -49,7 +49,7 @@ export abstract class Aesthetic<
   public _domain?: [number, number];
   public _range: [number, number] | Uint8Array;
   public _func?: (d: string | number) => GlValueType;
-  public dataset: QuadtileSet;
+  public dataset: QuadtileDataset;
   public partner: typeof this | null = null;
   public _textures: Record<string, Texture2D> = {};
   // cache of a d3 scale
@@ -61,7 +61,7 @@ export abstract class Aesthetic<
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
-    dataset: QuadtileSet,
+    dataset: QuadtileDataset,
     aesthetic_map: TextureSet
   ) {
     this.aesthetic_map = aesthetic_map;
@@ -403,7 +403,7 @@ abstract class OneDAesthetic extends Aesthetic {
   constructor(
     scatterplot: Plot,
     regl: Regl,
-    dataset: QuadtileSet,
+    dataset: QuadtileDataset,
     aesthetic_map: TextureSet
   ) {
     super(scatterplot, regl, dataset, aesthetic_map);
@@ -438,7 +438,7 @@ export abstract class PositionalAesthetic extends OneDAesthetic {
   constructor(
     scatterplot: Plot,
     regl: Regl,
-    tile: QuadtileSet,
+    tile: QuadtileDataset,
     map: TextureSet
   ) {
     super(scatterplot, regl, tile, map);
@@ -482,7 +482,7 @@ abstract class BooleanAesthetic extends Aesthetic<
   constructor(
     scatterplot: Plot,
     regl: Regl,
-    tile: QuadtileSet,
+    tile: QuadtileDataset,
     map: TextureSet
   ) {
     super(scatterplot, regl, tile, map);

@@ -4,7 +4,7 @@ import { max, range, sum } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
-import { Dataset } from './Dataset';
+import { Dataset, QuadtileDataset, ArrowDataset } from './Dataset';
 import { tableFromIPC, type StructRowProxy } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
@@ -12,7 +12,8 @@ import { Renderer } from './rendering';
 import { ArrowTile, QuadTile, Rectangle, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
-import { DataSelection } from './selection';
+import { Bitmask, DataSelection } from './selection';
+import { dictionaryFromArrays } from './utilityFunctions';
 import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
 import type * as DS from './shared.d'
 // DOM elements that deepscatter uses.
@@ -36,12 +37,21 @@ const base_elements = [
   },
 ];
 
+// A hook is a function that you can add onto a scatterplot.
 type Hook = () => void;
+
+interface AdditionalProps {
+  Bitmask: typeof Bitmask;
+  QuadtileDataset: typeof QuadtileDataset;
+  ArrowDataset: typeof ArrowDataset;
+  DataSelection: typeof DataSelection;
+}
+
 /**
  * The core type of the module is a single scatterplot that manages
  * all data and renderering.
  */
-export default class Scatterplot<T extends Tile> {
+class Scatterplot<T extends Tile> {
   public _renderer?: ReglRenderer<T>;
   public width: number;
   public height: number;
@@ -50,6 +60,9 @@ export default class Scatterplot<T extends Tile> {
   public secondary_renderers: Record<string, Renderer<T>> = {};
   public selection_history: DS.SelectionRecord<T>[] = [];
   public tileProxy?: DS.TileProxy;
+  public util : Record<string, (unknown) => unknown> = {
+    dictionaryFromArrays
+  };
   div: Selection<any, any, any, any>;
   bound: boolean;
   //  d3 : Object;
@@ -161,7 +174,7 @@ export default class Scatterplot<T extends Tile> {
   async select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration=this.prefs.duration) {
     const selection = await this.select_data(params)
     await selection.ready
-    await this.plotAPI({ 
+    await this.plotAPI({
       duration,
       encoding: {
         foreground: {
@@ -918,6 +931,14 @@ export default class Scatterplot<T extends Tile> {
     this.drawContours(data);
   }
 }
+
+// Exported as static methods on Scatterplot to avoid breaking back-compatibility.
+(Scatterplot as Partial<AdditionalProps>).Bitmask = Bitmask;
+(Scatterplot as Partial<AdditionalProps>).ArrowDataset = ArrowDataset;
+(Scatterplot as Partial<AdditionalProps>).QuadtileDataset = QuadtileDataset;
+(Scatterplot as Partial<AdditionalProps>).DataSelection = DataSelection;
+
+export default Scatterplot;
 
 /**
  A function that can be set by a string or directly with a function

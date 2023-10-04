@@ -68,7 +68,7 @@ export declare abstract class Dataset<T extends Tile> {
      *
      **/
     get table(): Table;
-    static from_quadfeather(url: string, plot: DS.Plot): QuadtileSet;
+    static from_quadfeather(url: string, plot: DS.Plot): QuadtileDataset;
     /**
      * Generate an ArrowDataset from a single Arrow table.
      *
@@ -154,7 +154,7 @@ export declare class ArrowDataset extends Dataset<ArrowTile> {
     get ready(): Promise<void>;
     download_most_needed_tiles(...args: unknown[]): void;
 }
-export declare class QuadtileSet extends Dataset<QuadTile> {
+export declare class QuadtileDataset extends Dataset<QuadTile> {
     protected _download_queue: Set<Key>;
     promise: Promise<void>;
     root_tile: QuadTile;

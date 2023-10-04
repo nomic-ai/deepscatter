@@ -10,7 +10,6 @@ interface SelectParams {
   batchCallback?: (t: Tile) => Promise<void>;
 }
 
-
 export const defaultSelectionParams: SelectParams = {
   name: 'unnamed selection',
   foreground: true,
@@ -56,13 +55,14 @@ function isBooleanColumnParam(
   ]
 ]
  */
-// type PluralOperations = "ANY" | "ALL" | "NONE"
+type PluralOperation = "ANY" | "ALL" | "NONE"
 type BinaryOperation = "AND" | "OR" | "XOR"
 type UnaryOperation = "NOT"
 
 
 type CompArgs<T extends Tile> = DataSelection<T> | Composition<T>
-type Composition<T extends Tile> = [UnaryOperation, CompArgs<T> ] | [BinaryOperation, CompArgs<T>, CompArgs<T>]
+type Composition<T extends Tile> = [UnaryOperation, CompArgs<T> ] | [BinaryOperation, CompArgs<T>, CompArgs<T>] | 
+  [PluralOperation, CompArgs<T>, CompArgs<T>?, CompArgs<T>?, CompArgs<T>?] // Plural operations accept indefinite length, but this at least gets the internal signatures working.
 export interface CompositeSelectParams<T extends Tile> extends SelectParams {
   composition: Composition<T>
 }
@@ -79,8 +79,8 @@ function isComposition<T extends Tile>(
   if (elems === undefined) throw new Error("Undefined composition")
   if (!elems) return false
   if (!elems.length) return false
-  const op= elems[0];
-  return ["AND", "OR", "XOR", "NOT"].indexOf(op) > -1;
+  const op = elems[0];
+  return ["AND", "OR", "XOR", "NOT", "ANY", "ALL"].indexOf(op) == 0;
 }
 
 async function extractBitmask<T extends Tile>(tile : T, arg: CompArgs<T>) : Promise<Bitmask> {
@@ -93,26 +93,43 @@ async function extractBitmask<T extends Tile>(tile : T, arg: CompArgs<T>) : Prom
 }
 
 async function applyCompositeFunctionToTile<T extends Tile>(tile : T, args : Composition<T>) : Promise<Bitmask> {
-  if (isUnarySelectParam(args)) {
+  const operator = args[0]
+  if (args[0] === "NOT") {
     const bitmask = await extractBitmask(tile, args[1])
-    if (args[0] === "NOT") {
-      return bitmask.not()
+    return bitmask.not()
+  } else if (isBinarySelectParam(args)) {
+    const [op, arg1, arg2] = args;
+    const bitmask1 = await extractBitmask(tile, arg1)
+    const bitmask2 = await extractBitmask(tile, arg2)
+    if (op === "AND") {
+      return bitmask1.and(bitmask2)
+    } else if (op === "OR") {
+      return bitmask1.or(bitmask2)
+    } else if (op === "XOR") {
+      return bitmask1.xor(bitmask2)
     } else {
-      throw new Error("Unknown unary operation")
+      throw new Error("Unknown binary operation")
     }
+  } else if (isPluralSelectParam(args)) {
+    const op = args[0];
+    const bitmasks = await Promise.all(args.slice(1).map(arg => extractBitmask(tile, arg)))
+    const accumulated = bitmasks.slice(1).reduce((previousValue, currentValue) => {
+      switch (op) {
+        case "ALL":
+          return previousValue.and(currentValue)
+        case "ANY":
+          return previousValue.or(currentValue)
+        case "NONE":
+          return previousValue.or(currentValue)
+      }
+    }, bitmasks[0])
+    // For none, we've been secretly running an OR query;
+    // flip it.
+    if (op === 'NONE') return accumulated.not()
+    return accumulated
   }
-  const [op, arg1, arg2] = args;
-  const bitmask1 = await extractBitmask(tile, arg1)
-  const bitmask2 = await extractBitmask(tile, arg2)
-if (op === "AND") {
-    return bitmask1.and(bitmask2)
-  } else if (op === "OR") {
-    return bitmask1.or(bitmask2)
-  } else if (op === "XOR") {
-    return bitmask1.xor(bitmask2)
-  } else {
-    throw new Error("Unknown binary operation")
-  }
+  console.error("UNABLE TO PARSE", args)
+  throw new Error("UNABLE TO PARSE")
 }
 
 export interface FunctionSelectParams extends SelectParams {
@@ -120,10 +137,17 @@ export interface FunctionSelectParams extends SelectParams {
   tileFunction: (t: Tile) => Promise<Vector<Bool>> | Promise<Uint8Array>;
 }
 
-function isUnarySelectParam(
-  params
-) : params is UnaryOperation {
-  const things = new Set(["NOT"])
+function isPluralSelectParam(
+  params : PluralOperation | BinaryOperation | UnaryOperation
+) : params is PluralOperation {
+  const things = new Set(["ANY", "ALL", "NONE"])
+  return things.has(params[0])
+}
+
+function isBinarySelectParam(
+  params : PluralOperation | BinaryOperation | UnaryOperation
+) : params is BinaryOperation {
+  const things = new Set(["AND", "OR", "XOR", "NAND"])
   return things.has(params[0])
 }
 
@@ -269,11 +293,12 @@ export class DataSelection<T extends Tile> {
    * 
    */
   type?: string;
+  composition: null | Composition<T> = null;
   private events: { [key: string]: Array<(args) => void> } = {};
 
   constructor(
     plot: Scatterplot<T>,
-    params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams
+    params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams<T>
   ) {
     this.plot = plot;
     this.dataset = plot.dataset as Dataset<T>;
@@ -282,6 +307,7 @@ export class DataSelection<T extends Tile> {
     this.ready = new Promise((resolve, reject) => {
       markReady = resolve;
     })
+    this.composition = null;
     if (isIdSelectParam(params)) {
       this.add_identifier_column(params.name, params.ids, params.idField).then(markReady);
     } else if (isBooleanColumnParam(params)) {
@@ -289,16 +315,14 @@ export class DataSelection<T extends Tile> {
     } else if (isFunctionSelectParam(params)) {
       this.add_function_column(params.name, params.tileFunction).then(markReady);
     } else if (isCompositeSelectParam(params)) {
-
       const {name, composition} = params;
+      this.composition = composition;
       this.add_function_column(name, async (tile : T) => {
         const bitmask = await applyCompositeFunctionToTile(tile, composition)
         return bitmask.to_arrow()
       }).then(markReady)
     }
   }
-
-
 
   /**
    * 

@@ -9,7 +9,7 @@ import {
   tableToIPC,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
-import type { Dataset, QuadtileSet } from './Dataset';
+import type { Dataset, QuadtileDataset } from './Dataset';
 type MinMax = [number, number];
 
 export type Rectangle = {
@@ -370,7 +370,7 @@ export class QuadTile extends Tile {
     base_url: string,
     key: string,
     parent: QuadTile | null,
-    dataset: QuadtileSet
+    dataset: QuadtileDataset
   ) {
     super(dataset);
     this.url = base_url;
@@ -403,6 +403,9 @@ export class QuadTile extends Tile {
   async get_arrow(
     suffix: string | undefined = undefined
   ): Promise<RecordBatch> {
+    // By default fetches .../0/0/0.feather
+    // But if you pass a suffix, gets
+    // 0/0/0.suffix.feather
     let url = `${this.url}/${this.key}.feather`;
     if (suffix) {
       // 3/4/3

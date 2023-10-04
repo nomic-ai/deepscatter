@@ -33,10 +33,17 @@ export interface CompositionSelectParams<T extends Tile> extends SelectParams {
   ]
 ]
  */
+declare type PluralOperation = "ANY" | "ALL" | "NONE";
 declare type BinaryOperation = "AND" | "OR" | "XOR";
 declare type UnaryOperation = "NOT";
 declare type CompArgs<T extends Tile> = DataSelection<T> | Composition<T>;
-declare type Composition<T extends Tile> = [UnaryOperation, CompArgs<T>] | [BinaryOperation, CompArgs<T>, CompArgs<T>];
+declare type Composition<T extends Tile> = [UnaryOperation, CompArgs<T>] | [BinaryOperation, CompArgs<T>, CompArgs<T>] | [
+    PluralOperation,
+    CompArgs<T>,
+    CompArgs<T>?,
+    CompArgs<T>?,
+    CompArgs<T>?
+];
 export interface CompositeSelectParams<T extends Tile> extends SelectParams {
     composition: Composition<T>;
 }
@@ -121,8 +128,9 @@ export declare class DataSelection<T extends Tile> {
      *
      */
     type?: string;
+    composition: null | Composition<T>;
     private events;
-    constructor(plot: Scatterplot<T>, params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams);
+    constructor(plot: Scatterplot<T>, params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams<T>);
     /**
      *
      * @param event an internally dispatched event.

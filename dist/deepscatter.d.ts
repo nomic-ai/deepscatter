@@ -16,7 +16,7 @@ declare type Hook = () => void;
  * The core type of the module is a single scatterplot that manages
  * all data and renderering.
  */
-export default class Scatterplot<T extends Tile> {
+declare class Scatterplot<T extends Tile> {
     _renderer?: ReglRenderer<T>;
     width: number;
     height: number;
@@ -25,6 +25,7 @@ export default class Scatterplot<T extends Tile> {
     secondary_renderers: Record<string, Renderer<T>>;
     selection_history: DS.SelectionRecord<T>[];
     tileProxy?: DS.TileProxy;
+    util: Record<string, (unknown: any) => unknown>;
     div: Selection<any, any, any, any>;
     bound: boolean;
     _zoom: Zoom<T>;
@@ -171,6 +172,7 @@ export default class Scatterplot<T extends Tile> {
     sample_points(n?: number): Record<string, number | string>[];
     contours(aes: any): void;
 }
+export default Scatterplot;
 /**
  A function that can be set by a string or directly with a function
 */
@@ -193,5 +195,4 @@ declare class ClickFunction extends SettableFunction<void> {
 declare class TooltipHTML extends SettableFunction<string> {
     default(point: StructRowProxy, plot?: any): string;
 }
-export {};
 //# sourceMappingURL=deepscatter.d.ts.map

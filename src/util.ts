@@ -1,4 +1,5 @@
 import { extent } from 'd3-array';
+// TODO: DELETE THIS FILE?? IS IT CALLED ANYWHERE???
 
 // eslint-disable-next-line import/prefer-default-export
 export function encodeFloatsRGBArange(values, array) {

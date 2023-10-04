@@ -127,12 +127,12 @@ export abstract class Dataset<T extends Tile> {
   static from_quadfeather(
     url: string,
     plot: DS.Plot
-  ): QuadtileSet {
+  ): QuadtileDataset {
     const options = {};
     if (plot.tileProxy) {
       options['tileProxy'] = plot.tileProxy;
     }
-    return new QuadtileSet(url, plot, options);
+    return new QuadtileDataset(url, plot, options);
   }
 
 
@@ -464,9 +464,7 @@ export class ArrowDataset extends Dataset<ArrowTile> {
   }
 }
 
-
-
-export class QuadtileSet extends Dataset<QuadTile> {
+export class QuadtileDataset extends Dataset<QuadTile> {
   protected _download_queue: Set<Key> = new Set();
   public promise: Promise<void>;
   root_tile: QuadTile;

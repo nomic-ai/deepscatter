@@ -25538,46 +25538,6 @@ const decoder = new TextDecoder("utf-8");
 const decodeUtf8 = (buffer) => decoder.decode(buffer);
 const encoder = new TextEncoder();
 const encodeUtf8 = (value) => encoder.encode(value);
-const [BigInt64ArrayCtor, BigInt64ArrayAvailable] = (() => {
-  const BigInt64ArrayUnavailableError = () => {
-    throw new Error("BigInt64Array is not available in this environment");
-  };
-  class BigInt64ArrayUnavailable {
-    static get BYTES_PER_ELEMENT() {
-      return 8;
-    }
-    static of() {
-      throw BigInt64ArrayUnavailableError();
-    }
-    static from() {
-      throw BigInt64ArrayUnavailableError();
-    }
-    constructor() {
-      throw BigInt64ArrayUnavailableError();
-    }
-  }
-  return typeof BigInt64Array !== "undefined" ? [BigInt64Array, true] : [BigInt64ArrayUnavailable, false];
-})();
-const [BigUint64ArrayCtor, BigUint64ArrayAvailable] = (() => {
-  const BigUint64ArrayUnavailableError = () => {
-    throw new Error("BigUint64Array is not available in this environment");
-  };
-  class BigUint64ArrayUnavailable {
-    static get BYTES_PER_ELEMENT() {
-      return 8;
-    }
-    static of() {
-      throw BigUint64ArrayUnavailableError();
-    }
-    static from() {
-      throw BigUint64ArrayUnavailableError();
-    }
-    constructor() {
-      throw BigUint64ArrayUnavailableError();
-    }
-  }
-  return typeof BigUint64Array !== "undefined" ? [BigUint64Array, true] : [BigUint64ArrayUnavailable, false];
-})();
 const isNumber = (x) => typeof x === "number";
 const isBoolean = (x) => typeof x === "boolean";
 const isFunction = (x) => typeof x === "function";
@@ -26122,7 +26082,7 @@ function valueToString(x) {
     return x[Symbol.toPrimitive]("string");
   }
   if (ArrayBuffer.isView(x)) {
-    if (x instanceof BigInt64ArrayCtor || x instanceof BigUint64ArrayCtor) {
+    if (x instanceof BigInt64Array || x instanceof BigUint64Array) {
       return `[${[...x].map((x2) => valueToString(x2))}]`;
     }
     return `[${x}]`;
@@ -26138,24 +26098,24 @@ function BigNum(x, ...xs) {
 }
 BigNum.prototype[isArrowBigNumSymbol] = true;
 BigNum.prototype.toJSON = function() {
-  return `"${bignumToString(this)}"`;
+  return `"${bigNumToString(this)}"`;
 };
 BigNum.prototype.valueOf = function() {
-  return bignumToNumber(this);
+  return bigNumToNumber(this);
 };
 BigNum.prototype.toString = function() {
-  return bignumToString(this);
+  return bigNumToString(this);
 };
 BigNum.prototype[Symbol.toPrimitive] = function(hint = "default") {
   switch (hint) {
     case "number":
-      return bignumToNumber(this);
+      return bigNumToNumber(this);
     case "string":
-      return bignumToString(this);
+      return bigNumToString(this);
     case "default":
-      return bignumToBigInt(this);
+      return bigNumToBigInt(this);
   }
-  return bignumToString(this);
+  return bigNumToString(this);
 };
 function SignedBigNum(...args) {
   return BigNum.apply(this, args);
@@ -26169,13 +26129,13 @@ function DecimalBigNum(...args) {
 Object.setPrototypeOf(SignedBigNum.prototype, Object.create(Int32Array.prototype));
 Object.setPrototypeOf(UnsignedBigNum.prototype, Object.create(Uint32Array.prototype));
 Object.setPrototypeOf(DecimalBigNum.prototype, Object.create(Uint32Array.prototype));
-Object.assign(SignedBigNum.prototype, BigNum.prototype, { "constructor": SignedBigNum, "signed": true, "TypedArray": Int32Array, "BigIntArray": BigInt64ArrayCtor });
-Object.assign(UnsignedBigNum.prototype, BigNum.prototype, { "constructor": UnsignedBigNum, "signed": false, "TypedArray": Uint32Array, "BigIntArray": BigUint64ArrayCtor });
-Object.assign(DecimalBigNum.prototype, BigNum.prototype, { "constructor": DecimalBigNum, "signed": true, "TypedArray": Uint32Array, "BigIntArray": BigUint64ArrayCtor });
-function bignumToNumber(bn) {
+Object.assign(SignedBigNum.prototype, BigNum.prototype, { "constructor": SignedBigNum, "signed": true, "TypedArray": Int32Array, "BigIntArray": BigInt64Array });
+Object.assign(UnsignedBigNum.prototype, BigNum.prototype, { "constructor": UnsignedBigNum, "signed": false, "TypedArray": Uint32Array, "BigIntArray": BigUint64Array });
+Object.assign(DecimalBigNum.prototype, BigNum.prototype, { "constructor": DecimalBigNum, "signed": true, "TypedArray": Uint32Array, "BigIntArray": BigUint64Array });
+function bigNumToNumber(bn) {
   const { buffer, byteOffset, length, "signed": signed } = bn;
-  const words = new BigUint64ArrayCtor(buffer, byteOffset, length);
-  const negative = signed && words[words.length - 1] & BigInt(1) << BigInt(63);
+  const words = new BigUint64Array(buffer, byteOffset, length);
+  const negative = signed && words.at(-1) & BigInt(1) << BigInt(63);
   let number2 = negative ? BigInt(1) : BigInt(0);
   let i = BigInt(0);
   if (!negative) {
@@ -26190,9 +26150,39 @@ function bignumToNumber(bn) {
   }
   return number2;
 }
-const bignumToString = (a) => a.byteLength === 8 ? `${new a["BigIntArray"](a.buffer, a.byteOffset, 1)[0]}` : decimalToString(a);
-const bignumToBigInt = (a) => a.byteLength === 8 ? new a["BigIntArray"](a.buffer, a.byteOffset, 1)[0] : decimalToString(a);
-function decimalToString(a) {
+const bigNumToString = (a) => {
+  if (a.byteLength === 8) {
+    const bigIntArray = new a["BigIntArray"](a.buffer, a.byteOffset, 1);
+    return `${bigIntArray[0]}`;
+  }
+  if (!a["signed"]) {
+    return unsignedBigNumToString(a);
+  }
+  let array2 = new Uint16Array(a.buffer, a.byteOffset, a.byteLength / 2);
+  const highOrderWord = new Int16Array([array2.at(-1)])[0];
+  if (highOrderWord >= 0) {
+    return unsignedBigNumToString(a);
+  }
+  array2 = array2.slice();
+  let carry = 1;
+  for (let i = 0; i < array2.length; i++) {
+    const elem = array2[i];
+    const updated = ~elem + carry;
+    array2[i] = updated;
+    carry &= elem === 0 ? 1 : 0;
+  }
+  const negated = unsignedBigNumToString(array2);
+  return `-${negated}`;
+};
+const bigNumToBigInt = (a) => {
+  if (a.byteLength === 8) {
+    const bigIntArray = new a["BigIntArray"](a.buffer, a.byteOffset, 1);
+    return bigIntArray[0];
+  } else {
+    return bigNumToString(a);
+  }
+};
+function unsignedBigNumToString(a) {
   let digits = "";
   const base64 = new Uint32Array(2);
   let base32 = new Uint16Array(a.buffer, a.byteOffset, a.byteLength / 2);
@@ -26223,7 +26213,7 @@ class BN {
       case Int8Array:
       case Int16Array:
       case Int32Array:
-      case BigInt64ArrayCtor:
+      case BigInt64Array:
         return new SignedBigNum(num);
     }
     if (num.byteLength === 16) {
@@ -26373,7 +26363,7 @@ class Int_ extends DataType {
       case 32:
         return this.isSigned ? Int32Array : Uint32Array;
       case 64:
-        return this.isSigned ? BigInt64ArrayCtor : BigUint64ArrayCtor;
+        return this.isSigned ? BigInt64Array : BigUint64Array;
     }
     throw new Error(`Unrecognized ${this[Symbol.toStringTag]} type`);
   }
@@ -26416,7 +26406,7 @@ let Int64$1 = class Int64 extends Int_ {
     super(true, 64);
   }
   get ArrayType() {
-    return BigInt64ArrayCtor;
+    return BigInt64Array;
   }
 };
 class Uint8 extends Int_ {
@@ -26448,17 +26438,17 @@ let Uint64$1 = class Uint64 extends Int_ {
     super(false, 64);
   }
   get ArrayType() {
-    return BigUint64ArrayCtor;
+    return BigUint64Array;
   }
 };
 Object.defineProperty(Int8.prototype, "ArrayType", { value: Int8Array });
 Object.defineProperty(Int16.prototype, "ArrayType", { value: Int16Array });
 Object.defineProperty(Int32.prototype, "ArrayType", { value: Int32Array });
-Object.defineProperty(Int64$1.prototype, "ArrayType", { value: BigInt64ArrayCtor });
+Object.defineProperty(Int64$1.prototype, "ArrayType", { value: BigInt64Array });
 Object.defineProperty(Uint8.prototype, "ArrayType", { value: Uint8Array });
 Object.defineProperty(Uint16.prototype, "ArrayType", { value: Uint16Array });
 Object.defineProperty(Uint32.prototype, "ArrayType", { value: Uint32Array });
-Object.defineProperty(Uint64$1.prototype, "ArrayType", { value: BigUint64ArrayCtor });
+Object.defineProperty(Uint64$1.prototype, "ArrayType", { value: BigUint64Array });
 class Float extends DataType {
   constructor(precision) {
     super();
@@ -26586,6 +26576,11 @@ Date_[_j] = ((proto) => {
   proto.ArrayType = Int32Array;
   return proto[Symbol.toStringTag] = "Date";
 })(Date_.prototype);
+class DateMillisecond extends Date_ {
+  constructor() {
+    super(DateUnit$1.MILLISECOND);
+  }
+}
 class Time_ extends DataType {
   constructor(unit2, bitWidth) {
     super();
@@ -26603,7 +26598,7 @@ class Time_ extends DataType {
       case 32:
         return Int32Array;
       case 64:
-        return BigInt64ArrayCtor;
+        return BigInt64Array;
     }
     throw new Error(`Unrecognized ${this[Symbol.toStringTag]} type`);
   }
@@ -27343,7 +27338,7 @@ const setDecimal = ({ values, stride }, index, value) => {
 const setList = (data, index, value) => {
   const values = data.children[0];
   const valueOffsets = data.valueOffsets;
-  const set2 = instance$6.getVisitFn(values);
+  const set2 = instance$7.getVisitFn(values);
   if (Array.isArray(value)) {
     for (let idx = -1, itr = valueOffsets[index], end = valueOffsets[index + 1]; itr < end; ) {
       set2(values, itr++, value[++idx]);
@@ -27357,7 +27352,7 @@ const setList = (data, index, value) => {
 const setMap = (data, index, value) => {
   const values = data.children[0];
   const { valueOffsets } = data;
-  const set2 = instance$6.getVisitFn(values);
+  const set2 = instance$7.getVisitFn(values);
   let { [index]: idx, [index + 1]: end } = valueOffsets;
   const entries = value instanceof Map ? value.entries() : Object.entries(value);
   for (const val of entries) {
@@ -27371,7 +27366,7 @@ const _setStructVectorValue = (o, v) => (set2, c2, _, i) => c2 && set2(c2, o, v.
 const _setStructMapValue = (o, v) => (set2, c2, f, _) => c2 && set2(c2, o, v.get(f.name));
 const _setStructObjectValue = (o, v) => (set2, c2, f, _) => c2 && set2(c2, o, v[f.name]);
 const setStruct = (data, index, value) => {
-  const childSetters = data.type.children.map((f) => instance$6.getVisitFn(f.type));
+  const childSetters = data.type.children.map((f) => instance$7.getVisitFn(f.type));
   const set2 = value instanceof Map ? _setStructMapValue(index, value) : value instanceof Vector ? _setStructVectorValue(index, value) : Array.isArray(value) ? _setStructArrayValue(index, value) : _setStructObjectValue(index, value);
   data.type.children.forEach((f, i) => set2(childSetters[i], data.children[i], f, i));
 };
@@ -27381,12 +27376,12 @@ const setUnion = (data, index, value) => {
 const setDenseUnion = (data, index, value) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  instance$6.visit(child, data.valueOffsets[index], value);
+  instance$7.visit(child, data.valueOffsets[index], value);
 };
 const setSparseUnion = (data, index, value) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  instance$6.visit(child, index, value);
+  instance$7.visit(child, index, value);
 };
 const setDictionary = (data, index, value) => {
   var _a2;
@@ -27404,7 +27399,7 @@ const setIntervalYearMonth = ({ values }, index, value) => {
 const setFixedSizeList = (data, index, value) => {
   const { stride } = data;
   const child = data.children[0];
-  const set2 = instance$6.getVisitFn(child);
+  const set2 = instance$7.getVisitFn(child);
   if (Array.isArray(value)) {
     for (let idx = -1, offset = index * stride; ++idx < stride; ) {
       set2(child, offset + idx, value[idx]);
@@ -27457,7 +27452,7 @@ SetVisitor.prototype.visitIntervalDayTime = wrapSet(setIntervalDayTime);
 SetVisitor.prototype.visitIntervalYearMonth = wrapSet(setIntervalYearMonth);
 SetVisitor.prototype.visitFixedSizeList = wrapSet(setFixedSizeList);
 SetVisitor.prototype.visitMap = wrapSet(setMap);
-const instance$6 = new SetVisitor();
+const instance$7 = new SetVisitor();
 const kParent = Symbol.for("parent");
 const kRowIndex = Symbol.for("rowIndex");
 class StructRow {
@@ -27475,7 +27470,7 @@ class StructRow {
     const keys = parent.type.children;
     const json = {};
     for (let j = -1, n = keys.length; ++j < n; ) {
-      json[keys[j].name] = instance$5.visit(parent.children[j], i);
+      json[keys[j].name] = instance$6.visit(parent.children[j], i);
     }
     return json;
   }
@@ -27508,7 +27503,7 @@ class StructRowIterator {
         done: false,
         value: [
           this.childFields[i].name,
-          instance$5.visit(this.children[i], this.rowIndex)
+          instance$6.visit(this.children[i], this.rowIndex)
         ]
       };
     }
@@ -27548,7 +27543,7 @@ class StructRowProxyHandler {
     }
     const idx = row[kParent].type.children.findIndex((f) => f.name === key);
     if (idx !== -1) {
-      const val = instance$5.visit(row[kParent].children[idx], row[kRowIndex]);
+      const val = instance$6.visit(row[kParent].children[idx], row[kRowIndex]);
       Reflect.set(row, key, val);
       return val;
     }
@@ -27556,7 +27551,7 @@ class StructRowProxyHandler {
   set(row, key, val) {
     const idx = row[kParent].type.children.findIndex((f) => f.name === key);
     if (idx !== -1) {
-      instance$6.visit(row[kParent].children[idx], row[kRowIndex], val);
+      instance$7.visit(row[kParent].children[idx], row[kRowIndex], val);
       return Reflect.set(row, key, val);
     } else if (Reflect.has(row, key) || typeof key === "symbol") {
       return Reflect.set(row, key, val);
@@ -27659,12 +27654,12 @@ const getUnion = (data, index) => {
 const getDenseUnion = (data, index) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  return instance$5.visit(child, data.valueOffsets[index]);
+  return instance$6.visit(child, data.valueOffsets[index]);
 };
 const getSparseUnion = (data, index) => {
   const childIndex = data.type.typeIdToChildIndex[data.typeIds[index]];
   const child = data.children[childIndex];
-  return instance$5.visit(child, index);
+  return instance$6.visit(child, index);
 };
 const getDictionary = (data, index) => {
   var _a2;
@@ -27728,7 +27723,7 @@ GetVisitor.prototype.visitIntervalDayTime = wrapGet(getIntervalDayTime);
 GetVisitor.prototype.visitIntervalYearMonth = wrapGet(getIntervalYearMonth);
 GetVisitor.prototype.visitFixedSizeList = wrapGet(getFixedSizeList);
 GetVisitor.prototype.visitMap = wrapGet(getMap);
-const instance$5 = new GetVisitor();
+const instance$6 = new GetVisitor();
 const kKeys = Symbol.for("keys");
 const kVals = Symbol.for("vals");
 class MapRow {
@@ -27751,7 +27746,7 @@ class MapRow {
     const vals = this[kVals];
     const json = {};
     for (let i = -1, n = keys.length; ++i < n; ) {
-      json[keys.get(i)] = instance$5.visit(vals, i);
+      json[keys.get(i)] = instance$6.visit(vals, i);
     }
     return json;
   }
@@ -27782,7 +27777,7 @@ class MapRowIterator {
       done: false,
       value: [
         this.keys.get(i),
-        instance$5.visit(this.vals, i)
+        instance$6.visit(this.vals, i)
       ]
     };
   }
@@ -27816,7 +27811,7 @@ class MapRowProxyHandler {
     }
     const idx = row[kKeys].indexOf(key);
     if (idx !== -1) {
-      const val = instance$5.visit(Reflect.get(row, kVals), idx);
+      const val = instance$6.visit(Reflect.get(row, kVals), idx);
       Reflect.set(row, key, val);
       return val;
     }
@@ -27824,7 +27819,7 @@ class MapRowProxyHandler {
   set(row, key, val) {
     const idx = row[kKeys].indexOf(key);
     if (idx !== -1) {
-      instance$6.visit(Reflect.get(row, kVals), idx, val);
+      instance$7.visit(Reflect.get(row, kVals), idx, val);
       return Reflect.set(row, key, val);
     } else if (Reflect.has(row, key)) {
       return Reflect.set(row, key, val);
@@ -28475,7 +28470,7 @@ function indexOfValue(data, searchElement, fromIndex) {
   if (searchElement === null) {
     return indexOfNull(data, fromIndex);
   }
-  const get2 = instance$5.getVisitFn(data);
+  const get2 = instance$6.getVisitFn(data);
   const compare = createElementComparator(searchElement);
   for (let i = (fromIndex || 0) - 1, n = data.length; ++i < n; ) {
     if (compare(get2(data, i))) {
@@ -28485,7 +28480,7 @@ function indexOfValue(data, searchElement, fromIndex) {
   return -1;
 }
 function indexOfUnion(data, searchElement, fromIndex) {
-  const get2 = instance$5.getVisitFn(data);
+  const get2 = instance$6.getVisitFn(data);
   const compare = createElementComparator(searchElement);
   for (let i = (fromIndex || 0) - 1, n = data.length; ++i < n; ) {
     if (compare(get2(data, i))) {
@@ -28537,7 +28532,7 @@ IndexOfVisitor.prototype.visitIntervalDayTime = indexOfValue;
 IndexOfVisitor.prototype.visitIntervalYearMonth = indexOfValue;
 IndexOfVisitor.prototype.visitFixedSizeList = indexOfValue;
 IndexOfVisitor.prototype.visitMap = indexOfValue;
-const instance$4 = new IndexOfVisitor();
+const instance$5 = new IndexOfVisitor();
 class IteratorVisitor extends Visitor {
 }
 function vectorIterator(vector) {
@@ -28617,7 +28612,7 @@ IteratorVisitor.prototype.visitIntervalDayTime = vectorIterator;
 IteratorVisitor.prototype.visitIntervalYearMonth = vectorIterator;
 IteratorVisitor.prototype.visitFixedSizeList = vectorIterator;
 IteratorVisitor.prototype.visitMap = vectorIterator;
-const instance$3 = new IteratorVisitor();
+const instance$4 = new IteratorVisitor();
 const sum = (x, y) => x + y;
 class GetByteLengthVisitor extends Visitor {
   visitNull(____, _) {
@@ -28648,13 +28643,13 @@ class GetByteLengthVisitor extends Visitor {
     return (data.type.unit + 1) * 4;
   }
   visitStruct(data, i) {
-    return data.children.reduce((total, child) => total + instance$2.visit(child, i), 0);
+    return data.children.reduce((total, child) => total + instance$3.visit(child, i), 0);
   }
   visitFixedSizeBinary(data, _) {
     return data.type.byteWidth;
   }
   visitMap(data, i) {
-    return 8 + data.children.reduce((total, child) => total + instance$2.visit(child, i), 0);
+    return 8 + data.children.reduce((total, child) => total + instance$3.visit(child, i), 0);
   }
   visitDictionary(data, i) {
     var _a2;
@@ -28671,7 +28666,7 @@ const getListByteLength = ({ valueOffsets, stride, children: children2 }, index)
   const child = children2[0];
   const { [index * stride]: start2 } = valueOffsets;
   const { [index * stride + 1]: end } = valueOffsets;
-  const visit = instance$2.getVisitFn(child.type);
+  const visit = instance$3.getVisitFn(child.type);
   const slice = child.slice(start2, end - start2);
   let size = 8;
   for (let idx = -1, len = end - start2; ++idx < len; ) {
@@ -28682,7 +28677,7 @@ const getListByteLength = ({ valueOffsets, stride, children: children2 }, index)
 const getFixedSizeListByteLength = ({ stride, children: children2 }, index) => {
   const child = children2[0];
   const slice = child.slice(index * stride, stride);
-  const visit = instance$2.getVisitFn(child.type);
+  const visit = instance$3.getVisitFn(child.type);
   let size = 0;
   for (let idx = -1, len = slice.length; ++idx < len; ) {
     size += visit(slice, idx);
@@ -28694,10 +28689,10 @@ const getUnionByteLength = (data, index) => {
 };
 const getDenseUnionByteLength = ({ type, children: children2, typeIds, valueOffsets }, index) => {
   const childIndex = type.typeIdToChildIndex[typeIds[index]];
-  return 8 + instance$2.visit(children2[childIndex], valueOffsets[index]);
+  return 8 + instance$3.visit(children2[childIndex], valueOffsets[index]);
 };
 const getSparseUnionByteLength = ({ children: children2 }, index) => {
-  return 4 + instance$2.visitMany(children2, children2.map(() => index)).reduce(sum, 0);
+  return 4 + instance$3.visitMany(children2, children2.map(() => index)).reduce(sum, 0);
 };
 GetByteLengthVisitor.prototype.visitUtf8 = getUtf8ByteLength;
 GetByteLengthVisitor.prototype.visitBinary = getBinaryByteLength;
@@ -28706,7 +28701,7 @@ GetByteLengthVisitor.prototype.visitFixedSizeList = getFixedSizeListByteLength;
 GetByteLengthVisitor.prototype.visitUnion = getUnionByteLength;
 GetByteLengthVisitor.prototype.visitDenseUnion = getDenseUnionByteLength;
 GetByteLengthVisitor.prototype.visitSparseUnion = getSparseUnionByteLength;
-const instance$2 = new GetByteLengthVisitor();
+const instance$3 = new GetByteLengthVisitor();
 var _a$2;
 const visitorsByTypeId = {};
 const vectorPrototypesByTypeId = {};
@@ -28742,7 +28737,7 @@ class Vector {
     this.type = type;
     this.stride = strideForType(type);
     this.numChildren = (_d2 = (_c2 = type.children) === null || _c2 === void 0 ? void 0 : _c2.length) !== null && _d2 !== void 0 ? _d2 : 0;
-    this.length = this._offsets[this._offsets.length - 1];
+    this.length = this._offsets.at(-1);
   }
   /**
    * The aggregate size (in bytes) of this Vector's buffers and/or child Vectors.
@@ -28763,7 +28758,7 @@ class Vector {
     return this._nullCount;
   }
   /**
-   * The Array or TypedAray constructor used for the JS representation
+   * The Array or TypedArray constructor used for the JS representation
    *  of the element's values in {@link Vector.prototype.toArray `toArray()`}.
    */
   get ArrayType() {
@@ -28830,7 +28825,7 @@ class Vector {
    * Iterator for the Vector's elements.
    */
   [Symbol.iterator]() {
-    return instance$3.visit(this);
+    return instance$4.visit(this);
   }
   /**
    * Combines two or more Vectors of the same type.
@@ -28971,17 +28966,17 @@ Vector[_a$2] = ((proto) => {
   proto[Symbol.isConcatSpreadable] = true;
   const typeIds = Object.keys(Type$1).map((T) => Type$1[T]).filter((T) => typeof T === "number" && T !== Type$1.NONE);
   for (const typeId of typeIds) {
-    const get2 = instance$5.getVisitFnByTypeId(typeId);
-    const set2 = instance$6.getVisitFnByTypeId(typeId);
-    const indexOf = instance$4.getVisitFnByTypeId(typeId);
-    const byteLength = instance$2.getVisitFnByTypeId(typeId);
+    const get2 = instance$6.getVisitFnByTypeId(typeId);
+    const set2 = instance$7.getVisitFnByTypeId(typeId);
+    const indexOf = instance$5.getVisitFnByTypeId(typeId);
+    const byteLength = instance$3.getVisitFnByTypeId(typeId);
     visitorsByTypeId[typeId] = { get: get2, set: set2, indexOf, byteLength };
     vectorPrototypesByTypeId[typeId] = Object.create(proto, {
       ["isValid"]: { value: wrapChunkedCall1(isChunkedValid) },
-      ["get"]: { value: wrapChunkedCall1(instance$5.getVisitFnByTypeId(typeId)) },
-      ["set"]: { value: wrapChunkedCall2(instance$6.getVisitFnByTypeId(typeId)) },
-      ["indexOf"]: { value: wrapChunkedIndexOf(instance$4.getVisitFnByTypeId(typeId)) },
-      ["getByteLength"]: { value: wrapChunkedCall1(instance$2.getVisitFnByTypeId(typeId)) }
+      ["get"]: { value: wrapChunkedCall1(instance$6.getVisitFnByTypeId(typeId)) },
+      ["set"]: { value: wrapChunkedCall2(instance$7.getVisitFnByTypeId(typeId)) },
+      ["indexOf"]: { value: wrapChunkedIndexOf(instance$5.getVisitFnByTypeId(typeId)) },
+      ["getByteLength"]: { value: wrapChunkedCall1(instance$3.getVisitFnByTypeId(typeId)) }
     });
   }
   return "Vector";
@@ -29050,7 +29045,7 @@ function makeVector(init2) {
       if (init2 instanceof Int32Array) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Int32() }))]);
       }
-      if (init2 instanceof BigInt64ArrayCtor) {
+      if (init2 instanceof BigInt64Array) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Int64$1() }))]);
       }
       if (init2 instanceof Uint8Array || init2 instanceof Uint8ClampedArray) {
@@ -29062,7 +29057,7 @@ function makeVector(init2) {
       if (init2 instanceof Uint32Array) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Uint32() }))]);
       }
-      if (init2 instanceof BigUint64ArrayCtor) {
+      if (init2 instanceof BigUint64Array) {
         return new Vector([makeData(Object.assign(Object.assign({}, props), { type: new Uint64$1() }))]);
       }
       if (init2 instanceof Float32Array) {
@@ -29078,6 +29073,411 @@ function makeVector(init2) {
 }
 function unwrapInputs(x) {
   return x instanceof Data ? [x] : x instanceof Vector ? x.data : makeVector(x).data;
+}
+function createIsValidFunction(nullValues) {
+  if (!nullValues || nullValues.length <= 0) {
+    return function isValid(value) {
+      return true;
+    };
+  }
+  let fnBody = "";
+  const noNaNs = nullValues.filter((x) => x === x);
+  if (noNaNs.length > 0) {
+    fnBody = `
+    switch (x) {${noNaNs.map((x) => `
+        case ${valueToCase(x)}:`).join("")}
+            return false;
+    }`;
+  }
+  if (nullValues.length !== noNaNs.length) {
+    fnBody = `if (x !== x) return false;
+${fnBody}`;
+  }
+  return new Function(`x`, `${fnBody}
+return true;`);
+}
+function valueToCase(x) {
+  if (typeof x !== "bigint") {
+    return valueToString(x);
+  }
+  return `${valueToString(x)}n`;
+}
+const roundLengthUpToNearest64Bytes = (len, BPE) => (Math.ceil(len) * BPE + 63 & ~63 || 64) / BPE;
+const sliceOrExtendArray = (arr, len = 0) => arr.length >= len ? arr.subarray(0, len) : memcpy(new arr.constructor(len), arr, 0);
+class BufferBuilder {
+  constructor(buffer, stride = 1) {
+    this.buffer = buffer;
+    this.stride = stride;
+    this.BYTES_PER_ELEMENT = buffer.BYTES_PER_ELEMENT;
+    this.ArrayType = buffer.constructor;
+    this._resize(this.length = Math.ceil(buffer.length / stride));
+  }
+  get byteLength() {
+    return Math.ceil(this.length * this.stride) * this.BYTES_PER_ELEMENT;
+  }
+  get reservedLength() {
+    return this.buffer.length / this.stride;
+  }
+  get reservedByteLength() {
+    return this.buffer.byteLength;
+  }
+  // @ts-ignore
+  set(index, value) {
+    return this;
+  }
+  append(value) {
+    return this.set(this.length, value);
+  }
+  reserve(extra) {
+    if (extra > 0) {
+      this.length += extra;
+      const stride = this.stride;
+      const length = this.length * stride;
+      const reserved = this.buffer.length;
+      if (length >= reserved) {
+        this._resize(reserved === 0 ? roundLengthUpToNearest64Bytes(length * 1, this.BYTES_PER_ELEMENT) : roundLengthUpToNearest64Bytes(length * 2, this.BYTES_PER_ELEMENT));
+      }
+    }
+    return this;
+  }
+  flush(length = this.length) {
+    length = roundLengthUpToNearest64Bytes(length * this.stride, this.BYTES_PER_ELEMENT);
+    const array2 = sliceOrExtendArray(this.buffer, length);
+    this.clear();
+    return array2;
+  }
+  clear() {
+    this.length = 0;
+    this._resize(0);
+    return this;
+  }
+  _resize(newLength) {
+    return this.buffer = memcpy(new this.ArrayType(newLength), this.buffer);
+  }
+}
+BufferBuilder.prototype.offset = 0;
+class DataBufferBuilder extends BufferBuilder {
+  last() {
+    return this.get(this.length - 1);
+  }
+  get(index) {
+    return this.buffer[index];
+  }
+  set(index, value) {
+    this.reserve(index - this.length + 1);
+    this.buffer[index * this.stride] = value;
+    return this;
+  }
+}
+class BitmapBufferBuilder extends DataBufferBuilder {
+  constructor(data = new Uint8Array(0)) {
+    super(data, 1 / 8);
+    this.numValid = 0;
+  }
+  get numInvalid() {
+    return this.length - this.numValid;
+  }
+  get(idx) {
+    return this.buffer[idx >> 3] >> idx % 8 & 1;
+  }
+  set(idx, val) {
+    const { buffer } = this.reserve(idx - this.length + 1);
+    const byte = idx >> 3, bit = idx % 8, cur = buffer[byte] >> bit & 1;
+    val ? cur === 0 && (buffer[byte] |= 1 << bit, ++this.numValid) : cur === 1 && (buffer[byte] &= ~(1 << bit), --this.numValid);
+    return this;
+  }
+  clear() {
+    this.numValid = 0;
+    return super.clear();
+  }
+}
+class OffsetsBufferBuilder extends DataBufferBuilder {
+  constructor(data = new Int32Array(1)) {
+    super(data, 1);
+  }
+  append(value) {
+    return this.set(this.length - 1, value);
+  }
+  set(index, value) {
+    const offset = this.length - 1;
+    const buffer = this.reserve(index - offset + 1).buffer;
+    if (offset < index++) {
+      buffer.fill(buffer[offset], offset, index);
+    }
+    buffer[index] = buffer[index - 1] + value;
+    return this;
+  }
+  flush(length = this.length - 1) {
+    if (length > this.length) {
+      this.set(length - 1, 0);
+    }
+    return super.flush(length + 1);
+  }
+}
+let Builder$3 = class Builder {
+  /** @nocollapse */
+  // @ts-ignore
+  static throughNode(options) {
+    throw new Error(`"throughNode" not available in this environment`);
+  }
+  /** @nocollapse */
+  // @ts-ignore
+  static throughDOM(options) {
+    throw new Error(`"throughDOM" not available in this environment`);
+  }
+  /**
+   * Construct a builder with the given Arrow DataType with optional null values,
+   * which will be interpreted as "null" when set or appended to the `Builder`.
+   * @param {{ type: T, nullValues?: any[] }} options A `BuilderOptions` object used to create this `Builder`.
+   */
+  constructor({ "type": type, "nullValues": nulls }) {
+    this.length = 0;
+    this.finished = false;
+    this.type = type;
+    this.children = [];
+    this.nullValues = nulls;
+    this.stride = strideForType(type);
+    this._nulls = new BitmapBufferBuilder();
+    if (nulls && nulls.length > 0) {
+      this._isValid = createIsValidFunction(nulls);
+    }
+  }
+  /**
+   * Flush the `Builder` and return a `Vector<T>`.
+   * @returns {Vector<T>} A `Vector<T>` of the flushed values.
+   */
+  toVector() {
+    return new Vector([this.flush()]);
+  }
+  get ArrayType() {
+    return this.type.ArrayType;
+  }
+  get nullCount() {
+    return this._nulls.numInvalid;
+  }
+  get numChildren() {
+    return this.children.length;
+  }
+  /**
+   * @returns The aggregate length (in bytes) of the values that have been written.
+   */
+  get byteLength() {
+    let size = 0;
+    const { _offsets, _values, _nulls, _typeIds, children: children2 } = this;
+    _offsets && (size += _offsets.byteLength);
+    _values && (size += _values.byteLength);
+    _nulls && (size += _nulls.byteLength);
+    _typeIds && (size += _typeIds.byteLength);
+    return children2.reduce((size2, child) => size2 + child.byteLength, size);
+  }
+  /**
+   * @returns The aggregate number of rows that have been reserved to write new values.
+   */
+  get reservedLength() {
+    return this._nulls.reservedLength;
+  }
+  /**
+   * @returns The aggregate length (in bytes) that has been reserved to write new values.
+   */
+  get reservedByteLength() {
+    let size = 0;
+    this._offsets && (size += this._offsets.reservedByteLength);
+    this._values && (size += this._values.reservedByteLength);
+    this._nulls && (size += this._nulls.reservedByteLength);
+    this._typeIds && (size += this._typeIds.reservedByteLength);
+    return this.children.reduce((size2, child) => size2 + child.reservedByteLength, size);
+  }
+  get valueOffsets() {
+    return this._offsets ? this._offsets.buffer : null;
+  }
+  get values() {
+    return this._values ? this._values.buffer : null;
+  }
+  get nullBitmap() {
+    return this._nulls ? this._nulls.buffer : null;
+  }
+  get typeIds() {
+    return this._typeIds ? this._typeIds.buffer : null;
+  }
+  /**
+   * Appends a value (or null) to this `Builder`.
+   * This is equivalent to `builder.set(builder.length, value)`.
+   * @param {T['TValue'] | TNull } value The value to append.
+   */
+  append(value) {
+    return this.set(this.length, value);
+  }
+  /**
+   * Validates whether a value is valid (true), or null (false)
+   * @param {T['TValue'] | TNull } value The value to compare against null the value representations
+   */
+  isValid(value) {
+    return this._isValid(value);
+  }
+  /**
+   * Write a value (or null-value sentinel) at the supplied index.
+   * If the value matches one of the null-value representations, a 1-bit is
+   * written to the null `BitmapBufferBuilder`. Otherwise, a 0 is written to
+   * the null `BitmapBufferBuilder`, and the value is passed to
+   * `Builder.prototype.setValue()`.
+   * @param {number} index The index of the value to write.
+   * @param {T['TValue'] | TNull } value The value to write at the supplied index.
+   * @returns {this} The updated `Builder` instance.
+   */
+  set(index, value) {
+    if (this.setValid(index, this.isValid(value))) {
+      this.setValue(index, value);
+    }
+    return this;
+  }
+  /**
+   * Write a value to the underlying buffers at the supplied index, bypassing
+   * the null-value check. This is a low-level method that
+   * @param {number} index
+   * @param {T['TValue'] | TNull } value
+   */
+  setValue(index, value) {
+    this._setValue(this, index, value);
+  }
+  setValid(index, valid) {
+    this.length = this._nulls.set(index, +valid).length;
+    return valid;
+  }
+  // @ts-ignore
+  addChild(child, name = `${this.numChildren}`) {
+    throw new Error(`Cannot append children to non-nested type "${this.type}"`);
+  }
+  /**
+   * Retrieve the child `Builder` at the supplied `index`, or null if no child
+   * exists at that index.
+   * @param {number} index The index of the child `Builder` to retrieve.
+   * @returns {Builder | null} The child Builder at the supplied index or null.
+   */
+  getChildAt(index) {
+    return this.children[index] || null;
+  }
+  /**
+   * Commit all the values that have been written to their underlying
+   * ArrayBuffers, including any child Builders if applicable, and reset
+   * the internal `Builder` state.
+   * @returns A `Data<T>` of the buffers and children representing the values written.
+   */
+  flush() {
+    let data;
+    let typeIds;
+    let nullBitmap;
+    let valueOffsets;
+    const { type, length, nullCount, _typeIds, _offsets, _values, _nulls } = this;
+    if (typeIds = _typeIds === null || _typeIds === void 0 ? void 0 : _typeIds.flush(length)) {
+      valueOffsets = _offsets === null || _offsets === void 0 ? void 0 : _offsets.flush(length);
+    } else if (valueOffsets = _offsets === null || _offsets === void 0 ? void 0 : _offsets.flush(length)) {
+      data = _values === null || _values === void 0 ? void 0 : _values.flush(_offsets.last());
+    } else {
+      data = _values === null || _values === void 0 ? void 0 : _values.flush(length);
+    }
+    if (nullCount > 0) {
+      nullBitmap = _nulls === null || _nulls === void 0 ? void 0 : _nulls.flush(length);
+    }
+    const children2 = this.children.map((child) => child.flush());
+    this.clear();
+    return makeData({
+      type,
+      length,
+      nullCount,
+      children: children2,
+      "child": children2[0],
+      data,
+      typeIds,
+      nullBitmap,
+      valueOffsets
+    });
+  }
+  /**
+   * Finalize this `Builder`, and child builders if applicable.
+   * @returns {this} The finalized `Builder` instance.
+   */
+  finish() {
+    this.finished = true;
+    for (const child of this.children)
+      child.finish();
+    return this;
+  }
+  /**
+   * Clear this Builder's internal state, including child Builders if applicable, and reset the length to 0.
+   * @returns {this} The cleared `Builder` instance.
+   */
+  clear() {
+    var _a2, _b2, _c2, _d2;
+    this.length = 0;
+    (_a2 = this._nulls) === null || _a2 === void 0 ? void 0 : _a2.clear();
+    (_b2 = this._values) === null || _b2 === void 0 ? void 0 : _b2.clear();
+    (_c2 = this._offsets) === null || _c2 === void 0 ? void 0 : _c2.clear();
+    (_d2 = this._typeIds) === null || _d2 === void 0 ? void 0 : _d2.clear();
+    for (const child of this.children)
+      child.clear();
+    return this;
+  }
+};
+Builder$3.prototype.length = 1;
+Builder$3.prototype.stride = 1;
+Builder$3.prototype.children = null;
+Builder$3.prototype.finished = false;
+Builder$3.prototype.nullValues = null;
+Builder$3.prototype._isValid = () => true;
+class FixedWidthBuilder extends Builder$3 {
+  constructor(opts) {
+    super(opts);
+    this._values = new DataBufferBuilder(new this.ArrayType(0), this.stride);
+  }
+  setValue(index, value) {
+    const values = this._values;
+    values.reserve(index - values.length + 1);
+    return super.setValue(index, value);
+  }
+}
+class VariableWidthBuilder extends Builder$3 {
+  constructor(opts) {
+    super(opts);
+    this._pendingLength = 0;
+    this._offsets = new OffsetsBufferBuilder();
+  }
+  setValue(index, value) {
+    const pending = this._pending || (this._pending = /* @__PURE__ */ new Map());
+    const current = pending.get(index);
+    current && (this._pendingLength -= current.length);
+    this._pendingLength += value instanceof MapRow ? value[kKeys].length : value.length;
+    pending.set(index, value);
+  }
+  setValid(index, isValid) {
+    if (!super.setValid(index, isValid)) {
+      (this._pending || (this._pending = /* @__PURE__ */ new Map())).set(index, void 0);
+      return false;
+    }
+    return true;
+  }
+  clear() {
+    this._pendingLength = 0;
+    this._pending = void 0;
+    return super.clear();
+  }
+  flush() {
+    this._flush();
+    return super.flush();
+  }
+  finish() {
+    this._flush();
+    return super.finish();
+  }
+  _flush() {
+    const pending = this._pending;
+    const pendingLength = this._pendingLength;
+    this._pendingLength = 0;
+    this._pending = void 0;
+    if (pending && pending.size > 0) {
+      this._flushPending(pending, pendingLength);
+    }
+    return this;
+  }
 }
 class Block {
   constructor() {
@@ -29375,7 +29775,7 @@ let ByteBuffer$2 = class ByteBuffer {
     return ret;
   }
 };
-let Builder$2 = class Builder {
+let Builder$2 = class Builder2 {
   /**
    * Create a FlatBufferBuilder.
    */
@@ -29453,7 +29853,7 @@ let Builder$2 = class Builder {
     const align_size = ~(this.bb.capacity() - this.space + additional_bytes) + 1 & size - 1;
     while (this.space < align_size + size + additional_bytes) {
       const old_buf_size = this.bb.capacity();
-      this.bb = Builder.growByteBuffer(this.bb);
+      this.bb = Builder2.growByteBuffer(this.bb);
       this.space += this.bb.capacity() - old_buf_size;
     }
     this.pad(align_size);
@@ -29587,7 +29987,7 @@ let Builder$2 = class Builder {
    */
   nested(obj) {
     if (obj != this.offset()) {
-      throw new Error("FlatBuffers: struct must be serialized inline.");
+      throw new TypeError("FlatBuffers: struct must be serialized inline.");
     }
   }
   /**
@@ -29596,7 +29996,7 @@ let Builder$2 = class Builder {
    */
   notNested() {
     if (this.isNested) {
-      throw new Error("FlatBuffers: object serialization must not be nested.");
+      throw new TypeError("FlatBuffers: object serialization must not be nested.");
     }
   }
   /**
@@ -29717,7 +30117,7 @@ let Builder$2 = class Builder {
       const file_identifier = opt_file_identifier;
       this.prep(this.minalign, SIZEOF_INT + FILE_IDENTIFIER_LENGTH + size_prefix);
       if (file_identifier.length != FILE_IDENTIFIER_LENGTH) {
-        throw new Error("FlatBuffers: file identifier must be length " + FILE_IDENTIFIER_LENGTH);
+        throw new TypeError("FlatBuffers: file identifier must be length " + FILE_IDENTIFIER_LENGTH);
       }
       for (let i = FILE_IDENTIFIER_LENGTH - 1; i >= 0; i--) {
         this.writeInt8(file_identifier.charCodeAt(i));
@@ -29745,7 +30145,7 @@ let Builder$2 = class Builder {
     const vtable_start = table_start - this.bb.readInt32(table_start);
     const ok = field < this.bb.readInt16(vtable_start) && this.bb.readInt16(vtable_start + field) != 0;
     if (!ok) {
-      throw new Error("FlatBuffers: field " + field + " must be set");
+      throw new TypeError("FlatBuffers: field " + field + " must be set");
     }
   }
   /**
@@ -29847,7 +30247,7 @@ let Builder$2 = class Builder {
       if (val !== null) {
         ret.push(this.createObjectOffset(val));
       } else {
-        throw new Error("FlatBuffers: Argument for createObjectOffsetList cannot contain null.");
+        throw new TypeError("FlatBuffers: Argument for createObjectOffsetList cannot contain null.");
       }
     }
     return ret;
@@ -31406,16 +31806,12 @@ class AsyncByteQueue extends AsyncQueue {
       const buffers = [];
       let byteLength = 0;
       try {
-        for (var _d2 = true, _e2 = __asyncValues(this), _f2; _f2 = yield _e2.next(), _a2 = _f2.done, !_a2; ) {
+        for (var _d2 = true, _e2 = __asyncValues(this), _f2; _f2 = yield _e2.next(), _a2 = _f2.done, !_a2; _d2 = true) {
           _c2 = _f2.value;
           _d2 = false;
-          try {
-            const chunk = _c2;
-            buffers.push(chunk);
-            byteLength += chunk.byteLength;
-          } finally {
-            _d2 = true;
-          }
+          const chunk = _c2;
+          buffers.push(chunk);
+          byteLength += chunk.byteLength;
         }
       } catch (e_1_1) {
         e_1 = { error: e_1_1 };
@@ -32135,6 +32531,537 @@ function binaryDataFromJSON(values) {
   }
   return data;
 }
+class BinaryBuilder extends VariableWidthBuilder {
+  constructor(opts) {
+    super(opts);
+    this._values = new BufferBuilder(new Uint8Array(0));
+  }
+  get byteLength() {
+    let size = this._pendingLength + this.length * 4;
+    this._offsets && (size += this._offsets.byteLength);
+    this._values && (size += this._values.byteLength);
+    this._nulls && (size += this._nulls.byteLength);
+    return size;
+  }
+  setValue(index, value) {
+    return super.setValue(index, toUint8Array(value));
+  }
+  _flushPending(pending, pendingLength) {
+    const offsets = this._offsets;
+    const data = this._values.reserve(pendingLength).buffer;
+    let offset = 0;
+    for (const [index, value] of pending) {
+      if (value === void 0) {
+        offsets.set(index, 0);
+      } else {
+        const length = value.length;
+        data.set(value, offset);
+        offsets.set(index, length);
+        offset += length;
+      }
+    }
+  }
+}
+class BoolBuilder extends Builder$3 {
+  constructor(options) {
+    super(options);
+    this._values = new BitmapBufferBuilder();
+  }
+  setValue(index, value) {
+    this._values.set(index, +value);
+  }
+}
+class DateBuilder extends FixedWidthBuilder {
+}
+DateBuilder.prototype._setValue = setDate;
+class DateDayBuilder extends DateBuilder {
+}
+DateDayBuilder.prototype._setValue = setDateDay;
+class DateMillisecondBuilder extends DateBuilder {
+}
+DateMillisecondBuilder.prototype._setValue = setDateMillisecond;
+class DecimalBuilder extends FixedWidthBuilder {
+}
+DecimalBuilder.prototype._setValue = setDecimal;
+class DictionaryBuilder extends Builder$3 {
+  constructor({ "type": type, "nullValues": nulls, "dictionaryHashFunction": hashFn }) {
+    super({ type: new Dictionary(type.dictionary, type.indices, type.id, type.isOrdered) });
+    this._nulls = null;
+    this._dictionaryOffset = 0;
+    this._keysToIndices = /* @__PURE__ */ Object.create(null);
+    this.indices = makeBuilder({ "type": this.type.indices, "nullValues": nulls });
+    this.dictionary = makeBuilder({ "type": this.type.dictionary, "nullValues": null });
+    if (typeof hashFn === "function") {
+      this.valueToKey = hashFn;
+    }
+  }
+  get values() {
+    return this.indices.values;
+  }
+  get nullCount() {
+    return this.indices.nullCount;
+  }
+  get nullBitmap() {
+    return this.indices.nullBitmap;
+  }
+  get byteLength() {
+    return this.indices.byteLength + this.dictionary.byteLength;
+  }
+  get reservedLength() {
+    return this.indices.reservedLength + this.dictionary.reservedLength;
+  }
+  get reservedByteLength() {
+    return this.indices.reservedByteLength + this.dictionary.reservedByteLength;
+  }
+  isValid(value) {
+    return this.indices.isValid(value);
+  }
+  setValid(index, valid) {
+    const indices = this.indices;
+    valid = indices.setValid(index, valid);
+    this.length = indices.length;
+    return valid;
+  }
+  setValue(index, value) {
+    const keysToIndices = this._keysToIndices;
+    const key = this.valueToKey(value);
+    let idx = keysToIndices[key];
+    if (idx === void 0) {
+      keysToIndices[key] = idx = this._dictionaryOffset + this.dictionary.append(value).length - 1;
+    }
+    return this.indices.setValue(index, idx);
+  }
+  flush() {
+    const type = this.type;
+    const prev = this._dictionary;
+    const curr = this.dictionary.toVector();
+    const data = this.indices.flush().clone(type);
+    data.dictionary = prev ? prev.concat(curr) : curr;
+    this.finished || (this._dictionaryOffset += curr.length);
+    this._dictionary = data.dictionary;
+    this.clear();
+    return data;
+  }
+  finish() {
+    this.indices.finish();
+    this.dictionary.finish();
+    this._dictionaryOffset = 0;
+    this._keysToIndices = /* @__PURE__ */ Object.create(null);
+    return super.finish();
+  }
+  clear() {
+    this.indices.clear();
+    this.dictionary.clear();
+    return super.clear();
+  }
+  valueToKey(val) {
+    return typeof val === "string" ? val : `${val}`;
+  }
+}
+class FixedSizeBinaryBuilder extends FixedWidthBuilder {
+}
+FixedSizeBinaryBuilder.prototype._setValue = setFixedSizeBinary;
+class FixedSizeListBuilder extends Builder$3 {
+  setValue(index, value) {
+    const [child] = this.children;
+    const start2 = index * this.stride;
+    for (let i = -1, n = value.length; ++i < n; ) {
+      child.set(start2 + i, value[i]);
+    }
+  }
+  addChild(child, name = "0") {
+    if (this.numChildren > 0) {
+      throw new Error("FixedSizeListBuilder can only have one child.");
+    }
+    const childIndex = this.children.push(child);
+    this.type = new FixedSizeList$1(this.type.listSize, new Field2(name, child.type, true));
+    return childIndex;
+  }
+}
+class FloatBuilder extends FixedWidthBuilder {
+  setValue(index, value) {
+    this._values.set(index, value);
+  }
+}
+class Float16Builder extends FloatBuilder {
+  setValue(index, value) {
+    super.setValue(index, float64ToUint16(value));
+  }
+}
+class Float32Builder extends FloatBuilder {
+}
+class Float64Builder extends FloatBuilder {
+}
+class IntervalBuilder extends FixedWidthBuilder {
+}
+IntervalBuilder.prototype._setValue = setIntervalValue;
+class IntervalDayTimeBuilder extends IntervalBuilder {
+}
+IntervalDayTimeBuilder.prototype._setValue = setIntervalDayTime;
+class IntervalYearMonthBuilder extends IntervalBuilder {
+}
+IntervalYearMonthBuilder.prototype._setValue = setIntervalYearMonth;
+class IntBuilder extends FixedWidthBuilder {
+  setValue(index, value) {
+    this._values.set(index, value);
+  }
+}
+class Int8Builder extends IntBuilder {
+}
+class Int16Builder extends IntBuilder {
+}
+class Int32Builder extends IntBuilder {
+}
+class Int64Builder extends IntBuilder {
+}
+class Uint8Builder extends IntBuilder {
+}
+class Uint16Builder extends IntBuilder {
+}
+class Uint32Builder extends IntBuilder {
+}
+class Uint64Builder extends IntBuilder {
+}
+class ListBuilder extends VariableWidthBuilder {
+  constructor(opts) {
+    super(opts);
+    this._offsets = new OffsetsBufferBuilder();
+  }
+  addChild(child, name = "0") {
+    if (this.numChildren > 0) {
+      throw new Error("ListBuilder can only have one child.");
+    }
+    this.children[this.numChildren] = child;
+    this.type = new List$1(new Field2(name, child.type, true));
+    return this.numChildren - 1;
+  }
+  _flushPending(pending) {
+    const offsets = this._offsets;
+    const [child] = this.children;
+    for (const [index, value] of pending) {
+      if (typeof value === "undefined") {
+        offsets.set(index, 0);
+      } else {
+        const v = value;
+        const n = v.length;
+        const start2 = offsets.set(index, n).buffer[index];
+        for (let i = -1; ++i < n; ) {
+          child.set(start2 + i, v[i]);
+        }
+      }
+    }
+  }
+}
+class MapBuilder extends VariableWidthBuilder {
+  set(index, value) {
+    return super.set(index, value);
+  }
+  setValue(index, value) {
+    const row = value instanceof Map ? value : new Map(Object.entries(value));
+    const pending = this._pending || (this._pending = /* @__PURE__ */ new Map());
+    const current = pending.get(index);
+    current && (this._pendingLength -= current.size);
+    this._pendingLength += row.size;
+    pending.set(index, row);
+  }
+  addChild(child, name = `${this.numChildren}`) {
+    if (this.numChildren > 0) {
+      throw new Error("ListBuilder can only have one child.");
+    }
+    this.children[this.numChildren] = child;
+    this.type = new Map_(new Field2(name, child.type, true), this.type.keysSorted);
+    return this.numChildren - 1;
+  }
+  _flushPending(pending) {
+    const offsets = this._offsets;
+    const [child] = this.children;
+    for (const [index, value] of pending) {
+      if (value === void 0) {
+        offsets.set(index, 0);
+      } else {
+        let { [index]: idx, [index + 1]: end } = offsets.set(index, value.size).buffer;
+        for (const val of value.entries()) {
+          child.set(idx, val);
+          if (++idx >= end)
+            break;
+        }
+      }
+    }
+  }
+}
+class NullBuilder extends Builder$3 {
+  // @ts-ignore
+  setValue(index, value) {
+  }
+  setValid(index, valid) {
+    this.length = Math.max(index + 1, this.length);
+    return valid;
+  }
+}
+class StructBuilder extends Builder$3 {
+  setValue(index, value) {
+    const { children: children2, type } = this;
+    switch (Array.isArray(value) || value.constructor) {
+      case true:
+        return type.children.forEach((_, i) => children2[i].set(index, value[i]));
+      case Map:
+        return type.children.forEach((f, i) => children2[i].set(index, value.get(f.name)));
+      default:
+        return type.children.forEach((f, i) => children2[i].set(index, value[f.name]));
+    }
+  }
+  /** @inheritdoc */
+  setValid(index, valid) {
+    if (!super.setValid(index, valid)) {
+      this.children.forEach((child) => child.setValid(index, valid));
+    }
+    return valid;
+  }
+  addChild(child, name = `${this.numChildren}`) {
+    const childIndex = this.children.push(child);
+    this.type = new Struct([...this.type.children, new Field2(name, child.type, true)]);
+    return childIndex;
+  }
+}
+class TimestampBuilder extends FixedWidthBuilder {
+}
+TimestampBuilder.prototype._setValue = setTimestamp;
+class TimestampSecondBuilder extends TimestampBuilder {
+}
+TimestampSecondBuilder.prototype._setValue = setTimestampSecond;
+class TimestampMillisecondBuilder extends TimestampBuilder {
+}
+TimestampMillisecondBuilder.prototype._setValue = setTimestampMillisecond;
+class TimestampMicrosecondBuilder extends TimestampBuilder {
+}
+TimestampMicrosecondBuilder.prototype._setValue = setTimestampMicrosecond;
+class TimestampNanosecondBuilder extends TimestampBuilder {
+}
+TimestampNanosecondBuilder.prototype._setValue = setTimestampNanosecond;
+class TimeBuilder extends FixedWidthBuilder {
+}
+TimeBuilder.prototype._setValue = setTime;
+class TimeSecondBuilder extends TimeBuilder {
+}
+TimeSecondBuilder.prototype._setValue = setTimeSecond;
+class TimeMillisecondBuilder extends TimeBuilder {
+}
+TimeMillisecondBuilder.prototype._setValue = setTimeMillisecond;
+class TimeMicrosecondBuilder extends TimeBuilder {
+}
+TimeMicrosecondBuilder.prototype._setValue = setTimeMicrosecond;
+class TimeNanosecondBuilder extends TimeBuilder {
+}
+TimeNanosecondBuilder.prototype._setValue = setTimeNanosecond;
+class UnionBuilder extends Builder$3 {
+  constructor(options) {
+    super(options);
+    this._typeIds = new DataBufferBuilder(new Int8Array(0), 1);
+    if (typeof options["valueToChildTypeId"] === "function") {
+      this._valueToChildTypeId = options["valueToChildTypeId"];
+    }
+  }
+  get typeIdToChildIndex() {
+    return this.type.typeIdToChildIndex;
+  }
+  append(value, childTypeId) {
+    return this.set(this.length, value, childTypeId);
+  }
+  set(index, value, childTypeId) {
+    if (childTypeId === void 0) {
+      childTypeId = this._valueToChildTypeId(this, value, index);
+    }
+    if (this.setValid(index, this.isValid(value))) {
+      this.setValue(index, value, childTypeId);
+    }
+    return this;
+  }
+  setValue(index, value, childTypeId) {
+    this._typeIds.set(index, childTypeId);
+    const childIndex = this.type.typeIdToChildIndex[childTypeId];
+    const child = this.children[childIndex];
+    child === null || child === void 0 ? void 0 : child.set(index, value);
+  }
+  addChild(child, name = `${this.children.length}`) {
+    const childTypeId = this.children.push(child);
+    const { type: { children: children2, mode, typeIds } } = this;
+    const fields = [...children2, new Field2(name, child.type)];
+    this.type = new Union_(mode, [...typeIds, childTypeId], fields);
+    return childTypeId;
+  }
+  /** @ignore */
+  // @ts-ignore
+  _valueToChildTypeId(builder, value, offset) {
+    throw new Error(`Cannot map UnionBuilder value to child typeId. Pass the \`childTypeId\` as the second argument to unionBuilder.append(), or supply a \`valueToChildTypeId\` function as part of the UnionBuilder constructor options.`);
+  }
+}
+class SparseUnionBuilder extends UnionBuilder {
+}
+class DenseUnionBuilder extends UnionBuilder {
+  constructor(options) {
+    super(options);
+    this._offsets = new DataBufferBuilder(new Int32Array(0));
+  }
+  /** @ignore */
+  setValue(index, value, childTypeId) {
+    const id2 = this._typeIds.set(index, childTypeId).buffer[index];
+    const child = this.getChildAt(this.type.typeIdToChildIndex[id2]);
+    const denseIndex = this._offsets.set(index, child.length).buffer[index];
+    child === null || child === void 0 ? void 0 : child.set(denseIndex, value);
+  }
+}
+class Utf8Builder extends VariableWidthBuilder {
+  constructor(opts) {
+    super(opts);
+    this._values = new BufferBuilder(new Uint8Array(0));
+  }
+  get byteLength() {
+    let size = this._pendingLength + this.length * 4;
+    this._offsets && (size += this._offsets.byteLength);
+    this._values && (size += this._values.byteLength);
+    this._nulls && (size += this._nulls.byteLength);
+    return size;
+  }
+  setValue(index, value) {
+    return super.setValue(index, encodeUtf8(value));
+  }
+  // @ts-ignore
+  _flushPending(pending, pendingLength) {
+  }
+}
+Utf8Builder.prototype._flushPending = BinaryBuilder.prototype._flushPending;
+class GetBuilderCtor extends Visitor {
+  visitNull() {
+    return NullBuilder;
+  }
+  visitBool() {
+    return BoolBuilder;
+  }
+  visitInt() {
+    return IntBuilder;
+  }
+  visitInt8() {
+    return Int8Builder;
+  }
+  visitInt16() {
+    return Int16Builder;
+  }
+  visitInt32() {
+    return Int32Builder;
+  }
+  visitInt64() {
+    return Int64Builder;
+  }
+  visitUint8() {
+    return Uint8Builder;
+  }
+  visitUint16() {
+    return Uint16Builder;
+  }
+  visitUint32() {
+    return Uint32Builder;
+  }
+  visitUint64() {
+    return Uint64Builder;
+  }
+  visitFloat() {
+    return FloatBuilder;
+  }
+  visitFloat16() {
+    return Float16Builder;
+  }
+  visitFloat32() {
+    return Float32Builder;
+  }
+  visitFloat64() {
+    return Float64Builder;
+  }
+  visitUtf8() {
+    return Utf8Builder;
+  }
+  visitBinary() {
+    return BinaryBuilder;
+  }
+  visitFixedSizeBinary() {
+    return FixedSizeBinaryBuilder;
+  }
+  visitDate() {
+    return DateBuilder;
+  }
+  visitDateDay() {
+    return DateDayBuilder;
+  }
+  visitDateMillisecond() {
+    return DateMillisecondBuilder;
+  }
+  visitTimestamp() {
+    return TimestampBuilder;
+  }
+  visitTimestampSecond() {
+    return TimestampSecondBuilder;
+  }
+  visitTimestampMillisecond() {
+    return TimestampMillisecondBuilder;
+  }
+  visitTimestampMicrosecond() {
+    return TimestampMicrosecondBuilder;
+  }
+  visitTimestampNanosecond() {
+    return TimestampNanosecondBuilder;
+  }
+  visitTime() {
+    return TimeBuilder;
+  }
+  visitTimeSecond() {
+    return TimeSecondBuilder;
+  }
+  visitTimeMillisecond() {
+    return TimeMillisecondBuilder;
+  }
+  visitTimeMicrosecond() {
+    return TimeMicrosecondBuilder;
+  }
+  visitTimeNanosecond() {
+    return TimeNanosecondBuilder;
+  }
+  visitDecimal() {
+    return DecimalBuilder;
+  }
+  visitList() {
+    return ListBuilder;
+  }
+  visitStruct() {
+    return StructBuilder;
+  }
+  visitUnion() {
+    return UnionBuilder;
+  }
+  visitDenseUnion() {
+    return DenseUnionBuilder;
+  }
+  visitSparseUnion() {
+    return SparseUnionBuilder;
+  }
+  visitDictionary() {
+    return DictionaryBuilder;
+  }
+  visitInterval() {
+    return IntervalBuilder;
+  }
+  visitIntervalDayTime() {
+    return IntervalDayTimeBuilder;
+  }
+  visitIntervalYearMonth() {
+    return IntervalYearMonthBuilder;
+  }
+  visitFixedSizeList() {
+    return FixedSizeListBuilder;
+  }
+  visitMap() {
+    return MapBuilder;
+  }
+}
+const instance$2 = new GetBuilderCtor();
 class TypeComparator extends Visitor {
   compareSchemas(schema, other) {
     return schema === other || other instanceof schema.constructor && this.compareManyFields(schema.fields, other.fields);
@@ -32238,6 +33165,124 @@ const instance$1 = new TypeComparator();
 function compareSchemas(schema, other) {
   return instance$1.compareSchemas(schema, other);
 }
+function compareTypes(type, other) {
+  return instance$1.visit(type, other);
+}
+function makeBuilder(options) {
+  const type = options.type;
+  const builder = new (instance$2.getVisitFn(type)())(options);
+  if (type.children && type.children.length > 0) {
+    const children2 = options["children"] || [];
+    const defaultOptions = { "nullValues": options["nullValues"] };
+    const getChildOptions = Array.isArray(children2) ? (_, i) => children2[i] || defaultOptions : ({ name }) => children2[name] || defaultOptions;
+    for (const [index, field] of type.children.entries()) {
+      const { type: type2 } = field;
+      const opts = getChildOptions(field, index);
+      builder.children.push(makeBuilder(Object.assign(Object.assign({}, opts), { type: type2 })));
+    }
+  }
+  return builder;
+}
+function vectorFromArray(init2, type) {
+  if (init2 instanceof Data || init2 instanceof Vector || init2.type instanceof DataType || ArrayBuffer.isView(init2)) {
+    return makeVector(init2);
+  }
+  const options = { type: type !== null && type !== void 0 ? type : inferType(init2), nullValues: [null] };
+  const chunks = [...builderThroughIterable(options)(init2)];
+  const vector = chunks.length === 1 ? chunks[0] : chunks.reduce((a, b) => a.concat(b));
+  if (DataType.isDictionary(vector.type)) {
+    return vector.memoize();
+  }
+  return vector;
+}
+function inferType(value) {
+  if (value.length === 0) {
+    return new Null$1();
+  }
+  let nullsCount = 0;
+  let arraysCount = 0;
+  let objectsCount = 0;
+  let numbersCount = 0;
+  let stringsCount = 0;
+  let bigintsCount = 0;
+  let booleansCount = 0;
+  let datesCount = 0;
+  for (const val of value) {
+    if (val == null) {
+      ++nullsCount;
+      continue;
+    }
+    switch (typeof val) {
+      case "bigint":
+        ++bigintsCount;
+        continue;
+      case "boolean":
+        ++booleansCount;
+        continue;
+      case "number":
+        ++numbersCount;
+        continue;
+      case "string":
+        ++stringsCount;
+        continue;
+      case "object":
+        if (Array.isArray(val)) {
+          ++arraysCount;
+        } else if (Object.prototype.toString.call(val) === "[object Date]") {
+          ++datesCount;
+        } else {
+          ++objectsCount;
+        }
+        continue;
+    }
+    throw new TypeError("Unable to infer Vector type from input values, explicit type declaration expected.");
+  }
+  if (numbersCount + nullsCount === value.length) {
+    return new Float64();
+  } else if (stringsCount + nullsCount === value.length) {
+    return new Dictionary(new Utf8$1(), new Int32());
+  } else if (bigintsCount + nullsCount === value.length) {
+    return new Int64$1();
+  } else if (booleansCount + nullsCount === value.length) {
+    return new Bool$1();
+  } else if (datesCount + nullsCount === value.length) {
+    return new DateMillisecond();
+  } else if (arraysCount + nullsCount === value.length) {
+    const array2 = value;
+    const childType = inferType(array2[array2.findIndex((ary) => ary != null)]);
+    if (array2.every((ary) => ary == null || compareTypes(childType, inferType(ary)))) {
+      return new List$1(new Field2("", childType, true));
+    }
+  } else if (objectsCount + nullsCount === value.length) {
+    const fields = /* @__PURE__ */ new Map();
+    for (const row of value) {
+      for (const key of Object.keys(row)) {
+        if (!fields.has(key) && row[key] != null) {
+          fields.set(key, new Field2(key, inferType([row[key]]), true));
+        }
+      }
+    }
+    return new Struct([...fields.values()]);
+  }
+  throw new TypeError("Unable to infer Vector type from input values, explicit type declaration expected.");
+}
+function builderThroughIterable(options) {
+  const { ["queueingStrategy"]: queueingStrategy = "count" } = options;
+  const { ["highWaterMark"]: highWaterMark = queueingStrategy !== "bytes" ? Number.POSITIVE_INFINITY : Math.pow(2, 14) } = options;
+  const sizeProperty = queueingStrategy !== "bytes" ? "length" : "byteLength";
+  return function* (source) {
+    let numChunks = 0;
+    const builder = makeBuilder(options);
+    for (const value of source) {
+      if (builder.append(value)[sizeProperty] >= highWaterMark) {
+        ++numChunks && (yield builder.toVector());
+      }
+    }
+    if (builder.finish().length > 0 || numChunks === 0) {
+      yield builder.toVector();
+    }
+  };
+}
 function distributeVectorsIntoRecordBatches(schema, vecs) {
   return uniformlyDistributeChunksAcrossRecordBatches(schema, vecs.map((v) => v.data.concat()));
 }
@@ -32312,7 +33357,7 @@ class Table {
     if (args[0] instanceof Schema2) {
       schema = args.shift();
     }
-    if (args[args.length - 1] instanceof Uint32Array) {
+    if (args.at(-1) instanceof Uint32Array) {
       offsets = args.pop();
     }
     const unwrap = (x) => {
@@ -32434,7 +33479,7 @@ class Table {
    */
   [Symbol.iterator]() {
     if (this.batches.length > 0) {
-      return instance$3.visit(new Vector(this.data));
+      return instance$4.visit(new Vector(this.data));
     }
     return new Array(0)[Symbol.iterator]();
   }
@@ -32573,10 +33618,10 @@ Table[_a$1] = ((proto) => {
   proto._nullCount = -1;
   proto[Symbol.isConcatSpreadable] = true;
   proto["isValid"] = wrapChunkedCall1(isChunkedValid);
-  proto["get"] = wrapChunkedCall1(instance$5.getVisitFn(Type$1.Struct));
-  proto["set"] = wrapChunkedCall2(instance$6.getVisitFn(Type$1.Struct));
-  proto["indexOf"] = wrapChunkedIndexOf(instance$4.getVisitFn(Type$1.Struct));
-  proto["getByteLength"] = wrapChunkedCall1(instance$2.getVisitFn(Type$1.Struct));
+  proto["get"] = wrapChunkedCall1(instance$6.getVisitFn(Type$1.Struct));
+  proto["set"] = wrapChunkedCall2(instance$7.getVisitFn(Type$1.Struct));
+  proto["indexOf"] = wrapChunkedIndexOf(instance$5.getVisitFn(Type$1.Struct));
+  proto["getByteLength"] = wrapChunkedCall1(instance$3.getVisitFn(Type$1.Struct));
   return "Table";
 })(Table.prototype);
 var _a;
@@ -32656,7 +33701,7 @@ let RecordBatch$2 = class RecordBatch {
    * @param index The index of the element to read.
    */
   get(index) {
-    return instance$5.visit(this.data, index);
+    return instance$6.visit(this.data, index);
   }
   /**
    * Set a row by position.
@@ -32664,7 +33709,7 @@ let RecordBatch$2 = class RecordBatch {
    * @param value The value to set.
    */
   set(index, value) {
-    return instance$6.visit(this.data, index, value);
+    return instance$7.visit(this.data, index, value);
   }
   /**
    * Retrieve the index of the first occurrence of a row in an RecordBatch.
@@ -32672,20 +33717,20 @@ let RecordBatch$2 = class RecordBatch {
    * @param offset The index at which to begin the search. If offset is omitted, the search starts at index 0.
    */
   indexOf(element, offset) {
-    return instance$4.visit(this.data, element, offset);
+    return instance$5.visit(this.data, element, offset);
   }
   /**
    * Get the size (in bytes) of a row by index.
    * @param index The row index for which to compute the byteLength.
    */
   getByteLength(index) {
-    return instance$2.visit(this.data, index);
+    return instance$3.visit(this.data, index);
   }
   /**
    * Iterator for rows in this RecordBatch.
    */
   [Symbol.iterator]() {
-    return instance$3.visit(new Vector([this.data]));
+    return instance$4.visit(new Vector([this.data]));
   }
   /**
    * Return a JavaScript Array of the RecordBatch rows.
@@ -33444,7 +34489,7 @@ function typeFromJSON(f, children2) {
   }
   throw new Error(`Unrecognized type: "${typeId}"`);
 }
-var Builder2 = Builder$2;
+var Builder3 = Builder$2;
 var ByteBuffer2 = ByteBuffer$2;
 class Message2 {
   /** @nocollapse */
@@ -33466,7 +34511,7 @@ class Message2 {
   }
   /** @nocollapse */
   static encode(message) {
-    const b = new Builder2();
+    const b = new Builder3();
     let headerOffset = -1;
     if (message.isSchema()) {
       headerOffset = Schema2.encode(b, message.header());
@@ -34277,15 +35322,11 @@ class AsyncRecordBatchStreamReader extends RecordBatchReader {
     return __awaiter(this, void 0, void 0, function* () {
       const batches = new Array();
       try {
-        for (var _d2 = true, _e2 = __asyncValues(this), _f2; _f2 = yield _e2.next(), _a2 = _f2.done, !_a2; ) {
+        for (var _d2 = true, _e2 = __asyncValues(this), _f2; _f2 = yield _e2.next(), _a2 = _f2.done, !_a2; _d2 = true) {
           _c2 = _f2.value;
           _d2 = false;
-          try {
-            const batch = _c2;
-            batches.push(batch);
-          } finally {
-            _d2 = true;
-          }
+          const batch = _c2;
+          batches.push(batch);
         }
       } catch (e_1_1) {
         e_1 = { error: e_1_1 };
@@ -35380,7 +36421,7 @@ class Dataset {
     if (plot.tileProxy) {
       options["tileProxy"] = plot.tileProxy;
     }
-    return new QuadtileSet(url, plot, options);
+    return new QuadtileDataset(url, plot, options);
   }
   /**
    * Generate an ArrowDataset from a single Arrow table.
@@ -35644,7 +36685,7 @@ class ArrowDataset extends Dataset {
     return;
   }
 }
-class QuadtileSet extends Dataset {
+class QuadtileDataset extends Dataset {
   constructor(base_url, plot, options = {}) {
     super(plot);
     this._download_queue = /* @__PURE__ */ new Set();
@@ -36913,7 +37954,7 @@ function isComposition(elems) {
   if (!elems.length)
     return false;
   const op = elems[0];
-  return ["AND", "OR", "XOR", "NOT"].indexOf(op) > -1;
+  return ["AND", "OR", "XOR", "NOT", "ANY", "ALL"].indexOf(op) == 0;
 }
 async function extractBitmask(tile, arg) {
   if (isComposition(arg)) {
@@ -36924,29 +37965,49 @@ async function extractBitmask(tile, arg) {
   }
 }
 async function applyCompositeFunctionToTile(tile, args) {
-  if (isUnarySelectParam(args)) {
+  args[0];
+  if (args[0] === "NOT") {
     const bitmask = await extractBitmask(tile, args[1]);
-    if (args[0] === "NOT") {
-      return bitmask.not();
+    return bitmask.not();
+  } else if (isBinarySelectParam(args)) {
+    const [op, arg1, arg2] = args;
+    const bitmask1 = await extractBitmask(tile, arg1);
+    const bitmask2 = await extractBitmask(tile, arg2);
+    if (op === "AND") {
+      return bitmask1.and(bitmask2);
+    } else if (op === "OR") {
+      return bitmask1.or(bitmask2);
+    } else if (op === "XOR") {
+      return bitmask1.xor(bitmask2);
     } else {
-      throw new Error("Unknown unary operation");
+      throw new Error("Unknown binary operation");
     }
+  } else if (isPluralSelectParam(args)) {
+    const op = args[0];
+    const bitmasks = await Promise.all(args.slice(1).map((arg) => extractBitmask(tile, arg)));
+    const accumulated = bitmasks.slice(1).reduce((previousValue, currentValue) => {
+      switch (op) {
+        case "ALL":
+          return previousValue.and(currentValue);
+        case "ANY":
+          return previousValue.or(currentValue);
+        case "NONE":
+          return previousValue.or(currentValue);
+      }
+    }, bitmasks[0]);
+    if (op === "NONE")
+      return accumulated.not();
+    return accumulated;
   }
-  const [op, arg1, arg2] = args;
-  const bitmask1 = await extractBitmask(tile, arg1);
-  const bitmask2 = await extractBitmask(tile, arg2);
-  if (op === "AND") {
-    return bitmask1.and(bitmask2);
-  } else if (op === "OR") {
-    return bitmask1.or(bitmask2);
-  } else if (op === "XOR") {
-    return bitmask1.xor(bitmask2);
-  } else {
-    throw new Error("Unknown binary operation");
-  }
+  console.error("UNABLE TO PARSE", args);
+  throw new Error("UNABLE TO PARSE");
 }
-function isUnarySelectParam(params) {
-  const things = /* @__PURE__ */ new Set(["NOT"]);
+function isPluralSelectParam(params) {
+  const things = /* @__PURE__ */ new Set(["ANY", "ALL", "NONE"]);
+  return things.has(params[0]);
+}
+function isBinarySelectParam(params) {
+  const things = /* @__PURE__ */ new Set(["AND", "OR", "XOR", "NAND"]);
   return things.has(params[0]);
 }
 function isFunctionSelectParam(params) {
@@ -37012,6 +38073,7 @@ class DataSelection {
     this.selectionSize = 0;
     this.evaluationSetSize = 0;
     this.tiles = [];
+    this.composition = null;
     this.events = {};
     this.plot = plot;
     this.dataset = plot.dataset;
@@ -37021,6 +38083,7 @@ class DataSelection {
     this.ready = new Promise((resolve, reject) => {
       markReady = resolve;
     });
+    this.composition = null;
     if (isIdSelectParam(params)) {
       this.add_identifier_column(params.name, params.ids, params.idField).then(markReady);
     } else if (isBooleanColumnParam(params)) {
@@ -37029,6 +38092,7 @@ class DataSelection {
       this.add_function_column(params.name, params.tileFunction).then(markReady);
     } else if (isCompositeSelectParam(params)) {
       const { name, composition } = params;
+      this.composition = composition;
       this.add_function_column(name, async (tile) => {
         const bitmask = await applyCompositeFunctionToTile(tile, composition);
         return bitmask.to_arrow();
@@ -37400,6 +38464,37 @@ function stringmatcher(field, matches) {
     return bitmask.to_arrow();
   };
 }
+let currentDictNumber = 7540;
+function dictionaryFromArrays(labels, indices) {
+  const labelsArrow = vectorFromArray(labels, new Utf8$1());
+  if (indices === void 0) {
+    return (indices2) => createDictionaryWithVector(labelsArrow, indices2);
+  }
+  return createDictionaryWithVector(labelsArrow, indices);
+}
+function createDictionaryWithVector(labelsArrow, indices) {
+  let t;
+  if (indices[Symbol.toStringTag] === `Int8Array`) {
+    t = new Int8();
+  } else if (indices[Symbol.toStringTag] === `Int16Array`) {
+    t = new Int16();
+  } else if (indices[Symbol.toStringTag] === `Int32Array`) {
+    t = new Int32();
+  } else {
+    throw new Error(
+      "values must be an array of signed integers, 32 bit or smaller."
+    );
+  }
+  const type = new Dictionary(labelsArrow.type, t, currentDictNumber++, false);
+  const returnval = makeVector({
+    type,
+    length: indices.length,
+    nullCount: 0,
+    data: indices,
+    dictionary: labelsArrow
+  });
+  return returnval;
+}
 const default_background_options = {
   color: "gray",
   opacity: [0.2, 1],
@@ -37448,6 +38543,9 @@ class Scatterplot {
   constructor(selector2, width, height, options = {}) {
     this.secondary_renderers = {};
     this.selection_history = [];
+    this.util = {
+      dictionaryFromArrays
+    };
     this.plot_queue = Promise.resolve();
     this.hooks = {};
     this.mark_ready = function() {
@@ -38118,6 +39216,10 @@ class Scatterplot {
     this.drawContours(data);
   }
 }
+Scatterplot.Bitmask = Bitmask;
+Scatterplot.ArrowDataset = ArrowDataset;
+Scatterplot.QuadtileDataset = QuadtileDataset;
+Scatterplot.DataSelection = DataSelection;
 class SettableFunction {
   constructor(plot) {
     this.string_rep = "";

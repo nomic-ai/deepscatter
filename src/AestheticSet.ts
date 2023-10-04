@@ -2,7 +2,7 @@
 import type { Regl, Texture2D } from 'regl';
 import { ConcreteAesthetic, dimensions } from './StatefulAesthetic';
 import type Scatterplot from './deepscatter';
-import type { Dataset, QuadtileSet } from './Dataset';
+import type { Dataset, QuadtileDataset } from './Dataset';
 import { StatefulAesthetic } from './StatefulAesthetic';
 import { Aesthetic } from './Aesthetic';
 import type { Tile } from './tile';

@@ -6,7 +6,7 @@ import type { Tile } from './tile';
 import type Zoom from './interaction';
 import type { AestheticSet } from './AestheticSet';
 import { timer, Timer } from 'd3-timer';
-import { Dataset, QuadtileSet } from './Dataset';
+import { Dataset, QuadtileDataset } from './Dataset';
 
 class PlotSetting {
   start: number;

@@ -1,12 +1,19 @@
+# 2.14.1
+- Add exports of QuadtileDataset, ArrowDataset, Bitmask, and DataSelection classes as static methods
+  on core deepscatter object. In a future major release, these may become named exports: for now 
+  Scatterplot is staying the one and only default export for back-compatabiility.
+- Improve Bitmask class to include ANY and ALL compositors in selections, misc small fixes.
 # 2.14.0
-
-- Allow defining transformation functions by points, not just record batches, for convenience.
+- Allow defining transformation functions by points, not just record batches, 
+  so that you can define new functions without knowing the Apache Arrow spec front to back.
+- Create new function at deepscatter.utils.createDictionaryWithVector for use inside transformations that 
+  need to return a dictionary. This is unfortunately complicated, because utf-8 serialization and deserialization is an Arrow achilles heel. I've designed the function to be [curryable](https://en.wikipedia.org/wiki/Currying) so that an initial dictionary set can be used multiple times without incurring huge deserialization costs.
+- Bump Arrow to 13.0.0
 - Fix for bugs in domains.
 - Update dataset methods to allow instantiating from an arrow table represented
   as a Uint8Array, which is simpler and avoids some conflicts in Apache Arrow versions.
 - Allow creating a dataset in the constructor, before the initial
-  plotAPI call,
-  which allows more
+  plotAPI call,  which allows more
   precise staging of data and allows access to most dataset capabilities without binding to the DOM.
 - Support for Arrow Boolean types in transformations/selections.
 - New `Bitmask` type wrapping Boolean arrays on batches
