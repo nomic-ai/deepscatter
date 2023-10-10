@@ -143,7 +143,7 @@ export abstract class Aesthetic<
       return [1, 1];
     }
     if (column.type?.dictionary !== undefined) {
-      return [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
+      return [-2047, Math.floor(this.aesthetic_map.texture_size / 2)];
     }
     const domain = this.dataset.domain(this.field);
     return this.dataset.domain(this.field);
@@ -158,7 +158,7 @@ export abstract class Aesthetic<
 
   get webGLDomain() {
     if (this.is_dictionary()) {
-      return [-2047, 2047];
+      return [-2047, 2048];
     }
     return this.domain;
   }

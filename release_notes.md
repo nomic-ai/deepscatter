@@ -1,3 +1,10 @@
+# 2.14.2
+
+- Fix off-by-one bug in color schemes affecting legend appearance for more than 2,048 categories.
+  Because of variable rules around floating point precision, the number of categories you can display will vary
+  depending on hardware implementations of the WebGL standard;
+  The maximum number of points on my browser (M1 Pro macbook) is about 44,000.
+
 # 2.14.1
 - Add exports of QuadtileDataset, ArrowDataset, Bitmask, and DataSelection classes as static methods
   on core deepscatter object. In a future major release, these may become named exports: for now 

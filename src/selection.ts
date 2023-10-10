@@ -54,7 +54,8 @@ function isBooleanColumnParam(
     ]
   ]
 ]
- */
+*/
+
 type PluralOperation = "ANY" | "ALL" | "NONE"
 type BinaryOperation = "AND" | "OR" | "XOR"
 type UnaryOperation = "NOT"

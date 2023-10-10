@@ -340,7 +340,7 @@ export type APICall = {
   background_color?: string;
 
   // 
-  transformations: Record<string, string>;
+  transformations?: Record<string, string>;
   encoding?: Encoding;
   labels?: Labelcall;
   background_options?: BackgroundOptions;

@@ -1268,7 +1268,6 @@ export class TileBufferManager<T extends Tile> {
       const buffer = new Float32Array(tile.record_batch.numRows);
       const source_buffer = column.data[0];
 
-      
       if (column.type['dictionary']) {
         // We set the dictionary values down by 2047 so that we can use
         // even half-precision floats for direct indexing.
