@@ -15,7 +15,9 @@ import type { Tile } from './tile';
 import REGL from 'regl';
 import { Dataset } from './Dataset';
 import Scatterplot from './deepscatter';
-import { Bool, Data, Dictionary, Float, Int, StructRowProxy, Timestamp, Utf8, Vector } from 'apache-arrow';
+import { Bool, Data, Dictionary, Float, Int, StructRowProxy, Timestamp, Type, Utf8, Vector } from 'apache-arrow';
+import { StatefulAesthetic } from './StatefulAesthetic';
+import { Color } from './ColorAesthetic';
 
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer<T extends Tile> extends Renderer<T> {
@@ -99,32 +101,6 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     return this;
   }
 
-  /* 
-  apply_webgl_scale() {
-  // Should probably be attached to AestheticSet, not to this class.
-
-  // The webgl transform can either be 'literal', in which case it uses
-  // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
-  // in which case it has to calculate off of the x and y dimensions.
-
-    this._use_scale_to_download_tiles = true;
-    if (
-      (this.aes.encoding.x.transform && this.aes.encoding.x.transform !== 'literal')
-    || (this.aes.encoding.y.transform && this.aes.encoding.y.transform !== 'literal')
-    ) {
-      const webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat();
-      this._webgl_scale_history.unshift(webglscale);
-      this._use_scale_to_download_tiles = false;
-    } else {
-      if (!this._webgl_scale_history) {
-        this._webgl_scale_history = [];
-      }
-      // Use the default linked to the coordinates used to build the tree.
-      this._webgl_scale_history.unshift(this.default_webgl_scale);
-    }
-  }
-  */
-
   get props() {
     // Stuff needed for regl.
 
@@ -136,7 +112,15 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       buffer_num_to_variable,
       variable_to_buffer_num,
     } = this;
-    const { transform } = this.zoom as Zoom;
+    const { transform } = this.zoom;
+    const colorScales = this.aes.dim('color');
+    const [currentColor, lastColor] = [colorScales.current as Color, colorScales.last as Color];
+    // This allows us to wrap categorical scales according to the number
+    // of categories.
+    const wrap_colors_after = [
+      lastColor.colorscheme_size,
+      currentColor.colorscheme_size
+    ] as [number, number];
     const props = {
       // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
@@ -153,6 +137,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       string_index: 0,
       prefs: JSON.parse(JSON.stringify(prefs)) as DS.APICall,
       color_type: undefined,
+      wrap_colors_after,
       start_time: this.most_recent_restart,
       webgl_scale: this._webgl_scale_history[0],
       last_webgl_scale: this._webgl_scale_history[1],
@@ -846,6 +831,12 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
           // Other values plot a specific value of the color-encoded field.
           return -2;
         },
+        u_wrap_colors_after: (_, { wrap_colors_after }) => {
+          if (wrap_colors_after === undefined) {
+            throw new Error('wrap_colors_after is undefined');
+          }
+          return wrap_colors_after
+        },
         u_use_glyphset: (_, { prefs }) => (prefs.glyph_set ? 1 : 0),
         u_glyphset: (_, { prefs }) => {
           if (prefs.glyph_set) {
@@ -871,9 +862,9 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
         u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
           ? this.aes.dim("color").last.constant
           : [-1, -1, -1]),*/
-        u_tile_id: (_, props) => props.tile_id,
-        u_width: ({ viewportWidth }) => viewportWidth,
-        u_height: ({ viewportHeight }) => viewportHeight,
+        u_tile_id: (_, props) => props.tile_id as number,
+        u_width: ({ viewportWidth }) => viewportWidth as number,
+        u_height: ({ viewportHeight }) => viewportHeight as number,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
         u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) =>
@@ -1264,18 +1255,17 @@ export class TileBufferManager<T extends Tile> {
       throw new Error(`Column ${key} has no type.`);
     }
     // Anything that isn't a single-precision float must be coerced to one.
-    if (!column.type || column.type.typeId !== 3) {
+    if (!column.type || column.type.typeId !== Type.Float32) {
       const buffer = new Float32Array(tile.record_batch.numRows);
       const source_buffer = column.data[0];
 
-      
       if (column.type['dictionary']) {
         // We set the dictionary values down by 2047 so that we can use
         // even half-precision floats for direct indexing.
         for (let i = 0; i < tile.record_batch.numRows; i++) {
-          buffer[i] = (source_buffer as Data<Dictionary<Utf8>>).values[i] - 2047;
+          buffer[i] = (source_buffer as Data<Dictionary<Utf8>>).values[i];
         }
-      } else if (column.type.typeId === 6) {
+      } else if (column.type.typeId === Type.Bool) {
         // Booleans are unpacked using arrow fundamentals unless we see
         // a reason to do it directly with bit operations (such as the null checks)
         // being expensive.

@@ -1,3 +1,4 @@
+import type * as DS from './shared.d'
 import {
   Aesthetic,
   X,
@@ -46,16 +47,15 @@ export class StatefulAesthetic<T extends Aesthetic> {
   public states: [T, T];
   public dataset: QuadtileDataset;
   public regl: Regl;
-  public scatterplot: Plot;
-  //  public current_encoding : Channel;
+  public scatterplot: DS.Plot;
   public needs_transitions = false;
   public aesthetic_map: TextureSet;
   constructor(
-    scatterplot: Plot,
+    scatterplot: DS.Plot,
     regl: Regl,
     dataset: QuadtileDataset,
     aesthetic_map: TextureSet,
-    Factory: Newable<T>
+    Factory: DS.Newable<T>
   ) {
     if (aesthetic_map === undefined) {
       throw new Error('Aesthetic map is undefined.');
@@ -76,7 +76,7 @@ export class StatefulAesthetic<T extends Aesthetic> {
         this.regl,
         this.dataset,
         this.aesthetic_map
-      ),
+      ) as unknown as T,
     ] as [T, T];
   }
 
@@ -88,7 +88,7 @@ export class StatefulAesthetic<T extends Aesthetic> {
     return this.states[1];
   }
 
-  update(encoding: BasicChannel | ConstantChannel) {
+  update(encoding: DS.BasicChannel | DS.ConstantChannel) {
     const stringy = JSON.stringify(encoding);
     // Overwrite the last version.
     if (

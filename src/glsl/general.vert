@@ -4,7 +4,7 @@ uniform float u_zoom_balance;
 uniform float u_tile_id;
 uniform float u_update_time;
 uniform float u_transition_duration;
-
+uniform vec2 u_wrap_colors_after;
 // Type of jitter.
 uniform float u_jitter;
 uniform float u_last_jitter;
@@ -491,7 +491,9 @@ vec2 box_muller(in float ix, in float seed) {
 
 /*************** END COLOR SCALES *******************************/
 
-float domainify(in vec2 domain, in float transform, in float attr, in bool clamped) {
+
+float domainify(in vec2 domain, in float transform, in float attr, in float overflow_behavior) {
+
 
   // Clamp an attribute into a domain, with an optional log or sqrt transform.
   if (transform == 2.) {
@@ -502,11 +504,16 @@ float domainify(in vec2 domain, in float transform, in float attr, in bool clamp
     domain = log(domain);
     attr = log(attr);
   }
-  if (clamped) {
+  if (overflow_behavior == 1.) {
+    // clamp
     return linstep(domain, attr);
-  } else {
-    return linscale(domain, attr);
   }
+  if (overflow_behavior == 2.) {
+    //wrap
+
+    return fract(linscale(domain, attr));
+  }
+  return linscale(domain, attr);
 }
 
 mat3 pixelspace_to_glspace;
@@ -538,7 +545,7 @@ float choose_and_run_filter(
     }
     if (u_filter_numeric.r < 0.5) {
       // Must be on a dictionary. Unreasonable assumption, maybe?
-      float frac_filter = linstep(vec2(-2047., 2047), a_filter);
+      float frac_filter = linstep(vec2(-0., 4096.), a_filter);
       float map_coords = (map_location + .5) / 32.;
       return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
     } else {
@@ -589,7 +596,7 @@ float texture_float_lookup(in vec2 domain,
     // Literal transforms aren't looked up, just returned as is.
     return attr;
   }
-  float inrange = domainify(domain, transform, attr, true);
+  float inrange = domainify(domain, transform, attr, 1.);
   if (texture_position > 0.5) {
     float y_pos = texture_position / 32. - 0.5 / 32.;
     vec4 encoded = texture2D(u_one_d_aesthetic_map, vec2(y_pos, inrange));
@@ -785,9 +792,14 @@ void run_color_fill(in float ease) {
     if (a_color_is_constant) {
       fill = vec4(u_color_constant.rgb, alpha);
     } else {
-      float fractional_color = linstep(u_color_domain, a_color);
       float color_pos = (u_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
-      fractional_color = domainify(u_color_domain, u_color_transform, a_color, true);
+      float overflow_behavior = 1.; // means--clamp
+      float fractional_color;
+      if (u_wrap_colors_after.y > 0.) {
+        fractional_color = fract(a_color / u_wrap_colors_after.y);
+      } else {
+        fractional_color = domainify(u_color_domain, u_color_transform, a_color, overflow_behavior);
+      }
       fill = texture2D(u_color_aesthetic_map , vec2(color_pos, fractional_color));
       fill = vec4(fill.rgb, alpha);
     }
@@ -798,7 +810,14 @@ void run_color_fill(in float ease) {
       } else {
         float last_fractional = linstep(u_last_color_domain, a_last_color);
         float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
-        last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, true);
+        float overflow_behavior = 1.; // means--clamp
+                
+        if (u_last_color_domain.y == 4096. && u_last_color_domain.x == 0.) {
+          // Assume we're in dictionary land. Unsafe, but whatever.
+          overflow_behavior = 2.;
+        }
+
+        last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, overflow_behavior);
         last_fill = texture2D(u_color_aesthetic_map, vec2(color_pos, last_fractional));
         // Alpha channel interpolation already happened.
         last_fill = vec4(last_fill.rgb, alpha);

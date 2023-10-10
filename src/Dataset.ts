@@ -13,16 +13,19 @@ import {
   makeVector,
   Float32,
   Int64,
-  makeData
+  Field,
+  List,
+  Int,
+  Float,
+  Utf8,
+  Uint64,
+  Type,
+  Uint8
 } from 'apache-arrow';
 import Scatterplot from './deepscatter';
 
-type APICall = DS.APICall;
 type Key = string;
 
-function nothing() {
-  /* do nothing */
-}
 type ArrowBuildable = DS.ArrowBuildable;
 type Transformation<T> = DS.Transformation<T>;
 
@@ -39,6 +42,7 @@ export abstract class Dataset<T extends Tile> {
   abstract get extent(): Rectangle;
   abstract promise: Promise<void>;
   private extents: Record<string, [number, number]> = {};
+  // A 3d identifier for the tile. Usually [z, x, y]
   public _ix_seed = 0;
   public _schema?: Schema;
   public tileProxy?: DS.TileProxy;
@@ -146,7 +150,7 @@ export abstract class Dataset<T extends Tile> {
    */
   static from_arrow_table(
     table: Table,
-    plot: DS.Plot
+    plot: Scatterplot<ArrowTile>
   ): ArrowDataset {
     return new ArrowDataset(table, plot);
   }
@@ -183,7 +187,7 @@ export abstract class Dataset<T extends Tile> {
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
-    const dim = this._schema?.fields.find((d) => d.name === dimension);
+    const dim = this._schema?.fields.find((d) => d.name === dimension) as Field<DS.SupportedArrowTypes>;
     if (dim !== undefined) {
       let min: number | string | undefined = undefined;
       let max: number | string | undefined = undefined;
@@ -200,17 +204,17 @@ export abstract class Dataset<T extends Tile> {
         max = JSON.parse(mmax) as number | string;
       }
       // Can pass min, max as strings for dates.
-      if (dim.type.typeId == 10 && typeof min === 'string') {
+      if (dim.type.typeId === 10 && typeof min === 'string') {
         min = Number(new Date(min));
       }
-      if (dim.type?.typeId == 10 && typeof max === 'string') {
+      if (dim.type.typeId === 10 && typeof max === 'string') {
         max = Number(new Date(max));
       }
       if (typeof max === 'string') {
         throw new Error('Failed to parse min-max as numbers');
       }
       if (min !== undefined) {
-        return (this.extents[dimension] = [min as number, max as number]);
+        return (this.extents[dimension] = [min as number, max]);
       }
     }
     return (this.extents[dimension] = extent([
@@ -221,7 +225,7 @@ export abstract class Dataset<T extends Tile> {
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {
     const stack: T[] = [this.root_tile];
-    let current;
+    let current : T;
     while ((current = stack.shift())) {
       if (
         current.download_state == 'Complete' &&
@@ -317,14 +321,18 @@ export abstract class Dataset<T extends Tile> {
     const tb = tableFromIPC(buffer);
     const records: Record<string, Float32Array> = {};
     for (const batch of tb.batches) {
-      const offsets = batch.getChild('data')!.data[0].valueOffsets;
-      const values = batch.getChild('data')!.data[0].children[0];
+      const data = batch.getChild('data').data[0];
+      if (data === null) {throw new Error('tiled columns must contain "data" field.')}
+      const offsets = data.valueOffsets ;
+      const values = data.children[0] as Data<List<Float32>>;
       for (let i = 0; i < batch.data.length; i++) {
         const tilename = batch.getChild('_tile').get(i) as string;
         records[tilename] = values.values.slice(
           offsets[i],
           offsets[i + 1]
-        ) as Float32Array;
+        // Type coercion necessary because Float[]
+        // and the backing Float32Array are not recognized as equivalent.
+        ) as unknown as Float32Array;
       }
     }
     this.transformations[field_name] = function (tile) {
@@ -377,7 +385,8 @@ export abstract class Dataset<T extends Tile> {
   /**
    * Given an ix, apply a transformation to the point at that index and
    * return the transformed point (not just the transformation, the whole point)
-   * This applies the transformaation to all other points in the same tile.
+   * As a side-effect, this applies the transformaation to all other
+   * points in the same tile.
    *
    * @param transformation The name of the transformation to apply
    * @param ix The index of the point to transform
@@ -389,14 +398,12 @@ export abstract class Dataset<T extends Tile> {
     if (matches.length == 0) {
       throw new Error(`No point for ix ${ix}`);
     }
-    const [tile, row] = matches[0];
+    const [tile, row, mid] = matches[0];
     // Check if the column exists; if so, return the row.
     if (tile.record_batch.getChild(transformation) !== null) {
       return row;
     }
     await tile.apply_transformation(transformation);
-    const ixcol = tile.record_batch.getChild('ix');
-    const mid = bisectLeft([...ixcol.data[0].values], ix);
     return tile.record_batch.get(mid);
   }
   /**
@@ -413,8 +420,8 @@ export abstract class Dataset<T extends Tile> {
    * @param ix The index of the point to get.
    * @returns A list of [tile, point] pairs that match the index.
    */
-  findPointRaw(ix: number): [Tile, StructRowProxy][] {
-    const matches: [Tile, StructRowProxy][] = [];
+  findPointRaw(ix: number): [Tile, StructRowProxy, number][] {
+    const matches: [Tile, StructRowProxy, number][] = [];
     this.visit((tile: T) => {
       if (
         !(
@@ -426,13 +433,11 @@ export abstract class Dataset<T extends Tile> {
       ) {
         return;
       }
-      const mid = bisectLeft(
-        [...tile.record_batch.getChild('ix')!.data[0].values],
-        ix
-      );
+      const ixcol = tile.record_batch.getChild('ix') as Vector<Int>;
+      const mid = bisectLeft(ixcol.toArray() as ArrayLike<number>, ix);
       const val = tile.record_batch.get(mid);
       if (val !== null && val.ix === ix) {
-        matches.push([tile, val]);
+        matches.push([tile, val, mid]);
       }
     });
     return matches;
@@ -442,10 +447,9 @@ export abstract class Dataset<T extends Tile> {
 export class ArrowDataset extends Dataset<ArrowTile> {
   public promise: Promise<void> = Promise.resolve();
   public root_tile: ArrowTile;
-
   constructor(table: Table, plot: Scatterplot<ArrowTile>) {
     super(plot);
-    this.root_tile = new ArrowTile(table, this, 0, plot);
+    this.root_tile = new ArrowTile(table, this, 0);
   }
 
   get extent() {
@@ -586,10 +590,10 @@ export class QuadtileDataset extends Dataset<QuadTile> {
     transformation: (ids: string[]) => Promise<Uint8Array>
   ): void {
     const macrotile_tasks: Record<string, Promise<void>> = {};
-    const records: Record<string, Float32Array | Uint8Array> = {};
+    const records: Record<string, ArrowBuildable> = {};
 
-    async function get_table(tile: QuadTile) {
-      const { key, macrotile } = tile;
+    async function get_table(tile: QuadTile)  {
+      const { macrotile } = tile;
       if (macrotile_tasks[macrotile] !== undefined) {
         return await macrotile_tasks[macrotile];
       } else {
@@ -597,14 +601,10 @@ export class QuadtileDataset extends Dataset<QuadTile> {
           (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
-              const offsets = batch.getChild('data')!.data[0].valueOffsets;
-              const values = batch.getChild('data')!.data[0].children[0];
+              const data = batch.getChild('data') as Vector<List<DS.SupportedArrowTypes>>
               for (let i = 0; i < batch.data.length; i++) {
                 const tilename = batch.getChild('_tile').get(i) as string;
-                records[tilename] = values.values.slice(
-                  offsets[i],
-                  offsets[i + 1]
-                ) as (Float32Array | Uint8Array);
+                records[tilename] = data.get(i)
               }
             }
             return;
@@ -693,11 +693,12 @@ export function add_or_delete_column(
         throw new Error(`Name ${field.name} already exists, can't add.`);
       }
     }
-    tb[field.name] = batch.getChild(field.name)!.data[0];
+    const current = batch.getChild(field.name);
+    const coldata = current.data[0] as Data;
+    tb[field.name] = coldata;
   }
   if (data === null) {
-    // Then it's dropped.
-    throw new Error(`Name ${field_name} doesn't exist, can't drop.`);
+    // should have already happened.
   }
   if (data === undefined) {
     throw new Error('Must pass data to bind_column');
@@ -707,10 +708,14 @@ export function add_or_delete_column(
       tb[field_name] = makeVector({ type: new Float32(), data, length: data.length }).data[0];
     } else if (data instanceof BigInt64Array) {
       tb[field_name] = makeVector({ type: new Int64(), data, length: data.length }).data[0];
-    } else if (data.data?.length > 0) {
+    } else if (data instanceof Uint8Array) {
+      tb[field_name] = makeVector({ type: new Uint8(), data, length: data.length }).data[0];
+    } else if ((data as Vector<DS.SupportedArrowTypes>).data.length > 0) {
       tb[field_name] = data.data[0];
     } else {
-      tb[field_name] = data as Data
+      console.warn(`Unknown data format object passed to add or remove columns--treating as Data, but this behavior is deprecated`, data)
+      // Stopgap--maybe somewhere there are 
+      tb[field_name] = data as unknown as Data
     }
   }
 
@@ -727,6 +732,7 @@ export function add_or_delete_column(
         newfield.metadata.set(k, v);
       }
     } else if (data !== null) {
+      // OK to be null, that means it should have been deleted.
       throw new Error('Error!');
     }
   }
@@ -739,18 +745,6 @@ export function add_or_delete_column(
       'created by deepscatter',
       new Date().toISOString()
     );
-  }
-  window.state = {
-    new_batch,
-    batch,
-    data,
-    tb
-  }
-  const old_names = batch.schema.fields.map(d => d.name)
-  window.old_batch = batch;
-  window.new_batch = new_batch;
-  for (const name of old_names) {
-    // console.log(name, new_batch.getChild(name))
   }
   return new_batch;
 }
@@ -773,27 +767,22 @@ function supplement_identifiers(
   // A quick lookup before performing a costly string decode.
   const updatedFloatArray = new Float32Array(batch.numRows);
 
-  const kfield = batch.getChild(key_field);
+  const kfield = batch.getChild(key_field) as Vector<Utf8 | Int64 | Uint64>;
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
   }
 
-  let keytype = 'string';
-  if (kfield?.type?.typeId === 2) {
-    keytype = 'bigint';
-  }
-
-  if (keytype === 'bigint') {
+  if (kfield.type.typeId === Type.Int64 || kfield.type.typeId === Type.Uint64) {
     for (let i = 0; i < batch.numRows; i++) {
       // the object coerces bigints to strings. We just live with that.
       const value = ids[String(kfield.get(i))];
       if (value !== undefined) {
-        updatedFloatArray[i] = value as number;
+        updatedFloatArray[i] = value;
       }
     }
     return updatedFloatArray;
   }
-
+  // 
   const hashtab = new Set();
 
   for (const item of Object.keys(ids)) {
@@ -805,7 +794,7 @@ function supplement_identifiers(
   const values = kfield.data[0].values;
   // For every identifier, look if it's in the id array.
   for (let i = 0; i < batch.numRows; i++) {
-    const code = values.slice(offsets[i], offsets[i + 1]);
+    const code = values.slice(offsets[i], offsets[i + 1]) as Uint8Array;
     const shortversion: string = code.slice(0, 4).join('');
     if (hashtab.has(shortversion)) {
       const stringtime = String.fromCharCode(...code);

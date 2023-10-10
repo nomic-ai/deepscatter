@@ -5,7 +5,6 @@ import {
   scaleSqrt,
   scaleLog,
   scaleIdentity,
-  scaleOrdinal,
 } from 'd3-scale';
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
@@ -14,13 +13,27 @@ import type { QuadtileDataset } from './Dataset';
 import { Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
+import type * as DS from './shared.d'
+
+interface NumericScale {
+  domain(v: [number, number]): void;
+  domain(v: undefined): NumericScale;
+  range(v: [number, number]): void;
+  range(v: undefined): NumericScale;
+  (v: number | string): number;
+}
+
+interface NumericScaleMaker {
+  () : () => NumericScale
+}
+
 export const scales = {
   sqrt: scaleSqrt,
   log: scaleLog,
   linear: scaleLinear,
   literal: scaleIdentity,
-} as const;
-import type * as DS from './shared.d'
+} as unknown as Record<DS.Transform, NumericScaleMaker>;
+
 
 // A channel is usually going to be one of these.
 // Only color channels are different
@@ -32,6 +45,8 @@ type DefaultChannel =
 
 type PossibleGLVals = number | [number, number, number];
 
+// d3 scales are quite powerful, but we only use a limited subset of their features.
+
 export abstract class Aesthetic<
   GlValueType extends PossibleGLVals = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
   JSValueType = number, // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red
@@ -40,8 +55,8 @@ export abstract class Aesthetic<
   public abstract default_range: [number, number];
   public abstract default_constant: JSValueType;
   public _constant?: JSValueType;
-  public abstract default_transform: 'log' | 'sqrt' | 'linear' | 'literal';
-  public _transform: 'log' | 'sqrt' | 'linear' | 'literal' | undefined;
+  public abstract default_transform: DS.Transform;
+  private _transform: DS.Transform = 'linear';
   public scatterplot: DS.Plot;
   public field: string | null = null;
   public regl: Regl;
@@ -49,7 +64,7 @@ export abstract class Aesthetic<
   public _domain?: [number, number];
   public _range: [number, number] | Uint8Array;
   public _func?: (d: string | number) => GlValueType;
-  public dataset: QuadtileDataset;
+  public dataset: DS.Dataset<any>;
   public partner: typeof this | null = null;
   public _textures: Record<string, Texture2D> = {};
   // cache of a d3 scale
@@ -61,7 +76,7 @@ export abstract class Aesthetic<
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
-    dataset: QuadtileDataset,
+    dataset: DS.Dataset<any>,
     aesthetic_map: TextureSet
   ) {
     this.aesthetic_map = aesthetic_map;
@@ -100,15 +115,13 @@ export abstract class Aesthetic<
     if (this._scale) {
       return this._scale;
     }
-    const { range } = this;
 
     if (this.is_dictionary()) {
-      console.warn('Dictionary scales only supported for colors');
-      const scale = scaleOrdinal().domain(this.domain);
-      return (this._scale = scale.range(this.range));
+      throw new Error('Dictionary scales only supported for colors');
     }
-    const scale = scales[this.transform]();
 
+    const scale = scales[this.transform]();
+    // TODO CONSTRUCTION
     scale.domain(this.domain).range(this.range);
 
     return (this._scale = scale);
@@ -143,7 +156,7 @@ export abstract class Aesthetic<
       return [1, 1];
     }
     if (column.type?.dictionary !== undefined) {
-      return [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
+      return [0, this.aesthetic_map.texture_size];
     }
     const domain = this.dataset.domain(this.field);
     return this.dataset.domain(this.field);
@@ -158,7 +171,7 @@ export abstract class Aesthetic<
 
   get webGLDomain() {
     if (this.is_dictionary()) {
-      return [-2047, 2047];
+      return [0, 4096];
     }
     return this.domain;
   }
@@ -292,7 +305,7 @@ export abstract class Aesthetic<
       this._range = encoding.range;
     }
 
-    this._transform = encoding.transform || undefined;
+    this._transform = encoding.transform ?? undefined;
   }
 
   encode_for_textures(range: [number, number]) {
@@ -349,7 +362,7 @@ export abstract class Aesthetic<
       typeof raw_func === 'string'
         ? lambda_to_function(parseLambdaString(raw_func))
         : raw_func;
-    this._func = func;
+    this._func = func as ((d: string | number) => GlValueType);
     return func;
   }
 
@@ -401,9 +414,9 @@ export abstract class Aesthetic<
 
 abstract class OneDAesthetic extends Aesthetic {
   constructor(
-    scatterplot: Plot,
+    scatterplot: DS.Plot,
     regl: Regl,
-    dataset: QuadtileDataset,
+    dataset: DS.Dataset<any>,
     aesthetic_map: TextureSet
   ) {
     super(scatterplot, regl, dataset, aesthetic_map);
@@ -431,12 +444,12 @@ export class Size extends OneDAesthetic {
   get default_range() {
     return [0, 1] as [number, number];
   }
-  default_transform: Transform = 'sqrt';
+  default_transform: DS.Transform = 'sqrt';
 }
 
 export abstract class PositionalAesthetic extends OneDAesthetic {
   constructor(
-    scatterplot: Plot,
+    scatterplot: DS.Plot,
     regl: Regl,
     tile: QuadtileDataset,
     map: TextureSet
@@ -446,7 +459,7 @@ export abstract class PositionalAesthetic extends OneDAesthetic {
   }
   default_range: [number, number] = [-1, 1];
   default_constant = 0;
-  default_transform: Transform = 'literal';
+  default_transform: DS.Transform = 'literal';
   _constant = 0;
   get range(): [number, number] {
     if (this._range) {
@@ -477,12 +490,12 @@ export class Y0 extends Y {}
 abstract class BooleanAesthetic extends Aesthetic<
   number,
   boolean,
-  BooleanChannel
+  DS.BooleanChannel
 > {
   constructor(
-    scatterplot: Plot,
+    scatterplot: DS.Plot,
     regl: Regl,
-    tile: QuadtileDataset,
+    tile: DS.Dataset<any>,
     map: TextureSet
   ) {
     super(scatterplot, regl, tile, map);
@@ -491,7 +504,7 @@ abstract class BooleanAesthetic extends Aesthetic<
     return a ? 1 : 0;
   }
 
-  update(encoding: BooleanChannel | null) {
+  update(encoding: DS.BooleanChannel | null) {
     super.update(encoding);
 
     if (
@@ -502,7 +515,7 @@ abstract class BooleanAesthetic extends Aesthetic<
     }
   }
 
-  ops_to_array(): OpArray {
+  ops_to_array(): DS.OpArray {
     const input = this.current_encoding;
     if (input === null) return [0, 0, 0];
     if (input === undefined) return [0, 0, 0];
@@ -515,7 +528,7 @@ abstract class BooleanAesthetic extends Aesthetic<
     if (input.op === 'between') {
       return [4, (input.b - input.a) / 2, (input.b + input.a) / 2];
     }
-    const val: OpArray = [
+    const val: DS.OpArray = [
       // Encoding of op as number.
       [null, 'lt', 'gt', 'eq'].indexOf(input.op),
       input.a,
@@ -533,7 +546,16 @@ abstract class BooleanAesthetic extends Aesthetic<
       return this.apply_op(point, channel);
     }
     if (isConstantChannel(channel)) {
-      return channel.constant !== 0;
+      // TODO: TS
+      if (channel.constant as unknown as number === 0) {
+        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers")
+        return false
+      }
+      if (channel.constant as unknown as number === 1) {
+        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers")
+        return true
+      }
+      return channel.constant;
     }
     if (isLambdaChannel(channel)) {
       if (this._func === undefined) {
@@ -551,7 +573,7 @@ abstract class BooleanAesthetic extends Aesthetic<
     return true;
   }
 
-  apply_op(point: Datum, channel: OpChannel): boolean {
+  apply_op(point: Datum, channel: DS.OpChannel): boolean {
     const { op, a } = channel;
     const p = this.value_for(point) as number;
     if (p === null) {
@@ -584,10 +606,10 @@ abstract class BooleanAesthetic extends Aesthetic<
  */
 export class Foreground extends BooleanAesthetic {
   public current_encoding = null;
-  _constant = 1;
-  default_constant = 1;
+  _constant = true;
+  default_constant = true;
   default_range = [0, 1] as [number, number];
-  default_transform: Transform = 'literal';
+  default_transform: DS.Transform = 'literal';
   get active(): boolean {
     if (
       this.current_encoding === null ||
@@ -601,14 +623,14 @@ export class Foreground extends BooleanAesthetic {
 
 export class Filter extends BooleanAesthetic {
   public current_encoding = null;
-  _constant = 1;
-  default_constant = 1;
-  default_transform: Transform = 'literal';
+  _constant = true;
+  default_constant = true;
+  default_transform: DS.Transform = 'literal';
   default_range: [number, number] = [0, 1];
 }
 
 export class Jitter_speed extends OneDAesthetic {
-  default_transform: Transform = 'linear';
+  default_transform: DS.Transform = 'linear';
   default_range: [number, number] = [0, 1];
   public default_constant = 0.5;
   _constant = 0;
@@ -638,7 +660,7 @@ function encode_jitter_to_int(jitter: string) {
   return 0;
 }
 
-export class Jitter_radius extends Aesthetic<number, number, JitterChannel> {
+export class Jitter_radius extends Aesthetic<number, number, DS.JitterChannel> {
   _constant = 0;
 
   toGLType(a: number) {
@@ -648,19 +670,19 @@ export class Jitter_radius extends Aesthetic<number, number, JitterChannel> {
   get default_constant() {
     return 0;
   }
-  default_transform: Transform = 'linear';
+  default_transform: DS.Transform = 'linear';
 
   get default_range() {
     return [0, 1] as [number, number];
   }
 
-  public _method: JitterRadiusMethod = 'None';
+  public _method: DS.JitterRadiusMethod = 'None';
 
-  get method(): JitterRadiusMethod {
+  get method(): DS.JitterRadiusMethod {
     return this.current_encoding?.method ?? 'None';
   }
 
-  set method(value: string) {
+  set method(value: DS.JitterRadiusMethod) {
     this._method = value;
   }
 
@@ -686,7 +708,7 @@ function parseLambdaString(lambdastring: string) {
   };
 }
 
-function lambda_to_function(input: LambdaChannel): (d: any) => number {
+function lambda_to_function(input: DS.LambdaChannel): (d: any) => number {
   if (typeof input.lambda === 'function') {
     throw 'Must pass a string to lambda, not a function.';
   }
@@ -696,7 +718,7 @@ function lambda_to_function(input: LambdaChannel): (d: any) => number {
   }
   const cleaned = parseLambdaString(lambda).lambda;
   const [arg, code] = cleaned.split('=>', 2).map((d) => d.trim());
-  const func: (d: any) => number = new Function(arg, code);
+  const func = new Function(arg, code) as (d: any) => number;
   return func;
 }
 

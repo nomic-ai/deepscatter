@@ -1,7 +1,19 @@
+# 2.15.0
+
+This would be a bugfix release except that it's possible this might accidentally break code taking advantage of undocumented behavior involving the domain for categorical scales. If you've ever set a scale to have domain [-2047, 2047], the console will now throw a warning and autochange the extent to provide more sensible support for dictionary fields. 
+
+- Fix off-by-one bug in color schemes affecting legend appearance for more than 2,048 categories.
+  Because of variable rules around floating point precision, the number of categories you can display will vary
+  depending on hardware implementations of the WebGL standard;
+  The maximum number of points on my browser (M1 Pro macbook) is about 44,000.
+- Many typing improvements for typescript compliance.
+- Allow wrapping of dictionary colors in categorical scales.
+- Stop internally representing dictionary scales on the range [-2047, 2047], which was confusing and not necessary.
+
 # 2.14.1
 - Add exports of QuadtileDataset, ArrowDataset, Bitmask, and DataSelection classes as static methods
-  on core deepscatter object. In a future major release, these may become named exports: for now 
-  Scatterplot is staying the one and only default export for back-compatabiility.
+  on core deepscatter object. In a future release, these may become named exports: for now 
+  Scatterplot is staying the one and only export, as a default for back-compatabiility.
 - Improve Bitmask class to include ANY and ALL compositors in selections, misc small fixes.
 # 2.14.0
 - Allow defining transformation functions by points, not just record batches, 

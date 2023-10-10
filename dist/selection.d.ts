@@ -32,7 +32,7 @@ export interface CompositionSelectParams<T extends Tile> extends SelectParams {
     ]
   ]
 ]
- */
+*/
 declare type PluralOperation = "ANY" | "ALL" | "NONE";
 declare type BinaryOperation = "AND" | "OR" | "XOR";
 declare type UnaryOperation = "NOT";

@@ -1,3 +1,10 @@
+import type * as DS from './shared.d'
+import type {
+  RootChannel, OpChannel, ColorChannel,
+  ConstantChannel, LambdaChannel, Labelcall,
+  URLLabels, Labelset, 
+} from './shared.d'
+
 export function isOpChannel(input: RootChannel): input is OpChannel {
   return (input as OpChannel).op !== undefined;
 }

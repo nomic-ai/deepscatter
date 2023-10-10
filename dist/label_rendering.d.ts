@@ -3,8 +3,9 @@ import { Renderer } from './rendering';
 import { RBush3D } from 'rbush-3d';
 import Scatterplot from './deepscatter';
 import { Timer } from 'd3-timer';
+import type { Tile } from './tile';
 import type * as DS from './shared';
-export declare class LabelMaker extends Renderer {
+export declare class LabelMaker<T extends Tile> extends Renderer<T> {
     /**
      * A LabelMaker
      */

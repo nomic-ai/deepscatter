@@ -35,6 +35,7 @@
     return Number(d).toString();
   }
   let batch_no = 0;
+
   /* Clifford attractor frame.*/
   function batch(n_batches) {
     function make_batch(start = 0, length = 65536) {
@@ -44,8 +45,8 @@
 
       let x = new Float32Array(length);
       let y = new Float32Array(length);
-      let integers = new Float32Array(length);
-      let ix = new Float32Array(length);
+      let integers = new Int32Array(length);
+      let ix = new Uint32Array(length);
       let batch_id = new Float32Array(length).fill(batch_number_here);
       for (let i = start; i < start + length; i++) {
         ix[i - start] = i;
@@ -79,8 +80,9 @@
       });
     }
     const batches = [];
+    const SIZE = 65536
     for (let i = 0; i < n_batches; i++) {
-      const batch = make_batch(i * 65536, 65536);
+      const batch = make_batch(i * SIZE, SIZE);
       batches.push(batch);
       window.b = batch;
       console.log(i);
@@ -143,6 +145,7 @@
       },
     },
   });
+
   draw1.then(() => {
     for (let dim of ['filter', 'filter2', 'foreground']) {
       const id = document.getElementById(dim);
@@ -220,7 +223,7 @@
         encoding: {
           color: {
             field: "lowest_prime",
-            range: "category10"
+            range: 'dark2'
           }
         }
       })
@@ -228,7 +231,40 @@
 
     id.appendChild(button);
 
+    {
+      const id = document.getElementById("categorical");
+      // colorize by factors
+      const numbers = []
+      for (let i = 0; i < 1_000_000; i++) {
+        numbers.push("" + i)
+      }
 
+      let dictionaryBuilder = undefined
+      const button = document.createElement('button');
+      button.textContent = `Color by individual numbers as factors`;
+      plot.ready.then(() => {
+        if (dictionaryBuilder === undefined) {
+          // Curry up the numbers first to ensure we're always in the same dictionary.
+          dictionaryBuilder = plot.util.dictionaryFromArrays(numbers);
+        }
+        button.addEventListener('click', function () {
+          plot.dataset.transformations['dictionary number coloring'] = async function (tile) {
+            const num = await tile.get_column("integers");
+            console.log({ num })
+            return dictionaryBuilder(num.toArray())
+          }
+          plot.plotAPI({
+            encoding: {
+              color: {
+                field: "dictionary number coloring",
+                range: 'category10'
+              }
+            }
+          })
+        })
+      })
+      id.appendChild(button);
+    }
   });
   window.plot = plot;
   const functions = {

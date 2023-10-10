@@ -5632,7 +5632,7 @@ class Zoom {
     }
     const els = select(div).selectAll("div.tooltip").data(points).join(
       (enter) => enter.append("div").attr("class", "tooltip").style("top", 0).style("left", 0).style("position", "absolute").style("z-index", 100).style("border-radius", "8px").style("padding", "10px").style("background", "ivory").style("opacity", opacity),
-      (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)),
+      (update) => update.html((d) => this.scatterplot.tooltip_html(d.data, this.scatterplot)),
       (exit) => exit.call((e) => e.remove())
     );
     els.html((d) => this.scatterplot.tooltip_html(d.data, this)).style("transform", (d) => {
@@ -15816,6 +15816,7 @@ class Renderer {
   visible_tiles() {
     const { max_ix } = this;
     const { dataset: tileSet } = this;
+    this.aes.dim("x");
     const natural_display = this.aes.dim("x").current.field == "x" && this.aes.dim("y").current.field == "y" && this.aes.dim("x").last.field == "x" && this.aes.dim("y").last.field == "y";
     const all_tiles = natural_display ? tileSet.map((d) => d).filter((tile) => {
       const visible = tile.is_visible(
@@ -15842,7 +15843,7 @@ uniform float u_zoom_balance;
 uniform float u_tile_id;
 uniform float u_update_time;
 uniform float u_transition_duration;
-
+uniform vec2 u_wrap_colors_after;
 // Type of jitter.
 uniform float u_jitter;
 uniform float u_last_jitter;
@@ -16321,7 +16322,7 @@ vec2 box_muller(in float ix, in float seed) {
 
 /*************** END COLOR SCALES *******************************/
 
-float domainify(in vec2 domain, in float transform, in float attr, in bool clamped) {
+float domainify(in vec2 domain, in float transform, in float attr, in float overflow_behavior) {
 
   // Clamp an attribute into a domain, with an optional log or sqrt transform.
   if (transform == 2.) {
@@ -16332,11 +16333,16 @@ float domainify(in vec2 domain, in float transform, in float attr, in bool clamp
     domain = log(domain);
     attr = log(attr);
   }
-  if (clamped) {
+  if (overflow_behavior == 1.) {
+    // clamp
     return linstep(domain, attr);
-  } else {
-    return linscale(domain, attr);
   }
+  if (overflow_behavior == 2.) {
+    //wrap
+
+    return fract(linscale(domain, attr));
+  }
+  return linscale(domain, attr);
 }
 
 mat3 pixelspace_to_glspace;
@@ -16368,7 +16374,7 @@ float choose_and_run_filter(
     }
     if (u_filter_numeric.r < 0.5) {
       // Must be on a dictionary. Unreasonable assumption, maybe?
-      float frac_filter = linstep(vec2(-2047., 2047), a_filter);
+      float frac_filter = linstep(vec2(-0., 4096.), a_filter);
       float map_coords = (map_location + .5) / 32.;
       return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
     } else {
@@ -16578,7 +16584,7 @@ float texture_float_lookup(in vec2 domain,
     // Literal transforms aren't looked up, just returned as is.
     return attr;
   }
-  float inrange = domainify(domain, transform, attr, true);
+  float inrange = domainify(domain, transform, attr, 1.);
   if (texture_position > 0.5) {
     float y_pos = texture_position / 32. - 0.5 / 32.;
     vec4 encoded = texture2D(u_one_d_aesthetic_map, vec2(y_pos, inrange));
@@ -16772,9 +16778,14 @@ void run_color_fill(in float ease) {
     if (a_color_is_constant) {
       fill = vec4(u_color_constant.rgb, alpha);
     } else {
-      float fractional_color = linstep(u_color_domain, a_color);
       float color_pos = (u_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
-      fractional_color = domainify(u_color_domain, u_color_transform, a_color, true);
+      float overflow_behavior = 1.; // means--clamp
+      float fractional_color;
+      if (u_wrap_colors_after.y > 0.) {
+        fractional_color = fract((a_color + 1.) / u_wrap_colors_after.y);
+      } else {
+        fractional_color = domainify(u_color_domain, u_color_transform, a_color, overflow_behavior);
+      }
       fill = texture2D(u_color_aesthetic_map , vec2(color_pos, fractional_color));
       fill = vec4(fill.rgb, alpha);
     }
@@ -16785,7 +16796,14 @@ void run_color_fill(in float ease) {
       } else {
         float last_fractional = linstep(u_last_color_domain, a_last_color);
         float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
-        last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, true);
+        float overflow_behavior = 1.; // means--clamp
+                
+        if (u_last_color_domain.y == 4096. && u_last_color_domain.x == 0.) {
+          // Assume we're in dictionary land. Unsafe, but whatever.
+          overflow_behavior = 2.;
+        }
+
+        last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, overflow_behavior);
         last_fill = texture2D(u_color_aesthetic_map, vec2(color_pos, last_fractional));
         // Alpha channel interpolation already happened.
         last_fill = vec4(last_fill.rgb, alpha);
@@ -22876,6 +22894,7 @@ const scales = {
 };
 class Aesthetic {
   constructor(scatterplot, regl2, dataset, aesthetic_map) {
+    this._transform = "linear";
     this.field = null;
     this._texture_buffer = null;
     this.partner = null;
@@ -22910,9 +22929,7 @@ class Aesthetic {
       return this._scale;
     }
     if (this.is_dictionary()) {
-      console.warn("Dictionary scales only supported for colors");
-      const scale2 = ordinal().domain(this.domain);
-      return this._scale = scale2.range(this.range);
+      throw new Error("Dictionary scales only supported for colors");
     }
     const scale = scales[this.transform]();
     scale.domain(this.domain).range(this.range);
@@ -22945,7 +22962,7 @@ class Aesthetic {
       return [1, 1];
     }
     if (((_a2 = column.type) == null ? void 0 : _a2.dictionary) !== void 0) {
-      return [-2047, Math.floor(this.aesthetic_map.texture_size / 2) - 1];
+      return [0, this.aesthetic_map.texture_size];
     }
     this.dataset.domain(this.field);
     return this.dataset.domain(this.field);
@@ -22958,7 +22975,7 @@ class Aesthetic {
   }
   get webGLDomain() {
     if (this.is_dictionary()) {
-      return [-2047, 2047];
+      return [0, 4096];
     }
     return this.domain;
   }
@@ -23016,6 +23033,7 @@ class Aesthetic {
     this._scale = void 0;
   }
   update(encoding) {
+    var _a2;
     if (encoding === void 0) {
       console.warn("Should never be calling update with undefined.");
       return;
@@ -23066,7 +23084,7 @@ class Aesthetic {
       this._domain = encoding.domain;
       this._range = encoding.range;
     }
-    this._transform = encoding.transform || void 0;
+    this._transform = (_a2 = encoding.transform) != null ? _a2 : void 0;
   }
   encode_for_textures(range2) {
     const { texture_size } = this.aesthetic_map;
@@ -23255,7 +23273,15 @@ class BooleanAesthetic extends Aesthetic {
       return this.apply_op(point, channel);
     }
     if (isConstantChannel(channel)) {
-      return channel.constant !== 0;
+      if (channel.constant === 0) {
+        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers");
+        return false;
+      }
+      if (channel.constant === 1) {
+        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers");
+        return true;
+      }
+      return channel.constant;
     }
     if (isLambdaChannel(channel)) {
       if (this._func === void 0) {
@@ -23301,8 +23327,8 @@ class Foreground extends BooleanAesthetic {
   constructor() {
     super(...arguments);
     this.current_encoding = null;
-    this._constant = 1;
-    this.default_constant = 1;
+    this._constant = true;
+    this.default_constant = true;
     this.default_range = [0, 1];
     this.default_transform = "literal";
   }
@@ -23317,8 +23343,8 @@ class Filter extends BooleanAesthetic {
   constructor() {
     super(...arguments);
     this.current_encoding = null;
-    this._constant = 1;
-    this.default_constant = 1;
+    this._constant = true;
+    this.default_constant = true;
     this.default_transform = "literal";
     this.default_range = [0, 1];
   }
@@ -23853,10 +23879,15 @@ function palette_from_color_strings(colors2) {
     const col = rgb(color2);
     return [col.r, col.g, col.b, 255];
   });
+  console.log(colors2);
   const output = new Uint8Array(palette_size * 4);
-  for (let i = 0; i < palette_size; i++) {
-    output.set(scheme2[i % colors2.length], i * 4);
+  const repeat_each = Math.floor(palette_size / colors2.length);
+  for (let i = 0; i < colors2.length; i++) {
+    for (let j = 0; j < repeat_each && i * repeat_each + j < palette_size; j++) {
+      output.set(scheme2[i], (i * repeat_each + j) * 4);
+    }
   }
+  console.log(output);
   return output;
 }
 for (const schemename of [
@@ -23956,11 +23987,16 @@ class Color extends Aesthetic {
   get use_map_on_regl() {
     return 1;
   }
+  get colorscheme_size() {
+    if (this.is_dictionary()) {
+      return this.scale.range().length;
+    }
+    return -1;
+  }
   get scale() {
     if (this._scale) {
       return this._scale;
     }
-    scales[this.transform]().domain(this.domain).range(this.range);
     const range2 = this.range;
     function capitalize(r) {
       if (r === "ylorrd") {
@@ -23969,14 +24005,16 @@ class Color extends Aesthetic {
       return r.charAt(0).toUpperCase() + r.slice(1);
     }
     if (this.is_dictionary()) {
-      const scale2 = ordinal().domain(this.domain);
+      const scale = ordinal().domain(this.domain);
       if (typeof range2 === "string" && schemes[range2]) {
-        if (this.column.data[0].dictionary === null) {
+        const dictionary = this.column.data[0].dictionary;
+        if (dictionary === null) {
           throw new Error("Dictionary is null");
         }
-        return this._scale = scale2.range(schemes[range2]).domain(this.column.data[0].dictionary.toArray());
+        const keys = dictionary.toArray();
+        return this._scale = ordinal().range(schemes[range2]).domain(keys);
       } else {
-        return this._scale = scale2.range(this.range);
+        return this._scale = scale.range(this.range);
       }
     }
     if (typeof range2 == "string") {
@@ -24043,6 +24081,7 @@ class Color extends Aesthetic {
           const dict_values = Object.fromEntries(
             data_values.map((val, i) => [val, i])
           );
+          console.log({ dict_values, domain: this.domain });
           const colors2 = [];
           for (let i = 0; i < this.domain.length; i++) {
             const label = this.domain[i];
@@ -24067,8 +24106,7 @@ class Color extends Aesthetic {
       return;
     }
     if (range2.length === this.aesthetic_map.texture_size * 4) {
-      console.warn("SETTING FULL RANGE IS DEPRECATED,");
-      this.texture_buffer.set(range2);
+      throw new Error("SETTING FULL RANGE IS DEPRECATED");
     }
     console.error(`request range of ${range2} for color ${this.field} unknown`);
   }
@@ -24346,31 +24384,6 @@ class ReglRenderer extends Renderer {
     this.tileSet = dataset;
     return this;
   }
-  /* 
-    apply_webgl_scale() {
-    // Should probably be attached to AestheticSet, not to this class.
-  
-    // The webgl transform can either be 'literal', in which case it uses
-    // the settings linked to the zoom pyramid, or semantic (linear, log, etc.)
-    // in which case it has to calculate off of the x and y dimensions.
-  
-      this._use_scale_to_download_tiles = true;
-      if (
-        (this.aes.encoding.x.transform && this.aes.encoding.x.transform !== 'literal')
-      || (this.aes.encoding.y.transform && this.aes.encoding.y.transform !== 'literal')
-      ) {
-        const webglscale = window_transform(this.aes.x.scale, this.aes.y.scale).flat();
-        this._webgl_scale_history.unshift(webglscale);
-        this._use_scale_to_download_tiles = false;
-      } else {
-        if (!this._webgl_scale_history) {
-          this._webgl_scale_history = [];
-        }
-        // Use the default linked to the coordinates used to build the tree.
-        this._webgl_scale_history.unshift(this.default_webgl_scale);
-      }
-    }
-    */
   get props() {
     this.allocate_aesthetic_buffers();
     const {
@@ -24380,6 +24393,15 @@ class ReglRenderer extends Renderer {
       variable_to_buffer_num
     } = this;
     const { transform } = this.zoom;
+    const colorScales = this.aes.dim("color");
+    const [currentColor, lastColor] = [colorScales.current, colorScales.last];
+    const wrap_colors_after = [
+      lastColor.colorscheme_size,
+      currentColor.colorscheme_size
+    ];
+    if (Math.random() < 1e-3) {
+      console.log(wrap_colors_after);
+    }
     const props = {
       // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
@@ -24396,6 +24418,7 @@ class ReglRenderer extends Renderer {
       string_index: 0,
       prefs: JSON.parse(JSON.stringify(prefs)),
       color_type: void 0,
+      wrap_colors_after,
       start_time: this.most_recent_restart,
       webgl_scale: this._webgl_scale_history[0],
       last_webgl_scale: this._webgl_scale_history[1],
@@ -24966,6 +24989,12 @@ class ReglRenderer extends Renderer {
             return props.only_color;
           }
           return -2;
+        },
+        u_wrap_colors_after: (_, { wrap_colors_after }) => {
+          if (wrap_colors_after === void 0) {
+            throw new Error("wrap_colors_after is undefined");
+          }
+          return wrap_colors_after;
         },
         u_use_glyphset: (_, { prefs }) => prefs.glyph_set ? 1 : 0,
         u_glyphset: (_, { prefs }) => {
@@ -35849,9 +35878,6 @@ class Tile {
   get children() {
     return this._children;
   }
-  get dictionary_lookups() {
-    return this.dataset.dictionary_lookups;
-  }
   download() {
     throw new Error("Not implemented");
   }
@@ -35930,32 +35956,7 @@ class Tile {
         }
       }
     } else {
-      let children2 = this.children.map((tile) => {
-        const f = {
-          t: tile,
-          iterator: tile.points(bounding, sorted),
-          next: void 0
-        };
-        f.next = f.iterator.next();
-        return f;
-      });
-      children2 = children2.filter((d) => {
-        var _a2;
-        return (_a2 = d == null ? void 0 : d.next) == null ? void 0 : _a2.value;
-      });
-      while (children2.length > 0) {
-        let mindex = 0;
-        for (let i = 1; i < children2.length; i++) {
-          if (children2[i].next.value.ix < children2[mindex].next.value.ix) {
-            mindex = i;
-          }
-        }
-        yield children2[mindex].next.value;
-        children2[mindex].next = children2[mindex].iterator.next();
-        if (children2[mindex].next.done) {
-          children2 = children2.splice(mindex, 1);
-        }
-      }
+      throw new Error("Sorted iteration not supported");
     }
   }
   forEach(callback) {
@@ -35993,7 +35994,8 @@ class Tile {
     return 0;
   }
   async schema() {
-    await this.download();
+    this.download();
+    await this.promise;
     return this._schema;
   }
   /**
@@ -36237,6 +36239,7 @@ class ArrowTile extends Tile {
     this._batch = table.batches[batch_num];
     this.download_state = "Complete";
     this.batch_num = batch_num;
+    this.codes = [0, parent === null ? -1 : parent.batch_num, batch_num];
     if (this._batch.getChild("ix") === null) {
       console.warn("Manually setting ix");
       const batch = this._batch;
@@ -36276,6 +36279,7 @@ class ArrowTile extends Tile {
     while (++ix <= this.batch_num * 4 + 4) {
       if (ix < this.full_tab.batches.length) {
         this._children.push(
+          // TODO: fix type
           new ArrowTile(this.full_tab, this.dataset, ix, this)
         );
       }
@@ -36447,7 +36451,7 @@ class Dataset {
     delete this.transformations[name];
   }
   domain(dimension, max_ix = 1e6) {
-    var _a2, _b2;
+    var _a2;
     if (this.extents[dimension]) {
       return this.extents[dimension];
     }
@@ -36467,10 +36471,10 @@ class Dataset {
       if (mmax) {
         max2 = JSON.parse(mmax);
       }
-      if (dim.type.typeId == 10 && typeof min2 === "string") {
+      if (dim.type.typeId === 10 && typeof min2 === "string") {
         min2 = Number(new Date(min2));
       }
-      if (((_b2 = dim.type) == null ? void 0 : _b2.typeId) == 10 && typeof max2 === "string") {
+      if (dim.type.typeId === 10 && typeof max2 === "string") {
         max2 = Number(new Date(max2));
       }
       if (typeof max2 === "string") {
@@ -36566,13 +36570,19 @@ class Dataset {
     const tb = tableFromIPC(buffer);
     const records = {};
     for (const batch of tb.batches) {
-      const offsets = batch.getChild("data").data[0].valueOffsets;
-      const values = batch.getChild("data").data[0].children[0];
+      const data = batch.getChild("data").data[0];
+      if (data === null) {
+        throw new Error('tiled columns must contain "data" field.');
+      }
+      const offsets = data.valueOffsets;
+      const values = data.children[0];
       for (let i = 0; i < batch.data.length; i++) {
         const tilename = batch.getChild("_tile").get(i);
         records[tilename] = values.values.slice(
           offsets[i],
           offsets[i + 1]
+          // Type coercion necessary because Float[]
+          // and the backing Float32Array are not recognized as equivalent.
         );
       }
     }
@@ -36619,7 +36629,8 @@ class Dataset {
   /**
    * Given an ix, apply a transformation to the point at that index and
    * return the transformed point (not just the transformation, the whole point)
-   * This applies the transformaation to all other points in the same tile.
+   * As a side-effect, this applies the transformaation to all other
+   * points in the same tile.
    *
    * @param transformation The name of the transformation to apply
    * @param ix The index of the point to transform
@@ -36629,13 +36640,11 @@ class Dataset {
     if (matches.length == 0) {
       throw new Error(`No point for ix ${ix}`);
     }
-    const [tile, row] = matches[0];
+    const [tile, row, mid] = matches[0];
     if (tile.record_batch.getChild(transformation) !== null) {
       return row;
     }
     await tile.apply_transformation(transformation);
-    const ixcol = tile.record_batch.getChild("ix");
-    const mid = bisectLeft([...ixcol.data[0].values], ix);
     return tile.record_batch.get(mid);
   }
   /**
@@ -36657,13 +36666,11 @@ class Dataset {
       if (!(tile.ready && tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
         return;
       }
-      const mid = bisectLeft(
-        [...tile.record_batch.getChild("ix").data[0].values],
-        ix
-      );
+      const ixcol = tile.record_batch.getChild("ix");
+      const mid = bisectLeft(ixcol.toArray(), ix);
       const val = tile.record_batch.get(mid);
       if (val !== null && val.ix === ix) {
-        matches.push([tile, val]);
+        matches.push([tile, val, mid]);
       }
     });
     return matches;
@@ -36673,7 +36680,7 @@ class ArrowDataset extends Dataset {
   constructor(table, plot) {
     super(plot);
     this.promise = Promise.resolve();
-    this.root_tile = new ArrowTile(table, this, 0, plot);
+    this.root_tile = new ArrowTile(table, this, 0);
   }
   get extent() {
     return this.root_tile.extent;
@@ -36773,7 +36780,7 @@ class QuadtileDataset extends Dataset {
     const macrotile_tasks = {};
     const records = {};
     async function get_table(tile) {
-      const { key, macrotile: macrotile2 } = tile;
+      const { macrotile: macrotile2 } = tile;
       if (macrotile_tasks[macrotile2] !== void 0) {
         return await macrotile_tasks[macrotile2];
       } else {
@@ -36781,14 +36788,10 @@ class QuadtileDataset extends Dataset {
           (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
-              const offsets = batch.getChild("data").data[0].valueOffsets;
-              const values = batch.getChild("data").data[0].children[0];
+              const data = batch.getChild("data");
               for (let i = 0; i < batch.data.length; i++) {
                 const tilename = batch.getChild("_tile").get(i);
-                records[tilename] = values.values.slice(
-                  offsets[i],
-                  offsets[i + 1]
-                );
+                records[tilename] = data.get(i);
               }
             }
             return;
@@ -36842,7 +36845,6 @@ function check_overlap(tile, bbox) {
   return area(intersection) / area(bbox);
 }
 function add_or_delete_column(batch, field_name, data) {
-  var _a2;
   const tb = {};
   for (const field of batch.schema.fields) {
     if (field.name === field_name) {
@@ -36852,10 +36854,9 @@ function add_or_delete_column(batch, field_name, data) {
         throw new Error(`Name ${field.name} already exists, can't add.`);
       }
     }
-    tb[field.name] = batch.getChild(field.name).data[0];
-  }
-  if (data === null) {
-    throw new Error(`Name ${field_name} doesn't exist, can't drop.`);
+    const current = batch.getChild(field.name);
+    const coldata = current.data[0];
+    tb[field.name] = coldata;
   }
   if (data === void 0) {
     throw new Error("Must pass data to bind_column");
@@ -36865,9 +36866,12 @@ function add_or_delete_column(batch, field_name, data) {
       tb[field_name] = makeVector({ type: new Float32(), data, length: data.length }).data[0];
     } else if (data instanceof BigInt64Array) {
       tb[field_name] = makeVector({ type: new Int64$1(), data, length: data.length }).data[0];
-    } else if (((_a2 = data.data) == null ? void 0 : _a2.length) > 0) {
+    } else if (data instanceof Uint8Array) {
+      tb[field_name] = makeVector({ type: new Uint8(), data, length: data.length }).data[0];
+    } else if (data.data.length > 0) {
       tb[field_name] = data.data[0];
     } else {
+      console.warn(`Unknown data format object passed to add or remove columns--treating as Data, but this behavior is deprecated`, data);
       tb[field_name] = data;
     }
   }
@@ -36896,31 +36900,15 @@ function add_or_delete_column(batch, field_name, data) {
       new Date().toISOString()
     );
   }
-  window.state = {
-    new_batch,
-    batch,
-    data,
-    tb
-  };
-  const old_names = batch.schema.fields.map((d) => d.name);
-  window.old_batch = batch;
-  window.new_batch = new_batch;
-  for (const name of old_names) {
-  }
   return new_batch;
 }
 function supplement_identifiers(batch, ids, field_name, key_field = "_id") {
-  var _a2;
   const updatedFloatArray = new Float32Array(batch.numRows);
   const kfield = batch.getChild(key_field);
   if (kfield === null) {
     throw new Error(`Field ${key_field} not found in batch`);
   }
-  let keytype = "string";
-  if (((_a2 = kfield == null ? void 0 : kfield.type) == null ? void 0 : _a2.typeId) === 2) {
-    keytype = "bigint";
-  }
-  if (keytype === "bigint") {
+  if (kfield.type.typeId === Type$1.Int64 || kfield.type.typeId === Type$1.Uint64) {
     for (let i = 0; i < batch.numRows; i++) {
       const value = ids[String(kfield.get(i))];
       if (value !== void 0) {
@@ -38776,16 +38764,16 @@ class Scatterplot {
   }
   */
   visualize_tiles() {
-    const map2 = this;
-    const ctx = map2.elements[2].selectAll("canvas").node().getContext("2d");
+    const canvas = this.elements[2].selectAll("canvas").node();
+    const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, 1e4, 1e4);
-    const { x_, y_ } = map2._zoom.scales();
+    const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = "#888888";
-    const tiles = map2._root.map((t) => t);
-    for (const i of range(13)) {
+    const tiles = this._root.map((t) => t);
+    for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
-          if (tile.codes[0] != i) {
+          if (!tile.codes || tile.codes[0] != i) {
             continue;
           }
           if (!tile.extent) {
@@ -38805,77 +38793,6 @@ class Scatterplot {
       }, i * 400);
     }
     setTimeout(() => ctx.clearRect(0, 0, 1e4, 1e4), 17 * 400);
-  }
-  async make_big_png(xtimes = 3, points = 1e7, timeper = 100) {
-    await this.dataset.download_to_depth(points);
-    const { width, height } = this._renderer;
-    void this.plotAPI({ duration: 0 });
-    const canvas = document.createElement("canvas");
-    canvas.setAttribute("width", (xtimes * width).toString());
-    canvas.setAttribute("height", (xtimes * height).toString());
-    const ctx = canvas.getContext("2d");
-    const corners = this._zoom.current_corners();
-    this._zoom.transform.k;
-    const xstep = (corners.x[1] - corners.x[0]) / xtimes;
-    const ystep = (corners.y[1] - corners.y[0]) / xtimes;
-    const p = new Promise((resolve, reject) => {
-      for (let i = 0; i < xtimes; i++) {
-        for (let j = 0; j < xtimes; j++) {
-          setTimeout(() => {
-            this._zoom.zoom_to_bbox(
-              {
-                x: [corners.x[0] + xstep * i, corners.x[0] + xstep * (i + 1)],
-                y: [corners.y[0] + ystep * j, corners.y[0] + ystep * (j + 1)]
-              },
-              timeper / 5,
-              1
-            );
-            setTimeout(() => {
-              this._renderer.fbos.colorpicker.use(() => {
-                this._renderer.render_all(this._renderer.props);
-                const pixels = this._renderer.regl.read(
-                  0,
-                  0,
-                  width,
-                  height
-                );
-                const halfHeight = height / 2 | 0;
-                const bytesPerRow = width * 4;
-                var temp = new Uint8Array(width * 4);
-                for (var y = 0; y < halfHeight; ++y) {
-                  var topOffset = y * bytesPerRow;
-                  var bottomOffset = (height - y - 1) * bytesPerRow;
-                  temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
-                  pixels.copyWithin(
-                    topOffset,
-                    bottomOffset,
-                    bottomOffset + bytesPerRow
-                  );
-                  pixels.set(temp, bottomOffset);
-                }
-                const imageData = new ImageData(
-                  new Uint8ClampedArray(pixels),
-                  width
-                );
-                ctx.putImageData(imageData, width * i, height * j);
-              });
-              if (i == xtimes - 1 && j === xtimes - 1) {
-                resolve();
-              }
-            }, timeper / 2);
-          }, i * timeper * xtimes + j * timeper);
-        }
-      }
-    });
-    p.then(() => {
-      const canvasUrl = canvas.toDataURL();
-      const createEl = document.createElement("a");
-      createEl.href = canvasUrl;
-      createEl.style = "position:fixed;top:40vh;left:40vw;z-index:999;";
-      createEl.download = "deepscatter";
-      createEl.click();
-      createEl.remove();
-    });
   }
   /**
    * Destroy the scatterplot and release all associated resources.
@@ -39227,7 +39144,7 @@ class SettableFunction {
   }
   get f() {
     if (this._f === void 0) {
-      return this.default;
+      return (datum2, plot) => this.default(datum2, plot);
     }
     return this._f;
   }
@@ -39264,14 +39181,12 @@ class LabelClick extends SettableFunction {
   }
 }
 class ClickFunction extends SettableFunction {
-  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(datum2, plot = void 0) {
     console.log({ ...datum2 });
     return;
   }
 }
 class TooltipHTML extends SettableFunction {
-  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(point, plot = void 0) {
     let output = "<dl>";
     const nope = /* @__PURE__ */ new Set([

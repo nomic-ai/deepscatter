@@ -1,7 +1,7 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "2.14.1",
+  "version": "2.15.0-RC-0",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
     "dist"
@@ -19,7 +19,7 @@
   "scripts": {
     "dev": "vite --port 3344 --host",
     "format": "prettier --write src",
-    "build": "vite build && tsc || true && typedoc --skipErrorChecking src/*",
+    "build": "vite build && tsc || true",
     "prepublishOnly": "vite build && tsc || true && typedoc --skipErrorChecking src/*",
     "test": "playwright test",
     "lint": "eslint src"

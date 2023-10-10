@@ -15,7 +15,7 @@ import { isURLLabels, isLabelset } from './typing';
 import { Bitmask, DataSelection } from './selection';
 import { dictionaryFromArrays } from './utilityFunctions';
 import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
-import type * as DS from './shared.d'
+import type * as DS from './shared.d';
 // DOM elements that deepscatter uses.
 
 const base_elements = [
@@ -162,7 +162,7 @@ class Scatterplot<T extends Tile> {
         el.append('g').attr('id', 'mousepoints');
         el.append('g').attr('id', 'labelrects');
       }
-      this.elements.push(container);
+      this.elements.push(container as unknown as Selection<SVGSetElement, any, any, any>);
     }
     this.bound = true;
   }
@@ -396,17 +396,21 @@ class Scatterplot<T extends Tile> {
      * Draws a set of rectangles to the screen to illustrate the currently
      * loaded tiles. Useful for debugging and illustration.
      */
-    const map = this;
-    const ctx = map.elements[2].selectAll('canvas').node().getContext('2d');
+
+    const canvas = this.elements[2].selectAll('canvas').node() as HTMLCanvasElement;
+    
+    const ctx = canvas.getContext('2d')
+    
+    // as CanvasRenderingContext2D;
 
     ctx.clearRect(0, 0, 10_000, 10_000);
-    const { x_, y_ } = map._zoom.scales();
+    const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = '#888888';
-    const tiles = map._root.map((t: Tile) => t);
-    for (const i of range(13)) {
+    const tiles = this._root.map((t: T) => t);
+    for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
-          if (tile.codes[0] != i) {
+          if (!tile.codes || tile.codes[0] != i) {
             continue;
           }
           if (!tile.extent) {
@@ -428,95 +432,6 @@ class Scatterplot<T extends Tile> {
     setTimeout(() => ctx.clearRect(0, 0, 10_000, 10_000), 17 * 400);
   }
 
-  async make_big_png(xtimes = 3, points = 1e7, timeper = 100) {
-    // Run starting at no zoom.
-    // xtimes: the width/height will be this multiplier of screen width.
-    // points: pre-download to this depth.
-    await this.dataset.download_to_depth(points);
-    const { width, height } = this._renderer;
-    void this.plotAPI({ duration: 0 });
-    const canvas = document.createElement('canvas');
-    canvas.setAttribute('width', (xtimes * width).toString());
-    canvas.setAttribute('height', (xtimes * height).toString());
-    const ctx = canvas.getContext('2d');
-
-    const corners = this._zoom.current_corners();
-    const current_zoom = this._zoom.transform.k;
-    const xstep = (corners.x[1] - corners.x[0]) / xtimes;
-    const ystep = (corners.y[1] - corners.y[0]) / xtimes;
-
-    const p: Promise<void> = new Promise((resolve, reject) => {
-      for (let i = 0; i < xtimes; i++) {
-        for (let j = 0; j < xtimes; j++) {
-          setTimeout(() => {
-            this._zoom.zoom_to_bbox(
-              {
-                x: [corners.x[0] + xstep * i, corners.x[0] + xstep * (i + 1)],
-                y: [corners.y[0] + ystep * j, corners.y[0] + ystep * (j + 1)],
-              },
-              timeper / 5,
-              1
-            );
-            setTimeout(() => {
-              this._renderer.fbos.colorpicker.use(() => {
-                this._renderer.render_all(this._renderer.props);
-
-                const pixels = this._renderer.regl.read(
-                  0,
-                  0,
-                  width,
-                  height
-                ) as Uint8Array;
-
-                // https://stackoverflow.com/questions/41969562/how-can-i-flip-the-result-of-webglrenderingcontext-readpixels
-                const halfHeight = (height / 2) | 0; // the | 0 keeps the result an int
-                const bytesPerRow = width * 4;
-                // make a temp buffer to hold one row
-                var temp = new Uint8Array(width * 4);
-                for (var y = 0; y < halfHeight; ++y) {
-                  var topOffset = y * bytesPerRow;
-                  var bottomOffset = (height - y - 1) * bytesPerRow;
-                  // make copy of a row on the top half
-                  temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
-                  // copy a row from the bottom half to the top
-                  pixels.copyWithin(
-                    topOffset,
-                    bottomOffset,
-                    bottomOffset + bytesPerRow
-                  );
-                  // copy the copy of the top half row to the bottom half
-                  pixels.set(temp, bottomOffset);
-                }
-                const imageData = new ImageData(
-                  new Uint8ClampedArray(pixels),
-                  width
-                );
-                ctx.putImageData(imageData, width * i, height * j);
-                //                ctx?.strokeRect(width * i, height * j, width, height)
-              });
-              if (i == xtimes - 1 && j === xtimes - 1) {
-                resolve();
-              }
-            }, timeper / 2);
-          }, i * timeper * xtimes + j * timeper);
-        }
-      }
-    });
-
-    p.then(() => {
-      const canvasUrl = canvas.toDataURL();
-      // Create an anchor, and set the href value to our data URL
-      const createEl = document.createElement('a');
-      createEl.href = canvasUrl;
-      createEl.style = 'position:fixed;top:40vh;left:40vw;z-index:999;';
-      // This is the name of our downloaded file
-      createEl.download = 'deepscatter';
-
-      // Click the download button, causing a download, and then remove it
-      createEl.click();
-      createEl.remove();
-    });
-  }
   /**
    * Destroy the scatterplot and release all associated resources.
    * This is necessary because removing a deepscatter instance
@@ -952,19 +867,22 @@ abstract class SettableFunction<
     | undefined
     | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType);
   public string_rep: string;
-  abstract default: (datum: ArgType, plot: Scatterplot | undefined) => FuncType;
-  public plot: Scatterplot;
-  constructor(plot: Scatterplot) {
+  public plot: Scatterplot<Tiletype>;
+  constructor(plot: Scatterplot<Tiletype>) {
     this.string_rep = '';
     this.plot = plot;
   }
-  get f(): (datum: ArgType, plot: Scatterplot) => FuncType {
+
+  abstract default(datum: ArgType, plot: Scatterplot<Tiletype> | undefined): FuncType;
+
+  get f(): (datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType {
     if (this._f === undefined) {
-      return this.default;
+      return (datum, plot) => this.default(datum, plot);
     }
     return this._f;
   }
-  set f(f: string | ((datum: ArgType, plot: Scatterplot) => FuncType)) {
+  
+  set f(f: string | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType)) {
     if (typeof f === 'string') {
       if (this.string_rep !== f) {
         this.string_rep = f;
@@ -1000,7 +918,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
         lambda: `d => d === '${feature.properties[labelset.label_key]}'`,
       };
     }
-    const thisis = this;
     void this.plot.plotAPI({
       encoding: { filter },
     });
@@ -1008,7 +925,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
 }
 
 class ClickFunction extends SettableFunction<void> {
-  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(datum: StructRowProxy, plot = undefined) {
     console.log({ ...datum });
     return;
@@ -1016,7 +932,6 @@ class ClickFunction extends SettableFunction<void> {
 }
 
 class TooltipHTML extends SettableFunction<string> {
-  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(point: StructRowProxy, plot = undefined) {
     // By default, this returns a
     let output = '<dl>';

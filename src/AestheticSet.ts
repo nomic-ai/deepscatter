@@ -4,9 +4,9 @@ import { ConcreteAesthetic, dimensions } from './StatefulAesthetic';
 import type Scatterplot from './deepscatter';
 import type { Dataset, QuadtileDataset } from './Dataset';
 import { StatefulAesthetic } from './StatefulAesthetic';
-import { Aesthetic } from './Aesthetic';
+import type { Aesthetic } from './Aesthetic';
 import type { Tile } from './tile';
-import { Encoding } from './shared';
+import type { Encoding } from './shared.d';
 
 export class AestheticSet<TileType extends Tile> {
   public tileSet: Dataset<TileType>;
@@ -14,7 +14,7 @@ export class AestheticSet<TileType extends Tile> {
   public regl: Regl;
   public encoding: Encoding = {};
   public position_interpolation: boolean;
-  private store: Record<string, StatefulAesthetic>;
+  private store: Record<string, StatefulAesthetic<any>>;
   public aesthetic_map: TextureSet;
   constructor(
     scatterplot: Scatterplot<TileType>,
@@ -32,6 +32,8 @@ export class AestheticSet<TileType extends Tile> {
 
   public dim(aesthetic: keyof typeof dimensions) {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
+    // Used for things like 'what color would this point be?'
+
     if (this.store[aesthetic]) {
       return this.store[aesthetic];
     }
@@ -90,7 +92,7 @@ export class AestheticSet<TileType extends Tile> {
               transform: 'literal',
             };
           } else {
-            const field = encoding[p];
+            const field = encoding[p] as string;
             encoding[`x${suffix}`] = {
               field: `${field}.x`,
               transform: 'literal',
@@ -117,6 +119,17 @@ export class AestheticSet<TileType extends Tile> {
     }
     if (encoding['filter1'] !== undefined) {
       throw new Error('filter1 is not supported; just say "filter"');
+    }
+    // TODO: Remove this awfulness. It's part of a transition in 2.15.0.
+    const colorDomain = encoding.color && encoding.color.domain ? encoding.color['domain'] : undefined;
+    if (colorDomain && colorDomain.length == 2 ) {
+      if (Math.abs(colorDomain[1] - colorDomain[0] - 4096) < 2) {
+        console.warn(`Resetting color encoding from -2047 to 0. The old behavior of requiring negative numbers 
+          for dictionary schemes is deprecated. If you're actually trying to encode real numbers here, not a dictionary, change to [-4100, 4100] 
+          until a future update.
+        `); 
+        encoding.color['domain'] = [0, 4096];
+      }
     }
     // Overwrite position fields.
     this.interpret_position(encoding);

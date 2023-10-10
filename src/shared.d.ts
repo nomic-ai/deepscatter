@@ -1,4 +1,4 @@
-import type { Dictionary, Float, Float32, Int, Int16, Int32, Int8, StructRowProxy, Table, Utf8, Vector } from 'apache-arrow';
+import type { Dictionary, Float, Float32, Int, Int16, Int32, Int8, StructRowProxy, Table, Timestamp, Utf8, Vector } from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
 import type { ArrowDataset } from './Dataset';
@@ -40,10 +40,8 @@ type TwoArgumentOp = {
   b: number;
 };
 
-
+export type Newable<T> = { new (...args: any[]): T };
 export type PointFunction = (p : StructRowProxy) => number
-
-type Newable<T> = { new (...args: any[]): T };
 export type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
 
@@ -92,7 +90,7 @@ export type BufferLocation = {
   byte_size: number; // in bytes;
 };
 
-type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
+export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
 type FunctionalChannel = LambdaChannel | OpChannel;
 
@@ -177,11 +175,15 @@ export interface CategoricalChannel {
 
 type ArrowInt = Int8 | Int16 | Int32;
 
+// Deepscatter does not support all Arrow types; any columns not in the following set
+// cannot be rendered on the map.
+export type SupportedArrowTypes = Bool | Float | Int | Dictionary<Utf8, ArrowInt> | Timestamp
+
 // An arrow buildable vector is something returned that can be placed onto the scatterplot.
 // Float32Arrays will be dropped straight onto the GPU; other types while be cast
 // to Float32Array before going there.
 
-export type ArrowBuildable = Vector<Bool | Float | Int | Dictionary<Utf8, ArrowInt>> | Float32Array | Uint8Array;
+export type ArrowBuildable = Vector<SupportedArrowTypes> | Float32Array | Uint8Array;
 /**
  * A transformation is a batchwise operation that can be used to construct
  * a new column in the data table. It runs asynchronously so that it
@@ -340,7 +342,7 @@ export type APICall = {
   background_color?: string;
 
   // 
-  transformations: Record<string, string>;
+  transformations?: Record<string, string>;
   encoding?: Encoding;
   labels?: Labelcall;
   background_options?: BackgroundOptions;
@@ -370,6 +372,6 @@ export type CompletePrefs = APICall & {
 
 type RenderPrefs = CompletePrefs & {
   arrow_table?: Table;
-  arrow_buffer?: Buffer;
+  //arrow_buffer?: Buffer;
 };
 export type TileType = QuadTile | ArrowTile;
