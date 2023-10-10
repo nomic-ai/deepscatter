@@ -883,7 +883,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
             r / 255,
             g / 255,
             b / 255,
-            this.prefs.background_options.opacity,
+            this.prefs.background_options.opacity[0],
           ] as [number, number, number, number];
         },
         u_background_mouseover: () =>
