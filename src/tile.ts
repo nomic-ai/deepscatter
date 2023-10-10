@@ -6,7 +6,6 @@ import {
   tableFromIPC,
   RecordBatch,
   StructRowProxy,
-  tableToIPC,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
 import type { Dataset, QuadtileDataset } from './Dataset';
@@ -44,18 +43,18 @@ export abstract class Tile {
   public _highest_known_ix?: number;
   public _min_ix?: number;
   public _max_ix?: number;
-  public dataset: Dataset<this>;
+  public dataset: Dataset<Tile>;
   public _download?: Promise<void>;
   public ready: boolean;
   __schema?: schema_entry[];
-  local_dictionary_lookups?: Map<string, any>;
   public _extent?: { x: MinMax; y: MinMax };
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
   public _buffer_manager?: TileBufferManager<this>;
+  abstract codes: [number, number, number];
 
   
-  constructor(dataset: Dataset<this>) {
+  constructor(dataset: Dataset<Tile>) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
@@ -73,10 +72,6 @@ export abstract class Tile {
 
   get children() {
     return this._children;
-  }
-
-  get dictionary_lookups() {
-    return this.dataset.dictionary_lookups;
   }
 
   download() {
@@ -186,6 +181,8 @@ export abstract class Tile {
         }
       }
     } else {
+      throw new Error("Sorted iteration not supported")
+      /*
       let children = this.children.map((tile) => {
         const f = {
           t: tile,
@@ -209,6 +206,7 @@ export abstract class Tile {
           children = children.splice(mindex, 1);
         }
       }
+    */
     }
   }
 
@@ -255,7 +253,8 @@ export abstract class Tile {
   }
 
   async schema() {
-    await this.download();
+    this.download();
+    await this.promise;
     return this._schema;
   }
 
@@ -564,17 +563,19 @@ export class QuadTile extends Tile {
 export class ArrowTile extends Tile {
   batch_num: number;
   full_tab: Table;
+  codes: [number, number, number];
   constructor(
     table: Table,
     dataset: Dataset<ArrowTile>,
     batch_num: number,
-    parent = null
+    parent: null | ArrowTile = null
   ) {
     super(dataset);
     this.full_tab = table;
     this._batch = table.batches[batch_num];
     this.download_state = 'Complete';
     this.batch_num = batch_num;
+    this.codes = [0, parent === null ? -1 : parent.batch_num, batch_num]
     // On arrow tables, it's reasonable to just add a new index by order.
     if (this._batch.getChild('ix') === null) {
       console.warn('Manually setting ix');
@@ -595,7 +596,8 @@ export class ArrowTile extends Tile {
       x: extent(this._batch.getChild('x')),
       y: extent(this._batch.getChild('y')),
     };
-    this.parent = parent;
+    // Ugh, typescript.
+    this.parent = parent as unknown as this;
 
     const row_last = this._batch.get(this._batch.numRows - 1);
     if (row_last === null) {
@@ -617,7 +619,8 @@ export class ArrowTile extends Tile {
     while (++ix <= this.batch_num * 4 + 4) {
       if (ix < this.full_tab.batches.length) {
         this._children.push(
-          new ArrowTile(this.full_tab, this.dataset, ix, this)
+          // TODO: fix type
+          new ArrowTile(this.full_tab, this.dataset, ix, this) as unknown as this
         );
       }
     }
@@ -674,7 +677,7 @@ function macrotile_descendants(
   parents = 2
 ): Array<string> {
   if (descendant_cache.has(macrokey)) {
-    return descendant_cache.get(macrokey) as string[];
+    return descendant_cache.get(macrokey);
   }
   const parent_tiles = [[macrokey]];
   while (parent_tiles.length < parents) {
@@ -700,5 +703,5 @@ function children(tile: string) {
   for (let i = 0; i < 4; i++) {
     children.push(`${z + 1}/${x * 2 + (i % 2)}/${y * 2 + Math.floor(i / 2)}`);
   }
-  return children;
+  return children as string[];
 }

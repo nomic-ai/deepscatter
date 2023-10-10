@@ -80,8 +80,9 @@
       });
     }
     const batches = [];
+    const SIZE = 65536
     for (let i = 0; i < n_batches; i++) {
-      const batch = make_batch(i * 65536, 65536);
+      const batch = make_batch(i * SIZE, SIZE);
       batches.push(batch);
       window.b = batch;
       console.log(i);
@@ -222,7 +223,7 @@
         encoding: {
           color: {
             field: "lowest_prime",
-            range: "dark2"
+            range: 'dark2'
           }
         }
       })
@@ -256,7 +257,7 @@
             encoding: {
               color: {
                 field: "dictionary number coloring",
-                range: 'dark2'
+                range: 'category10'
               }
             }
           })

@@ -77,7 +77,7 @@ export declare abstract class Dataset<T extends Tile> {
      * @param plot The Scatterplot to use.
      * @returns
      */
-    static from_arrow_table(table: Table, plot: DS.Plot): ArrowDataset;
+    static from_arrow_table(table: Table, plot: Scatterplot<ArrowTile>): ArrowDataset;
     abstract download_most_needed_tiles(bbox: Rectangle | undefined, max_ix: number, queue_length: number): void;
     /**
      *
@@ -87,7 +87,7 @@ export declare abstract class Dataset<T extends Tile> {
     has_column(name: string): boolean;
     delete_column_if_exists(name: string): void;
     domain(dimension: string, max_ix?: number): [number, number];
-    points(bbox: Rectangle | undefined, max_ix?: number): Generator<any, void, unknown>;
+    points(bbox: Rectangle | undefined, max_ix?: number): Generator<StructRowProxy<any>, void, unknown>;
     /**
      * Map a function against all tiles.
      * It is often useful simply to invoke Dataset.map(d => d) to
@@ -127,7 +127,8 @@ export declare abstract class Dataset<T extends Tile> {
     /**
      * Given an ix, apply a transformation to the point at that index and
      * return the transformed point (not just the transformation, the whole point)
-     * This applies the transformaation to all other points in the same tile.
+     * As a side-effect, this applies the transformaation to all other
+     * points in the same tile.
      *
      * @param transformation The name of the transformation to apply
      * @param ix The index of the point to transform
@@ -144,7 +145,7 @@ export declare abstract class Dataset<T extends Tile> {
      * @param ix The index of the point to get.
      * @returns A list of [tile, point] pairs that match the index.
      */
-    findPointRaw(ix: number): [Tile, StructRowProxy][];
+    findPointRaw(ix: number): [Tile, StructRowProxy, number][];
 }
 export declare class ArrowDataset extends Dataset<ArrowTile> {
     promise: Promise<void>;

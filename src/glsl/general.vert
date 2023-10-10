@@ -4,7 +4,7 @@ uniform float u_zoom_balance;
 uniform float u_tile_id;
 uniform float u_update_time;
 uniform float u_transition_duration;
-
+uniform vec2 u_wrap_colors_after;
 // Type of jitter.
 uniform float u_jitter;
 uniform float u_last_jitter;
@@ -494,6 +494,7 @@ vec2 box_muller(in float ix, in float seed) {
 
 float domainify(in vec2 domain, in float transform, in float attr, in float overflow_behavior) {
 
+
   // Clamp an attribute into a domain, with an optional log or sqrt transform.
   if (transform == 2.) {
     domain = sqrt(domain);
@@ -509,6 +510,7 @@ float domainify(in vec2 domain, in float transform, in float attr, in float over
   }
   if (overflow_behavior == 2.) {
     //wrap
+
     return fract(linscale(domain, attr));
   }
   return linscale(domain, attr);
@@ -543,7 +545,7 @@ float choose_and_run_filter(
     }
     if (u_filter_numeric.r < 0.5) {
       // Must be on a dictionary. Unreasonable assumption, maybe?
-      float frac_filter = linstep(vec2(-2047., 2048), a_filter);
+      float frac_filter = linstep(vec2(-0., 4096.), a_filter);
       float map_coords = (map_location + .5) / 32.;
       return texture2D(u_one_d_aesthetic_map, vec2(map_coords, frac_filter)).a;
     } else {
@@ -790,14 +792,14 @@ void run_color_fill(in float ease) {
     if (a_color_is_constant) {
       fill = vec4(u_color_constant.rgb, alpha);
     } else {
-      float fractional_color = linstep(u_color_domain, a_color);
       float color_pos = (u_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
       float overflow_behavior = 1.; // means--clamp
-      if (u_color_domain.x == -2047. && u_color_domain.y == 2048.) {
-        // Assume we're in dictionary land. Unsafe, but whatever.
-        overflow_behavior = 2.;
+      float fractional_color;
+      if (u_wrap_colors_after.y > 0.) {
+        fractional_color = fract(a_color / u_wrap_colors_after.y);
+      } else {
+        fractional_color = domainify(u_color_domain, u_color_transform, a_color, overflow_behavior);
       }
-      fractional_color = domainify(u_color_domain, u_color_transform, a_color, overflow_behavior);
       fill = texture2D(u_color_aesthetic_map , vec2(color_pos, fractional_color));
       fill = vec4(fill.rgb, alpha);
     }
@@ -810,7 +812,7 @@ void run_color_fill(in float ease) {
         float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
         float overflow_behavior = 1.; // means--clamp
                 
-        if (u_last_color_domain.x == -2047. && u_last_color_domain.y == 2048.) {
+        if (u_last_color_domain.y == 4096. && u_last_color_domain.x == 0.) {
           // Assume we're in dictionary land. Unsafe, but whatever.
           overflow_behavior = 2.;
         }

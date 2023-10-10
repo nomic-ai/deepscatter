@@ -1,3 +1,5 @@
+import type { BackgroundOptions, APICall } from "./shared";
+
 export const default_background_options: BackgroundOptions = {
   color: 'gray',
   opacity: [0.2, 1],

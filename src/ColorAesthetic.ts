@@ -1,4 +1,6 @@
 import { Aesthetic, scales } from './Aesthetic';
+import type * as DS from './shared.d'
+
 import type { Regl, Texture2D } from 'regl';
 import { range as arange, extent, shuffler } from 'd3-array';
 import { isConstantChannel, isOpChannel } from './typing';
@@ -17,6 +19,7 @@ import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 const palette_size = 4096;
 import { randomLcg } from 'd3-random';
+import { Dictionary, Int, Int32, Utf8, Vector } from 'apache-arrow';
 /*function to_buffer(data: number[] | number[][]) {
   output.set(data.flat());
   return output;
@@ -45,11 +48,14 @@ function palette_from_color_strings(colors: readonly string[]): Uint8Array {
     const col = rgb(color);
     return [col.r, col.g, col.b, 255];
   });
-
   const output = new Uint8Array(palette_size * 4);
 
-  for (let i = 0; i < palette_size; i++) {
-    output.set(scheme[i % colors.length], i * 4);
+  const repeat_each = Math.floor(palette_size / colors.length);
+  for (let i = 0; i < colors.length; i++) {
+    for (let j = 0; j < repeat_each && (i * repeat_each + j < palette_size); j++) {
+      output.set(scheme[i], (i * repeat_each + j) * 4);
+    }
+//    output.set(scheme[i % colors.length], i *  4);
   }
 
   return output;
@@ -144,16 +150,16 @@ okabe();
 export class Color extends Aesthetic<
   [number, number, number],
   string,
-  ColorChannel
+  DS.ColorChannel
 > {
   _constant = '#CC5500';
   public texture_type = 'uint8';
   public default_constant = '#CC5500';
-  default_transform: Transform = 'linear';
+  default_transform: DS.Transform = 'linear';
   get default_range(): [number, number] {
     return [0, 1];
   }
-  current_encoding: null | ColorChannel = null;
+  current_encoding: null | DS.ColorChannel = null;
   default_data(): Uint8Array {
     return color_palettes.viridis;
   }
@@ -162,16 +168,23 @@ export class Color extends Aesthetic<
     return 1 as const;
   }
 
+  get colorscheme_size() : number {
+    if (this.is_dictionary()) {
+      return (this.scale.range().length as unknown as number);
+    }
+    return -1;
+  }
+
   get scale() {
     if (this._scale) {
       return this._scale;
     }
-    const scale = scales[this.transform]()
-      .domain(this.domain)
-      .range(this.range);
+
     const range = this.range;
 
     function capitalize(r: string) {
+      // TODO: this can't be right for RdBu, etc. and
+      // aso for ylorrd.
       if (r === 'ylorrd') {
         return 'YlOrRd';
       }
@@ -181,12 +194,14 @@ export class Color extends Aesthetic<
     if (this.is_dictionary()) {
       const scale = scaleOrdinal().domain(this.domain);
       if (typeof range === 'string' && schemes[range]) {
-        if (this.column.data[0].dictionary === null) {
+        const dictionary = this.column.data[0].dictionary as Vector<Utf8>;
+        if (dictionary === null) {
           throw new Error('Dictionary is null');
         }
-        return (this._scale = scale
+        const keys = dictionary.toArray() as unknown as string[];
+        return (this._scale = scaleOrdinal()
           .range(schemes[range])
-          .domain(this.column.data[0].dictionary.toArray()));
+          .domain(keys));
       } else {
         return (this._scale = scale.range(this.range));
       }
@@ -231,7 +246,7 @@ export class Color extends Aesthetic<
     this.aesthetic_map.set_color(this.id, this.texture_buffer);
   }
 
-  update(encoding: ColorChannel) {
+  update(encoding: DS.ColorChannel) {
     super.update(encoding);
     this.current_encoding = encoding;
     if (encoding === null) {
@@ -262,7 +277,7 @@ export class Color extends Aesthetic<
         return;
       } else {
         let palette: Uint8Array;
-        if (!this.is_dictionary()) {
+        if (!this.is_dictionary()) {          
           palette = palette_from_color_strings(range);
         } else {
           // We need to find the integer identifiers for each of
@@ -295,8 +310,7 @@ export class Color extends Aesthetic<
       return;
     }
     if (range.length === this.aesthetic_map.texture_size * 4) {
-      console.warn('SETTING FULL RANGE IS DEPRECATED,');
-      this.texture_buffer.set(range);
+      throw new Error('SETTING FULL RANGE IS DEPRECATED')
     }
     console.error(`request range of ${range} for color ${this.field} unknown`);
   }

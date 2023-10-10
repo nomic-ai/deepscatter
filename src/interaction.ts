@@ -95,7 +95,7 @@ export default class Zoom<T extends DS.Tile> {
             .style('padding', '10px')
             .style('background', 'ivory')
             .style('opacity', opacity),
-        (update) => update.html((d) => this.scatterplot.tooltip_html(d.data)),
+        (update) => update.html((d) => this.scatterplot.tooltip_html(d.data, this.scatterplot)),
         (exit) => exit.call((e) => e.remove())
       );
 
@@ -358,8 +358,8 @@ export default class Zoom<T extends DS.Tile> {
       .domain(scale_dat.y.limits)
       .range([y_buffer_size, height - y_buffer_size]);
 
-    scales.x_ = this.transform!.rescaleX(scales.x);
-    scales.y_ = this.transform!.rescaleY(scales.y);
+    scales.x_ = this.transform.rescaleX(scales.x);
+    scales.y_ = this.transform.rescaleY(scales.y);
 
     this._scales = scales;
     return scales;

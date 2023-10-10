@@ -4,7 +4,7 @@ import type Scatterplot from './deepscatter';
 import type { Dataset } from './Dataset';
 import { StatefulAesthetic } from './StatefulAesthetic';
 import type { Tile } from './tile';
-import { Encoding } from './shared';
+import type { Encoding } from './shared.d';
 export declare class AestheticSet<TileType extends Tile> {
     tileSet: Dataset<TileType>;
     scatterplot: Scatterplot<TileType>;
@@ -14,7 +14,7 @@ export declare class AestheticSet<TileType extends Tile> {
     private store;
     aesthetic_map: TextureSet;
     constructor(scatterplot: Scatterplot<TileType>, regl: Regl, tileSet: Dataset<TileType>);
-    dim(aesthetic: keyof typeof dimensions): any;
+    dim(aesthetic: keyof typeof dimensions): StatefulAesthetic<any>;
     [Symbol.iterator](): Iterator<[string, StatefulAesthetic<any>]>;
     interpret_position(encoding: Encoding): void;
     apply_encoding(encoding: Encoding): void;

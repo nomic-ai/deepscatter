@@ -15,7 +15,7 @@ import { isURLLabels, isLabelset } from './typing';
 import { Bitmask, DataSelection } from './selection';
 import { dictionaryFromArrays } from './utilityFunctions';
 import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
-import type * as DS from './shared.d'
+import type * as DS from './shared.d';
 // DOM elements that deepscatter uses.
 
 const base_elements = [
@@ -162,7 +162,7 @@ class Scatterplot<T extends Tile> {
         el.append('g').attr('id', 'mousepoints');
         el.append('g').attr('id', 'labelrects');
       }
-      this.elements.push(container);
+      this.elements.push(container as unknown as Selection<SVGSetElement, any, any, any>);
     }
     this.bound = true;
   }
@@ -396,17 +396,21 @@ class Scatterplot<T extends Tile> {
      * Draws a set of rectangles to the screen to illustrate the currently
      * loaded tiles. Useful for debugging and illustration.
      */
-    const map = this;
-    const ctx = map.elements[2].selectAll('canvas').node().getContext('2d');
+
+    const canvas = this.elements[2].selectAll('canvas').node() as HTMLCanvasElement;
+    
+    const ctx = canvas.getContext('2d')
+    
+    // as CanvasRenderingContext2D;
 
     ctx.clearRect(0, 0, 10_000, 10_000);
-    const { x_, y_ } = map._zoom.scales();
+    const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = '#888888';
-    const tiles = map._root.map((t: Tile) => t);
-    for (const i of range(13)) {
+    const tiles = this._root.map((t: T) => t);
+    for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
-          if (tile.codes[0] != i) {
+          if (!tile.codes || tile.codes[0] != i) {
             continue;
           }
           if (!tile.extent) {
@@ -863,19 +867,22 @@ abstract class SettableFunction<
     | undefined
     | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType);
   public string_rep: string;
-  abstract default: (datum: ArgType, plot: Scatterplot | undefined) => FuncType;
-  public plot: Scatterplot;
-  constructor(plot: Scatterplot) {
+  public plot: Scatterplot<Tiletype>;
+  constructor(plot: Scatterplot<Tiletype>) {
     this.string_rep = '';
     this.plot = plot;
   }
-  get f(): (datum: ArgType, plot: Scatterplot) => FuncType {
+
+  abstract default(datum: ArgType, plot: Scatterplot<Tiletype> | undefined): FuncType;
+
+  get f(): (datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType {
     if (this._f === undefined) {
-      return this.default;
+      return (datum, plot) => this.default(datum, plot);
     }
     return this._f;
   }
-  set f(f: string | ((datum: ArgType, plot: Scatterplot) => FuncType)) {
+  
+  set f(f: string | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType)) {
     if (typeof f === 'string') {
       if (this.string_rep !== f) {
         this.string_rep = f;
@@ -911,7 +918,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
         lambda: `d => d === '${feature.properties[labelset.label_key]}'`,
       };
     }
-    const thisis = this;
     void this.plot.plotAPI({
       encoding: { filter },
     });
@@ -919,7 +925,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
 }
 
 class ClickFunction extends SettableFunction<void> {
-  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(datum: StructRowProxy, plot = undefined) {
     console.log({ ...datum });
     return;
@@ -927,7 +932,6 @@ class ClickFunction extends SettableFunction<void> {
 }
 
 class TooltipHTML extends SettableFunction<string> {
-  //@ts-ignore bc https://github.com/microsoft/TypeScript/issues/48125
   default(point: StructRowProxy, plot = undefined) {
     // By default, this returns a
     let output = '<dl>';
