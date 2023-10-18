@@ -16782,7 +16782,7 @@ void run_color_fill(in float ease) {
       float overflow_behavior = 1.; // means--clamp
       float fractional_color;
       if (u_wrap_colors_after.y > 0.) {
-        fractional_color = fract((a_color + 1.) / u_wrap_colors_after.y);
+        fractional_color = fract(a_color / u_wrap_colors_after.y);
       } else {
         fractional_color = domainify(u_color_domain, u_color_transform, a_color, overflow_behavior);
       }
@@ -23879,7 +23879,6 @@ function palette_from_color_strings(colors2) {
     const col = rgb(color2);
     return [col.r, col.g, col.b, 255];
   });
-  console.log(colors2);
   const output = new Uint8Array(palette_size * 4);
   const repeat_each = Math.floor(palette_size / colors2.length);
   for (let i = 0; i < colors2.length; i++) {
@@ -23887,7 +23886,6 @@ function palette_from_color_strings(colors2) {
       output.set(scheme2[i], (i * repeat_each + j) * 4);
     }
   }
-  console.log(output);
   return output;
 }
 for (const schemename of [
@@ -24081,7 +24079,6 @@ class Color extends Aesthetic {
           const dict_values = Object.fromEntries(
             data_values.map((val, i) => [val, i])
           );
-          console.log({ dict_values, domain: this.domain });
           const colors2 = [];
           for (let i = 0; i < this.domain.length; i++) {
             const label = this.domain[i];
@@ -24250,6 +24247,16 @@ class AestheticSet {
     if (encoding["filter1"] !== void 0) {
       throw new Error('filter1 is not supported; just say "filter"');
     }
+    const colorDomain = encoding.color && encoding.color.domain ? encoding.color["domain"] : void 0;
+    if (colorDomain && colorDomain.length == 2) {
+      if (Math.abs(colorDomain[1] - colorDomain[0] - 4096) < 2) {
+        console.warn(`Resetting color encoding from -2047 to 0. The old behavior of requiring negative numbers 
+          for dictionary schemes is deprecated. If you're actually trying to encode real numbers here, not a dictionary, change to [-4100, 4100] 
+          until a future update.
+        `);
+        encoding.color["domain"] = [0, 4096];
+      }
+    }
     this.interpret_position(encoding);
     for (const k of Object.keys(dimensions)) {
       this.dim(k).update(encoding[k]);
@@ -24333,1117 +24340,6 @@ class TextureSet {
       format: "rgba"
     });
     return this._color_texture;
-  }
-}
-class ReglRenderer extends Renderer {
-  //  public _renderer :  Renderer;
-  constructor(selector2, tileSet, scatterplot) {
-    super(selector2, tileSet, scatterplot);
-    this.buffer_size = 1024 * 1024 * 64;
-    this._use_scale_to_download_tiles = true;
-    this.fbos = {};
-    this.textures = {};
-    const c2 = this.canvas;
-    if (this.canvas === void 0) {
-      throw new Error("No canvas found");
-    }
-    this.regl = reglExports({
-      //      extensions: 'angle_instanced_arrays',
-      optionalExtensions: [
-        "OES_standard_derivatives",
-        "OES_element_index_uint",
-        "OES_texture_float",
-        "OES_texture_half_float"
-      ],
-      canvas: c2
-    });
-    this.tileSet = tileSet;
-    this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
-    this.initialize_textures();
-    this._initializations = [
-      // some things that need to be initialized before the renderer is loaded.
-      this.tileSet.promise.then(() => {
-        this.remake_renderer();
-        this._webgl_scale_history = [
-          this.default_webgl_scale,
-          this.default_webgl_scale
-        ];
-      })
-    ];
-    void this.initialize();
-    this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
-  }
-  get buffers() {
-    this._buffers = this._buffers || new MultipurposeBufferSet(this.regl, this.buffer_size);
-    return this._buffers;
-  }
-  data(dataset) {
-    if (dataset === void 0) {
-      return this.tileSet;
-    }
-    this.tileSet = dataset;
-    return this;
-  }
-  get props() {
-    this.allocate_aesthetic_buffers();
-    const {
-      prefs,
-      aes_to_buffer_num,
-      buffer_num_to_variable,
-      variable_to_buffer_num
-    } = this;
-    const { transform } = this.zoom;
-    const colorScales = this.aes.dim("color");
-    const [currentColor, lastColor] = [colorScales.current, colorScales.last];
-    const wrap_colors_after = [
-      lastColor.colorscheme_size,
-      currentColor.colorscheme_size
-    ];
-    if (Math.random() < 1e-3) {
-      console.log(wrap_colors_after);
-    }
-    const props = {
-      // Copy the aesthetic as a string.
-      aes: { encoding: this.aes.encoding },
-      colors_as_grid: 0,
-      corners: this.zoom.current_corners(),
-      zoom_balance: prefs.zoom_balance,
-      transform,
-      max_ix: this.max_ix,
-      point_size: this.point_size,
-      alpha: this.optimal_alpha,
-      time: Date.now() - this.zoom._start,
-      update_time: Date.now() - this.most_recent_restart,
-      relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
-      string_index: 0,
-      prefs: JSON.parse(JSON.stringify(prefs)),
-      color_type: void 0,
-      wrap_colors_after,
-      start_time: this.most_recent_restart,
-      webgl_scale: this._webgl_scale_history[0],
-      last_webgl_scale: this._webgl_scale_history[1],
-      use_scale_for_tiles: this._use_scale_to_download_tiles,
-      grid_mode: 0,
-      buffer_num_to_variable,
-      aes_to_buffer_num,
-      variable_to_buffer_num,
-      color_picker_mode: 0,
-      // whether to draw as a color picker.
-      zoom_matrix: [
-        [transform.k, 0, transform.x],
-        [0, transform.k, transform.y],
-        [0, 0, 1]
-      ].flat()
-    };
-    return JSON.parse(JSON.stringify(props));
-  }
-  get default_webgl_scale() {
-    if (this._default_webgl_scale) {
-      return this._default_webgl_scale;
-    }
-    this._default_webgl_scale = this.zoom.webgl_scale();
-    return this._default_webgl_scale;
-  }
-  render_points(props) {
-    const prop_list = [];
-    let call_no = 0;
-    const needs_background_pass = this.aes.store.foreground.states[0].active || this.aes.store.foreground.states[1].active;
-    for (const tile of this.visible_tiles()) {
-      tile._buffer_manager = tile._buffer_manager || new TileBufferManager(this.regl, tile, this);
-      if (!tile._buffer_manager.ready(props.block_for_buffers)) {
-        continue;
-      }
-      const this_props = {
-        manager: tile._buffer_manager,
-        number: call_no++,
-        foreground: needs_background_pass ? 1 : -1,
-        tile_id: tile.numeric_id,
-        sprites: this.sprites
-      };
-      Object.assign(this_props, props);
-      prop_list.push(this_props);
-      if (needs_background_pass) {
-        const background_props = { ...this_props, foreground: 0 };
-        prop_list.push(background_props);
-      }
-    }
-    prop_list.sort((a, b) => {
-      return (3 + a.foreground) * 1e3 - (3 + b.foreground) * 1e3 + b.number - a.number;
-    });
-    this._renderer(prop_list);
-  }
-  /**
-   * Actions that run on a single animation tick.
-   */
-  tick() {
-    const { prefs } = this;
-    const { regl: regl2, tileSet } = this;
-    const { props } = this;
-    this.tick_num = this.tick_num || 0;
-    this.tick_num++;
-    if (this._use_scale_to_download_tiles) {
-      tileSet.download_most_needed_tiles(
-        this.zoom.current_corners(),
-        this.props.max_ix,
-        5
-      );
-    } else {
-      tileSet.download_most_needed_tiles(prefs.max_points, this.max_ix, 5);
-    }
-    regl2.clear({
-      color: [0.9, 0.9, 0.93, 0],
-      depth: 1
-    });
-    const start2 = Date.now();
-    async function pop_deferred_functions(deferred_functions) {
-      while (Date.now() - start2 < 10 && deferred_functions.length > 0) {
-        const current = deferred_functions.shift();
-        if (current === void 0) {
-          continue;
-        }
-        try {
-          await current();
-        } catch (error) {
-          console.warn(error, current);
-        }
-      }
-    }
-    void pop_deferred_functions(this.deferred_functions);
-    try {
-      this.render_all(props);
-    } catch (error) {
-      console.warn("ERROR NOTED");
-      this.reglframe.cancel();
-      throw error;
-    }
-  }
-  single_blur_pass(fbo1, fbo2, direction) {
-    const { regl: regl2 } = this;
-    fbo2.use(() => {
-      regl2.clear({ color: [0, 0, 0, 0] });
-      regl2({
-        frag: gaussian_blur,
-        uniforms: {
-          iResolution: ({ viewportWidth, viewportHeight }) => [
-            viewportWidth,
-            viewportHeight
-          ],
-          iChannel0: fbo1,
-          direction
-        },
-        /* blend: {
-          enable: true,
-          func: {
-            srcRGB: 'one',
-            srcAlpha: 'one',
-            dstRGB: 'one minus src alpha',
-            dstAlpha: 'one minus src alpha',
-          },
-        }, */
-        vert: `
-        precision mediump float;
-        attribute vec2 position;
-        varying vec2 uv;
-        void main() {
-          uv = 0.5 * (position + 1.0);
-          gl_Position = vec4(position, 0, 1);
-        }`,
-        attributes: {
-          position: [-4, -4, 4, -4, 0, 4]
-        },
-        depth: { enable: false },
-        count: 3
-      })();
-    });
-  }
-  blur(fbo1, fbo2, passes = 3) {
-    let remaining = passes - 1;
-    while (remaining > -1) {
-      this.single_blur_pass(fbo1, fbo2, [2 ** remaining, 0]);
-      this.single_blur_pass(fbo2, fbo1, [0, 2 ** remaining]);
-      remaining -= 1;
-    }
-  }
-  render_all(props) {
-    const { regl: regl2 } = this;
-    this.fbos.points.use(() => {
-      regl2.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-    });
-    regl2.clear({ color: [0, 0, 0, 0] });
-    this.fbos.lines.use(() => regl2.clear({ color: [0, 0, 0, 0] }));
-    if (this.scatterplot.trimap) {
-      this.fbos.lines.use(() => {
-        this.scatterplot.trimap.zoom = this.zoom;
-        this.scatterplot.trimap.tick("polygon");
-      });
-    }
-    for (const layer of [this.fbos.lines, this.fbos.points]) {
-      regl2({
-        profile: true,
-        blend: {
-          enable: true,
-          func: {
-            srcRGB: "one",
-            srcAlpha: "one",
-            dstRGB: "one minus src alpha",
-            dstAlpha: "one minus src alpha"
-          }
-        },
-        frag: `
-        precision mediump float;
-        varying vec2 uv;
-        uniform sampler2D tex;
-        uniform float wRcp, hRcp;
-        void main() {
-          gl_FragColor = texture2D(tex, uv);
-        }
-      `,
-        vert: `
-        precision mediump float;
-        attribute vec2 position;
-        varying vec2 uv;
-        void main() {
-          uv = 0.5 * (position + 1.0);
-          gl_Position = vec4(position, 0., 1.);
-        }
-      `,
-        attributes: {
-          position: this.fill_buffer
-        },
-        depth: { enable: false },
-        count: 3,
-        uniforms: {
-          tex: () => layer,
-          wRcp: ({ viewportWidth }) => 1 / viewportWidth,
-          hRcp: ({ viewportHeight }) => 1 / viewportHeight
-        }
-      })();
-    }
-  }
-  /*
-    set_image_data(tile, ix) {
-    // Stores a *single* image onto the texture.
-      const { regl } = this;
-  
-      this.initialize_sprites(tile);
-  
-      //    const { sprites, image_locations } = tile._regl_elements;
-      const { current_position } = sprites;
-      if (current_position[1] > (4096 - 18 * 2)) {
-        console.error(`First spritesheet overflow on ${tile.key}`);
-        // Just move back to the beginning. Will cause all sorts of havoc.
-        sprites.current_position = [0, 0];
-        return;
-      }
-      if (!tile.table.get(ix)._jpeg) {
-  
-      }
-    }
-    */
-  /*
-    spritesheet_setter(word) {
-    // Set if not there.
-      let ctx = 0;
-      if (!this.spritesheet) {
-        const offscreen = create('canvas')
-          .attr('width', 4096)
-          .attr('width', 4096)
-          .style('display', 'none');
-  
-        ctx = offscreen.node().getContext('2d');
-        const font_size = 32;
-        ctx.font = `${font_size}px Times New Roman`;
-        ctx.fillStyle = 'black';
-        ctx.lookups = new Map();
-        ctx.position = [0, font_size - font_size / 4.0];
-        this.spritesheet = ctx;
-      } else {
-        ctx = this.spritesheet;
-      }
-      let [x, y] = ctx.position;
-  
-      if (ctx.lookups.get(word)) {
-        return ctx.lookups.get(word);
-      }
-      const w_ = ctx.measureText(word).width;
-      if (w_ > 4096) {
-        return;
-      }
-      if ((x + w_) > 4096) {
-        x = 0;
-        y += font_size;
-      }
-      ctx.fillText(word, x, y);
-      lookups.set(word, { x, y, width: w_ });
-      // ctx.strokeRect(x, y - font_size, width, font_size)
-      x += w_;
-      ctx.position = [x, y];
-      return lookups.get(word);
-    }
-    */
-  initialize_textures() {
-    const { regl: regl2 } = this;
-    this.fbos = this.fbos || {};
-    this.textures = this.textures || {};
-    this.textures.empty_texture = regl2.texture(
-      range(128).map((d) => range(128).map((d2) => [0, 0, 0]))
-    );
-    this.fbos.minicounter = regl2.framebuffer({
-      width: 512,
-      height: 512,
-      depth: false
-    });
-    this.fbos.lines = regl2.framebuffer({
-      // type: 'half float',
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.points = regl2.framebuffer({
-      // type: 'half float',
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.ping = regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.pong = regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.contour = this.fbos.contour || regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.colorpicker = this.fbos.colorpicker || regl2.framebuffer({
-      width: this.width,
-      height: this.height,
-      depth: false
-    });
-    this.fbos.dummy = this.fbos.dummy || regl2.framebuffer({
-      width: 1,
-      height: 1,
-      depth: false
-    });
-  }
-  get_image_texture(url) {
-    const { regl: regl2 } = this;
-    this.textures = this.textures || {};
-    if (this.textures[url]) {
-      return this.textures[url];
-    }
-    const image = new Image();
-    image.src = url;
-    image.addEventListener("load", () => {
-      this.textures[url] = regl2.texture(image);
-    });
-    return this.textures[url];
-  }
-  /*
-    plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
-      const { scatterplot, regl, tileSet } = this.aes;
-  
-      const saved_aes = this.aes;
-  
-      if (buffer === undefined) {
-      // Mock up dummy syntax to use the main draw buffer.
-        buffer = {
-          width: this.width,
-          height: this.height,
-          use: (f) => f(),
-        };
-      }
-  
-      const { width, height } = buffer;
-  
-      this.aes = new AestheticSet(scatterplot, regl, tileSet);
-  
-      const x_length = map._root.table.getColumn(x_field).data.dictionary.length;
-  
-      const stride = 1;
-  
-      let nearest_pow_2 = 1;
-      while (nearest_pow_2 < x_length) {
-        nearest_pow_2 *= 2;
-      }
-  
-      const encoding = {
-        x: {
-          field: x_field,
-          transform: 'linear',
-          domain: [-2047, -2047 + nearest_pow_2],
-        },
-        y: y_field !== undefined ? {
-          field: y_field,
-          transform: 'linear',
-          domain: [-2047, -2020],
-  
-        } : { constant: -1 },
-        size: 1,
-        color: {
-          constant: [0, 0, 0],
-          transform: 'literal',
-        },
-        jitter_radius: {
-          constant: 1 / 2560, // maps to x jitter
-          method: 'uniform', // Means x in radius and y in speed.
-        },
-  
-        jitter_speed: y_field === undefined ? 1 : 1 / 256, // maps to y jitter
-      };
-      // Twice to overwrite the defaults and avoid interpolation.
-      this.aes.apply_encoding(encoding);
-      this.aes.apply_encoding(encoding);
-      this.aes.x[1] = saved_aes.x[0];
-      this.aes.y[1] = saved_aes.y[0];
-      this.aes.filter1 = saved_aes.filter1;
-      this.aes.filter2 = saved_aes.filter2;
-  
-      const { props } = this;
-      props.block_for_buffers = true;
-      props.grid_mode = 1;
-  
-      const minilist = new Uint8Array(width * height * 4);
-  
-      buffer.use(() => {
-        this.regl.clear({ color: [0, 0, 0, 0] });
-        this.render_points(props);
-        regl.read({ data: minilist });
-      });
-      // Then revert back.
-      this.aes = saved_aes;
-    }
-     */
-  n_visible(only_color = -1) {
-    let { width, height } = this;
-    width = Math.floor(width);
-    height = Math.floor(height);
-    if (this.contour_vals === void 0) {
-      this.contour_vals = new Uint8Array(width * height * 4);
-    }
-    const { props } = this;
-    props.only_color = only_color;
-    let v;
-    this.fbos.contour.use(() => {
-      this.regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      this.regl.read(this.contour_vals);
-      v = sum$1(this.contour_vals);
-    });
-    return v;
-  }
-  get integer_buffer() {
-    if (this._integer_buffer === void 0) {
-      const array2 = new Float32Array(2 ** 16);
-      for (let i = 0; i < 2 ** 16; i++) {
-        array2[i] = i;
-      }
-      this._integer_buffer = this.regl.buffer(array2);
-    }
-    return this._integer_buffer;
-  }
-  color_pick(x, y) {
-    if (y === 0) {
-      return null;
-    }
-    const tile_number = this.color_pick_single(x, y, "tile_id");
-    if (tile_number == -1) {
-      return null;
-    }
-    const row_number = this.color_pick_single(x, y, "ix_in_tile");
-    if (row_number === -1) {
-      return null;
-    }
-    for (const tile of this.visible_tiles()) {
-      if (tile.numeric_id === tile_number) {
-        return tile.record_batch.get(row_number);
-      }
-    }
-    return null;
-  }
-  color_pick_single(x, y, field = "tile_id") {
-    const { props, height } = this;
-    props.color_picker_mode = ["ix", "tile_id", "ix_in_tile"].indexOf(field) + 1;
-    let color_at_point = [0, 0, 0, 0];
-    this.fbos.colorpicker.use(() => {
-      this.regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      try {
-        color_at_point = this.regl.read({
-          x,
-          y: height - y,
-          width: 1,
-          height: 1
-        });
-      } catch {
-        console.warn("Read bad data from", {
-          x,
-          y,
-          height,
-          attempted: height - y
-        });
-      }
-    });
-    const point_as_float = glslReadFloat(...color_at_point) - 1;
-    const point_as_int = Math.round(point_as_float);
-    return point_as_int;
-  }
-  /* blur(fbo) {
-    var passes = [];
-    var radii = [Math.round(
-      Math.max(1, state.bloom.radius * pixelRatio / state.bloom.downsample))];
-    for (var radius = nextPow2(radii[0]) / 2; radius >= 1; radius /= 2) {
-      radii.push(radius);
-    }
-    radii.forEach(radius => {
-      for (var pass = 0; pass < state.bloom.blur.passes; pass++) {
-        passes.push({
-          kernel: 13,
-          src: bloomFbo[0],
-          dst: bloomFbo[1],
-          direction: [radius, 0]
-        }, {
-          kernel: 13,
-          src: bloomFbo[1],
-          dst: bloomFbo[0],
-          direction: [0, radius]
-        });
-      }
-    })
-  } */
-  get fill_buffer() {
-    if (!this._fill_buffer) {
-      const { regl: regl2 } = this;
-      this._fill_buffer = regl2.buffer({ data: [-4, -4, 4, -4, 0, 4] });
-    }
-    return this._fill_buffer;
-  }
-  draw_contour_buffer(field, ix) {
-    let { width, height } = this;
-    width = Math.floor(width);
-    height = Math.floor(height);
-    this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height);
-    this.contour_alpha_vals = this.contour_alpha_vals || new Uint16Array(width * height);
-    const { props } = this;
-    props.aes.encoding.color = {
-      field
-    };
-    props.only_color = ix;
-    this.fbos.contour.use(() => {
-      this.regl.clear({ color: [0, 0, 0, 0] });
-      this.render_points(props);
-      this.regl.read(this.contour_vals);
-    });
-    this.blur(this.fbos.contour, this.fbos.ping, 3);
-    this.fbos.contour.use(() => {
-      this.regl.read(this.contour_vals);
-    });
-    let i = 0;
-    while (i < width * height * 4) {
-      this.contour_alpha_vals[i / 4] = this.contour_vals[i + 3] * 255;
-      i += 4;
-    }
-    return this.contour_alpha_vals;
-  }
-  remake_renderer() {
-    const { regl: regl2 } = this;
-    const parameters = {
-      depth: { enable: false },
-      stencil: { enable: false },
-      blend: {
-        enable(_, { color_picker_mode }) {
-          return color_picker_mode < 0.5;
-        },
-        func: {
-          srcRGB: "one",
-          srcAlpha: "one",
-          dstRGB: "one minus src alpha",
-          dstAlpha: "one minus src alpha"
-        }
-      },
-      primitive: "points",
-      frag: frag_shader,
-      vert: vertex_shader,
-      count(_, props) {
-        return props.manager.count;
-      },
-      attributes: {
-        //        buffer_0: (_, props) => props.manager.regl_elements.get('ix'),
-        //        buffer_1: this.integer_buffer
-      },
-      // Filled below.
-      uniforms: {
-        //@ts-ignore
-        u_update_time: regl2.prop("update_time"),
-        u_transition_duration(_, props) {
-          return props.prefs.duration;
-        },
-        u_only_color(_, props) {
-          if (props.only_color !== void 0) {
-            return props.only_color;
-          }
-          return -2;
-        },
-        u_wrap_colors_after: (_, { wrap_colors_after }) => {
-          if (wrap_colors_after === void 0) {
-            throw new Error("wrap_colors_after is undefined");
-          }
-          return wrap_colors_after;
-        },
-        u_use_glyphset: (_, { prefs }) => prefs.glyph_set ? 1 : 0,
-        u_glyphset: (_, { prefs }) => {
-          if (prefs.glyph_set) {
-            return this.get_image_texture(prefs.glyph_set);
-          }
-          return this.textures.empty_texture;
-        },
-        //@ts-ignore
-        u_color_picker_mode: regl2.prop("color_picker_mode"),
-        u_position_interpolation_mode() {
-          if (this.aes.position_interpolation) {
-            return 1;
-          }
-          return 0;
-        },
-        u_grid_mode: (_, { grid_mode }) => grid_mode,
-        //@ts-ignore
-        u_colors_as_grid: regl2.prop("colors_as_grid"),
-        /*        u_constant_color: () => (this.aes.dim("color").current.constant !== undefined
-          ? this.aes.dim("color").current.constant
-          : [-1, -1, -1]),
-        u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
-          ? this.aes.dim("color").last.constant
-          : [-1, -1, -1]),*/
-        u_tile_id: (_, props) => props.tile_id,
-        u_width: ({ viewportWidth }) => viewportWidth,
-        u_height: ({ viewportHeight }) => viewportHeight,
-        u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
-        u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
-        u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
-        //@ts-ignore
-        u_zoom_balance: regl2.prop("zoom_balance"),
-        u_base_size: (_, { point_size }) => point_size,
-        u_maxix: (_, { max_ix }) => max_ix,
-        u_alpha: (_, { alpha }) => alpha,
-        u_foreground_number: (_, { foreground }) => foreground,
-        u_foreground_alpha: () => this.render_props.foreground_opacity,
-        u_background_rgba: () => {
-          const color2 = this.prefs.background_options.color;
-          const { r, g, b } = rgb(color2);
-          return [
-            r / 255,
-            g / 255,
-            b / 255,
-            this.prefs.background_options.opacity
-          ];
-        },
-        u_background_mouseover: () => this.prefs.background_options.mouseover ? 1 : 0,
-        u_background_size: () => this.render_props.background_size,
-        u_foreground_size: () => this.render_props.foreground_size,
-        u_k: (_, props) => {
-          return props.transform.k;
-        },
-        // Allow interpolation between different coordinate systems.
-        //@ts-ignore
-        u_window_scale: regl2.prop("webgl_scale"),
-        //@ts-ignore
-        u_last_window_scale: regl2.prop("last_webgl_scale"),
-        u_time: ({ time }) => time,
-        u_filter_numeric() {
-          return this.aes.dim("filter").current.ops_to_array();
-        },
-        u_last_filter_numeric() {
-          return this.aes.dim("filter").last.ops_to_array();
-        },
-        u_filter2_numeric() {
-          return this.aes.dim("filter2").current.ops_to_array();
-        },
-        u_last_filter2_numeric() {
-          return this.aes.dim("filter2").last.ops_to_array();
-        },
-        u_foreground_numeric() {
-          return this.aes.dim("foreground").current.ops_to_array();
-        },
-        u_last_foreground_numeric() {
-          return this.aes.dim("foreground").last.ops_to_array();
-        },
-        u_jitter: () => this.aes.dim("jitter_radius").current.jitter_int_format,
-        u_last_jitter: () => this.aes.dim("jitter_radius").last.jitter_int_format,
-        u_zoom(_, props) {
-          return props.zoom_matrix;
-        }
-      }
-    };
-    for (const i of range(0, 16)) {
-      parameters.attributes[`buffer_${i}`] = (_, { manager, buffer_num_to_variable }) => {
-        const c2 = manager.regl_elements.get(buffer_num_to_variable[i]);
-        return c2 || { constant: 0 };
-      };
-    }
-    for (const k of [
-      "x",
-      "y",
-      "color",
-      "jitter_radius",
-      "x0",
-      "y0",
-      "jitter_speed",
-      "size",
-      "filter",
-      "filter2",
-      "foreground"
-      //      'character',
-    ]) {
-      for (const time of ["current", "last"]) {
-        const temporal = time === "current" ? "" : "last_";
-        parameters.uniforms[`u_${temporal}${k}_map_position`] = () => {
-          return this.aes.dim(k)[time].map_position;
-        };
-        parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
-          const val = aes_to_buffer_num[`${k}--${time}`];
-          if (val === void 0) {
-            return -1;
-          }
-          return val;
-        };
-        parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].webGLDomain;
-        parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
-        parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
-          const t = this.aes.dim(k)[time].transform;
-          if (t === "linear")
-            return 1;
-          if (t === "sqrt")
-            return 2;
-          if (t === "log")
-            return 3;
-          if (t === "literal")
-            return 4;
-          throw "Invalid transform";
-        };
-        parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
-          return this.aes.dim(k)[time].constant;
-        };
-      }
-    }
-    this._renderer = regl2(parameters);
-    return this._renderer;
-  }
-  allocate_aesthetic_buffers() {
-    const buffers = [];
-    const priorities = [
-      // How important is safe interpolation?
-      "x",
-      "y",
-      "color",
-      "x0",
-      "y0",
-      "size",
-      "jitter_radius",
-      "jitter_speed",
-      "filter",
-      "filter2",
-      "foreground"
-    ];
-    for (const aesthetic of priorities) {
-      const times = ["current", "last"];
-      for (const time of times) {
-        try {
-          if (this.aes.dim(aesthetic)[time].field) {
-            buffers.push({
-              aesthetic,
-              time,
-              field: this.aes.dim(aesthetic)[time].field
-            });
-          }
-        } catch (error) {
-          this.reglframe = void 0;
-          throw error;
-        }
-      }
-    }
-    buffers.sort((a, b) => {
-      if (a.time < b.time) {
-        return -1;
-      }
-      if (b.time < a.time) {
-        return 1;
-      }
-      return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
-    });
-    const aes_to_buffer_num = {};
-    const variable_to_buffer_num = {
-      ix: 0,
-      ix_in_tile: 1
-    };
-    let num = 1;
-    for (const { aesthetic, time, field } of buffers) {
-      const k = `${aesthetic}--${time}`;
-      if (variable_to_buffer_num[field] !== void 0) {
-        aes_to_buffer_num[k] = variable_to_buffer_num[field];
-        continue;
-      }
-      if (num++ < 16) {
-        aes_to_buffer_num[k] = num;
-        variable_to_buffer_num[field] = num;
-        continue;
-      } else {
-        aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
-      }
-    }
-    const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
-    this.aes_to_buffer_num = aes_to_buffer_num;
-    this.variable_to_buffer_num = variable_to_buffer_num;
-    this.buffer_num_to_variable = buffer_num_to_variable;
-  }
-  get discard_share() {
-    return 0;
-  }
-}
-class TileBufferManager {
-  constructor(regl2, tile, renderer) {
-    this.tile = tile;
-    this.regl = regl2;
-    this.renderer = renderer;
-    this.regl_elements = /* @__PURE__ */ new Map([
-      [
-        "ix_in_tile",
-        {
-          offset: 0,
-          stride: 4,
-          buffer: renderer.integer_buffer,
-          byte_size: 4 * 2 ** 16
-        }
-      ]
-    ]);
-  }
-  /**
-   *
-   * @param
-   * @returns
-   */
-  ready() {
-    const { renderer } = this;
-    const needed_dimensions = /* @__PURE__ */ new Set();
-    for (const [k, v] of renderer.aes) {
-      for (const aesthetic of v.states) {
-        if (aesthetic.field) {
-          needed_dimensions.add(aesthetic.field);
-        }
-      }
-    }
-    for (const key of ["ix", "ix_in_tile", ...needed_dimensions]) {
-      if (!this.ready_or_not_here_it_comes(key).ready) {
-        return false;
-      }
-    }
-    return true;
-  }
-  /**
-   * Creates a deferred call that will populate the regl buffer
-   * when there's some free time.
-   *
-   * @param key a string representing the requested column; must either exist in the
-   * record batch or have a means for creating it asynchronously in 'transformations.'
-   * @returns both an instantly available object called 'ready' that says if we're ready
-   * to go: and, if the tile is ready, a promise that starts the update going and resolves
-   * once it's ready.
-   */
-  ready_or_not_here_it_comes(key) {
-    const { renderer, regl_elements } = this;
-    const current = this.regl_elements.get(key);
-    if (current === null) {
-      return { ready: false, promise: null };
-    }
-    if (current === void 0) {
-      if (!this.tile.ready) {
-        return { ready: false, promise: null };
-      }
-      regl_elements.set(key, null);
-      const created = new Promise((resolve) => {
-        renderer.deferred_functions.push(async () => {
-          await this.create_regl_buffer(key);
-          resolve();
-        });
-      });
-      return { ready: false, promise: created };
-    }
-    return { ready: true, promise: Promise.resolve() };
-  }
-  /**
-   *
-   * @param colname the name of the column to release
-   *
-   * @returns Nothing, not even if the column isn't currently defined.
-   */
-  release(colname) {
-    let current;
-    if (current = this.regl_elements.get(colname)) {
-      this.renderer.buffers.free_block(current);
-    }
-  }
-  get count() {
-    return this.tile.record_batch.numRows;
-  }
-  async create_buffer_data(key) {
-    const { tile } = this;
-    if (!tile.ready) {
-      throw new Error("Tile table not present.");
-    }
-    let column = tile.record_batch.getChild(key);
-    if (!column) {
-      const transformation = tile.dataset.transformations[key];
-      if (transformation !== void 0) {
-        await tile.apply_transformation(key);
-        column = tile.record_batch.getChild(key);
-        if (!column) {
-          throw new Error(`${key} was not created.`);
-        }
-      } else {
-        const col_names = tile.record_batch.schema.fields.map((d) => d.name);
-        throw new Error(
-          `Requested ${key} but table only has columns ["${col_names.join(
-            '", "'
-          )}]"`
-        );
-      }
-    }
-    if (column.data.length !== 1) {
-      throw new Error(
-        `Column ${key} has ${column.data.length} buffers, not 1.`
-      );
-    }
-    if (!column.type || !column.type.typeId) {
-      throw new Error(`Column ${key} has no type.`);
-    }
-    if (!column.type || column.type.typeId !== 3) {
-      const buffer = new Float32Array(tile.record_batch.numRows);
-      const source_buffer = column.data[0];
-      if (column.type["dictionary"]) {
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
-          buffer[i] = source_buffer.values[i] - 2047;
-        }
-      } else if (column.type.typeId === 6) {
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
-          buffer[i] = column.get(i) ? 1 : 0;
-        }
-      } else if (source_buffer.stride === 2 && column.type.typeId === 10) {
-        const copy2 = new Int32Array(source_buffer.values).buffer;
-        const view64 = new BigInt64Array(copy2);
-        const timetype = column.type.unit;
-        const divisor = timetype === 0 ? 1e-3 : timetype === 1 ? 1 : timetype === 2 ? 1e3 : timetype === 3 ? 1e6 : 42;
-        if (divisor === 42) {
-          throw new Error(`Unknown time type ${timetype}`);
-        }
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
-          buffer[i] = Number(view64[i]) / divisor;
-        }
-      } else {
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
-          buffer[i] = Number(source_buffer.values[i]);
-        }
-      }
-      return buffer;
-    }
-    if (column.data[0].values.constructor === Float64Array) {
-      return new Float32Array(column.data[0].values);
-    }
-    return column.data[0].values;
-  }
-  async create_regl_buffer(key) {
-    const { regl_elements, renderer } = this;
-    const data = await this.create_buffer_data(key);
-    if (data.constructor !== Float32Array) {
-      console.warn(typeof data, data);
-      throw new Error("Buffer data must be a Float32Array");
-    }
-    const item_size = 4;
-    const data_length = data.length;
-    const buffer_desc = renderer.buffers.allocate_block(data_length, item_size);
-    regl_elements.set(key, buffer_desc);
-    buffer_desc.buffer.subdata(data, buffer_desc.offset);
-  }
-}
-class MultipurposeBufferSet {
-  /**
-   *
-   * @param regl the Regl context we're using.
-   * @param buffer_size The number of bytes on each strip of memory that we'll ask for.
-   */
-  constructor(regl2, buffer_size) {
-    this.freed_buffers = [];
-    this.regl = regl2;
-    this.buffer_size = buffer_size;
-    this.buffers = [];
-    this.pointer = 0;
-    this.generate_new_buffer();
-  }
-  generate_new_buffer() {
-    if (this.buffers.length && this.buffer_size - this.pointer > 128) {
-      this.freed_buffers.push({
-        buffer: this.buffers[0],
-        offset: this.pointer,
-        stride: 4,
-        // meaningless here.
-        byte_size: this.buffer_size - this.pointer
-      });
-    }
-    this.pointer = 0;
-    this.buffers.unshift(
-      this.regl.buffer({
-        type: "float",
-        length: this.buffer_size,
-        usage: "dynamic"
-      })
-    );
-  }
-  /**
-   * Freeing a block means just adding its space back into the list of open blocks.
-   * There's no need to actually zero out the memory or anything.
-   *
-   * @param buff The location of the buffer we're done with.
-   */
-  free_block(buff) {
-    this.freed_buffers.push(buff);
-  }
-  /**
-   *
-   * @param items The number of datapoints in the arrow column being allocated
-   * @param bytes_per_item The number of bytes per item in the arrow column being allocated
-   * @returns
-   */
-  allocate_block(items, bytes_per_item) {
-    const bytes_needed = items * bytes_per_item;
-    let i = 0;
-    for (const buffer_loc of this.freed_buffers) {
-      if (buffer_loc.byte_size === bytes_needed) {
-        this.freed_buffers.splice(i, 1);
-        return {
-          buffer: buffer_loc.buffer,
-          offset: buffer_loc.offset,
-          stride: bytes_per_item,
-          byte_size: bytes_needed
-        };
-      }
-      i += 1;
-    }
-    if (this.pointer + items * bytes_per_item > this.buffer_size) {
-      this.generate_new_buffer();
-    }
-    const value = {
-      // First slot stores the active buffer.
-      buffer: this.buffers[0],
-      offset: this.pointer,
-      stride: bytes_per_item,
-      byte_size: items * bytes_per_item
-    };
-    this.pointer += items * bytes_per_item;
-    return value;
   }
 }
 function __awaiter(thisArg, _arguments, P, generator) {
@@ -35857,6 +34753,1114 @@ function tableFromIPC(input) {
     return reader.readAll().then((xs) => new Table(xs));
   }
   return new Table(reader.readAll());
+}
+class ReglRenderer extends Renderer {
+  //  public _renderer :  Renderer;
+  constructor(selector2, tileSet, scatterplot) {
+    super(selector2, tileSet, scatterplot);
+    this.buffer_size = 1024 * 1024 * 64;
+    this._use_scale_to_download_tiles = true;
+    this.fbos = {};
+    this.textures = {};
+    const c2 = this.canvas;
+    if (this.canvas === void 0) {
+      throw new Error("No canvas found");
+    }
+    this.regl = reglExports({
+      //      extensions: 'angle_instanced_arrays',
+      optionalExtensions: [
+        "OES_standard_derivatives",
+        "OES_element_index_uint",
+        "OES_texture_float",
+        "OES_texture_half_float"
+      ],
+      canvas: c2
+    });
+    this.tileSet = tileSet;
+    this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
+    this.initialize_textures();
+    this._initializations = [
+      // some things that need to be initialized before the renderer is loaded.
+      this.tileSet.promise.then(() => {
+        this.remake_renderer();
+        this._webgl_scale_history = [
+          this.default_webgl_scale,
+          this.default_webgl_scale
+        ];
+      })
+    ];
+    void this.initialize();
+    this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
+  }
+  get buffers() {
+    this._buffers = this._buffers || new MultipurposeBufferSet(this.regl, this.buffer_size);
+    return this._buffers;
+  }
+  data(dataset) {
+    if (dataset === void 0) {
+      return this.tileSet;
+    }
+    this.tileSet = dataset;
+    return this;
+  }
+  get props() {
+    this.allocate_aesthetic_buffers();
+    const {
+      prefs,
+      aes_to_buffer_num,
+      buffer_num_to_variable,
+      variable_to_buffer_num
+    } = this;
+    const { transform } = this.zoom;
+    const colorScales = this.aes.dim("color");
+    const [currentColor, lastColor] = [colorScales.current, colorScales.last];
+    const wrap_colors_after = [
+      lastColor.colorscheme_size,
+      currentColor.colorscheme_size
+    ];
+    const props = {
+      // Copy the aesthetic as a string.
+      aes: { encoding: this.aes.encoding },
+      colors_as_grid: 0,
+      corners: this.zoom.current_corners(),
+      zoom_balance: prefs.zoom_balance,
+      transform,
+      max_ix: this.max_ix,
+      point_size: this.point_size,
+      alpha: this.optimal_alpha,
+      time: Date.now() - this.zoom._start,
+      update_time: Date.now() - this.most_recent_restart,
+      relative_time: (Date.now() - this.most_recent_restart) / prefs.duration,
+      string_index: 0,
+      prefs: JSON.parse(JSON.stringify(prefs)),
+      color_type: void 0,
+      wrap_colors_after,
+      start_time: this.most_recent_restart,
+      webgl_scale: this._webgl_scale_history[0],
+      last_webgl_scale: this._webgl_scale_history[1],
+      use_scale_for_tiles: this._use_scale_to_download_tiles,
+      grid_mode: 0,
+      buffer_num_to_variable,
+      aes_to_buffer_num,
+      variable_to_buffer_num,
+      color_picker_mode: 0,
+      // whether to draw as a color picker.
+      zoom_matrix: [
+        [transform.k, 0, transform.x],
+        [0, transform.k, transform.y],
+        [0, 0, 1]
+      ].flat()
+    };
+    return JSON.parse(JSON.stringify(props));
+  }
+  get default_webgl_scale() {
+    if (this._default_webgl_scale) {
+      return this._default_webgl_scale;
+    }
+    this._default_webgl_scale = this.zoom.webgl_scale();
+    return this._default_webgl_scale;
+  }
+  render_points(props) {
+    const prop_list = [];
+    let call_no = 0;
+    const needs_background_pass = this.aes.store.foreground.states[0].active || this.aes.store.foreground.states[1].active;
+    for (const tile of this.visible_tiles()) {
+      tile._buffer_manager = tile._buffer_manager || new TileBufferManager(this.regl, tile, this);
+      if (!tile._buffer_manager.ready(props.block_for_buffers)) {
+        continue;
+      }
+      const this_props = {
+        manager: tile._buffer_manager,
+        number: call_no++,
+        foreground: needs_background_pass ? 1 : -1,
+        tile_id: tile.numeric_id,
+        sprites: this.sprites
+      };
+      Object.assign(this_props, props);
+      prop_list.push(this_props);
+      if (needs_background_pass) {
+        const background_props = { ...this_props, foreground: 0 };
+        prop_list.push(background_props);
+      }
+    }
+    prop_list.sort((a, b) => {
+      return (3 + a.foreground) * 1e3 - (3 + b.foreground) * 1e3 + b.number - a.number;
+    });
+    this._renderer(prop_list);
+  }
+  /**
+   * Actions that run on a single animation tick.
+   */
+  tick() {
+    const { prefs } = this;
+    const { regl: regl2, tileSet } = this;
+    const { props } = this;
+    this.tick_num = this.tick_num || 0;
+    this.tick_num++;
+    if (this._use_scale_to_download_tiles) {
+      tileSet.download_most_needed_tiles(
+        this.zoom.current_corners(),
+        this.props.max_ix,
+        5
+      );
+    } else {
+      tileSet.download_most_needed_tiles(prefs.max_points, this.max_ix, 5);
+    }
+    regl2.clear({
+      color: [0.9, 0.9, 0.93, 0],
+      depth: 1
+    });
+    const start2 = Date.now();
+    async function pop_deferred_functions(deferred_functions) {
+      while (Date.now() - start2 < 10 && deferred_functions.length > 0) {
+        const current = deferred_functions.shift();
+        if (current === void 0) {
+          continue;
+        }
+        try {
+          await current();
+        } catch (error) {
+          console.warn(error, current);
+        }
+      }
+    }
+    void pop_deferred_functions(this.deferred_functions);
+    try {
+      this.render_all(props);
+    } catch (error) {
+      console.warn("ERROR NOTED");
+      this.reglframe.cancel();
+      throw error;
+    }
+  }
+  single_blur_pass(fbo1, fbo2, direction) {
+    const { regl: regl2 } = this;
+    fbo2.use(() => {
+      regl2.clear({ color: [0, 0, 0, 0] });
+      regl2({
+        frag: gaussian_blur,
+        uniforms: {
+          iResolution: ({ viewportWidth, viewportHeight }) => [
+            viewportWidth,
+            viewportHeight
+          ],
+          iChannel0: fbo1,
+          direction
+        },
+        /* blend: {
+          enable: true,
+          func: {
+            srcRGB: 'one',
+            srcAlpha: 'one',
+            dstRGB: 'one minus src alpha',
+            dstAlpha: 'one minus src alpha',
+          },
+        }, */
+        vert: `
+        precision mediump float;
+        attribute vec2 position;
+        varying vec2 uv;
+        void main() {
+          uv = 0.5 * (position + 1.0);
+          gl_Position = vec4(position, 0, 1);
+        }`,
+        attributes: {
+          position: [-4, -4, 4, -4, 0, 4]
+        },
+        depth: { enable: false },
+        count: 3
+      })();
+    });
+  }
+  blur(fbo1, fbo2, passes = 3) {
+    let remaining = passes - 1;
+    while (remaining > -1) {
+      this.single_blur_pass(fbo1, fbo2, [2 ** remaining, 0]);
+      this.single_blur_pass(fbo2, fbo1, [0, 2 ** remaining]);
+      remaining -= 1;
+    }
+  }
+  render_all(props) {
+    const { regl: regl2 } = this;
+    this.fbos.points.use(() => {
+      regl2.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+    });
+    regl2.clear({ color: [0, 0, 0, 0] });
+    this.fbos.lines.use(() => regl2.clear({ color: [0, 0, 0, 0] }));
+    if (this.scatterplot.trimap) {
+      this.fbos.lines.use(() => {
+        this.scatterplot.trimap.zoom = this.zoom;
+        this.scatterplot.trimap.tick("polygon");
+      });
+    }
+    for (const layer of [this.fbos.lines, this.fbos.points]) {
+      regl2({
+        profile: true,
+        blend: {
+          enable: true,
+          func: {
+            srcRGB: "one",
+            srcAlpha: "one",
+            dstRGB: "one minus src alpha",
+            dstAlpha: "one minus src alpha"
+          }
+        },
+        frag: `
+        precision mediump float;
+        varying vec2 uv;
+        uniform sampler2D tex;
+        uniform float wRcp, hRcp;
+        void main() {
+          gl_FragColor = texture2D(tex, uv);
+        }
+      `,
+        vert: `
+        precision mediump float;
+        attribute vec2 position;
+        varying vec2 uv;
+        void main() {
+          uv = 0.5 * (position + 1.0);
+          gl_Position = vec4(position, 0., 1.);
+        }
+      `,
+        attributes: {
+          position: this.fill_buffer
+        },
+        depth: { enable: false },
+        count: 3,
+        uniforms: {
+          tex: () => layer,
+          wRcp: ({ viewportWidth }) => 1 / viewportWidth,
+          hRcp: ({ viewportHeight }) => 1 / viewportHeight
+        }
+      })();
+    }
+  }
+  /*
+    set_image_data(tile, ix) {
+    // Stores a *single* image onto the texture.
+      const { regl } = this;
+  
+      this.initialize_sprites(tile);
+  
+      //    const { sprites, image_locations } = tile._regl_elements;
+      const { current_position } = sprites;
+      if (current_position[1] > (4096 - 18 * 2)) {
+        console.error(`First spritesheet overflow on ${tile.key}`);
+        // Just move back to the beginning. Will cause all sorts of havoc.
+        sprites.current_position = [0, 0];
+        return;
+      }
+      if (!tile.table.get(ix)._jpeg) {
+  
+      }
+    }
+    */
+  /*
+    spritesheet_setter(word) {
+    // Set if not there.
+      let ctx = 0;
+      if (!this.spritesheet) {
+        const offscreen = create('canvas')
+          .attr('width', 4096)
+          .attr('width', 4096)
+          .style('display', 'none');
+  
+        ctx = offscreen.node().getContext('2d');
+        const font_size = 32;
+        ctx.font = `${font_size}px Times New Roman`;
+        ctx.fillStyle = 'black';
+        ctx.lookups = new Map();
+        ctx.position = [0, font_size - font_size / 4.0];
+        this.spritesheet = ctx;
+      } else {
+        ctx = this.spritesheet;
+      }
+      let [x, y] = ctx.position;
+  
+      if (ctx.lookups.get(word)) {
+        return ctx.lookups.get(word);
+      }
+      const w_ = ctx.measureText(word).width;
+      if (w_ > 4096) {
+        return;
+      }
+      if ((x + w_) > 4096) {
+        x = 0;
+        y += font_size;
+      }
+      ctx.fillText(word, x, y);
+      lookups.set(word, { x, y, width: w_ });
+      // ctx.strokeRect(x, y - font_size, width, font_size)
+      x += w_;
+      ctx.position = [x, y];
+      return lookups.get(word);
+    }
+    */
+  initialize_textures() {
+    const { regl: regl2 } = this;
+    this.fbos = this.fbos || {};
+    this.textures = this.textures || {};
+    this.textures.empty_texture = regl2.texture(
+      range(128).map((d) => range(128).map((d2) => [0, 0, 0]))
+    );
+    this.fbos.minicounter = regl2.framebuffer({
+      width: 512,
+      height: 512,
+      depth: false
+    });
+    this.fbos.lines = regl2.framebuffer({
+      // type: 'half float',
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.points = regl2.framebuffer({
+      // type: 'half float',
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.ping = regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.pong = regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.contour = this.fbos.contour || regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.colorpicker = this.fbos.colorpicker || regl2.framebuffer({
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.dummy = this.fbos.dummy || regl2.framebuffer({
+      width: 1,
+      height: 1,
+      depth: false
+    });
+  }
+  get_image_texture(url) {
+    const { regl: regl2 } = this;
+    this.textures = this.textures || {};
+    if (this.textures[url]) {
+      return this.textures[url];
+    }
+    const image = new Image();
+    image.src = url;
+    image.addEventListener("load", () => {
+      this.textures[url] = regl2.texture(image);
+    });
+    return this.textures[url];
+  }
+  /*
+    plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
+      const { scatterplot, regl, tileSet } = this.aes;
+  
+      const saved_aes = this.aes;
+  
+      if (buffer === undefined) {
+      // Mock up dummy syntax to use the main draw buffer.
+        buffer = {
+          width: this.width,
+          height: this.height,
+          use: (f) => f(),
+        };
+      }
+  
+      const { width, height } = buffer;
+  
+      this.aes = new AestheticSet(scatterplot, regl, tileSet);
+  
+      const x_length = map._root.table.getColumn(x_field).data.dictionary.length;
+  
+      const stride = 1;
+  
+      let nearest_pow_2 = 1;
+      while (nearest_pow_2 < x_length) {
+        nearest_pow_2 *= 2;
+      }
+  
+      const encoding = {
+        x: {
+          field: x_field,
+          transform: 'linear',
+          domain: [-2047, -2047 + nearest_pow_2],
+        },
+        y: y_field !== undefined ? {
+          field: y_field,
+          transform: 'linear',
+          domain: [-2047, -2020],
+  
+        } : { constant: -1 },
+        size: 1,
+        color: {
+          constant: [0, 0, 0],
+          transform: 'literal',
+        },
+        jitter_radius: {
+          constant: 1 / 2560, // maps to x jitter
+          method: 'uniform', // Means x in radius and y in speed.
+        },
+  
+        jitter_speed: y_field === undefined ? 1 : 1 / 256, // maps to y jitter
+      };
+      // Twice to overwrite the defaults and avoid interpolation.
+      this.aes.apply_encoding(encoding);
+      this.aes.apply_encoding(encoding);
+      this.aes.x[1] = saved_aes.x[0];
+      this.aes.y[1] = saved_aes.y[0];
+      this.aes.filter1 = saved_aes.filter1;
+      this.aes.filter2 = saved_aes.filter2;
+  
+      const { props } = this;
+      props.block_for_buffers = true;
+      props.grid_mode = 1;
+  
+      const minilist = new Uint8Array(width * height * 4);
+  
+      buffer.use(() => {
+        this.regl.clear({ color: [0, 0, 0, 0] });
+        this.render_points(props);
+        regl.read({ data: minilist });
+      });
+      // Then revert back.
+      this.aes = saved_aes;
+    }
+     */
+  n_visible(only_color = -1) {
+    let { width, height } = this;
+    width = Math.floor(width);
+    height = Math.floor(height);
+    if (this.contour_vals === void 0) {
+      this.contour_vals = new Uint8Array(width * height * 4);
+    }
+    const { props } = this;
+    props.only_color = only_color;
+    let v;
+    this.fbos.contour.use(() => {
+      this.regl.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+      this.regl.read(this.contour_vals);
+      v = sum$1(this.contour_vals);
+    });
+    return v;
+  }
+  get integer_buffer() {
+    if (this._integer_buffer === void 0) {
+      const array2 = new Float32Array(2 ** 16);
+      for (let i = 0; i < 2 ** 16; i++) {
+        array2[i] = i;
+      }
+      this._integer_buffer = this.regl.buffer(array2);
+    }
+    return this._integer_buffer;
+  }
+  color_pick(x, y) {
+    if (y === 0) {
+      return null;
+    }
+    const tile_number = this.color_pick_single(x, y, "tile_id");
+    if (tile_number == -1) {
+      return null;
+    }
+    const row_number = this.color_pick_single(x, y, "ix_in_tile");
+    if (row_number === -1) {
+      return null;
+    }
+    for (const tile of this.visible_tiles()) {
+      if (tile.numeric_id === tile_number) {
+        return tile.record_batch.get(row_number);
+      }
+    }
+    return null;
+  }
+  color_pick_single(x, y, field = "tile_id") {
+    const { props, height } = this;
+    props.color_picker_mode = ["ix", "tile_id", "ix_in_tile"].indexOf(field) + 1;
+    let color_at_point = [0, 0, 0, 0];
+    this.fbos.colorpicker.use(() => {
+      this.regl.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+      try {
+        color_at_point = this.regl.read({
+          x,
+          y: height - y,
+          width: 1,
+          height: 1
+        });
+      } catch {
+        console.warn("Read bad data from", {
+          x,
+          y,
+          height,
+          attempted: height - y
+        });
+      }
+    });
+    const point_as_float = glslReadFloat(...color_at_point) - 1;
+    const point_as_int = Math.round(point_as_float);
+    return point_as_int;
+  }
+  /* blur(fbo) {
+    var passes = [];
+    var radii = [Math.round(
+      Math.max(1, state.bloom.radius * pixelRatio / state.bloom.downsample))];
+    for (var radius = nextPow2(radii[0]) / 2; radius >= 1; radius /= 2) {
+      radii.push(radius);
+    }
+    radii.forEach(radius => {
+      for (var pass = 0; pass < state.bloom.blur.passes; pass++) {
+        passes.push({
+          kernel: 13,
+          src: bloomFbo[0],
+          dst: bloomFbo[1],
+          direction: [radius, 0]
+        }, {
+          kernel: 13,
+          src: bloomFbo[1],
+          dst: bloomFbo[0],
+          direction: [0, radius]
+        });
+      }
+    })
+  } */
+  get fill_buffer() {
+    if (!this._fill_buffer) {
+      const { regl: regl2 } = this;
+      this._fill_buffer = regl2.buffer({ data: [-4, -4, 4, -4, 0, 4] });
+    }
+    return this._fill_buffer;
+  }
+  draw_contour_buffer(field, ix) {
+    let { width, height } = this;
+    width = Math.floor(width);
+    height = Math.floor(height);
+    this.contour_vals = this.contour_vals || new Uint8Array(4 * width * height);
+    this.contour_alpha_vals = this.contour_alpha_vals || new Uint16Array(width * height);
+    const { props } = this;
+    props.aes.encoding.color = {
+      field
+    };
+    props.only_color = ix;
+    this.fbos.contour.use(() => {
+      this.regl.clear({ color: [0, 0, 0, 0] });
+      this.render_points(props);
+      this.regl.read(this.contour_vals);
+    });
+    this.blur(this.fbos.contour, this.fbos.ping, 3);
+    this.fbos.contour.use(() => {
+      this.regl.read(this.contour_vals);
+    });
+    let i = 0;
+    while (i < width * height * 4) {
+      this.contour_alpha_vals[i / 4] = this.contour_vals[i + 3] * 255;
+      i += 4;
+    }
+    return this.contour_alpha_vals;
+  }
+  remake_renderer() {
+    const { regl: regl2 } = this;
+    const parameters = {
+      depth: { enable: false },
+      stencil: { enable: false },
+      blend: {
+        enable(_, { color_picker_mode }) {
+          return color_picker_mode < 0.5;
+        },
+        func: {
+          srcRGB: "one",
+          srcAlpha: "one",
+          dstRGB: "one minus src alpha",
+          dstAlpha: "one minus src alpha"
+        }
+      },
+      primitive: "points",
+      frag: frag_shader,
+      vert: vertex_shader,
+      count(_, props) {
+        return props.manager.count;
+      },
+      attributes: {
+        //        buffer_0: (_, props) => props.manager.regl_elements.get('ix'),
+        //        buffer_1: this.integer_buffer
+      },
+      // Filled below.
+      uniforms: {
+        //@ts-ignore
+        u_update_time: regl2.prop("update_time"),
+        u_transition_duration(_, props) {
+          return props.prefs.duration;
+        },
+        u_only_color(_, props) {
+          if (props.only_color !== void 0) {
+            return props.only_color;
+          }
+          return -2;
+        },
+        u_wrap_colors_after: (_, { wrap_colors_after }) => {
+          if (wrap_colors_after === void 0) {
+            throw new Error("wrap_colors_after is undefined");
+          }
+          return wrap_colors_after;
+        },
+        u_use_glyphset: (_, { prefs }) => prefs.glyph_set ? 1 : 0,
+        u_glyphset: (_, { prefs }) => {
+          if (prefs.glyph_set) {
+            return this.get_image_texture(prefs.glyph_set);
+          }
+          return this.textures.empty_texture;
+        },
+        //@ts-ignore
+        u_color_picker_mode: regl2.prop("color_picker_mode"),
+        u_position_interpolation_mode() {
+          if (this.aes.position_interpolation) {
+            return 1;
+          }
+          return 0;
+        },
+        u_grid_mode: (_, { grid_mode }) => grid_mode,
+        //@ts-ignore
+        u_colors_as_grid: regl2.prop("colors_as_grid"),
+        /*        u_constant_color: () => (this.aes.dim("color").current.constant !== undefined
+          ? this.aes.dim("color").current.constant
+          : [-1, -1, -1]),
+        u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
+          ? this.aes.dim("color").last.constant
+          : [-1, -1, -1]),*/
+        u_tile_id: (_, props) => props.tile_id,
+        u_width: ({ viewportWidth }) => viewportWidth,
+        u_height: ({ viewportHeight }) => viewportHeight,
+        u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
+        u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
+        u_aspect_ratio: ({ viewportWidth, viewportHeight }) => viewportWidth / viewportHeight,
+        //@ts-ignore
+        u_zoom_balance: regl2.prop("zoom_balance"),
+        u_base_size: (_, { point_size }) => point_size,
+        u_maxix: (_, { max_ix }) => max_ix,
+        u_alpha: (_, { alpha }) => alpha,
+        u_foreground_number: (_, { foreground }) => foreground,
+        u_foreground_alpha: () => this.render_props.foreground_opacity,
+        u_background_rgba: () => {
+          const color2 = this.prefs.background_options.color;
+          const { r, g, b } = rgb(color2);
+          return [
+            r / 255,
+            g / 255,
+            b / 255,
+            this.prefs.background_options.opacity[0]
+          ];
+        },
+        u_background_mouseover: () => this.prefs.background_options.mouseover ? 1 : 0,
+        u_background_size: () => this.render_props.background_size,
+        u_foreground_size: () => this.render_props.foreground_size,
+        u_k: (_, props) => {
+          return props.transform.k;
+        },
+        // Allow interpolation between different coordinate systems.
+        //@ts-ignore
+        u_window_scale: regl2.prop("webgl_scale"),
+        //@ts-ignore
+        u_last_window_scale: regl2.prop("last_webgl_scale"),
+        u_time: ({ time }) => time,
+        u_filter_numeric() {
+          return this.aes.dim("filter").current.ops_to_array();
+        },
+        u_last_filter_numeric() {
+          return this.aes.dim("filter").last.ops_to_array();
+        },
+        u_filter2_numeric() {
+          return this.aes.dim("filter2").current.ops_to_array();
+        },
+        u_last_filter2_numeric() {
+          return this.aes.dim("filter2").last.ops_to_array();
+        },
+        u_foreground_numeric() {
+          return this.aes.dim("foreground").current.ops_to_array();
+        },
+        u_last_foreground_numeric() {
+          return this.aes.dim("foreground").last.ops_to_array();
+        },
+        u_jitter: () => this.aes.dim("jitter_radius").current.jitter_int_format,
+        u_last_jitter: () => this.aes.dim("jitter_radius").last.jitter_int_format,
+        u_zoom(_, props) {
+          return props.zoom_matrix;
+        }
+      }
+    };
+    for (const i of range(0, 16)) {
+      parameters.attributes[`buffer_${i}`] = (_, { manager, buffer_num_to_variable }) => {
+        const c2 = manager.regl_elements.get(buffer_num_to_variable[i]);
+        return c2 || { constant: 0 };
+      };
+    }
+    for (const k of [
+      "x",
+      "y",
+      "color",
+      "jitter_radius",
+      "x0",
+      "y0",
+      "jitter_speed",
+      "size",
+      "filter",
+      "filter2",
+      "foreground"
+      //      'character',
+    ]) {
+      for (const time of ["current", "last"]) {
+        const temporal = time === "current" ? "" : "last_";
+        parameters.uniforms[`u_${temporal}${k}_map_position`] = () => {
+          return this.aes.dim(k)[time].map_position;
+        };
+        parameters.uniforms[`u_${temporal}${k}_buffer_num`] = (_, { aes_to_buffer_num }) => {
+          const val = aes_to_buffer_num[`${k}--${time}`];
+          if (val === void 0) {
+            return -1;
+          }
+          return val;
+        };
+        parameters.uniforms[`u_${temporal}${k}_domain`] = () => this.aes.dim(k)[time].webGLDomain;
+        parameters.uniforms[`u_${temporal}${k}_range`] = () => this.aes.dim(k)[time].range;
+        parameters.uniforms[`u_${temporal}${k}_transform`] = () => {
+          const t = this.aes.dim(k)[time].transform;
+          if (t === "linear")
+            return 1;
+          if (t === "sqrt")
+            return 2;
+          if (t === "log")
+            return 3;
+          if (t === "literal")
+            return 4;
+          throw "Invalid transform";
+        };
+        parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
+          return this.aes.dim(k)[time].constant;
+        };
+      }
+    }
+    this._renderer = regl2(parameters);
+    return this._renderer;
+  }
+  allocate_aesthetic_buffers() {
+    const buffers = [];
+    const priorities = [
+      // How important is safe interpolation?
+      "x",
+      "y",
+      "color",
+      "x0",
+      "y0",
+      "size",
+      "jitter_radius",
+      "jitter_speed",
+      "filter",
+      "filter2",
+      "foreground"
+    ];
+    for (const aesthetic of priorities) {
+      const times = ["current", "last"];
+      for (const time of times) {
+        try {
+          if (this.aes.dim(aesthetic)[time].field) {
+            buffers.push({
+              aesthetic,
+              time,
+              field: this.aes.dim(aesthetic)[time].field
+            });
+          }
+        } catch (error) {
+          this.reglframe = void 0;
+          throw error;
+        }
+      }
+    }
+    buffers.sort((a, b) => {
+      if (a.time < b.time) {
+        return -1;
+      }
+      if (b.time < a.time) {
+        return 1;
+      }
+      return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
+    });
+    const aes_to_buffer_num = {};
+    const variable_to_buffer_num = {
+      ix: 0,
+      ix_in_tile: 1
+    };
+    let num = 1;
+    for (const { aesthetic, time, field } of buffers) {
+      const k = `${aesthetic}--${time}`;
+      if (variable_to_buffer_num[field] !== void 0) {
+        aes_to_buffer_num[k] = variable_to_buffer_num[field];
+        continue;
+      }
+      if (num++ < 16) {
+        aes_to_buffer_num[k] = num;
+        variable_to_buffer_num[field] = num;
+        continue;
+      } else {
+        aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
+      }
+    }
+    const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
+    this.aes_to_buffer_num = aes_to_buffer_num;
+    this.variable_to_buffer_num = variable_to_buffer_num;
+    this.buffer_num_to_variable = buffer_num_to_variable;
+  }
+  get discard_share() {
+    return 0;
+  }
+}
+class TileBufferManager {
+  constructor(regl2, tile, renderer) {
+    this.tile = tile;
+    this.regl = regl2;
+    this.renderer = renderer;
+    this.regl_elements = /* @__PURE__ */ new Map([
+      [
+        "ix_in_tile",
+        {
+          offset: 0,
+          stride: 4,
+          buffer: renderer.integer_buffer,
+          byte_size: 4 * 2 ** 16
+        }
+      ]
+    ]);
+  }
+  /**
+   *
+   * @param
+   * @returns
+   */
+  ready() {
+    const { renderer } = this;
+    const needed_dimensions = /* @__PURE__ */ new Set();
+    for (const [k, v] of renderer.aes) {
+      for (const aesthetic of v.states) {
+        if (aesthetic.field) {
+          needed_dimensions.add(aesthetic.field);
+        }
+      }
+    }
+    for (const key of ["ix", "ix_in_tile", ...needed_dimensions]) {
+      if (!this.ready_or_not_here_it_comes(key).ready) {
+        return false;
+      }
+    }
+    return true;
+  }
+  /**
+   * Creates a deferred call that will populate the regl buffer
+   * when there's some free time.
+   *
+   * @param key a string representing the requested column; must either exist in the
+   * record batch or have a means for creating it asynchronously in 'transformations.'
+   * @returns both an instantly available object called 'ready' that says if we're ready
+   * to go: and, if the tile is ready, a promise that starts the update going and resolves
+   * once it's ready.
+   */
+  ready_or_not_here_it_comes(key) {
+    const { renderer, regl_elements } = this;
+    const current = this.regl_elements.get(key);
+    if (current === null) {
+      return { ready: false, promise: null };
+    }
+    if (current === void 0) {
+      if (!this.tile.ready) {
+        return { ready: false, promise: null };
+      }
+      regl_elements.set(key, null);
+      const created = new Promise((resolve) => {
+        renderer.deferred_functions.push(async () => {
+          await this.create_regl_buffer(key);
+          resolve();
+        });
+      });
+      return { ready: false, promise: created };
+    }
+    return { ready: true, promise: Promise.resolve() };
+  }
+  /**
+   *
+   * @param colname the name of the column to release
+   *
+   * @returns Nothing, not even if the column isn't currently defined.
+   */
+  release(colname) {
+    let current;
+    if (current = this.regl_elements.get(colname)) {
+      this.renderer.buffers.free_block(current);
+    }
+  }
+  get count() {
+    return this.tile.record_batch.numRows;
+  }
+  async create_buffer_data(key) {
+    const { tile } = this;
+    if (!tile.ready) {
+      throw new Error("Tile table not present.");
+    }
+    let column = tile.record_batch.getChild(key);
+    if (!column) {
+      const transformation = tile.dataset.transformations[key];
+      if (transformation !== void 0) {
+        await tile.apply_transformation(key);
+        column = tile.record_batch.getChild(key);
+        if (!column) {
+          throw new Error(`${key} was not created.`);
+        }
+      } else {
+        const col_names = tile.record_batch.schema.fields.map((d) => d.name);
+        throw new Error(
+          `Requested ${key} but table only has columns ["${col_names.join(
+            '", "'
+          )}]"`
+        );
+      }
+    }
+    if (column.data.length !== 1) {
+      throw new Error(
+        `Column ${key} has ${column.data.length} buffers, not 1.`
+      );
+    }
+    if (!column.type || !column.type.typeId) {
+      throw new Error(`Column ${key} has no type.`);
+    }
+    if (!column.type || column.type.typeId !== Type$1.Float32) {
+      const buffer = new Float32Array(tile.record_batch.numRows);
+      const source_buffer = column.data[0];
+      if (column.type["dictionary"]) {
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = source_buffer.values[i];
+        }
+      } else if (column.type.typeId === Type$1.Bool) {
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = column.get(i) ? 1 : 0;
+        }
+      } else if (source_buffer.stride === 2 && column.type.typeId === 10) {
+        const copy2 = new Int32Array(source_buffer.values).buffer;
+        const view64 = new BigInt64Array(copy2);
+        const timetype = column.type.unit;
+        const divisor = timetype === 0 ? 1e-3 : timetype === 1 ? 1 : timetype === 2 ? 1e3 : timetype === 3 ? 1e6 : 42;
+        if (divisor === 42) {
+          throw new Error(`Unknown time type ${timetype}`);
+        }
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = Number(view64[i]) / divisor;
+        }
+      } else {
+        for (let i = 0; i < tile.record_batch.numRows; i++) {
+          buffer[i] = Number(source_buffer.values[i]);
+        }
+      }
+      return buffer;
+    }
+    if (column.data[0].values.constructor === Float64Array) {
+      return new Float32Array(column.data[0].values);
+    }
+    return column.data[0].values;
+  }
+  async create_regl_buffer(key) {
+    const { regl_elements, renderer } = this;
+    const data = await this.create_buffer_data(key);
+    if (data.constructor !== Float32Array) {
+      console.warn(typeof data, data);
+      throw new Error("Buffer data must be a Float32Array");
+    }
+    const item_size = 4;
+    const data_length = data.length;
+    const buffer_desc = renderer.buffers.allocate_block(data_length, item_size);
+    regl_elements.set(key, buffer_desc);
+    buffer_desc.buffer.subdata(data, buffer_desc.offset);
+  }
+}
+class MultipurposeBufferSet {
+  /**
+   *
+   * @param regl the Regl context we're using.
+   * @param buffer_size The number of bytes on each strip of memory that we'll ask for.
+   */
+  constructor(regl2, buffer_size) {
+    this.freed_buffers = [];
+    this.regl = regl2;
+    this.buffer_size = buffer_size;
+    this.buffers = [];
+    this.pointer = 0;
+    this.generate_new_buffer();
+  }
+  generate_new_buffer() {
+    if (this.buffers.length && this.buffer_size - this.pointer > 128) {
+      this.freed_buffers.push({
+        buffer: this.buffers[0],
+        offset: this.pointer,
+        stride: 4,
+        // meaningless here.
+        byte_size: this.buffer_size - this.pointer
+      });
+    }
+    this.pointer = 0;
+    this.buffers.unshift(
+      this.regl.buffer({
+        type: "float",
+        length: this.buffer_size,
+        usage: "dynamic"
+      })
+    );
+  }
+  /**
+   * Freeing a block means just adding its space back into the list of open blocks.
+   * There's no need to actually zero out the memory or anything.
+   *
+   * @param buff The location of the buffer we're done with.
+   */
+  free_block(buff) {
+    this.freed_buffers.push(buff);
+  }
+  /**
+   *
+   * @param items The number of datapoints in the arrow column being allocated
+   * @param bytes_per_item The number of bytes per item in the arrow column being allocated
+   * @returns
+   */
+  allocate_block(items, bytes_per_item) {
+    const bytes_needed = items * bytes_per_item;
+    let i = 0;
+    for (const buffer_loc of this.freed_buffers) {
+      if (buffer_loc.byte_size === bytes_needed) {
+        this.freed_buffers.splice(i, 1);
+        return {
+          buffer: buffer_loc.buffer,
+          offset: buffer_loc.offset,
+          stride: bytes_per_item,
+          byte_size: bytes_needed
+        };
+      }
+      i += 1;
+    }
+    if (this.pointer + items * bytes_per_item > this.buffer_size) {
+      this.generate_new_buffer();
+    }
+    const value = {
+      // First slot stores the active buffer.
+      buffer: this.buffers[0],
+      offset: this.pointer,
+      stride: bytes_per_item,
+      byte_size: items * bytes_per_item
+    };
+    this.pointer += items * bytes_per_item;
+    return value;
+  }
 }
 let tile_identifier = 0;
 class Tile {

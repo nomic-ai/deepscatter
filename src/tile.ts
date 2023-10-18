@@ -291,8 +291,8 @@ export abstract class Tile {
           type: 'dictionary',
           keys: this.record_batch.getChild(name).data[0].dictionary.toArray(),
           extent: [
-            -2047,
-            this.record_batch.getChild(name).data[0].dictionary.length - 2047,
+            0,
+            this.record_batch.getChild(name).data[0].dictionary.length,
           ],
         });
       }

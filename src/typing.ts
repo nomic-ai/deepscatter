@@ -1,4 +1,3 @@
-import type * as DS from './shared.d'
 import type {
   RootChannel, OpChannel, ColorChannel,
   ConstantChannel, LambdaChannel, Labelcall,

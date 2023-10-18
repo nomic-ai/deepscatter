@@ -674,7 +674,6 @@ class Scatterplot<T extends Tile> {
     }
 
     if (prefs.transformations) {
-      console.log(prefs)
       for (const [k, v] of Object.entries(prefs.transformations)) {
         const func = Function('datum', v) as unknown as DS.PointFunction;
         if (!this.dataset.transformations[k]) {
