@@ -166,7 +166,7 @@ export default class Zoom<T extends DS.Tile> {
     const { x_, y_ } = this.scales();
     const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
-
+    this.scatterplot.highlit_point_change(data);
     type Annotation = {
       x: number;
       y: number;

@@ -6,8 +6,9 @@ import { Bool, StructRowProxy, Vector, makeData } from 'apache-arrow';
 import { bisectLeft } from 'd3-array';
 interface SelectParams {
   name: string;
+  useNameCache?: boolean; // If true and a selection with that name already exists, use it and ignore all passed parameters. Otherwise, throw an error.
   foreground?: boolean;
-  batchCallback?: (t: Tile) => Promise<void>;
+  batchCallback?: (t: Tile) => Promise<void>; // a function that will called after each individual tile is processed. You can use this for progress bars, etc.
 }
 
 export const defaultSelectionParams: SelectParams = {
@@ -456,6 +457,40 @@ export class DataSelection<T extends Tile> {
       }
    }
    return columns
+  }
+
+  public moveCursorToPoint(point: StructRowProxy) {
+    let currentOffset = 0;
+    let relevantTile : T = undefined;
+    let current_tile_ix = 0;
+    for (const tile of this.tiles) {
+      bisectLeft([...tile.record_batch.getChild('ix').data[0].values as BigUint64Array], point.ix as bigint)
+
+    }
+
+    for (let match_length of this.match_count) {
+      if (i < currentOffset + match_length) {
+        relevantTile = this.tiles[current_tile_ix];
+        break;
+      }
+      current_tile_ix += 1
+      currentOffset += match_length;
+    }
+    if (relevantTile === undefined) {
+      return null;
+    }
+    const column = relevantTile.record_batch.getChild(this.name) as Vector<Bool>;
+    const offset = i - currentOffset;
+    let ix_in_match = 0;
+    for (let j = 0; j < column.length; j++) {
+      if (column.get(j)) {
+        if (ix_in_match === offset) {
+          return relevantTile.record_batch.get(j);
+        }
+        ix_in_match++;
+      }
+    }
+    throw new Error(`unable to locate point ${i}`)
   }
 
   private async add_or_remove_points(name, ixes: BigInt[], which : 'add' | 'remove') {

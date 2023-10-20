@@ -80,6 +80,7 @@ class Scatterplot<T extends Tile> {
   private hooks: Record<string, Hook> = {};
   public tooltip_handler: TooltipHTML;
   public label_click_handler: LabelClick;
+  public handle_highlit_point_change: ChangeToHighlitPointFunction;
   // In order to preserve JSON serializable nature of prefs, the consumer directly sets this
   public on_zoom?: DS.onZoomCallback;
   private mark_ready: () => void = function () {
@@ -104,6 +105,7 @@ class Scatterplot<T extends Tile> {
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.label_click_handler = new LabelClick(this);
+    this.handle_highlit_point_change = new ChangeToHighlitPointFunction(this);
     if (options.tileProxy) {
       this.tileProxy = options.tileProxy;
     }
@@ -193,6 +195,14 @@ class Scatterplot<T extends Tile> {
    * See `select_and_plot` for a method that will select data and plot it.
    */
   async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams<T>) {
+    if (params.useNameCache && params.name && this.selection_history.length > 0) {
+      const old_version = this.selection_history.find((x) => x.name === params.name);
+      // If we have a cached version, move the cached version to the end and return it.
+      this.selection_history = [...this.selection_history.filter((x) => x.name !== params.name), old_version];
+      if (old_version) {
+        return old_version.selection;
+      }
+    }
     const selection = new DataSelection<T>(this, params);
     await selection.ready;
     this.selection_history.push({
@@ -519,6 +529,16 @@ class Scatterplot<T extends Tile> {
     return this.label_click_handler.f.bind(this.label_click_handler);
   }
 
+  set highlit_point_change(func) {
+    this.handle_highlit_point_change.f = func;
+  }
+
+  get highlit_point_change() {
+    return this.handle_highlit_point_change.f.bind(
+      this.handle_highlit_point_change
+    );
+  }
+
   set click_function(func) {
     this.click_handler.f = func;
   }
@@ -562,7 +582,7 @@ class Scatterplot<T extends Tile> {
     // If there's not a transition time, things might get weird and a flicker
     // is probably OK. Using the *current* transition time means that the start
     // of a set of duration-0 calls (like, e.g., dragging a time slider) will
-    // block but that
+    // block but that 
     return new Promise((resolve) => {
       if (this.prefs.duration < delay) {
         delay = this.prefs.duration;
@@ -607,7 +627,7 @@ class Scatterplot<T extends Tile> {
         } else {
           const starttime = Date.now();
           // It's important to get at least the first promise done,
-          // because it's needed to determine some details about state.
+          // because it's used to determine some details about state.
           void Promise.all(sine_qua_non).then(() => {
             const endtime = Date.now();
             const elapsed = endtime - starttime;
@@ -929,6 +949,17 @@ class ClickFunction extends SettableFunction<void> {
     return;
   }
 }
+
+class ChangeToHighlitPointFunction extends SettableFunction<
+  void,
+  StructRowProxy[],
+  QuadTile
+  > {
+    default(points: StructRowProxy[], plot = undefined) {
+      // console.log({points})
+      return;
+    }
+  }
 
 class TooltipHTML extends SettableFunction<string> {
   default(point: StructRowProxy, plot = undefined) {
