@@ -4,11 +4,20 @@ This would be a bugfix release except that it's possible this might accidentally
 
 - Fix off-by-one bug in color schemes affecting legend appearance for more than 2,048 categories.
   Because of variable rules around floating point precision, the number of categories you can display will vary
-  depending on hardware implementations of the WebGL standard;
-  The maximum number of points on my browser (M1 Pro macbook) is about 44,000.
+  depending on hardware implementations of the WebGL standard. But 10s of thousands should be fine.
 - Many typing improvements for typescript compliance.
 - Allow wrapping of dictionary colors in categorical scales.
 - Stop internally representing dictionary scales on the range [-2047, 2047], which was confusing and not necessary.
+- add a new scatterplot setter/getter method `highlit_point_change`. Like `click_handler`, `tooltip_html`, etc. Whatever function
+  you place here will be called on the list of points that are currently highlighted (i.e., that have a svg circle over them). In
+  all standard cases this list will be of length zero (there's no point under the cursor) or one (there's a point under
+  the cursor that's bigger). This can be useful for calling events when--for example--the user switches to a no-highlighted 
+  point state. In general I suspect that this could be superior to tooltip_html unless you're actually using the tooltip.
+- Add an optional method `useNameCache` to `scatterplot.select_data`. This makes it easier for users to maintain their own 
+  namespaces for selections. By default, attempting to create a new selection with 
+  the same name as an existing selection raises an error, because having two selections with *different* rules but the same name
+  could result in some crazy errors where different parts of the map rendered different rules. With a name cache, the first rule
+  used will be the one that's kept, and the second will be ignored.
 
 # 2.14.1
 - Add exports of QuadtileDataset, ArrowDataset, Bitmask, and DataSelection classes as static methods
