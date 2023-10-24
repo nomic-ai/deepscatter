@@ -459,38 +459,47 @@ export class DataSelection<T extends Tile> {
    return columns
   }
 
-  public moveCursorToPoint(point: StructRowProxy) {
+  public moveCursorToPoint(point: StructRowProxy | Record<"ix", BigInt | Number>) {
+    // The point contains a field called 'ix', which increases in each tile;
+    // we use this for moving because it lets us do binary search for relevant tile.
+
+    const ix = point.ix ;
+    if (point.ix === undefined) {
+      throw new Error("Unable to move cursor to point, because it has no `ix` property.")
+    }
     let currentOffset = 0;
     let relevantTile : T = undefined;
     let current_tile_ix = 0;
-    for (const tile of this.tiles) {
-      bisectLeft([...tile.record_batch.getChild('ix').data[0].values as BigUint64Array], point.ix as bigint)
-
-    }
-
+    let positionInTile : number;
     for (let match_length of this.match_count) {
-      if (i < currentOffset + match_length) {
-        relevantTile = this.tiles[current_tile_ix];
-        break;
+      const tile = this.tiles[current_tile_ix];
+      // If the tile might have the relevant ix in it, we examine it more closely.
+      if (tile.min_ix < ix && tile.max_ix > ix) {
+        const mid = bisectLeft([...tile.record_batch.getChild('ix').data[0].values as BigUint64Array], point.ix as BigInt)
+        const val = tile.record_batch.get(mid);
+        // We have to check that there's actually a match,
+        // because the binary search identifies where it *would* be.
+        if (val !== null && val.ix === ix) {
+          relevantTile = tile;
+          positionInTile = mid;
+          break;
+        }
       }
       current_tile_ix += 1
       currentOffset += match_length;
     }
-    if (relevantTile === undefined) {
+
+    if (relevantTile === undefined || positionInTile === undefined) {
       return null;
     }
     const column = relevantTile.record_batch.getChild(this.name) as Vector<Bool>;
-    const offset = i - currentOffset;
-    let ix_in_match = 0;
-    for (let j = 0; j < column.length; j++) {
+
+    for (let j = 0; j < positionInTile; j++) {
       if (column.get(j)) {
-        if (ix_in_match === offset) {
-          return relevantTile.record_batch.get(j);
-        }
-        ix_in_match++;
+        currentOffset += 1
       }
     }
-    throw new Error(`unable to locate point ${i}`)
+    this.cursor = currentOffset;
   }
 
   private async add_or_remove_points(name, ixes: BigInt[], which : 'add' | 'remove') {

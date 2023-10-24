@@ -173,7 +173,7 @@ class Scatterplot<T extends Tile> {
    * Creates a new selection from a set of parameters, and immediately applies it to the plot.
    * @param params A set of parameters defining a selection. 
   */
-  async select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration=this.prefs.duration) {
+  async select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration=this.prefs.duration) : Promise<DataSelection<T>> {
     const selection = await this.select_data(params)
     await selection.ready
     await this.plotAPI({
@@ -186,6 +186,7 @@ class Scatterplot<T extends Tile> {
         }
       }
      })
+     return selection;
   }
   /**
    * 
