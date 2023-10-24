@@ -326,7 +326,9 @@
       .filter((d) => d);
     console.log({ ids });
     const name = Math.random().toString(36);
-    plot.select_and_plot({ name, ids, idField: '_id' });
+    plot.select_and_plot({ name, ids, idField: '_id' }).then(selection => {
+      window.selection = selection;
+    })
   });
 
   document
