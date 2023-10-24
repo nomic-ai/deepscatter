@@ -18,7 +18,11 @@ This would be a bugfix release except that it's possible this might accidentally
   the same name as an existing selection raises an error, because having two selections with *different* rules but the same name
   could result in some crazy errors where different parts of the map rendered different rules. With a name cache, the first rule
   used will be the one that's kept, and the second will be ignored.
-
+- add method `Selection.moveCursorToPoint(point)`. This allows a selection's cursor
+  (the thing we use in Nomic Atlas to show a point on mouseover) to be fast-forwarded so that it's over a given point.
+- The method `Scatterplot.select_and_plot()` used to return nothing;
+  it now returns the selection that it creates. This could introduce typescript 
+  errors into code.
 # 2.14.1
 - Add exports of QuadtileDataset, ArrowDataset, Bitmask, and DataSelection classes as static methods
   on core deepscatter object. In a future release, these may become named exports: for now 
