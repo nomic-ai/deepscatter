@@ -1,11 +1,17 @@
 <body>
   <div class="buttons">
-    <button id="prime">Highlight Primes</button>
-    <button id="even">Highlight Even</button>
-    <button id="even2">Stable highlight Even</button>
-    <button id="b">Clear</button>
-    <button id="select-ids">Select ids</button>
-    <input id="input-ids" title="selection" label="selection" type="text" value="1066 1968 2431 10012" />
+    <button id="prime" data-testid="primes">Highlight Primes</button>
+    <button id="even" data-testid="evens">Highlight Even</button>
+    <button id="even2" data-testid="evens2">Stable highlight Even</button>
+    <button id="b" data-testid="clear">Clear</button>
+    <button id="select-ids" data-testid="select-ids">Select ids</button>
+    <input
+      id="input-ids"
+      title="selection"
+      label="selection"
+      type="text"
+      value="1066 1968 2431 10012"
+    />
     <button id="select-lots-of-ids">Select lots of ids</button>
     <div id="filter">FILTER:</div>
     <div id="filter2">FILTER2:</div>
@@ -26,7 +32,7 @@
     Int16,
     Int32,
     Dictionary,
-    makeVector
+    makeVector,
   } from 'apache-arrow';
   const num_batches = 1;
   window.RecordBatch = RecordBatch;
@@ -80,7 +86,7 @@
       });
     }
     const batches = [];
-    const SIZE = 65536
+    const SIZE = 65536;
     for (let i = 0; i < n_batches; i++) {
       const batch = make_batch(i * SIZE, SIZE);
       batches.push(batch);
@@ -162,6 +168,7 @@
       for (const i of [2, 3, 5, 7, 11, 13, 17]) {
         const button = document.createElement('button');
         button.textContent = `products of ${i}`;
+        button.setAttribute('data-testid', `products${i}`);
         button.addEventListener('click', function () {
           bindproductsOf(i);
           const encoding = {};
@@ -178,28 +185,30 @@
         id.appendChild(button);
       }
     }
-    const id = document.getElementById("categorical");
+    const id = document.getElementById('categorical');
     const button = document.createElement('button');
     button.textContent = `Color by lowest prime factor`;
 
     plot.ready.then(() => {
-      plot._root.promise.then(dataset => {
-        [2, 3, 5, 7, 11, 13, 17, 19].map(prime => {
-          if (plot.dataset.transformations[`products of ${prime}`] === undefined) {
-            bindproductsOf(prime)
+      plot._root.promise.then((dataset) => {
+        [2, 3, 5, 7, 11, 13, 17, 19].map((prime) => {
+          if (
+            plot.dataset.transformations[`products of ${prime}`] === undefined
+          ) {
+            bindproductsOf(prime);
           }
-        })
-      })
-    })
+        });
+      });
+    });
     button.addEventListener('click', function () {
       plot.dataset.transformations['lowest_prime'] = async function (tile) {
-        const factors = {}
+        const factors = {};
         const primes = [2, 3, 5, 7, 11, 13, 17];
-        const labels = ["NA", "2", "3", "5", "7", "11", "13", "seventeen"]
+        const labels = ['NA', '2', '3', '5', '7', '11', '13', 'seventeen'];
         const indices = new Int8Array(tile.record_batch.numRows);
-        const lookups = []
+        const lookups = [];
         for (const prime of primes) {
-          lookups.push(await tile.get_column(`products of ${prime}`))
+          lookups.push(await tile.get_column(`products of ${prime}`));
         }
         outer: for (let i = 0; i < tile.record_batch.numRows; i++) {
           for (let j = 0; j < lookups.length; j++) {
@@ -207,39 +216,39 @@
               //            console.log(i, j, lookups[j].get(i))
             }
             if (lookups[j].get(i) > 0) {
-              indices[i] = j + 1
-              continue outer
+              indices[i] = j + 1;
+              continue outer;
             }
           }
         }
-        console.log("YOOHOO")
-        console.log({ indices, labels })
-        const dicto = dictionaryFromArrays(indices, labels)
-        console.log({ dicto })
-        console.log(dicto.length, dicto.toArray())
-        return dicto
-      }
+        console.log('YOOHOO');
+        console.log({ indices, labels });
+        const dicto = dictionaryFromArrays(indices, labels);
+        console.log({ dicto });
+        console.log(dicto.length, dicto.toArray());
+        return dicto;
+      };
       plot.plotAPI({
         encoding: {
           color: {
-            field: "lowest_prime",
-            range: 'dark2'
-          }
-        }
-      })
-    })
+            field: 'lowest_prime',
+            range: 'dark2',
+          },
+        },
+      });
+    });
 
     id.appendChild(button);
 
     {
-      const id = document.getElementById("categorical");
+      const id = document.getElementById('categorical');
       // colorize by factors
-      const numbers = []
+      const numbers = [];
       for (let i = 0; i < 1_000_000; i++) {
-        numbers.push("" + i)
+        numbers.push('' + i);
       }
 
-      let dictionaryBuilder = undefined
+      let dictionaryBuilder = undefined;
       const button = document.createElement('button');
       button.textContent = `Color by individual numbers as factors`;
       plot.ready.then(() => {
@@ -248,21 +257,22 @@
           dictionaryBuilder = plot.util.dictionaryFromArrays(numbers);
         }
         button.addEventListener('click', function () {
-          plot.dataset.transformations['dictionary number coloring'] = async function (tile) {
-            const num = await tile.get_column("integers");
-            console.log({ num })
-            return dictionaryBuilder(num.toArray())
-          }
+          plot.dataset.transformations['dictionary number coloring'] =
+            async function (tile) {
+              const num = await tile.get_column('integers');
+              console.log({ num });
+              return dictionaryBuilder(num.toArray());
+            };
           plot.plotAPI({
             encoding: {
               color: {
-                field: "dictionary number coloring",
-                range: 'category10'
-              }
-            }
-          })
-        })
-      })
+                field: 'dictionary number coloring',
+                range: 'category10',
+              },
+            },
+          });
+        });
+      });
       id.appendChild(button);
     }
   });
@@ -359,21 +369,22 @@
       plot.plotAPI({ encoding: { foreground: null, size: {} } })
     );
 
-
   function dictionaryFromArrays(indices, labels) {
     const labelsArrow = vectorFromArray(labels, new Utf8());
     let t;
     if (indices[Symbol.toStringTag] === `Int8Array`) {
-      t = new Int8()
+      t = new Int8();
     } else if (indices[Symbol.toStringTag] === `Int16Array`) {
-      t = new Int16()
+      t = new Int16();
     } else if (indices[Symbol.toStringTag] === `Int32Array`) {
-      t = new Int32()
+      t = new Int32();
     } else {
-      console.log(indices[Symbol.toStringTag])
-      throw new Error("values must be an array of signed integers, 32 bit or smaller.")
+      console.log(indices[Symbol.toStringTag]);
+      throw new Error(
+        'values must be an array of signed integers, 32 bit or smaller.'
+      );
     }
-    console.log({ indices }, indices.length)
+    console.log({ indices }, indices.length);
     const type = new Dictionary(labelsArrow.type, t, 0, false);
     const returnval = makeVector({
       type,
@@ -382,7 +393,7 @@
       data: indices,
       dictionary: labelsArrow,
     });
-    return returnval
+    return returnval;
   }
 </script>
 
