@@ -33,6 +33,8 @@ type Key = string;
 type ArrowBuildable = DS.ArrowBuildable;
 type Transformation<T> = DS.Transformation<T>;
 
+
+
 /**
  * A Dataset manages the production and manipulation of tiles. Each plot has a
  * single dataset; the dataset handles all transformations around data through
@@ -868,4 +870,25 @@ function supplement_identifiers(
     }
   }
   return updatedFloatArray;
+}
+
+class ArrowWrapper implements DS.TileProxy {
+  tb : Table;
+  constructor(tb : Uint8Array | Table) {
+    this.tb = tb as unknown as Table
+  }
+
+  private makeTree() {
+    let [x, y, z] = [0, 0, 0]
+    let batch = 0;
+    while (batch < this.tb.batches.length) {
+      
+      batch++;
+    }
+  }
+
+  apiCall(endpoint, method = "GET", d1 = undefined, d2 = undefined, options = {}) {
+
+  }
+
 }
