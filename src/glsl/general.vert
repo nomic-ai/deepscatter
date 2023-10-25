@@ -808,19 +808,17 @@ void run_color_fill(in float ease) {
       if (a_last_color_is_constant) {
         last_fill = vec4(u_last_color_constant.rgb, alpha);
       } else {
-        float last_fractional = linstep(u_last_color_domain, a_last_color);
         float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
         float overflow_behavior = 1.; // means--clamp
-                
-        if (u_last_color_domain.y == 4096. && u_last_color_domain.x == 0.) {
-          // Assume we're in dictionary land. Unsafe, but whatever.
-          overflow_behavior = 2.;
+        float last_fractional;
+        if (u_wrap_colors_after.x > 0.) {
+          last_fractional = fract(a_last_color / u_wrap_colors_after.x);
+        } else {
+          last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, overflow_behavior);
         }
-
-        last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, overflow_behavior);
-        last_fill = texture2D(u_color_aesthetic_map, vec2(color_pos, last_fractional));
-        // Alpha channel interpolation already happened.
+        last_fill = texture2D(u_color_aesthetic_map , vec2(color_pos, last_fractional));
         last_fill = vec4(last_fill.rgb, alpha);
+        // last_fill = vec4(0.8, 0.1, 0.1, 1.0);
       }
       // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
       // instead?
