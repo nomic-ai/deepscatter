@@ -40,9 +40,9 @@ type Transformation<T> = DS.Transformation<T>;
  * single dataset; the dataset handles all transformations around data through
  * batchwise operations.
  */
-export abstract class Dataset<T extends Tile> {
-  public transformations: Record<string, Transformation<T>> = {};
-  abstract root_tile: T;
+export abstract class Dataset {
+  public transformations: Record<string, Transformation> = {};
+  abstract root_tile: Tile;
   protected plot: DS.Plot;
   abstract ready: Promise<void>;
   abstract get extent(): Rectangle;
@@ -872,23 +872,60 @@ function supplement_identifiers(
   return updatedFloatArray;
 }
 
-class ArrowWrapper implements DS.TileProxy {
-  tb : Table;
-  constructor(tb : Uint8Array | Table) {
-    this.tb = tb as unknown as Table
+
+function wrapArrow(tbArray: Uint8Array, plot: Scatterplot<QuadTile>) : Dataset<QuadTile> {
+  const tb = tableFromIPC(tbArray);
+  let rowNum = 0;
+  let batches = tb.batches;
+  if (tb.getChild('ix') === null) {
+    batches = batches.map(batch => {
+      const array = new Float32Array(batch.numRows);
+      for (let i = 0; i < batch.numRows; i++) {
+        array[i] = rowNum++;
+      }
+      const newBatch = batch
+      return add_or_delete_column(batch, 'ix', array)
+    })
   }
 
-  private makeTree() {
-    let [x, y, z] = [0, 0, 0]
+  const proxy = new ArrowProxy(tb);
+
+  new QuadtileDataset(`arrow://`, plot, {
+    tileProxy: proxy
+  })
+
+}
+class ArrowProxy implements DS.TileProxy {
+  tb : Table;
+
+  constructor(tb : Uint8Array | Table) {
+    this.tb = tb as unknown as Table;
+  }
+
+  private makeTree(root = [0, 0, 0]) {
+    let [x, y, z] = [0, 0, 0];
     let batch = 0;
+    const keys : Record<string, RecordBatch> = {};
+
     while (batch < this.tb.batches.length) {
-      
+      const key = `${z}/${x}/${y}`;
+      keys[key] = this.tb.batches[batch];
       batch++;
     }
   }
 
   apiCall(endpoint, method = "GET", d1 = undefined, d2 = undefined, options = {}) {
-
+    
   }
+}
 
+function quadTileToPosition(z, x, y) {
+  let position = 0;
+  const tilesAcross = Math.pow(2, z_)
+  for (let z_ = 0; z_ < z; z_ += 1) {
+    position += tilesAcross * tilesAcross;
+  }
+  position += x * tilesAcross;
+  position += y
+  return position;
 }

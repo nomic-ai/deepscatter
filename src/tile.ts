@@ -43,7 +43,7 @@ export abstract class Tile {
   public _highest_known_ix?: number;
   public _min_ix?: number;
   public _max_ix?: number;
-  public dataset: Dataset<Tile>;
+  public dataset: Dataset;
   public _download?: Promise<void>;
   public ready: boolean;
   __schema?: schema_entry[];
@@ -54,7 +54,7 @@ export abstract class Tile {
   abstract codes: [number, number, number];
 
   
-  constructor(dataset: Dataset<Tile>) {
+  constructor(dataset: Dataset) {
     // Accepts prefs only for the case of the root tile.
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
@@ -165,7 +165,6 @@ export abstract class Tile {
         yield p;
       }
     }
-    //    console.log("Exhausted points on ", this.key)
     if (sorted === false) {
       for (const child of this.children) {
         if (!child.ready) {
@@ -362,7 +361,7 @@ export class QuadTile extends Tile {
   url: string;
   key: string;
   public _children: Array<this> = [];
-  codes: [number, number, number];
+  codes: number[];
   _already_called = false;
   public child_locations: string[] = [];
   constructor(
@@ -375,8 +374,7 @@ export class QuadTile extends Tile {
     this.url = base_url;
     this.parent = parent as this;
     this.key = key;
-    const [z, x, y] = key.split('/').map((d) => Number.parseInt(d));
-    this.codes = [z, x, y];
+    this.codes = key.split('/').map((d) => Number.parseInt(d));
   }
 
   get extent(): Rectangle {
@@ -544,6 +542,10 @@ export class QuadTile extends Tile {
 
   get theoretical_extent(): Rectangle {
     // QUADTREE SPECIFIC CODE.
+    if (this.codes.length !== 3) {
+      // Three-length-keys are treated as quadtrees.
+      return this.parent.extent;
+    }
     const base = this.dataset.extent;
     const [z, x, y] = this.codes;
 
@@ -694,6 +696,7 @@ function macrotile_descendants(
 }
 
 function children(tile: string) {
+  
   const [z, x, y] = tile.split('/').map((d) => parseInt(d)) as [
     number,
     number,
@@ -705,3 +708,4 @@ function children(tile: string) {
   }
   return children as string[];
 }
+
