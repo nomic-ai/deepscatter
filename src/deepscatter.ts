@@ -1,21 +1,21 @@
 import { select, Selection } from 'd3-selection';
 import { geoPath, geoIdentity } from 'd3-geo';
-import { max, range, sum } from 'd3-array';
+import { max, range } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
-import { Dataset, QuadtileDataset, ArrowDataset } from './Dataset';
-import { tableFromIPC, type StructRowProxy, vectorFromArray } from 'apache-arrow';
+import { tableFromIPC, type StructRowProxy, vectorFromArray, Table } from 'apache-arrow';
+import { Dataset } from './Dataset';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
-import { ArrowTile, QuadTile, Rectangle, Tile } from './tile';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { Bitmask, DataSelection } from './selection';
 import { dictionaryFromArrays } from './utilityFunctions';
 import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
 import type * as DS from './shared.d';
+import { wrapArrowTable } from './wrapArrow';
 // DOM elements that deepscatter uses.
 
 const base_elements = [
@@ -42,23 +42,24 @@ type Hook = () => void;
 
 interface AdditionalProps {
   Bitmask: typeof Bitmask;
-  QuadtileDataset: typeof QuadtileDataset;
-  ArrowDataset: typeof ArrowDataset;
+  Dataset: typeof Dataset;
+  QuadtileDataset: typeof Dataset;
   DataSelection: typeof DataSelection;
+  wrapArrow?: (t: Table) => Dataset;
 }
 
 /**
  * The core type of the module is a single scatterplot that manages
  * all data and renderering.
  */
-class Scatterplot<T extends Tile> {
-  public _renderer?: ReglRenderer<T>;
+class Scatterplot {
+  public _renderer?: ReglRenderer;
   public width: number;
   public height: number;
-  public _root?: Dataset<T>;
+  public _root?: Dataset;
   public elements?: Selection<SVGElement, any, any, any>[];
-  public secondary_renderers: Record<string, Renderer<T>> = {};
-  public selection_history: DS.SelectionRecord<T>[] = [];
+  public secondary_renderers: Record<string, Renderer> = {};
+  public selection_history: DS.SelectionRecord[] = [];
   public tileProxy?: DS.TileProxy;
   public util : Record<string, (unknown) => unknown> = {
     dictionaryFromArrays,
@@ -67,7 +68,7 @@ class Scatterplot<T extends Tile> {
   div: Selection<any, any, any, any>;
   bound: boolean;
   //  d3 : Object;
-  public _zoom: Zoom<T>;
+  public _zoom: Zoom;
   // The queue of draw calls are a chain of promises.
   private plot_queue: Promise<void> = Promise.resolve();
   public prefs: DS.CompletePrefs;
@@ -174,7 +175,7 @@ class Scatterplot<T extends Tile> {
    * Creates a new selection from a set of parameters, and immediately applies it to the plot.
    * @param params A set of parameters defining a selection. 
   */
-  async select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration=this.prefs.duration) : Promise<DataSelection<T>> {
+  async select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration=this.prefs.duration) : Promise<DataSelection> {
     const selection = await this.select_data(params)
     await selection.ready
     await this.plotAPI({
@@ -196,7 +197,7 @@ class Scatterplot<T extends Tile> {
    * 
    * See `select_and_plot` for a method that will select data and plot it.
    */
-  async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams<T>) {
+  async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams) {
     if (params.useNameCache && params.name && this.selection_history.length > 0) {
       const old_version = this.selection_history.find((x) => x.name === params.name);
       // If we have a cached version, move the cached version to the end and return it.
@@ -205,7 +206,8 @@ class Scatterplot<T extends Tile> {
         return old_version.selection;
       }
     }
-    const selection = new DataSelection<T>(this, params);
+    const selection = new DataSelection(this, params);
+    await selection.ready;
     this.selection_history.push({
       selection,
       name: selection.name,
@@ -222,18 +224,18 @@ class Scatterplot<T extends Tile> {
    *   **or** a keyed of values like `{'Rome': 3, 'Vienna': 13}` in which case the numeric values will be used.
    * @param key_field The field in which to look for the identifiers.
    */
-  add_identifier_column(
+  join(
     name: string,
-    codes:
-      | string[]
-      | bigint[]
-      | Record<string, number>,
+    codes: Record<string | number, number>,
     key_field: string
   ) {
-    const true_codes: Record<string, number> = Array.isArray(codes)
-      ? Object.fromEntries(codes.map((next : string | bigint) => [next, 1]))
-      : codes;
-    this._root.add_label_identifiers(true_codes, name, key_field);
+    let true_codes: Record<string, number> 
+    
+    if (Array.isArray(codes)) {
+      true_codes = Object.fromEntries(codes.map((next : string | bigint) => [next, 1]))
+    } else {
+      this._root.add_label_identifiers(true_codes, name, key_field);
+    }
   }
 
   async add_labels_from_url(
@@ -328,14 +330,14 @@ class Scatterplot<T extends Tile> {
 
   async load_dataset(
     params: DS.DataSpec
-  ) : Promise<DS.Dataset<T>> {
+  ) : Promise<DS.Dataset> {
     if (params.source_url !== undefined) {
-      this._root = Dataset.from_quadfeather(params.source_url, this as unknown as Scatterplot<QuadTile>) as unknown as Dataset<T>;
+      this._root = Dataset.from_quadfeather(params.source_url, this as unknown as Scatterplot) as unknown as Dataset;
     } else if (params.arrow_table !== undefined) {
-      this._root = Dataset.from_arrow_table(params.arrow_table, this as unknown as Scatterplot<ArrowTile>) as unknown as Dataset<T>;
+      this._root = Dataset.from_arrow_table(params.arrow_table, this as unknown as Scatterplot) as unknown as Dataset;
     } else if (params.arrow_buffer !== undefined) {
       const tb = tableFromIPC(params.arrow_buffer);
-      this._root = Dataset.from_arrow_table(tb, this as unknown as Scatterplot<ArrowTile>) as unknown as Dataset<T>;
+      this._root = Dataset.from_arrow_table(tb, this as unknown as Scatterplot) as unknown as Dataset;
     } else {
       throw new Error('No source_url or arrow_table specified');
     }
@@ -418,7 +420,7 @@ class Scatterplot<T extends Tile> {
     ctx.clearRect(0, 0, 10_000, 10_000);
     const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = '#888888';
-    const tiles = this._root.map((t: T) => t);
+    const tiles = this._root.map((t) => t);
     for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
@@ -870,8 +872,9 @@ class Scatterplot<T extends Tile> {
 
 // Exported as static methods on Scatterplot to avoid breaking back-compatibility.
 (Scatterplot as Partial<AdditionalProps>).Bitmask = Bitmask;
-(Scatterplot as Partial<AdditionalProps>).ArrowDataset = ArrowDataset;
-(Scatterplot as Partial<AdditionalProps>).QuadtileDataset = QuadtileDataset;
+(Scatterplot as Partial<AdditionalProps>).Dataset = Dataset;
+
+(Scatterplot as Partial<AdditionalProps>).QuadtileDataset = Dataset;
 (Scatterplot as Partial<AdditionalProps>).DataSelection = DataSelection;
 
 export default Scatterplot;
@@ -882,28 +885,27 @@ export default Scatterplot;
 abstract class SettableFunction<
   FuncType,
   ArgType = StructRowProxy,
-  Tiletype extends Tile = QuadTile
 > {
   public _f:
     | undefined
-    | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType);
+    | ((datum: ArgType, plot: Scatterplot) => FuncType);
   public string_rep: string;
-  public plot: Scatterplot<Tiletype>;
-  constructor(plot: Scatterplot<Tiletype>) {
+  public plot: Scatterplot;
+  constructor(plot: Scatterplot) {
     this.string_rep = '';
     this.plot = plot;
   }
 
-  abstract default(datum: ArgType, plot: Scatterplot<Tiletype> | undefined): FuncType;
+  abstract default(datum: ArgType, plot: Scatterplot | undefined): FuncType;
 
-  get f(): (datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType {
+  get f(): (datum: ArgType, plot: Scatterplot) => FuncType {
     if (this._f === undefined) {
       return (datum, plot) => this.default(datum, plot);
     }
     return this._f;
   }
   
-  set f(f: string | ((datum: ArgType, plot: Scatterplot<Tiletype>) => FuncType)) {
+  set f(f: string | ((datum: ArgType, plot: Scatterplot) => FuncType)) {
     if (typeof f === 'string') {
       if (this.string_rep !== f) {
         this.string_rep = f;
@@ -954,8 +956,7 @@ class ClickFunction extends SettableFunction<void> {
 
 class ChangeToHighlitPointFunction extends SettableFunction<
   void,
-  StructRowProxy[],
-  QuadTile
+  StructRowProxy[]
   > {
     default(points: StructRowProxy[], plot = undefined) {
       // console.log({points})

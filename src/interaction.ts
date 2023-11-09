@@ -12,7 +12,7 @@ import { Rectangle } from './tile';
 import { PositionalAesthetic } from './Aesthetic';
 import type { Dataset } from './Dataset';
 import type * as DS from './shared';
-export default class Zoom<T extends DS.Tile> {
+export default class Zoom {
   public prefs: DS.APICall;
   public svg_element_selection: d3.Selection<
     d3.ContainerElement,
@@ -22,8 +22,8 @@ export default class Zoom<T extends DS.Tile> {
   >;
   public width: number;
   public height: number;
-  public renderers: Map<string, Renderer<T>>;
-  public tileSet?: Dataset<T>;
+  public renderers: Map<string, Renderer>;
+  public tileSet?: Dataset;
   public _timer?: d3.Timer;
   public _scales?: Record<string, d3.ScaleLinear<number, number>>;
   public zoomer?: d3.ZoomBehavior<Element, unknown>;
@@ -48,13 +48,14 @@ export default class Zoom<T extends DS.Tile> {
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles: Dataset<T>) {
+  attach_tiles(tiles: Dataset) {
     this.tileSet = tiles;
+    // TODO: remove bad assignment here.
     this.tileSet._zoom = this;
     return this;
   }
 
-  attach_renderer(key: string, renderer: Renderer<T>) {
+  attach_renderer(key: string, renderer: Renderer) {
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
     renderer.zoom.initialize_zoom();
@@ -73,8 +74,8 @@ export default class Zoom<T extends DS.Tile> {
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
 
-  html_annotation(points: Array<Record<string, string | number>>) {
-    const div = this.svg_element_selection.node()!.parentNode!.parentNode;
+  html_annotation(points: StructRowProxy[]) {
+    const div = this.svg_element_selection.node()!.parentNode.parentNode;
     let opacity = 0.75;
     if (this.scatterplot.prefs.tooltip_opacity !== undefined) {
       opacity = this.scatterplot.prefs.tooltip_opacity;

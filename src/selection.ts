@@ -32,8 +32,8 @@ export interface BooleanColumnParams extends SelectParams {
   field: string;
 }
 
-export interface CompositionSelectParams<T extends Tile> extends SelectParams {
-  composition: Composition<T>
+export interface CompositionSelectParams extends SelectParams {
+  composition: Composition
 }
 
 function isBooleanColumnParam(
@@ -62,22 +62,22 @@ type BinaryOperation = "AND" | "OR" | "XOR"
 type UnaryOperation = "NOT"
 
 
-type CompArgs<T extends Tile> = DataSelection<T> | Composition<T>
-type Composition<T extends Tile> = [UnaryOperation, CompArgs<T> ] | [BinaryOperation, CompArgs<T>, CompArgs<T>] | 
-  [PluralOperation, CompArgs<T>, CompArgs<T>?, CompArgs<T>?, CompArgs<T>?] // Plural operations accept indefinite length, but this at least gets the internal signatures working.
-export interface CompositeSelectParams<T extends Tile> extends SelectParams {
-  composition: Composition<T>
+type CompArgs = DataSelection | Composition
+type Composition = [UnaryOperation, CompArgs ] | [BinaryOperation, CompArgs, CompArgs] | 
+  [PluralOperation, CompArgs, CompArgs?, CompArgs?, CompArgs?] // Plural operations accept indefinite length, but this at least gets the internal signatures working.
+export interface CompositeSelectParams extends SelectParams {
+  composition: Composition
 }
 
 function isCompositeSelectParam(
   params: Record<string, any>
-): params is CompositeSelectParams<T> {
+): params is CompositeSelectParams {
   return params.composition !== undefined;
 }
 
-function isComposition<T extends Tile>(
+function isComposition(
   elems: any
-): elems is Composition<T> {
+): elems is Composition {
   if (elems === undefined) throw new Error("Undefined composition")
   if (!elems) return false
   if (!elems.length) return false
@@ -85,16 +85,16 @@ function isComposition<T extends Tile>(
   return ["AND", "OR", "XOR", "NOT", "ANY", "ALL"].indexOf(op) == 0;
 }
 
-async function extractBitmask<T extends Tile>(tile : T, arg: CompArgs<T>) : Promise<Bitmask> {
+async function extractBitmask(tile : Tile, arg: CompArgs) : Promise<Bitmask> {
   if (isComposition(arg)) {
     return applyCompositeFunctionToTile(tile, arg)
   } else {
-    const column = tile.get_column((arg as DataSelection<T>).name) as Promise<Vector<Bool>>;
+    const column = tile.get_column((arg as DataSelection).name) as Promise<Vector<Bool>>;
     return Bitmask.from_arrow(await column)
   }
 }
 
-async function applyCompositeFunctionToTile<T extends Tile>(tile : T, args : Composition<T>) : Promise<Bitmask> {
+async function applyCompositeFunctionToTile(tile : Tile, args : Composition) : Promise<Bitmask> {
   const operator = args[0]
   if (args[0] === "NOT") {
     const bitmask = await extractBitmask(tile, args[1])
@@ -232,9 +232,9 @@ export class Bitmask {
     return result;
   }
 }
-export class DataSelection<T extends Tile> {
-  dataset: Dataset<T>;
-  plot: Scatterplot<T>;
+export class DataSelection {
+  dataset: Dataset;
+  plot: Scatterplot;
   // The match count is the number of matches **per tile**;
   // used to access numbers by index.
 
@@ -295,15 +295,15 @@ export class DataSelection<T extends Tile> {
    * 
    */
   type?: string;
-  composition: null | Composition<T> = null;
+  composition: null | Composition = null;
   private events: { [key: string]: Array<(args) => void> } = {};
 
   constructor(
-    plot: Scatterplot<T>,
-    params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams<T>
+    plot: Scatterplot,
+    params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams
   ) {
     this.plot = plot;
-    this.dataset = plot.dataset as Dataset<T>;
+    this.dataset = plot.dataset as Dataset;
     this.name = params.name;
     let markReady = function() {}
     this.ready = new Promise((resolve, reject) => {
@@ -319,7 +319,7 @@ export class DataSelection<T extends Tile> {
     } else if (isCompositeSelectParam(params)) {
       const {name, composition} = params;
       this.composition = composition;
-      this.add_function_column(name, async (tile : T) => {
+      this.add_function_column(name, async (tile : Tile) => {
         const bitmask = await applyCompositeFunctionToTile(tile, composition)
         return bitmask.to_arrow()
       }).then(markReady)
@@ -383,7 +383,7 @@ export class DataSelection<T extends Tile> {
    * A function that combines two selections into a third
    * selection that is the union of the two.
    */
-  union(other: DataSelection<T>, name: string | undefined): DataSelection<T> {
+  union(other: DataSelection, name: string | undefined): DataSelection {
     return new DataSelection(this.plot, {
       name: name || this.name + " union " + other.name,
       composition: ["OR", this, other]
@@ -397,7 +397,7 @@ export class DataSelection<T extends Tile> {
    * queries than simple intersection/union, use the (not yet defined)
    * disjunctive normal form constructor.
    */
-  intersection(other: DataSelection<T>, name: string | undefined): DataSelection<T> {
+  intersection(other: DataSelection, name: string | undefined): DataSelection {
     return new DataSelection(this.plot, {
       name: name || this.name + " intersection " + other.name,
       composition: ["AND", this, other]
@@ -422,13 +422,13 @@ export class DataSelection<T extends Tile> {
     return this
   }
 
-  async removePoints(name, ixes: BigInt[]) : Promise<DataSelection<T>> {
+  async removePoints(name, ixes: BigInt[]) : Promise<DataSelection> {
     return this.add_or_remove_points(name, ixes, 'remove')
   }
 
   // Non-editable behavior: 
   // if a single point is added, will also adjust the cursor.
-  async addPoints(name, ixes: BigInt[]) : Promise<DataSelection<T>> {
+  async addPoints(name, ixes: BigInt[]) : Promise<DataSelection> {
     return this.add_or_remove_points(name, ixes, 'add')
   }
 
@@ -582,7 +582,7 @@ export class DataSelection<T extends Tile> {
    * @param name the name for the column to assign in the dataset.
    * @param tileFunction The transformation to apply
    */
-  async add_function_column(name: string, tileFunction: DS.BoolTransformation<T>): Promise<void> {
+  async add_function_column(name: string, tileFunction: DS.BoolTransformation): Promise<void> {
     if (this.dataset.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
     }
@@ -599,7 +599,7 @@ export class DataSelection<T extends Tile> {
    * @param functionToApply the user-defined transformation
    */
 
-  private wrapWithSelectionMetadata(functionToApply : DS.BoolTransformation<T>) : DS.BoolTransformation<T> {
+  private wrapWithSelectionMetadata(functionToApply : DS.BoolTransformation) : DS.BoolTransformation {
     return async (tile : T) => {
       const array = await functionToApply(tile);
       const batch = tile.record_batch;
@@ -734,7 +734,7 @@ export class DataSelection<T extends Tile> {
   }
 }
   
-function bigintmatcher<T extends Tile>(field: string, matches: bigint[]) {
+function bigintmatcher(field: string, matches: bigint[]) {
   const matchings = new Set(matches);
   return async function (tile: T) {
     const col = (await tile.get_column(field)).data[0];
@@ -769,7 +769,7 @@ function bigintmatcher<T extends Tile>(field: string, matches: bigint[]) {
  * @param matches A list of strings to match in that column
  * @returns 
  */
-function stringmatcher<T extends Tile>(field: string, matches: string[]) {
+function stringmatcher(field: string, matches: string[]) {
   if (field===undefined) {
     throw new Error("Field must be defined")
   }

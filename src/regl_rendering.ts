@@ -16,19 +16,20 @@ import REGL from 'regl';
 import { Dataset } from './Dataset';
 import Scatterplot from './deepscatter';
 import { Bool, Data, Dictionary, Float, Int, StructRowProxy, Timestamp, Type, Utf8, Vector } from 'apache-arrow';
-import { StatefulAesthetic } from './StatefulAesthetic';
 import { Color } from './ColorAesthetic';
+import { StatefulAesthetic } from './StatefulAesthetic';
+import { Aesthetic, Foreground } from './Aesthetic';
 
 // eslint-disable-next-line import/prefer-default-export
-export class ReglRenderer<T extends Tile> extends Renderer<T> {
+export class ReglRenderer extends Renderer {
   public regl: Regl;
-  public aes: AestheticSet<T>;
+  public aes: AestheticSet;
   public buffer_size = 1024 * 1024 * 64; // Use GPU memory in blocks of 64 MB buffers by default.
   private _buffers: MultipurposeBufferSet;
   public _initializations: Promise<void>[];
-  public tileSet: Dataset<T>;
-  public zoom?: Zoom<T>;
-  public _zoom?: Zoom<T>;
+  public tileSet: Dataset;
+  public zoom?: Zoom;
+  public _zoom?: Zoom;
   public _start: number;
   public most_recent_restart?: number;
   public _default_webgl_scale?: number[];
@@ -40,14 +41,13 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   public textures: Record<string, Texture2D> = {};
   public _fill_buffer?: Buffer;
   public contour_vals?: Uint8Array;
-  //  public contour_alpha_vals : Float32Array | Uint8Array | Uint16Array;
-  //  public contour_vals : Uint8Array;
+  public contour_alpha_vals? : Float32Array | Uint8Array | Uint16Array;
   public tick_num?: number;
   public reglframe?: REGL.FrameCallback;
   public _integer_buffer?: Buffer;
   //  public _renderer :  Renderer;
 
-  constructor(selector, tileSet: Dataset<T>, scatterplot: Scatterplot<T>) {
+  constructor(selector : string | Node, tileSet: Dataset, scatterplot: Scatterplot) {
     super(selector, tileSet, scatterplot);
     const c = this.canvas;
     if (this.canvas === undefined) {
@@ -92,7 +92,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     return this._buffers;
   }
 
-  data(dataset: Dataset<T>) {
+  data(dataset: Dataset) {
     if (dataset === undefined) {
       // throw
       return this.tileSet;
@@ -170,9 +170,10 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     // Regl is faster if it can render a large number of draw calls together.
     const prop_list = [];
     let call_no = 0;
+    const foreground = this.aes.dim('foreground') as StatefulAesthetic<Foreground>;
     const needs_background_pass =
-      (this.aes.store.foreground.states[0].active as boolean) ||
-      (this.aes.store.foreground.states[1].active as boolean);
+      (foreground.states[0].active) ||
+      (foreground.states[1].active);
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
       tile._buffer_manager =
@@ -667,7 +668,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     }
     for (const tile of this.visible_tiles()) {
       if (tile.numeric_id === tile_number) {
-        return tile.record_batch.get(row_number) as StructRowProxy;
+        return tile.record_batch.get(row_number);
       }
     }
     return null;
@@ -1100,7 +1101,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   }
 }
 
-export class TileBufferManager<T extends Tile> {
+export class TileBufferManager {
   // Handle the interactions of a tile with a regl state.
 
   // binds elements directly to the tile, so it's safe
@@ -1109,12 +1110,12 @@ export class TileBufferManager<T extends Tile> {
   // In an ideal world, these might all be methods directly on tile, but since they relate to Regl,
   // I want them in this file instead.
 
-  public tile: T;
+  public tile: Tile;
   public regl: Regl;
-  public renderer: ReglRenderer<T>;
+  public renderer: ReglRenderer;
   public regl_elements: Map<string, DS.BufferLocation | null>;
 
-  constructor(regl: Regl, tile: T, renderer: ReglRenderer<T>) {
+  constructor(regl: Regl, tile: Tile, renderer: ReglRenderer) {
     this.tile = tile;
     this.regl = regl;
     this.renderer = renderer;

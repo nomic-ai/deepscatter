@@ -9,54 +9,57 @@ import {
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
 import { isOpChannel, isLambdaChannel, isConstantChannel } from './typing';
-import type { QuadtileDataset } from './Dataset';
-import { Vector } from 'apache-arrow';
+import { Type, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
 import type * as DS from './shared.d'
 
-interface NumericScale {
-  domain(v: [number, number]): void;
-  domain(v: undefined): NumericScale;
-  range(v: [number, number]): void;
-  range(v: undefined): NumericScale;
-  (v: number | string): number;
-}
-
-interface NumericScaleMaker {
-  () : () => NumericScale
-}
 
 export const scales = {
   sqrt: scaleSqrt,
   log: scaleLog,
   linear: scaleLinear,
   literal: scaleIdentity,
-} as unknown as Record<DS.Transform, NumericScaleMaker>;
+} as const;
 
 
 // A channel is usually going to be one of these.
 // Only color channels are different
 type DefaultChannel =
-  | DS.BasicChannel
+  | DS.Channel
   | DS.OpChannel
   | DS.LambdaChannel
   | DS.ConstantChannel;
 
-type PossibleGLVals = number | [number, number, number];
+type WebGlValue = number | [number, number, number];
+
+type JSValue = number | string | boolean;
 
 // d3 scales are quite powerful, but we only use a limited subset of their features.
 
+/**
+ * An Aesthetic bundles all operations in mapping from user dataspace to webGL based aesthetics.
+ * 
+ * It is a generic type that needs to be subclassed. The GLType represents the convention that we
+ * use on the GPU for representing it: in every case except for colors, data is represented as an
+ * indeterminate precision float. Colors are represented as a three-tuple.
+ * 
+ * The JSValue type represents how the user expects to interact with these in the setting of 
+ * ranges. Again, these are generally numbers, but they can be strings for special instructions,
+ * especially for colors.
+ */
 export abstract class Aesthetic<
-  GlValueType extends PossibleGLVals = number, // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
-  JSValueType = number, // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red
+  // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
+  GlValueType extends WebGlValue = number, 
+  // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red  
+  JSValueType extends JSValue = number,
   ChannelType extends DS.RootChannel = DefaultChannel
 > {
   public abstract default_range: [number, number];
   public abstract default_constant: JSValueType;
   public _constant?: JSValueType;
   public abstract default_transform: DS.Transform;
-  private _transform: DS.Transform = 'linear';
+  public _transform: DS.Transform = 'linear';
   public scatterplot: DS.Plot;
   public field: string | null = null;
   public regl: Regl;
@@ -64,7 +67,7 @@ export abstract class Aesthetic<
   public _domain?: [number, number];
   public _range: [number, number] | Uint8Array;
   public _func?: (d: string | number) => GlValueType;
-  public dataset: DS.Dataset<any>;
+  public dataset: DS.Dataset;
   public partner: typeof this | null = null;
   public _textures: Record<string, Texture2D> = {};
   // cache of a d3 scale
@@ -76,7 +79,7 @@ export abstract class Aesthetic<
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
-    dataset: DS.Dataset<any>,
+    dataset: DS.Dataset,
     aesthetic_map: TextureSet
   ) {
     this.aesthetic_map = aesthetic_map;
@@ -111,7 +114,7 @@ export abstract class Aesthetic<
     this._transform = transform;
   }
 
-  get scale(): (arg0: any) => JSValueType {
+  get scale(): (arg0: unknown) => JSValueType {
     if (this._scale) {
       return this._scale;
     }
@@ -120,14 +123,15 @@ export abstract class Aesthetic<
       throw new Error('Dictionary scales only supported for colors');
     }
 
-    const scale = scales[this.transform]();
+    const scaleMaker = scales[this.transform];
+    const scale = scaleMaker();
     // TODO CONSTRUCTION
     scale.domain(this.domain).range(this.range);
 
     return (this._scale = scale);
   }
 
-  get column(): Vector {
+  get column(): Vector<DS.SupportedArrowTypes> {
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
@@ -155,7 +159,8 @@ export abstract class Aesthetic<
     if (!column) {
       return [1, 1];
     }
-    if (column.type?.dictionary !== undefined) {
+
+    if (column.type === Type.Dictionary) {
       return [0, this.aesthetic_map.texture_size];
     }
     const domain = this.dataset.domain(this.field);
@@ -218,8 +223,8 @@ export abstract class Aesthetic<
     this.aesthetic_map.set_one_d(this.id, this.texture_buffer);
   }
 
-  convert_string_encoding(channel: string): DS.BasicChannel {
-    const v: DS.BasicChannel = {
+  convert_string_encoding(channel: string): DS.Channel {
+    const v: DS.Channel = {
       field: channel,
       domain: this.default_domain,
       range: this.default_range,
@@ -227,7 +232,7 @@ export abstract class Aesthetic<
     return v;
   }
 
-  complete_domain(encoding: DS.BasicChannel) {
+  complete_domain(encoding: DS.Channel) {
     encoding.domain = encoding.domain || this.default_domain;
     return encoding;
   }
@@ -245,11 +250,13 @@ export abstract class Aesthetic<
   update(encoding: string | null | ChannelType) {
     // null handling.
     if (encoding === undefined) {
-      console.warn('Should never be calling update with undefined.');
+      console.warn('Updates with undefined should be handled upstream of the aesthetic.');
       return;
     }
-
-    if (encoding === null || encoding === 'null') {
+    if (encoding === 'null') {
+      throw new Error("Setting encoding with string 'null' is no longer supported. Pass a true null value.")
+    }
+    if (encoding === null) {
       this.current_encoding = null;
       this.reset_to_defaults();
       return;
@@ -319,23 +326,16 @@ export abstract class Aesthetic<
     }
   }
 
-  arrow_column(): Vector {
-    if (this.field === null) {
-      throw new Error("Can't retrieve column for aesthetic without a field");
+  arrow_column(): Vector | null {
+    if (this.field === null || this.field === undefined) {
+      return null
     }
-    const c = this.dataset.root_tile.record_batch.getChild(this.field) as Vector | null;
-    if (c === null) {
-      throw new Error(`No column ${this.field} on arrow table for aesthetic`);
-    }
-    return c;
+    return this.dataset.root_tile.record_batch.getChild(this.field);
   }
 
   is_dictionary(): boolean {
-    if (this.field === null || this.field === undefined) {
-      return false;
-    }
-    if (this.arrow_column()?.type?.dictionary !== undefined) return true;
-    return false;
+    const t = this.arrow_column() as Vector<DS.SupportedArrowTypes> | null;
+    return t ? t.type.typeId === Type.Dictionary : false;
   }
 
   get constant(): GlValueType {
@@ -349,6 +349,7 @@ export abstract class Aesthetic<
   }
 
   get use_map_on_regl(): 1 | 0 {
+    // Do we need to use the dictionary map in regl?
     if (this.is_dictionary()) {
       return 1;
     }
@@ -356,25 +357,25 @@ export abstract class Aesthetic<
   }
 
   materialize_function(
-    raw_func: string | ((d: string | number) => GlValueType)
+    raw_func: string | ((d: JSValueType) => GlValueType)
   ) {
     const func =
       typeof raw_func === 'string'
         ? lambda_to_function(parseLambdaString(raw_func))
         : raw_func;
-    this._func = func as ((d: string | number) => GlValueType);
+    this._func = func as ((d: JSValueType) => GlValueType);
     return func;
   }
 
   apply_function_for_textures(
     field: string,
     range: number[],
-    raw_func: string | ((d: string | number) => GlValueType)
+    raw_func: string | ((d: JSValueType) => GlValueType)
   ) {
     const { texture_size } = this.aesthetic_map;
     const func = this.materialize_function(raw_func);
 
-    let input: (string | number)[] = arange(texture_size);
+    let input: (JSValueType)[] = arange(texture_size);
 
     if (
       field === undefined ||
@@ -390,17 +391,17 @@ export abstract class Aesthetic<
       //      this.texture_buffer.set(encodeFloatsRGBA(arange(this.texture_size).map(i => 1)))
       return;
     }
-    const { column } = this;
+    const column = this.arrow_column();
 
     if (!column) {
       throw new Error(`Column ${field} does not exist on table.`);
     }
 
-    if (column?.type?.dictionary) {
+    if (this.is_dictionary()) {
       // NB--Assumes string type for dictionaries.
 
       input.fill('');
-      const dvals = column.data[0].dictionary!.toArray() as string[];
+      const dvals = column.data[0].dictionary.toArray() as string[];
       for (const [i, d] of dvals.entries()) {
         input[i] = d;
       }
@@ -412,11 +413,13 @@ export abstract class Aesthetic<
   }
 }
 
+
 abstract class OneDAesthetic extends Aesthetic {
+  public _range: [number, number];
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
-    dataset: DS.Dataset<any>,
+    dataset: DS.Dataset,
     aesthetic_map: TextureSet
   ) {
     super(scatterplot, regl, dataset, aesthetic_map);
@@ -448,13 +451,14 @@ export class Size extends OneDAesthetic {
 }
 
 export abstract class PositionalAesthetic extends OneDAesthetic {
+  field: 'x' | 'y' | 'x0' | 'y0'
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
-    tile: QuadtileDataset,
+    dataset: DS.Dataset,
     map: TextureSet
   ) {
-    super(scatterplot, regl, tile, map);
+    super(scatterplot, regl, dataset, map);
     this._transform = 'literal';
   }
   default_range: [number, number] = [-1, 1];
@@ -476,13 +480,13 @@ export abstract class PositionalAesthetic extends OneDAesthetic {
 }
 
 export class X extends PositionalAesthetic {
-  field = 'x';
+  field = 'x' as const;
 }
 
 export class X0 extends X {}
 
 export class Y extends PositionalAesthetic {
-  field = 'y';
+  field = 'y' as const;
 }
 
 export class Y0 extends Y {}
@@ -495,7 +499,7 @@ abstract class BooleanAesthetic extends Aesthetic<
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
-    tile: DS.Dataset<any>,
+    tile: DS.Dataset,
     map: TextureSet
   ) {
     super(scatterplot, regl, tile, map);
@@ -718,7 +722,7 @@ function lambda_to_function(input: DS.LambdaChannel): (d: any) => number {
   }
   const cleaned = parseLambdaString(lambda).lambda;
   const [arg, code] = cleaned.split('=>', 2).map((d) => d.trim());
-  const func = new Function(arg, code) as (d: any) => number;
+  const func = new Function(arg, code) as (d: unknown) => number;
   return func;
 }
 

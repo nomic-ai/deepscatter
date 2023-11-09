@@ -1,7 +1,6 @@
 import { Aesthetic, scales } from './Aesthetic';
 import type * as DS from './shared.d'
 
-import type { Regl, Texture2D } from 'regl';
 import { range as arange, extent, shuffler } from 'd3-array';
 import { isConstantChannel, isOpChannel } from './typing';
 import {
@@ -20,12 +19,8 @@ import * as d3Chromatic from 'd3-scale-chromatic';
 const palette_size = 4096;
 import { randomLcg } from 'd3-random';
 import { Dictionary, Int, Int32, Utf8, Vector } from 'apache-arrow';
-/*function to_buffer(data: number[] | number[][]) {
-  output.set(data.flat());
-  return output;
-}*/
 
-function materialize_color_interplator(
+function materialize_color_interpolator(
   interpolator: (t: number) => string
 ): Uint8Array {
   const output = new Uint8Array(4 * palette_size);
@@ -55,7 +50,6 @@ function palette_from_color_strings(colors: readonly string[]): Uint8Array {
     for (let j = 0; j < repeat_each && (i * repeat_each + j < palette_size); j++) {
       output.set(scheme[i], (i * repeat_each + j) * 4);
     }
-//    output.set(scheme[i % colors.length], i *  4);
   }
 
   return output;
@@ -78,6 +72,20 @@ for (const schemename of [
   const name = schemename.replace('scheme', '').toLowerCase();
   color_palettes[name] = palette_from_color_strings(colors);
   schemes[name] = colors;
+
+  // Okabe-Ito color scheme.
+  const okabe_palette = [
+    '#E69F00',
+    '#CC79A7',
+    '#56B4E9',
+    '#009E73',
+    '#0072B2',
+    '#D55E00',
+    '#F0E442',
+  ];
+  color_palettes['okabe'] = palette_from_color_strings(okabe_palette);
+  schemes['okabe'] = okabe_palette;
+
 }
 
 for (const interpolator of [
@@ -122,31 +130,13 @@ for (const interpolator of [
 ] as const) {
   const name = interpolator.replace('interpolate', '').toLowerCase();
   const v = d3Chromatic[interpolator];
-  color_palettes[name] = materialize_color_interplator(v);
+  color_palettes[name] = materialize_color_interpolator(v);
   if (name === 'rainbow') {
     // Deterministic random shuffle orders
     const shuffle = shuffler(randomLcg(1));
     color_palettes.shufbow = shuffle(color_palettes[name]);
   }
 }
-
-function okabe() {
-  // Okabe-Ito color scheme.
-  const okabe_palette = [
-    '#E69F00',
-    '#CC79A7',
-    '#56B4E9',
-    '#009E73',
-    '#0072B2',
-    '#D55E00',
-    '#F0E442',
-  ];
-  color_palettes.okabe = palette_from_color_strings(okabe_palette);
-  schemes['okabe'] = okabe_palette;
-}
-
-okabe();
-
 export class Color extends Aesthetic<
   [number, number, number],
   string,
@@ -194,7 +184,7 @@ export class Color extends Aesthetic<
     if (this.is_dictionary()) {
       const scale = scaleOrdinal().domain(this.domain);
       if (typeof range === 'string' && schemes[range]) {
-        const dictionary = this.column.data[0].dictionary as Vector<Utf8>;
+        const dictionary = this.arrow_column().data[0].dictionary as Vector<Utf8>;
         if (dictionary === null) {
           throw new Error('Dictionary is null');
         }
@@ -282,7 +272,7 @@ export class Color extends Aesthetic<
         } else {
           // We need to find the integer identifiers for each of
           // the values in the domain.
-          const data_values = this.column.data[0].dictionary!.toArray();
+          const data_values = this.column.data[0].dictionary.toArray();
           const dict_values = Object.fromEntries(
             data_values.map((val: string, i: Number) => [val, i])
           );

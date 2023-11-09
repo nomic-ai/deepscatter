@@ -8,18 +8,18 @@ import type { Aesthetic } from './Aesthetic';
 import type { Tile } from './tile';
 import type { Encoding } from './shared.d';
 
-export class AestheticSet<TileType extends Tile> {
-  public tileSet: Dataset<TileType>;
-  public scatterplot: Scatterplot<TileType>;
+export class AestheticSet {
+  public tileSet: Dataset;
+  public scatterplot: Scatterplot;
   public regl: Regl;
   public encoding: Encoding = {};
   public position_interpolation: boolean;
   private store: Record<string, StatefulAesthetic<any>>;
   public aesthetic_map: TextureSet;
   constructor(
-    scatterplot: Scatterplot<TileType>,
+    scatterplot: Scatterplot,
     regl: Regl,
-    tileSet: Dataset<TileType>
+    tileSet: Dataset
   ) {
     this.scatterplot = scatterplot;
     this.store = {};
@@ -121,7 +121,7 @@ export class AestheticSet<TileType extends Tile> {
       throw new Error('filter1 is not supported; just say "filter"');
     }
     // TODO: Remove this awfulness. It's part of a transition in 2.15.0.
-    const colorDomain = encoding.color && encoding.color.domain ? encoding.color['domain'] : undefined;
+    const colorDomain : undefined | [number, number] = encoding.color && encoding.color.domain ? encoding.color['domain'] : undefined;
     if (colorDomain && colorDomain.length == 2 ) {
       if (Math.abs(colorDomain[1] - colorDomain[0] - 4096) < 2) {
         console.warn(`Resetting color encoding from -2047 to 0. The old behavior of requiring negative numbers 
@@ -186,7 +186,7 @@ export class TextureSet {
   }
 
   public set_color(id: string, value: Uint8Array) {
-    let offset;
+    let offset : number;
     const { offsets } = this;
     if (offsets[id]) {
       offset = offsets[id];

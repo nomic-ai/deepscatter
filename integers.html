@@ -291,13 +291,16 @@
   const done = new Set();
   function highlight(key) {
     const vals = functions[key](num_batches * 2 ** 16);
-    console.log({ vals });
     const prime_ids = vals.map((d) => d.toString());
 
-    const k2 = key.slice(0, 7) == 'stable_' ? key : '' + Math.random();
-
     if (!done.has(key)) {
-      plot.add_identifier_column(k2, prime_ids, '_id');
+      plot.select_data(
+        {
+          name: key,
+          ids: prime_ids,
+          field: '_id',          
+        }
+      )
     }
 
     if (key.slice(0, 7) == 'stable_') {
