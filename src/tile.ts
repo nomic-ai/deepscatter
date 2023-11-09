@@ -8,7 +8,7 @@ import {
   StructRowProxy,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
-import type { Dataset, QuadtileDataset } from './Dataset';
+import type { Dataset } from './Dataset';
 type MinMax = [number, number];
 
 export type Rectangle = {
@@ -32,14 +32,14 @@ let tile_identifier = 0;
  * and to associate metadata with it, in the context of a larger dataset.
  *
  */
-export abstract class Tile {
+export class Tile {
   public max_ix = -1;
   readonly key: string; // A unique identifier for this tile.
   promise: Promise<void>;
   download_state: string;
   public _batch?: RecordBatch;
   parent: this | null;
-  public _children: Array<this> = [];
+  public _children: Array<Tile> = [];
   public _highest_known_ix?: number;
   public _min_ix?: number;
   public _max_ix?: number;
@@ -50,15 +50,21 @@ export abstract class Tile {
   public _extent?: { x: MinMax; y: MinMax };
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
-  public _buffer_manager?: TileBufferManager<this>;
-  abstract codes: [number, number, number];
-
+  public _buffer_manager?: TileBufferManager;
+  url: string;
+  codes: number[];
+  _already_called = false;
+  public child_locations: string[] = [];
   
-  constructor(dataset: Dataset) {
-    // Accepts prefs only for the case of the root tile.
+  constructor(
+    key: string,
+    parent: Tile | null,
+    dataset: Dataset,
+    base_url: string,
+  ) {
+    this.key = key;
     this.promise = Promise.resolve();
     this.download_state = 'Unattempted';
-    this.key = String(Math.random());
     this.parent = null;
     this.dataset = dataset;
     this.ready = false;
@@ -68,14 +74,6 @@ export abstract class Tile {
     // Grab the next identifier off the queue. This should be async safe with the current setup, but
     // the logic might fall apart in truly parallel situations.
     this.numeric_id = tile_identifier++;
-  }
-
-  get children() {
-    return this._children;
-  }
-
-  download() : Promise<void> {
-    throw new Error('Not implemented');
   }
 
   delete_column_if_exists(colname: string) {
@@ -331,16 +329,13 @@ export abstract class Tile {
     }
   }
 
+
   get extent(): Rectangle {
     if (this._extent) {
       return this._extent;
     }
-    return {
-      x: [Number.MIN_VALUE, Number.MAX_VALUE],
-      y: [Number.MIN_VALUE, Number.MAX_VALUE],
-    };
+    return this.theoretical_extent;
   }
-
   [Symbol.iterator](): IterableIterator<StructRowProxy> {
     return this.yielder();
   }
@@ -355,34 +350,7 @@ export abstract class Tile {
     }
     return this.parent.root_extent;
   }
-}
 
-export class QuadTile extends Tile {
-  url: string;
-  key: string;
-  public _children: Array<this> = [];
-  codes: number[];
-  _already_called = false;
-  public child_locations: string[] = [];
-  constructor(
-    base_url: string,
-    key: string,
-    parent: QuadTile | null,
-    dataset: QuadtileDataset
-  ) {
-    super(dataset);
-    this.url = base_url;
-    this.parent = parent as this;
-    this.key = key;
-    this.codes = key.split('/').map((d) => Number.parseInt(d));
-  }
-
-  get extent(): Rectangle {
-    if (this._extent) {
-      return this._extent;
-    }
-    return this.theoretical_extent;
-  }
 
   async download_to_depth(max_ix: number): Promise<void> {
     /**
@@ -467,7 +435,6 @@ export class QuadTile extends Tile {
 
     this._already_called = true;
     this.download_state = 'In progress';
-
     return this._download = this.get_arrow()
       .then((batch) => {
         this.ready = true;
@@ -519,21 +486,16 @@ export class QuadTile extends Tile {
     return macrotile_siblings(this.key);
   }
 
-  get children(): Array<this> {
+  get children(): Array<Tile> {
     // create or return children.
 
     if (this.download_state !== 'Complete') {
       return [];
     }
-    const constructor = this.constructor as new (
-      k: string,
-      l: string,
-      m: this,
-      data: typeof this.dataset
-    ) => this;
+
     if (this._children.length < this.child_locations.length) {
       for (const key of this.child_locations) {
-        const child = new constructor(this.url, key, this, this.dataset);
+        const child = new Tile(key, this, this.dataset, this.url);
         this._children.push(child);
       }
     }
@@ -543,7 +505,7 @@ export class QuadTile extends Tile {
   get theoretical_extent(): Rectangle {
     // QUADTREE SPECIFIC CODE.
     if (this.codes.length !== 3) {
-      // Three-length-keys are treated as quadtrees.
+      // Only three-length-keys are treated as quadtrees.
       return this.parent.extent;
     }
     const base = this.dataset.extent;
@@ -560,90 +522,6 @@ export class QuadTile extends Tile {
       y: [base.y[0] + y * each_y, base.y[0] + (y + 1) * each_y],
     };
   }
-}
-
-export class ArrowTile extends Tile {
-  batch_num: number;
-  full_tab: Table;
-  codes: [number, number, number];
-  constructor(
-    table: Table,
-    dataset: Dataset<ArrowTile>,
-    batch_num: number,
-    parent: null | ArrowTile = null
-  ) {
-    super(dataset);
-    this.full_tab = table;
-    this._batch = table.batches[batch_num];
-    this.download_state = 'Complete';
-    this.batch_num = batch_num;
-    this.codes = [0, parent === null ? -1 : parent.batch_num, batch_num]
-    // On arrow tables, it's reasonable to just add a new index by order.
-    if (this._batch.getChild('ix') === null) {
-      console.warn('Manually setting ix');
-      const batch = this._batch;
-      const array = new Float32Array(batch.numRows);
-      const seed = this.dataset._ix_seed;
-      this.dataset._ix_seed += batch.numRows;
-      for (let i = 0; i < batch.numRows; i++) {
-        array[i] = i + seed;
-      }
-      this._min_ix = seed;
-      this._max_ix = seed + batch.numRows;
-      // This bubbles up to parents.
-      this.highest_known_ix = this._max_ix;
-      this._batch = add_or_delete_column(this.record_batch, 'ix', array);
-    }
-    this._extent = {
-      x: extent(this._batch.getChild('x')),
-      y: extent(this._batch.getChild('y')),
-    };
-    // Ugh, typescript.
-    this.parent = parent as unknown as this;
-
-    const row_last = this._batch.get(this._batch.numRows - 1);
-    if (row_last === null) {
-      throw 'No rows in table';
-    }
-    this.max_ix = Number(row_last.ix);
-    this.highest_known_ix = Number(this.max_ix);
-    const row_1 = this._batch.get(0);
-    if (row_1 === null) {
-      throw 'No rows in table';
-    }
-    this._min_ix = Number(row_1.ix);
-    this.highest_known_ix = Number(this.max_ix);
-    this.create_children();
-    this.ready = true;
-  }
-  create_children() {
-    let ix = this.batch_num * 4;
-    while (++ix <= this.batch_num * 4 + 4) {
-      if (ix < this.full_tab.batches.length) {
-        this._children.push(
-          // TODO: fix type
-          new ArrowTile(this.full_tab, this.dataset, ix, this) as unknown as this
-        );
-      }
-    }
-    for (const child of this._children) {
-      for (const dim of ['x', 'y'] as const) {
-        this._extent[dim][0] = Math.min(
-          this._extent[dim][0],
-          child._extent[dim][0]
-        );
-        this._extent[dim][1] = Math.max(
-          this._extent[dim][1],
-          child._extent[dim][1]
-        );
-      }
-    }
-  }
-
-  download(): Promise<RecordBatch> {
-    return Promise.resolve(this._batch);
-  }
-  
 }
 
 type Point = [number, number];
@@ -709,3 +587,5 @@ function children(tile: string) {
   return children as string[];
 }
 
+// Deprecated, for backwards compatibility.
+export const QuadTile = Tile;

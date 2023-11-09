@@ -5,11 +5,10 @@ import Scatterplot from './deepscatter';
 import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
-import type { Tile } from './tile';
 import type * as DS from './shared'
 const handler = drag();
 
-function pixel_ratio(scatterplot: Scatterplot<any>): number {
+function pixel_ratio(scatterplot: Scatterplot): number {
   // pixelspace
   const [px1, px2] = scatterplot._zoom.scales().x.range() as [number, number];
   // dataspace
@@ -19,7 +18,7 @@ function pixel_ratio(scatterplot: Scatterplot<any>): number {
 }
 // Should be 0 except in testing.
 const RECT_DEFAULT_OPACITY = 0;
-export class LabelMaker<T extends Tile> extends Renderer<T> {
+export class LabelMaker extends Renderer {
   /**
    * A LabelMaker
    */
@@ -39,7 +38,7 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
    * @param options
    */
   constructor(
-    scatterplot: Scatterplot<DS.TileType>,
+    scatterplot: Scatterplot,
     id_raw: string,
     options: DS.LabelOptions = {}
   ) {
@@ -55,7 +54,7 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
         .select('#labelrects')
         .append('g')
         .attr('id', id)
-        .node() as SVGGElement;
+        .node();
     } else {
       this.labelgroup = labgroup[1] as SVGGElement;
     }
@@ -63,7 +62,7 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
     if (this.canvas === undefined) {
       throw new Error('WTF?');
     }
-    this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+    this.ctx = this.canvas.getContext('2d');
 
     this.tree = new DepthTree(
       this.ctx,
@@ -195,7 +194,6 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
       );
 
     const { scatterplot, label_key } = this;
-    const labeler = this;
     const Y_BUFFER = 5;
 
     // Go through and draw the canvas events.

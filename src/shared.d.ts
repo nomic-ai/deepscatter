@@ -1,19 +1,16 @@
-import type { Dictionary, Float, Float32, Int, Int16, Int32, Int8, StructRowProxy, Table, Timestamp, Utf8, Vector } from 'apache-arrow';
+import type { Dictionary, Float, Float32, Bool, Int, Int16, Int32, Int8, StructRowProxy, Table, Timestamp, Utf8, Vector } from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
-import type { ArrowDataset } from './Dataset';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
-import type { Tile, QuadTile, ArrowTile } from './tile';
+import type { Tile, QuadTile } from './tile';
 import type Scatterplot from './deepscatter';
 import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
-import { Bool } from 'apache-arrow';
 import type { DataSelection } from './selection';
 //import { DataSelection } from './selection';
 
 export type {
   Renderer,
-  ArrowDataset,
   Dataset,
   ConcreteAesthetic,
   Tile,
@@ -40,15 +37,38 @@ type TwoArgumentOp = {
   b: number;
 };
 
+/**
+ * A channel represents the information necessary to map a single dimension
+ * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
+ * to construct a scale and to pass any other necessary information to assist
+ * in converting tabular data to visual representation. In some cases it is a scale;
+ * in others it is parameters used to define a function on the GPU.
+ *
+ * The names and design are taken largely from channels as defined in Vega-Lite,
+ * but the syntax differs for a number of operations.
+ * https://vega.github.io/vega-lite/docs/encoding.html
+ */
+
+export interface Channel {
+  /** The name of a column in the data table to be encoded. */
+  field: string;
+  /**
+   * A transformation to apply on the field.
+   * 'literal' maps in the implied dataspace set by 'x', 'y', while
+   * 'linear' transforms the data by the range and domain.
+   */
+  transform?: Transform;
+  // The domain over which the data extends
+  domain?: [number, number];
+  // The range into which to map the data.
+  range?: [number, number];
+}
+
+
 export type Newable<T> = { new (...args: any[]): T };
 export type PointFunction = (p : StructRowProxy) => number
-export type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
+export type Plot = Scatterplot | Scatterplot;
 export type OpChannel = OneArgumentOp | TwoArgumentOp;
-
-interface InitializedScatterplot<T extends Tile> {
-  _root: Dataset<T>;
-  _renderer: ReglRenderer<T>;
-}
 
 /**
  * A proxy class that wraps around tile get calls. Used to avoid
@@ -65,12 +85,12 @@ export type ScatterplotOptions = {
   dataset?: DataSpec;
 };
 
-export type QuadtileOptions = {
+export type DatasetOptions = {
   tileProxy?: TileProxy;
 };
 
-export interface SelectionRecord<T extends Tile>  {
-  selection: DataSelection<T> | null;
+export interface SelectionRecord  {
+  selection: DataSelection | null;
   name: string;
   flushed: boolean;
 }
@@ -135,31 +155,8 @@ export type ConstantChannel =
   | ConstantBool
   | ConstantNumber
   | ConstantColorChannel;
-/**
- * A channel represents the information necessary to map a single dimension
- * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
- * to construct a scale and to pass any other necessary information to assist
- * in converting tabular data to visual representation. In some cases it is a scale;
- * in others it is parameters used to define a function on the GPU.
- *
- * The names and design are taken largely from channels as defined in Vega-Lite,
- * but the syntax differs for a number of operations.
- * https://vega.github.io/vega-lite/docs/encoding.html
- */
-export interface BasicChannel {
-  /** The name of a column in the data table to be encoded. */
-  field: string;
-  /**
-   * A transformation to apply on the field.
-   * 'literal' maps in the implied dataspace set by 'x', 'y', while
-   * 'linear' transforms the data by the range and domain.
-   */
-  transform?: Transform;
-  // The domain over which the data extends
-  domain?: [number, number];
-  // The range into which to map the data.
-  range?: [number, number];
-}
+
+
 
 export type JitterRadiusMethod =
   | 'None' // 
@@ -168,10 +165,6 @@ export type JitterRadiusMethod =
   | 'normal' // static jitters around a central point biased towards the middle.
   | 'circle' // animates a circle around the point.
   | 'time'; // lapses the point in and out of view.
-
-export interface CategoricalChannel {
-  field: string;
-}
 
 type ArrowInt = Int8 | Int16 | Int32;
 
@@ -194,16 +187,19 @@ export type ArrowBuildable = Vector<SupportedArrowTypes> | Float32Array | Uint8A
  * inputTile.record_batch.numRows, it will fail in an undefined way.
  * This is not a guarantee I know how to enforce in the type system.
  */
-export type Transformation<T> = (inputTile: T) => ArrowBuildable | Promise<ArrowBuildable>;
+export type Transformation = (inputTile: Tile) => ArrowBuildable | Promise<ArrowBuildable>;
 
-export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
+export type BoolTransformation = (inputTile: Tile) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
 
-export type BasicColorChannel = BasicChannel & {
+
+
+export type BasicColorChannel = Channel & {
   range?: string[] | string;
   domain?: [number, number];
 };
 
-export type CategoricalColorChannel = CategoricalChannel & {
+export type CategoricalColorChannel = {
+  field: string;
   range?: string | string[];
   domain?: string[];
 };
@@ -217,7 +213,7 @@ export type BooleanChannel = FunctionalChannel | ConstantBool;
 
 export type RootChannel =
   | BooleanChannel
-  | BasicChannel
+  | Channel
   | string
   | OpChannel
   | ConstantColorChannel
@@ -295,9 +291,10 @@ export type DataSpec = Record<string, never> &
 export type onZoomCallback = (transform: d3.ZoomTransform) => null;
 
 export type Label = {
-  x: number;
-  y: number;
-  text: string;
+  x: number; // in data space.
+  y: number; // in data space.
+  text: string; // The text to appear on the label.
+  size?: number; // The size of the label (in pt)
 };
 export type URLLabels = {
   url: string;
@@ -374,4 +371,3 @@ type RenderPrefs = CompletePrefs & {
   arrow_table?: Table;
   //arrow_buffer?: Buffer;
 };
-export type TileType = QuadTile | ArrowTile;

@@ -88,7 +88,7 @@ export class StatefulAesthetic<T extends Aesthetic> {
     return this.states[1];
   }
 
-  update(encoding: DS.BasicChannel | DS.ConstantChannel) {
+  update(encoding: DS.Channel | DS.ConstantChannel) {
     const stringy = JSON.stringify(encoding);
     // Overwrite the last version.
     if (

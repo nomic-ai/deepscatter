@@ -118,25 +118,25 @@ class RenderProps {
   }
 }
 
-export class Renderer<TileType extends Tile> {
+export class Renderer {
   // A renderer handles drawing to a display element.
-  public scatterplot: Scatterplot<TileType>;
+  public scatterplot: Scatterplot;
   public holder: d3.Selection<any, any, any, any>;
   public canvas: HTMLCanvasElement;
-  public dataset: Dataset<TileType>;
+  public dataset: Dataset;
   public width: number;
   public height: number;
   public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
-  public zoom?: Zoom<TileType>;
-  public aes?: AestheticSet<TileType>;
-  public _zoom?: Zoom<TileType>;
+  public zoom?: Zoom;
+  public aes?: AestheticSet;
+  public _zoom?: Zoom;
   public _initializations: Promise<void>[] = [];
   public render_props: RenderProps = new RenderProps();
   constructor(
-    selector: string,
-    tileSet: Dataset<TileType>,
-    scatterplot: Scatterplot<TileType>
+    selector: string | Node,
+    tileSet: Dataset,
+    scatterplot: Scatterplot
   ) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
@@ -218,7 +218,7 @@ export class Renderer<TileType extends Tile> {
     return (max_points * k * k) / point_size_adjust / point_size_adjust;
   }
 
-  visible_tiles(): Array<TileType> {
+  visible_tiles(): Array<Tile> {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
@@ -234,7 +234,7 @@ export class Renderer<TileType extends Tile> {
 
     const all_tiles = natural_display
       ? tileSet
-          .map((d: TileType) => d)
+          .map((d: Tile) => d)
           .filter((tile) => {
             const visible = tile.is_visible(
               max_ix,
