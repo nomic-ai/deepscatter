@@ -676,9 +676,6 @@ function check_overlap(tile: Tile, bbox: Rectangle): number {
   return area(intersection) / area(bbox);
 }
 
-// A starting value for dictionary ids to allocate.
-let dval = 40000;
-
 /**
  *
  * @param batch the batch to delete from.
@@ -722,10 +719,11 @@ export function add_or_delete_column(
       let newval = data.data[0];
       if (newval.dictionary) {
         const dicto = newval as Data<Dictionary<Utf8, Int8 | Int16 | Int32>>;
+        const dictionary_id = max([0, ...batch.schema.dictionaries.keys()]) + 1;
         const newv = makeVector({
           data: dicto.values,  // indexes into the dictionary
           dictionary: dicto.dictionary as Vector<Utf8>, // keys
-          type: new Dictionary(dicto.type.dictionary, dicto.type.indices, dval++) // increment the identifier.
+          type: new Dictionary(dicto.type.dictionary, dicto.type.indices, dictionary_id) // increment the identifier.
         });
         newval = newv.data[0];
       }
