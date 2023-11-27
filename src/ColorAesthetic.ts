@@ -13,6 +13,7 @@ import {
   scaleSequentialLog,
   scaleSequentialPow,
   scaleImplicit,
+  InterpolatorFactory,
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
@@ -88,7 +89,7 @@ for (const schemename of [
 
 }
 
-for (const interpolator of [
+const d3Interpolators = [
   'interpolateBlues',
   'interpolateBrBG',
   'interpolateBuGn',
@@ -127,7 +128,9 @@ for (const interpolator of [
   'interpolateYlGnBu',
   'interpolateYlOrBr',
   'interpolateYlOrRd',
-] as const) {
+] as const;
+
+for (const interpolator of d3Interpolators) {
   const name = interpolator.replace('interpolate', '').toLowerCase();
   const v = d3Chromatic[interpolator];
   color_palettes[name] = materialize_color_interpolator(v);
@@ -200,8 +203,8 @@ export class Color extends Aesthetic<
     // If not a dictionary, it's a different type.
     if (typeof range == 'string') {
       // Convert range from 'viridis' to InterpolateViridis.
-
-      const interpolator = d3Chromatic['interpolate' + capitalize(range)];
+      const k = 'interpolate' + capitalize(range) as keyof d3Chromatic
+      const interpolator = d3Chromatic[k] as typeof d3Chromatic.interpolateViridis;
       if (interpolator !== undefined) {
         // linear maps to nothing, but.
         // scaleLinear, and scaleLog but

@@ -39,13 +39,13 @@ export type ConcreteAesthetic =
   | Foreground
   | Filter;
 
-import type { QuadtileDataset } from './Dataset';
+import type { Dataset } from './Dataset';
 import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
 
 export class StatefulAesthetic<T extends Aesthetic> {
   public states: [T, T];
-  public dataset: QuadtileDataset;
+  public dataset: Dataset;
   public regl: Regl;
   public scatterplot: DS.Plot;
   public needs_transitions = false;
@@ -53,7 +53,7 @@ export class StatefulAesthetic<T extends Aesthetic> {
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
-    dataset: QuadtileDataset,
+    dataset: Dataset,
     aesthetic_map: TextureSet,
     Factory: DS.Newable<T>
   ) {

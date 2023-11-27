@@ -9,7 +9,8 @@ import { timer, Timer } from 'd3-timer';
 import { Dataset } from './Dataset';
 import type * as DS from './shared.d'
 import { Table } from 'apache-arrow';
-import { X } from './Aesthetic';
+import { X, Y } from './Aesthetic';
+import { StatefulAesthetic } from './StatefulAesthetic';
 class PlotSetting {
   start: number;
   value: number;
@@ -134,14 +135,14 @@ export class Renderer {
   public _initializations: Promise<void>[] = [];
   public render_props: RenderProps = new RenderProps();
   constructor(
-    selector: string | Node,
+    selector: string,
     tileSet: Dataset,
     scatterplot: Scatterplot
   ) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
     this.canvas = select(
-      this.holder.node().firstElementChild
+      (this.holder.node() as Element).firstElementChild
     ).node() as HTMLCanvasElement;
     this.dataset = tileSet;
     this.width = +select(this.canvas).attr('width');
@@ -225,12 +226,13 @@ export class Renderer {
     const { dataset: tileSet } = this;
     // Materialize using a tileset method.
 
-    const x = this.aes.dim('x') as X;
+    const x = this.aes.dim('x') as StatefulAesthetic<X>
+    const y = this.aes.dim('x') as StatefulAesthetic<Y>
     const natural_display =
-      this.aes.dim('x').current.field == 'x' &&
-      this.aes.dim('y').current.field == 'y' &&
-      this.aes.dim('x').last.field == 'x' &&
-      this.aes.dim('y').last.field == 'y';
+      x.current.field == 'x' &&
+      y.current.field == 'y' &&
+      x.last.field == 'x' &&
+      y.last.field == 'y';
 
     const all_tiles = natural_display
       ? tileSet

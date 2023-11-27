@@ -234,15 +234,15 @@ export type Encoding = {
   y?: RootChannel;
   color?: null | ColorChannel;
   size?: null | RootChannel;
-  shape?: null | RootChannel;
+//  shape?: null | RootChannel;
   filter?: null | FunctionalChannel;
   filter2?: null | FunctionalChannel;
   jitter_radius?: null | JitterChannel;
   jitter_speed?: null | RootChannel;
   x0?: null | RootChannel;
   y0?: null | RootChannel;
-  position?: string;
-  position0?: string;
+//  position?: string;
+//  position0?: string;
   foreground?: null | FunctionalChannel;
 };
 
@@ -332,8 +332,18 @@ export type APICall = {
   /** Overall screen saturation target at average point density */
   alpha?: number;
 
-  /** A function defind as a string that takes implied argument 'datum' */
+  /** A function defind as a string that takes implied argument 'datum'
+   * Every time a mouseover happens on a point, this function will be
+   * called on that point.
+  */
   click_function?: string;
+
+  /** A function defined as a string that take the implied argument 'datum'.
+   * Every time a mouseover happens on a point, this function will be
+   * called on that point; the string that it returns will be inserted into
+   * the innerHTML of the tooltip.
+   */
+  tooltip_html?: string;
 
   // The color of the screen background.
   background_color?: string;

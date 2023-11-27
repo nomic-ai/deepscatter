@@ -9,7 +9,7 @@ import {
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
 import { isOpChannel, isLambdaChannel, isConstantChannel } from './typing';
-import { Type, Vector } from 'apache-arrow';
+import { Dictionary, Int16, Type, Utf8, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
 import type * as DS from './shared.d'
@@ -66,7 +66,7 @@ export abstract class Aesthetic<
   public _texture_buffer: Float32Array | Uint8Array | null = null;
   public _domain?: [number, number];
   public _range: [number, number] | Uint8Array;
-  public _func?: (d: string | number) => GlValueType;
+  public _func?: (d: JSValueType) => GlValueType;
   public dataset: DS.Dataset;
   public partner: typeof this | null = null;
   public _textures: Record<string, Texture2D> = {};
@@ -159,19 +159,19 @@ export abstract class Aesthetic<
     if (!column) {
       return [1, 1];
     }
-
-    if (column.type === Type.Dictionary) {
-      return [0, this.aesthetic_map.texture_size];
-    }
+    // Not sure why this was here.
+    // if (column.type.typeId === Type.Dictionary) {
+    //   return [0, this.aesthetic_map.texture_size];
+    // }
     const domain = this.dataset.domain(this.field);
     return this.dataset.domain(this.field);
   }
 
-  default_data(): Uint8Array | Float32Array | Array<GlValueType> {
+  default_data(): Uint8Array | Float32Array | Array<number> {
     const def = this.toGLType(this.default_constant);
     return Array(this.aesthetic_map.texture_size).fill(
       def
-    ) as Array<GlValueType>;
+    ) as Array<number>;
   }
 
   get webGLDomain() {
@@ -192,9 +192,9 @@ export abstract class Aesthetic<
     return this._range || this.default_range;
   }
 
-  value_for(point: Datum): string | number | null {
+  value_for(point: Datum): JSValueType | null {
     if (this.field && point[this.field]) {
-      return point[this.field] as string | number;
+      return point[this.field] as JSValueType;
     }
     // Needs a default perhaps?
     return null;
@@ -304,25 +304,27 @@ export abstract class Aesthetic<
       }
       return;
     }
+    const e = encoding as DS.Channel;
+
     if (encoding['domain'] === undefined) {
       encoding['domain'] = this.default_domain;
     }
     if (encoding['range']) {
-      this._domain = encoding.domain;
-      this._range = encoding.range;
+      this._domain = e.domain;
+      this._range = e.range;
     }
 
-    this._transform = encoding.transform ?? undefined;
+    this._transform = e.transform ?? undefined;
   }
 
   encode_for_textures(range: [number, number]) {
     const { texture_size } = this.aesthetic_map;
-    const values = Array(texture_size);
+    const values = Array<number>(texture_size);
     const scale = scales[this.transform]()
       .range(range)
       .domain([0, texture_size - 1]);
     for (let i = 0; i < texture_size; i += 1) {
-      values[i] = scale(i);
+      values[i] = scale(i) as number;
     }
   }
 
@@ -343,7 +345,7 @@ export abstract class Aesthetic<
       this.current_encoding !== null &&
       isConstantChannel(this.current_encoding)
     ) {
-      return this.toGLType(this.current_encoding.constant);
+      return this.toGLType(this.current_encoding.constant as JSValueType);
     }
     return this.toGLType(this.default_constant);
   }
@@ -399,16 +401,15 @@ export abstract class Aesthetic<
 
     if (this.is_dictionary()) {
       // NB--Assumes string type for dictionaries.
-
-      input.fill('');
+      input.fill('' as JSValueType);
       const dvals = column.data[0].dictionary.toArray() as string[];
       for (const [i, d] of dvals.entries()) {
-        input[i] = d;
+        input[i] = d as JSValueType;
       }
     } else {
       input = input.map((d) => this.scale(d));
     }
-    const values = input.map((i) => func(i));
+    const values = input.map((i) => func(i)) as number[];
     this.texture_buffer.set(values);
   }
 }
@@ -469,8 +470,9 @@ export abstract class PositionalAesthetic extends OneDAesthetic {
     if (this._range) {
       return this._range;
     }
-    if (this.dataset.extent && this.field && this.dataset.extent[this.field])
-      return this.dataset.extent[this.field];
+    if (this.dataset.extent && this.field && this.dataset.extent[this.field]) {
+      return this.dataset.extent[this.field as 'x' | 'y'];
+    }
     return this.default_range;
   }
 
@@ -492,7 +494,7 @@ export class Y extends PositionalAesthetic {
 export class Y0 extends Y {}
 
 abstract class BooleanAesthetic extends Aesthetic<
-  number,
+  0 | 1,
   boolean,
   DS.BooleanChannel
 > {
@@ -609,7 +611,7 @@ abstract class BooleanAesthetic extends Aesthetic<
  * background points will be plotted with much less resolution.
  */
 export class Foreground extends BooleanAesthetic {
-  public current_encoding = null;
+  public current_encoding : DS.BooleanChannel = null;
   _constant = true;
   default_constant = true;
   default_range = [0, 1] as [number, number];

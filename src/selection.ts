@@ -99,7 +99,7 @@ async function applyCompositeFunctionToTile(tile : Tile, args : Composition) : P
   if (args[0] === "NOT") {
     const bitmask = await extractBitmask(tile, args[1])
     return bitmask.not()
-  } else if (isBinarySelectParam(args)) {
+  } else if (isBinarySelectParam(operator)) {
     const [op, arg1, arg2] = args;
     const bitmask1 = await extractBitmask(tile, arg1)
     const bitmask2 = await extractBitmask(tile, arg2)
@@ -112,7 +112,7 @@ async function applyCompositeFunctionToTile(tile : Tile, args : Composition) : P
     } else {
       throw new Error("Unknown binary operation")
     }
-  } else if (isPluralSelectParam(args)) {
+  } else if (isPluralSelectParam(operator)) {
     const op = args[0];
     const bitmasks = await Promise.all(args.slice(1).map(arg => extractBitmask(tile, arg)))
     const accumulated = bitmasks.slice(1).reduce((previousValue, currentValue) => {
@@ -282,7 +282,7 @@ export class DataSelection {
    * untile they are loaded.
    */
   evaluationSetSize: number = 0;
-  tiles: T[] = [];
+  tiles: Tile[] = [];
 
   /**
    * Optionally, a user-defined for defining.
@@ -468,14 +468,14 @@ export class DataSelection {
       throw new Error("Unable to move cursor to point, because it has no `ix` property.")
     }
     let currentOffset = 0;
-    let relevantTile : T = undefined;
+    let relevantTile : Tile = undefined;
     let current_tile_ix = 0;
     let positionInTile : number;
     for (let match_length of this.match_count) {
       const tile = this.tiles[current_tile_ix];
       // If the tile might have the relevant ix in it, we examine it more closely.
       if (tile.min_ix < ix && tile.max_ix > ix) {
-        const mid = bisectLeft([...tile.record_batch.getChild('ix').data[0].values as BigUint64Array], point.ix as BigInt)
+        const mid = bisectLeft([...tile.record_batch.getChild('ix').data[0].values], point.ix as number)
         const val = tile.record_batch.get(mid);
         // We have to check that there's actually a match,
         // because the binary search identifies where it *would* be.
@@ -505,17 +505,17 @@ export class DataSelection {
   private async add_or_remove_points(name, ixes: BigInt[], which : 'add' | 'remove') {
     let newCursor = 0;
     let tileOfMatch = undefined;
-    const tileFunction = async (tile: T) => {
+    const tileFunction = async (tile: Tile) => {
       newCursor = -1;
       await this.ready;
       // First, get the current version of the tile.
       let value = (await tile.get_column(this.name)).toArray() as Float32Array;
       // Then locate the ix column and look for matches.
-      const ixcol = tile.record_batch.getChild('ix').data[0].values as BigUint64Array;
+      const ixcol = tile.record_batch.getChild('ix').data[0].values;
       for (let ix of ixes) {
         // Since ix is ordered, we can do a fast binary search to see if the 
         // point is there--no need for a full scan.
-        const mid = bisectLeft([...ixcol], ix);
+        const mid = bisectLeft([...ixcol], ix as unknown as number);
         const val = tile.record_batch.get(mid);
         // We have to check that there's actually a match,
         // because the binary search identifies where it *would* be.
@@ -600,7 +600,7 @@ export class DataSelection {
    */
 
   private wrapWithSelectionMetadata(functionToApply : DS.BoolTransformation) : DS.BoolTransformation {
-    return async (tile : T) => {
+    return async (tile : Tile) => {
       const array = await functionToApply(tile);
       const batch = tile.record_batch;
       let matches = 0;
@@ -647,7 +647,7 @@ export class DataSelection {
       throw new Error(`Index ${i} out of bounds for selection of size ${this.selectionSize}`);
     }
     let currentOffset = 0;
-    let relevantTile : T = undefined;
+    let relevantTile : Tile = undefined;
     let current_tile_ix = 0;
     for (let match_length of this.match_count) {
       if (i < currentOffset + match_length) {
@@ -736,7 +736,7 @@ export class DataSelection {
   
 function bigintmatcher(field: string, matches: bigint[]) {
   const matchings = new Set(matches);
-  return async function (tile: T) {
+  return async function (tile: Tile) {
     const col = (await tile.get_column(field)).data[0];
     const values = col.values as bigint[];
     const bitmask = new Bitmask(tile.record_batch.numRows);
@@ -806,7 +806,7 @@ function stringmatcher(field: string, matches: string[]) {
   /* 
   * The Deepscatter transformation function.
   */
-  return async function (tile: T) {
+  return async function (tile: Tile) {
     const col = (await tile.get_column(field)).data[0];
     const bytes = col.values as Uint8Array;
     const offsets = col.valueOffsets;
