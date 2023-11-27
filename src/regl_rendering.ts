@@ -43,7 +43,7 @@ export class ReglRenderer extends Renderer {
   public contour_vals?: Uint8Array;
   public contour_alpha_vals? : Float32Array | Uint8Array | Uint16Array;
   public tick_num?: number;
-  public reglframe?: REGL.FrameCallback;
+  public reglframe?: REGL.Cancellable;
   public _integer_buffer?: Buffer;
   //  public _renderer :  Renderer;
 
@@ -155,7 +155,7 @@ export class ReglRenderer extends Renderer {
     } as const;
 
     // Clone.
-    return JSON.parse(JSON.stringify(props));
+    return JSON.parse(JSON.stringify(props)) as typeof props;
   }
 
   get default_webgl_scale() {

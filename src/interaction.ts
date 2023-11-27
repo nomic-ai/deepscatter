@@ -1,17 +1,25 @@
 /* eslint-disable no-underscore-dangle */
 import { select } from 'd3-selection';
 import { timer } from 'd3-timer';
-import { zoom, zoomIdentity } from 'd3-zoom';
+import { D3ZoomEvent, zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
 import type { Renderer } from './rendering';
 import { ReglRenderer } from './regl_rendering';
-import { StructRow, StructRowProxy } from 'apache-arrow';
+import { StructRowProxy } from 'apache-arrow';
 import { Rectangle } from './tile';
 import { PositionalAesthetic } from './Aesthetic';
 import type { Dataset } from './Dataset';
 import type * as DS from './shared';
+type Annotation = {
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  data: StructRowProxy;
+};
+
 export default class Zoom {
   public prefs: DS.APICall;
   public svg_element_selection: d3.Selection<
@@ -30,6 +38,7 @@ export default class Zoom {
   public transform?: d3.ZoomTransform;
   public _start?: number;
   public scatterplot: DS.Plot;
+  private stopTimerAt?: number;
   constructor(selector: string, prefs: DS.APICall, plot: DS.Plot) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
@@ -50,8 +59,6 @@ export default class Zoom {
 
   attach_tiles(tiles: Dataset) {
     this.tileSet = tiles;
-    // TODO: remove bad assignment here.
-    this.tileSet._zoom = this;
     return this;
   }
 
@@ -74,12 +81,8 @@ export default class Zoom {
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
 
-  html_annotation(points: StructRowProxy[]) {
-    const div = this.svg_element_selection.node()!.parentNode.parentNode;
-    let opacity = 0.75;
-    if (this.scatterplot.prefs.tooltip_opacity !== undefined) {
-      opacity = this.scatterplot.prefs.tooltip_opacity;
-    }
+  html_annotation(points: Annotation[]) {
+    const div = this.svg_element_selection.node()!.parentNode.parentNode as unknown as string;
     const els = select(div)
       .selectAll('div.tooltip')
       .data(points)
@@ -94,14 +97,13 @@ export default class Zoom {
             .style('z-index', 100)
             .style('border-radius', '8px')
             .style('padding', '10px')
-            .style('background', 'ivory')
-            .style('opacity', opacity),
+            .style('background', 'ivory'),
         (update) => update.html((d) => this.scatterplot.tooltip_html(d.data, this.scatterplot)),
         (exit) => exit.call((e) => e.remove())
       );
 
     els
-      .html((d) => this.scatterplot.tooltip_html(d.data, this))
+      .html((d) => this.scatterplot.tooltip_html(d.data, this.scatterplot))
       .style('transform', (d) => {
         const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
         return t;
@@ -143,7 +145,7 @@ export default class Zoom {
         [0, 0],
         [width, height],
       ])
-      .on('zoom', (event) => {
+      .on('zoom', (event : D3ZoomEvent<Element, unknown>) => {
         try {
           document.getElementById('tooltipcircle').remove();
         } catch (error) {
@@ -153,7 +155,9 @@ export default class Zoom {
         this.restart_timer(10 * 1000);
 
         this.scatterplot.on_zoom?.(event.transform);
-        event?.sourceEvent?.stopPropagation();
+        if (event.sourceEvent) {
+          (event.sourceEvent as Event).stopPropagation()
+        }
       });
 
     canvas.call(zoomer);
@@ -168,13 +172,7 @@ export default class Zoom {
     const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
     this.scatterplot.highlit_point_change(data);
-    type Annotation = {
-      x: number;
-      y: number;
-      dx: number;
-      dy: number;
-      data: StructRowProxy;
-    };
+
     const annotations: Annotation[] = data.map((d) => ({
       x: x_(xdim.apply(d)) ,
       y: y_(ydim.apply(d)) ,
@@ -218,9 +216,9 @@ export default class Zoom {
 
   add_mouseover() {
     let last_fired = 0;
-    const renderer: ReglRenderer<any> = this.renderers.get(
+    const renderer: ReglRenderer = this.renderers.get(
       'regl'
-    ) as ReglRenderer<any>;
+    ) as ReglRenderer;
 
     this.svg_element_selection.on('mousemove', (event: MouseEvent) => {
       // Debouncing this is really important, it turns out.
@@ -255,7 +253,7 @@ export default class Zoom {
   }
 
   current_center() {
-    const { x, y } = this.current_corners() as Rectangle;
+    const { x, y } = this.current_corners();
     return [(x[0] + x[1]) / 2, (y[0] + y[1]) / 2];
   }
 
@@ -265,10 +263,8 @@ export default class Zoom {
     // whichever is greater.
     let stop_at = Date.now() + run_at_least;
     if (this._timer) {
-      //@ts-ignore
-      if (this._timer.stop_at > stop_at) {
-        //@ts-ignore
-        stop_at = this._timer.stop_at;
+      if (this.stopTimerAt > stop_at) {
+        stop_at = this.stopTimerAt;
       }
       this._timer.stop();
     }
@@ -276,18 +272,19 @@ export default class Zoom {
     const t = timer(this.tick.bind(this));
 
     this._timer = t;
-    //@ts-ignore
-    this._timer.stop_at = stop_at;
-
+    this.stopTimerAt = stop_at;
     return this._timer;
   }
 
-  data(dataset) {
+  data(dataset: undefined) : Dataset;
+  data(dataset: Dataset) : Zoom;
+
+  data(dataset : Dataset | undefined) {
     if (dataset === undefined) {
       return this.tileSet;
     }
     this.tileSet = dataset;
-    return this;
+    return this as Zoom;
   }
 
   scales(equal_units = true): Record<string, ScaleLinear<number, number>> {
@@ -380,20 +377,11 @@ export default class Zoom {
 
     if (
       force !== true &&
-      this._timer && //@ts-ignore
-      this._timer.stop_at <= Date.now()
+      this._timer &&
+      this.stopTimerAt <= Date.now()
     ) {
       this._timer.stop();
     }
-    /*
-    for (const renderer of this.renderers.values()) {
-      try {
-        // renderer.tick()
-      } catch (err) {
-        this._timer.stop();
-        throw err;
-      }
-    } */
   }
 }
 
@@ -409,8 +397,8 @@ export function window_transform(x_scale: ScaleLinear<number, number, never>, y_
     return array[1] - array[0];
   }
 
-  const x_mid = mean(x_scale.domain()) as number;
-  const y_mid = mean(y_scale.domain()) as number;
+  const x_mid = mean(x_scale.domain());
+  const y_mid = mean(y_scale.domain());
 
   const xmulti = gap(x_scale.range()) / gap(x_scale.domain());
   const ymulti = gap(y_scale.range()) / gap(y_scale.domain());
@@ -418,8 +406,8 @@ export function window_transform(x_scale: ScaleLinear<number, number, never>, y_
   // translates from data space to scaled space.
   const m1 = [
     // transform by the scale;
-    [xmulti, 0, -xmulti * x_mid + (mean(x_scale.range()) as number)],
-    [0, ymulti, -ymulti * y_mid + (mean(y_scale.range()) as number)],
+    [xmulti, 0, -xmulti * x_mid + (mean(x_scale.range()))],
+    [0, ymulti, -ymulti * y_mid + (mean(y_scale.range()))],
     [0, 0, 1],
   ];
   // Note--at the end, you need to multiply by this matrix.

@@ -1,6 +1,6 @@
 import type { GeoJsonObject, GeoJsonProperties } from 'geojson';
 import { Renderer } from './rendering';
-import { RBush3D } from 'rbush-3d';
+import { BBox, RBush3D } from 'rbush-3d';
 import Scatterplot from './deepscatter';
 import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
@@ -44,8 +44,8 @@ export class LabelMaker extends Renderer {
   ) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
     this.options = options;
-    this.canvas = scatterplot.elements![2].selectAll('canvas').node();
-    const svg = scatterplot.elements![3].selectAll('svg').node() as SVGElement;
+    this.canvas = scatterplot.elements[2].selectAll('canvas').node() as HTMLCanvasElement;
+    const svg = scatterplot.elements[3].selectAll('svg').node() as SVGElement;
     const id = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, '---');
     const labgroup = svg.querySelectorAll(`#${id}`);
     // eslint-disable-next-line unicorn/prefer-ternary
@@ -185,7 +185,7 @@ export class LabelMaker extends Renderer {
     const bboxes = select(this.labelgroup)
       .selectAll('rect.labelbbox')
       // Keyed by the coordinates.
-      .data(overlaps, (d) => '' + d.minZ + d.minX)
+      .data(overlaps, (d : BBox) => String(d.minZ) + String(d.minX))
       .join((enter) =>
         enter
           .append('rect')
@@ -199,8 +199,8 @@ export class LabelMaker extends Renderer {
     // Go through and draw the canvas events.
     for (const d of overlaps) {
       const datum = d.data as RawPoint;
-      const x = x_(datum.x) as number;
-      const y = y_(datum.y) as number;
+      const x = x_(datum.x);
+      const y = y_(datum.y);
 
       context.globalAlpha = 1;
       context.fillStyle = 'white';
@@ -231,7 +231,7 @@ export class LabelMaker extends Renderer {
         context.strokeStyle = '#71797E';
       } else if (datum.properties[dim.field]) {
         const exists =
-          dim.scale.domain().indexOf(datum.properties[dim.field]) > -1;
+          (dim.scale.domain!() as string[]).indexOf(datum.properties[dim.field]) > -1;
         if (exists) {
           context.shadowColor = dim.scale(datum.properties[dim.field]);
           context.strokeStyle = dim.scale(datum.properties[dim.field]);
