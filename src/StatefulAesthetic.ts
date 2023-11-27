@@ -44,12 +44,22 @@ import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
 
 export class StatefulAesthetic<T extends Aesthetic> {
+  /**
+   * A stateful aesthetic holds the history and associated resources for an encoding
+   * channel. It holds two Aesthetic objects: the current and the previous scales. These
+   * are used for things like smoothly generating interpolated paths between a previous color and a new one.
+   * 
+   * While Aesthetics can be created and destroyed willfully, the stateful aesthetic also holds 
+   * a number of memory resources that it is important not to re-allocate willy-nilly. Each encoding
+   * channel in a scatterplot has exactly on StatefulAesthetic that persists for the lifetime of the Plot.
+   */
   public states: [T, T];
   public dataset: Dataset;
   public regl: Regl;
   public scatterplot: DS.Plot;
   public needs_transitions = false;
   public aesthetic_map: TextureSet;
+  public texture_buffers
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
@@ -76,7 +86,7 @@ export class StatefulAesthetic<T extends Aesthetic> {
         this.regl,
         this.dataset,
         this.aesthetic_map
-      ) as unknown as T,
+      ),
     ] as [T, T];
   }
 
