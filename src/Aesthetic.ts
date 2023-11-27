@@ -64,16 +64,15 @@ export abstract class Aesthetic<
   public field: string | null = null;
   public regl: Regl;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
+  public _textures: Record<string, Texture2D> = {};
+  public aesthetic_map: TextureSet;
   public _domain?: [number, number];
   public _range: [number, number] | Uint8Array;
   public _func?: (d: JSValueType) => GlValueType;
   public dataset: DS.Dataset;
-  public partner: typeof this | null = null;
-  public _textures: Record<string, Texture2D> = {};
   // cache of a d3 scale
   public _scale?: (p: number | string) => JSValueType;
   public current_encoding: ChannelType | null = null;
-  public aesthetic_map: TextureSet;
   public id: string;
 
   constructor(

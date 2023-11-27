@@ -163,7 +163,7 @@ export class Color extends Aesthetic<
 
   get colorscheme_size() : number {
     if (this.is_dictionary()) {
-      return (this.scale.range().length as unknown as number);
+      return ((this.scale).range().length as unknown as number);
     }
     return -1;
   }

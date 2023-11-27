@@ -216,7 +216,7 @@ export type RootChannel =
   | Channel
   | string
   | OpChannel
-  | ConstantColorChannel
+  | ColorChannel
   | ConstantChannel
   | LambdaChannel;
 
