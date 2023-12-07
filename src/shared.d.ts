@@ -49,26 +49,55 @@ type TwoArgumentOp = {
  * https://vega.github.io/vega-lite/docs/encoding.html
  */
 
-export interface Channel {
+
+
+export type WebGlValue = number | [number, number, number];
+
+// The type in javascript. This does not include Date because only 
+// JSON-serializable types are allowed. 
+export type JSValue = number | string | boolean;
+
+export type DomainType = null | ArrowBuildable;
+
+export type ScaleChannel<
+  DomainType extends JSValue,
+  RangeType extends JSValue
+> = {
   /** The name of a column in the data table to be encoded. */
   field: string;
   /**
    * A transformation to apply on the field.
    * 'literal' maps in the implied dataspace set by 'x', 'y', while
    * 'linear' transforms the data by the range and domain.
-   */
+   */  
   transform?: Transform;
   // The domain over which the data extends
-  domain?: [number, number];
+  domain?: [DomainType, DomainType];
   // The range into which to map the data.
-  range?: [number, number];
+  range?: [RangeType, RangeType];
 }
 
+export type BooleanChannel = {
+  lambda?: (v: string | number | Date) => boolean;
+  field: string;
+}
+
+// Functions that are defined as strings and executed in JS.
+export type LambdaChannel = {
+  lambda: (val) => unknown;
+  field: string;
+};
+
+export type BufferLocation = {
+  buffer: Buffer;
+  offset: number;
+  stride: number;
+  byte_size: number; // in bytes;
+};
 
 export type Newable<T> = { new (...args: any[]): T };
 export type PointFunction = (p : StructRowProxy) => number
 export type Plot = Scatterplot | Scatterplot;
-export type OpChannel = OneArgumentOp | TwoArgumentOp;
 
 /**
  * A proxy class that wraps around tile get calls. Used to avoid
@@ -95,25 +124,6 @@ export interface SelectionRecord  {
   flushed: boolean;
 }
 
-// Functions that are defined as strings and executed in JS.
-export type LambdaChannel = {
-  lambda: string;
-  field: string;
-  domain?: [number, number];
-  range?: [number, number];
-};
-
-export type BufferLocation = {
-  buffer: Buffer;
-  offset: number;
-  stride: number;
-  byte_size: number; // in bytes;
-};
-
-export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
-
-type FunctionalChannel = LambdaChannel | OpChannel;
-
 export type BackgroundOptions = {
   // The color of background points. Hex codes or HTML
   // colors are accepted.
@@ -134,37 +144,6 @@ export type BackgroundOptions = {
   // Whether the background points sho`uld respond on mouseover.
   mouseover?: boolean;
 };
-
-type ConstantBool = {
-  constant: boolean;
-};
-
-export type ConstantNumber = {
-  constant: number;
-};
-
-/**
- * A constant color channel must be represented as a string that 
- * is valid HTML. (`blue`, `#EEFF00`, etc.)
- */
-export type ConstantColorChannel = {
-  constant: string;
-};
-
-export type ConstantChannel =
-  | ConstantBool
-  | ConstantNumber
-  | ConstantColorChannel;
-
-
-
-export type JitterRadiusMethod =
-  | 'None' // 
-  | 'spiral' // animates along a log spiral.
-  | 'uniform' // static jitters around a central point.
-  | 'normal' // static jitters around a central point biased towards the middle.
-  | 'circle' // animates a circle around the point.
-  | 'time'; // lapses the point in and out of view.
 
 type ArrowInt = Int8 | Int16 | Int32;
 
@@ -189,11 +168,43 @@ export type ArrowBuildable = Vector<SupportedArrowTypes> | Float32Array | Uint8A
  */
 export type Transformation = (inputTile: Tile) => ArrowBuildable | Promise<ArrowBuildable>;
 
-export type BoolTransformation = (inputTile: Tile) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
+export type BoolTransformation = (inputTile: Tile) => 
+ Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
 
 
+export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
-export type BasicColorChannel = Channel & {
+type ConstantBool = {
+  constant: boolean;
+};
+
+export type ConstantNumber = {
+  constant: number;
+};
+
+export type ConstantString = {
+  constant: string;
+};
+/**
+ * A constant color channel must be represented as a string that 
+ * is valid HTML. (`blue`, `#EEFF00`, etc.)
+ */
+
+
+export type ConstantChannel =
+  | ConstantBool
+  | ConstantNumber
+  | ConstantColorChannel;
+
+export type JitterRadiusMethod =
+  | 'None' // No jitter
+  | 'spiral' // animates along a log spiral.
+  | 'uniform' // static jitters around a central point.
+  | 'normal' // static jitters around a central point biased towards the middle.
+  | 'circle' // animates a circle around the point.
+  | 'time'; // lapses the point in and out of view.
+
+export type BasicColorChannel = {
   range?: string[] | string;
   domain?: [number, number];
 };
@@ -208,19 +219,8 @@ export type ColorChannel =
   | BasicColorChannel
   | CategoricalColorChannel
   | ConstantColorChannel;
-
-export type BooleanChannel = FunctionalChannel | ConstantBool;
-
-export type RootChannel =
-  | BooleanChannel
-  | Channel
-  | string
-  | OpChannel
-  | ColorChannel
-  | ConstantChannel
-  | LambdaChannel;
-
-export type JitterChannel = RootChannel & {
+  
+export type JitterChannel = ScaleChannel & {
   method: JitterRadiusMethod;
 };
 
@@ -235,19 +235,14 @@ export type Encoding = {
   color?: null | ColorChannel;
   size?: null | RootChannel;
 //  shape?: null | RootChannel;
-  filter?: null | FunctionalChannel;
-  filter2?: null | FunctionalChannel;
+  filter?: null | BooleanChannel;
+  filter2?: null | BooleanChannel;
+  foreground?: null | BooleanChannel;
   jitter_radius?: null | JitterChannel;
   jitter_speed?: null | RootChannel;
   x0?: null | RootChannel;
   y0?: null | RootChannel;
-//  position?: string;
-//  position0?: string;
-  foreground?: null | FunctionalChannel;
 };
-
-type ColumnTimeLookups = Record<string, Date>;
-type TileKey = `${number}/${number}/${number}`;
 
 export type PointUpdate = {
   column_name: string;
@@ -375,9 +370,4 @@ export type CompletePrefs = APICall & {
   duration: number;
   zoom_balance: number;
   max_points: number;
-};
-
-type RenderPrefs = CompletePrefs & {
-  arrow_table?: Table;
-  //arrow_buffer?: Buffer;
 };

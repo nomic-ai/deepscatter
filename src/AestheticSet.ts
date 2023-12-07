@@ -62,52 +62,18 @@ export class AestheticSet {
   }
 
   interpret_position(encoding: Encoding) {
-    /*
-      You can specify just 'position' or 'position0' as a string and it will 
-      parse into 'position.x' or 'position.x0' and 'position.y' or 'position.y0'.
-    */
-
     if (encoding) {
       // First--set position interpolation mode to
       // true if x0 or position0 has been manually passed.
 
       // If it hasn't, set it to false *only* if the positional
       // parameters have changed.
-      if (encoding.x0 || encoding.position0) {
+      if (encoding.x0) {
         this.position_interpolation = true;
-      } else if (encoding.x || encoding.position) {
+      } else if (encoding.x) {
         this.position_interpolation = false;
       }
-      for (const p of ['position', 'position0']) {
-        const suffix = p.replace('position', '');
-        if (encoding[p]) {
-          if (encoding[p] === 'literal') {
-            // A shortcut.
-            encoding[`x${suffix}`] = {
-              field: 'x',
-              transform: 'literal',
-            };
-            encoding[`y${suffix}`] = {
-              field: 'y',
-              transform: 'literal',
-            };
-          } else {
-            const field = encoding[p] as string;
-            encoding[`x${suffix}`] = {
-              field: `${field}.x`,
-              transform: 'literal',
-            };
-            encoding[`y${suffix}`] = {
-              field: `${field}.y`,
-              transform: 'literal',
-            };
-          }
-          delete encoding[p];
-        }
-      }
     }
-    delete encoding.position;
-    delete encoding.position0;
   }
 
   apply_encoding(encoding: Encoding) {
@@ -133,13 +99,19 @@ export class AestheticSet {
     }
     // Overwrite position fields.
     this.interpret_position(encoding);
-    for (const k of Object.keys(dimensions)) {
+    for (const k of Object.keys(dimensions as const)) {
       this.dim(k).update(encoding[k]);
     }
   }
 }
 
 export class TextureSet {
+
+  /**
+   * A texture set manages memory allocation for scales. It's mostly 
+  used for handling color aesthetics (through the set_color function)
+
+   */
   private _one_d_texture?: Texture2D;
   private _color_texture?: Texture2D;
   public texture_size: number;
