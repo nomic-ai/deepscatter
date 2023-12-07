@@ -199,8 +199,8 @@ class Scatterplot<T extends Tile> {
     if (params.useNameCache && params.name && this.selection_history.length > 0) {
       const old_version = this.selection_history.find((x) => x.name === params.name);
       // If we have a cached version, move the cached version to the end and return it.
-      this.selection_history = [...this.selection_history.filter((x) => x.name !== params.name), old_version];
       if (old_version) {
+        this.selection_history = [...this.selection_history.filter((x) => x.name !== params.name), old_version];
         return old_version.selection;
       }
     }
