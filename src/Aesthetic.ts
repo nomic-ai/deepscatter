@@ -5,6 +5,9 @@ import {
   scaleSqrt,
   scaleLog,
   scaleIdentity,
+  ScaleLinear,
+  ScaleContinuousNumeric,
+  ScaleOrdinal,
 } from 'd3-scale';
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
@@ -22,19 +25,6 @@ export const scales = {
   literal: scaleIdentity,
 } as const;
 
-
-// A channel is usually going to be one of these.
-// Only color channels are different
-type DefaultChannel =
-  | DS.Channel
-  | DS.OpChannel
-  | DS.LambdaChannel
-  | DS.ConstantChannel;
-
-type WebGlValue = number | [number, number, number];
-
-type JSValue = number | string | boolean;
-
 // d3 scales are quite powerful, but we only use a limited subset of their features.
 
 /**
@@ -50,10 +40,13 @@ type JSValue = number | string | boolean;
  */
 export abstract class Aesthetic<
   // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
-  GlValueType extends WebGlValue = number, 
+  GlValueType extends DS.WebGlValue, 
   // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red  
-  JSValueType extends JSValue = number,
-  ChannelType extends DS.RootChannel = DefaultChannel
+  JSValueType extends DS.JSValue,
+  DomainType extends DS.JSValue,
+  ScaleType : ScaleContinuousNumeric<JSValueType, JSValueType> 
+  | ScaleOrdinal<DomainType, JSValueType>
+  | ScaleOrdinal<DomainType, JSValueType>
 > {
   public abstract default_range: [number, number];
   public abstract default_constant: JSValueType;
@@ -64,22 +57,23 @@ export abstract class Aesthetic<
   public field: string | null = null;
   public regl: Regl;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
-  public _textures: Record<string, Texture2D> = {};
   public aesthetic_map: TextureSet;
-  public _domain?: [number, number];
-  public _range: [number, number] | Uint8Array;
+  public _domain?: [DomainType, DomainType];
+  public _range?: [JSValueType, JSValueType];
   public _func?: (d: JSValueType) => GlValueType;
   public dataset: DS.Dataset;
   // cache of a d3 scale
-  public _scale?: (p: number | string) => JSValueType;
-  public current_encoding: ChannelType | null = null;
+  public _scale? : ScaleType
+  public current_encoding: DS.Channel | null = null;
   public id: string;
 
   constructor(
+    encoding: DS.Channel | null,
     scatterplot: DS.Plot,
     regl: Regl,
     dataset: DS.Dataset,
-    aesthetic_map: TextureSet
+    aesthetic_map: TextureSet,
+    id: string
   ) {
     this.aesthetic_map = aesthetic_map;
     if (this.aesthetic_map === undefined) {
@@ -87,10 +81,79 @@ export abstract class Aesthetic<
     }
     this.scatterplot = scatterplot;
     this.regl = regl;
-    this._range = [0, 1];
     this.dataset = dataset;
     // A flag that will be turned on and off in AestheticSet.
-    this.id = Math.random().toString();
+    this.id = id;
+  }
+
+  update(encoding: string | null | ChannelType) {
+    // null handling.
+    if (encoding === undefined) {
+      console.warn('Updates with undefined should be handled upstream of the aesthetic.');
+      return;
+    }
+    if (encoding === 'null') {
+      throw new Error("Setting encoding with string 'null' is no longer supported. Pass a true null value.")
+    }
+    if (encoding === null) {
+      this.current_encoding = null;
+      this.reset_to_defaults();
+      return;
+    }
+
+    // Reset the scale
+    this._scale = undefined;
+    if (typeof encoding === 'string') {
+      encoding = this.convert_string_encoding(encoding) as ChannelType;
+    }
+
+    if (isNumber(encoding)) {
+      const x: ChannelType = {
+        constant: encoding,
+      } as unknown as ChannelType;
+      this.current_encoding = x;
+      return;
+    }
+
+    if (Object.keys(encoding).length === 0) {
+      console.warn(
+        "Resetting parameters with an empty object is deprecated: use 'null'"
+      );
+      this.reset_to_defaults();
+      return;
+    }
+
+    this.current_encoding = encoding;
+
+    if (isConstantChannel(encoding)) {
+      return;
+    }
+
+    this.field = encoding.field;
+
+    if (isOpChannel(encoding)) {
+      return;
+    }
+
+    if (isLambdaChannel(encoding)) {
+      const { lambda, field } = encoding;
+      if (lambda) {
+        this.apply_function_for_textures(field, this.domain, lambda);
+        this.post_to_regl_buffer();
+      }
+      return;
+    }
+    const e = encoding as DS.Channel;
+
+    if (encoding['domain'] === undefined) {
+      encoding['domain'] = this.default_domain;
+    }
+    if (encoding['range']) {
+      this._domain = e.domain;
+      this._range = e.range;
+    }
+
+    this._transform = e.transform ?? undefined;
   }
 
   apply(point: Datum): JSValueType {
@@ -167,9 +230,9 @@ export abstract class Aesthetic<
   }
 
   default_data(): Uint8Array | Float32Array | Array<number> {
-    const def = this.toGLType(this.default_constant);
+    const default_value = this.toGLType(this.default_constant);
     return Array(this.aesthetic_map.texture_size).fill(
-      def
+      default_value
     ) as Array<number>;
   }
 
@@ -246,75 +309,7 @@ export abstract class Aesthetic<
     this._scale = undefined;
   }
 
-  update(encoding: string | null | ChannelType) {
-    // null handling.
-    if (encoding === undefined) {
-      console.warn('Updates with undefined should be handled upstream of the aesthetic.');
-      return;
-    }
-    if (encoding === 'null') {
-      throw new Error("Setting encoding with string 'null' is no longer supported. Pass a true null value.")
-    }
-    if (encoding === null) {
-      this.current_encoding = null;
-      this.reset_to_defaults();
-      return;
-    }
 
-    // Reset the scale
-    this._scale = undefined;
-    if (typeof encoding === 'string') {
-      encoding = this.convert_string_encoding(encoding) as ChannelType;
-    }
-
-    if (isNumber(encoding)) {
-      const x: ChannelType = {
-        constant: encoding,
-      } as unknown as ChannelType;
-      this.current_encoding = x;
-      return;
-    }
-
-    if (Object.keys(encoding).length === 0) {
-      console.warn(
-        "Resetting parameters with an empty object is deprecated: use 'null'"
-      );
-      this.reset_to_defaults();
-      return;
-    }
-
-    this.current_encoding = encoding;
-
-    if (isConstantChannel(encoding)) {
-      return;
-    }
-
-    this.field = encoding.field;
-
-    if (isOpChannel(encoding)) {
-      return;
-    }
-
-    if (isLambdaChannel(encoding)) {
-      const { lambda, field } = encoding;
-      if (lambda) {
-        this.apply_function_for_textures(field, this.domain, lambda);
-        this.post_to_regl_buffer();
-      }
-      return;
-    }
-    const e = encoding as DS.Channel;
-
-    if (encoding['domain'] === undefined) {
-      encoding['domain'] = this.default_domain;
-    }
-    if (encoding['range']) {
-      this._domain = e.domain;
-      this._range = e.range;
-    }
-
-    this._transform = e.transform ?? undefined;
-  }
 
   encode_for_textures(range: [number, number]) {
     const { texture_size } = this.aesthetic_map;
@@ -357,24 +352,12 @@ export abstract class Aesthetic<
     return 0;
   }
 
-  materialize_function(
-    raw_func: string | ((d: JSValueType) => GlValueType)
-  ) {
-    const func =
-      typeof raw_func === 'string'
-        ? lambda_to_function(parseLambdaString(raw_func))
-        : raw_func;
-    this._func = func as ((d: JSValueType) => GlValueType);
-    return func;
-  }
-
   apply_function_for_textures(
     field: string,
     range: number[],
-    raw_func: string | ((d: JSValueType) => GlValueType)
+    func: ((d: JSValueType) => GlValueType)
   ) {
     const { texture_size } = this.aesthetic_map;
-    const func = this.materialize_function(raw_func);
 
     let input: (JSValueType)[] = arange(texture_size);
 
@@ -694,37 +677,6 @@ export class Jitter_radius extends Aesthetic<number, number, DS.JitterChannel> {
   get jitter_int_format() {
     return encode_jitter_to_int(this.method);
   }
-}
-
-function parseLambdaString(lambdastring: string) {
-  // Materialize an arrow function from its string.
-  // Note that this *does* reassign 'field'.
-  let [field, lambda] = lambdastring.split('=>').map((d) => d.trim());
-  if (lambda === undefined) {
-    throw new Error(`Couldn't parse ${lambdastring} into a function`);
-  }
-  if (lambda.slice(0, 1) !== '{' && lambda.slice(0, 6) !== 'return') {
-    lambda = `return ${lambda}`;
-  }
-  const func = `${field} => ${lambda}`;
-  return {
-    field,
-    lambda: func,
-  };
-}
-
-function lambda_to_function(input: DS.LambdaChannel): (d: any) => number {
-  if (typeof input.lambda === 'function') {
-    throw 'Must pass a string to lambda, not a function.';
-  }
-  const { lambda, field } = input;
-  if (field === undefined) {
-    throw 'Must pass a field to lambda.';
-  }
-  const cleaned = parseLambdaString(lambda).lambda;
-  const [arg, code] = cleaned.split('=>', 2).map((d) => d.trim());
-  const func = new Function(arg, code) as (d: unknown) => number;
-  return func;
 }
 
 type Datum = StructRowProxy | Record<string, string | number | boolean>;

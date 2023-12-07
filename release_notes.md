@@ -1,3 +1,45 @@
+# 3.0.0
+
+3.0.0 introduces fewer major new features than some previous 2.0 releases, but it includes a number of pent-up *breaking* changes. The underlying motivation for many of these is to allow library to now fully pass typescript compilation tests, with all the stability benefits that provides.
+
+Breaking changes:
+1. The library is now structured as named exports,
+   rather than a single default export. Instead of
+   
+   ```js
+   import Scatterplot from 'deepscatter';
+   ```
+  
+   a typical first line will be
+
+   ```js
+   import { Scatterplot } from 'deepscatter';
+   ```
+
+   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{Dataset, Bitmask, Scatterplot}`.
+
+2. The distinction between QuadTile and ArrowTile 
+   has been eliminated in favor of Tile, and with it the need to provide 
+   generics around them through the system. Similarly, QuadTileDataset and ArrowDataset  are both removed in favor of Dataset.
+   Instead, the TileProxy object is used to provide a wrapper than can turn anything into a
+   dataset. Although datasets are presumed to be  quadtiles right now, formally they can be any
+   any collection of arrow batches structured as a tree. (This is increasingly how I've come to think of the data parts of deepscatter: as a system for navigating dataframes that consist of trees rather than of linear lists of points.)
+3. Deepscatter no longer accepts strings as direct
+   arguments to `Scatterplot.plotAPI` in places where they were previously cast to functions 
+   as lambdas, because linters rightfully get crazy mad about the unsafe use of `eval`. If
+   you want to use deepscatter in scrollytelling
+   contexts where definining functions as strings inside json is convenient (I still will do this myself in static sites) you must turn them
+   into functions *before* passing them into deepscatter.
+4. Shortcuts for passing `position` and `position0` rather than naming the `x` and `y` dimensions explicitly have been removed.
+5. The syntax for expressly passing a categorical scale may change.
+
+## Fundamental design changes
+
+1. Previously `Aesthetic` objects were stateful; 
+   they are now stateless, with all necessary state held in the pair of `StatefulAesthetic` that defines them. This allows for tighter binding and type safety with d3 scales; it should 
+2. The preferred tile input type has changed. 
+    (There will be associated changes to the quadfeather package as well). Although for the sake of back-compatibility the special keys `x`, `y`, and `ix` will still work, deepscatter now falls back to those as defaults, preferring to find them wrapped in a struct field called `_deepscatter`.
+3. Boolean channels are no longer passed with `op` commands
 
 # 2.15.1
 
@@ -52,6 +94,7 @@ This would be a bugfix release except that it's possible this might accidentally
   fast `AND`, `OR`, `NOT`, and `XOR` operations.
 - Avoid race condition in multiple calls to the same selector.
 - Add applyToAllLoadedTiles method to selections.
+
 # 2.13.3
 
 Add `select_and_plot` shortcut on `Deepscatter` object to plot a selection immediately

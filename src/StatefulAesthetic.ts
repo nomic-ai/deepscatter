@@ -59,7 +59,9 @@ export class StatefulAesthetic<T extends Aesthetic> {
   public scatterplot: DS.Plot;
   public needs_transitions = false;
   public aesthetic_map: TextureSet;
-  public texture_buffers
+  public texture_buffers;
+  public ids: [string, string];
+  private factory : DS.Newable<T>;
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
@@ -74,18 +76,25 @@ export class StatefulAesthetic<T extends Aesthetic> {
     this.regl = regl;
     this.dataset = dataset;
     this.aesthetic_map = aesthetic_map;
+    this.factory = Factory;
+    this.ids = [
+      Math.random().toString(),
+      Math.random().toString()
+    ]
     this.states = [
       new Factory(
         this.scatterplot,
         this.regl,
         this.dataset,
-        this.aesthetic_map
+        this.aesthetic_map,
+        null
       ),
       new Factory(
         this.scatterplot,
         this.regl,
         this.dataset,
-        this.aesthetic_map
+        this.aesthetic_map,
+        null
       ),
     ] as [T, T];
   }
@@ -98,27 +107,36 @@ export class StatefulAesthetic<T extends Aesthetic> {
     return this.states[1];
   }
 
-  update(encoding: DS.Channel | DS.ConstantChannel) {
+  update(encoding: DS.Channel) {
     const stringy = JSON.stringify(encoding);
     // Overwrite the last version.
     if (
-      stringy === JSON.stringify(this.states[0].current_encoding) ||
+      stringy === JSON.stringify(this.current.current_encoding) ||
       encoding === undefined
     ) {
       // If an undefined encoding is passed, that means
       // we've seen an update without any change.
       if (this.needs_transitions) {
         // The first one is fine, but we gotta update the *last* one.
-        this.states[1].update(this.states[0].current_encoding);
+        this.states[1] = this.current;
       }
       // And mark not to bother animating it.
       this.needs_transitions = false;
     } else {
       // Flip the current encoding to the second position.
       this.states.reverse();
-      this.states[0].update(encoding);
+      this.ids.reverse();
+      // replace the first encoding with a new one 
+      // with the same id (so it will reuse the same buffers)
+      this.states[0] = new this.factory(
+        encoding,
+        this.scatterplot,
+        this.regl,
+        this.dataset,
+        this.aesthetic_map,
+        this.ids[0]
+      )
       this.needs_transitions = true;
-      //      this.current_encoding = encoding;
     }
   }
 }
