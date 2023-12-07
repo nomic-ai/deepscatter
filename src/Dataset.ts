@@ -356,13 +356,13 @@ export class Dataset {
    * @param filter 
    */
 
-  async visit_full(
-    callback: (tile: T) => Promise<void>,
-    after = false,
-    starting_tile : T | null = null,
-    filter: (t: T) => boolean = (x) => true,
-    updateFunction: (tile: T, completed, total) => Promise<void>
-  ) {
+    async visit_full(
+      callback: (tile: Tile) => Promise<void>,
+      after = false,
+      starting_tile : Tile | null = null,
+      filter: (t: Tile) => boolean = (x) => true,
+      updateFunction: (tile: Tile, completed, total) => Promise<void>
+    ) {
 
       // Visit all children with a callback function.
       // In general recursing quadtrees isn't that fast, but
@@ -374,7 +374,7 @@ export class Dataset {
       await start.download();
       const total = JSON.parse(start.record_batch.schema.metadata.get("total_points"))
      
-      async function resolve(tile: T) {
+      async function resolve(tile: Tile) {
         await tile.download();
         if (after) {
           await Promise.all(tile.children.map(resolve))
@@ -389,6 +389,7 @@ export class Dataset {
         }
       }
       await resolve(start);
+
     }
 
   async schema() {
@@ -820,4 +821,50 @@ function supplement_identifiers(
     }
   }
   return updatedFloatArray;
+}
+
+
+class AsyncQueue<T> {
+  private promises: Promise<T>[] = [];
+
+  constructor(promises: Promise<T>[] = []) {
+    this.promises.concat(promises)
+  }
+
+  add(promise: Promise<T>): void {
+    // Add a promise onto the queue.
+      this.promises.push(promise);
+  }
+
+  private removeFromArray(item: Promise<T>): void {
+      const index = this.promises.indexOf(item);
+      if (index > -1) {
+          this.promises.splice(index, 1);
+      }
+  }
+
+  async apop(): Promise<T> {
+    /**
+     * Pop the first promise to resolve off the queue.
+     */
+      if (this.promises.length === 0) {
+          throw new Error("No promises to race");
+      }
+
+      return new Promise((resolve, reject) => {
+          this.promises.forEach(promise => {
+              promise.then((value) => {
+                  this.removeFromArray(promise);
+                  resolve(value);
+              }).catch((error) => {
+                  this.removeFromArray(promise);
+                  reject(error);
+              });
+          });
+      });
+  }
+
+  get length(): number {
+      return this.promises.length;
+  }
 }
