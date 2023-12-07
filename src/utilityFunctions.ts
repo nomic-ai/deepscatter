@@ -54,7 +54,6 @@ function createDictionaryWithVector(
       'values must be an array of signed integers, 32 bit or smaller.'
     );
   }
-
   const type = new Dictionary(labelsArrow.type, t, currentDictNumber++, false);
   const returnval = makeVector({
     type,
