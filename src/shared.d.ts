@@ -17,25 +17,7 @@ export type {
   QuadTile,
 };
 
-/**
- * Operations to be performed on the GPU taking a single argument.
- */
-type OneArgumentOp = {
-  op: 'gt' | 'lt' | 'eq';
-  field: string;
-  a: number;
-};
 
-/**
- * Operations to be performed on the GPU taking two arguments
- */
-
-type TwoArgumentOp = {
-  op: 'within' | 'between';
-  field: string;
-  a: number;
-  b: number;
-};
 
 /**
  * A channel represents the information necessary to map a single dimension
@@ -50,14 +32,46 @@ type TwoArgumentOp = {
  */
 
 
-
+type SignedInt = Int8 | Int16 | Int32
 export type WebGlValue = number | [number, number, number];
 
-// The type in javascript. This does not include Date because only 
+// The type in JSON. This does not include Date because only 
 // JSON-serializable types are allowed. 
-export type JSValue = number | string | boolean;
+export type JSONValue = number | string | boolean;
 
+// The type in javascript. This lets us capture that some things become dates.
+export type JSValue = number | string | boolean | Date;
 export type DomainType = null | ArrowBuildable;
+
+export type TypeBundle<ArrowType, JSONType, DomainType, RangeType, GLType> = {
+  arrowType: ArrowType,
+  jsonType: JSONType,
+  domainType: DomainType,
+  rangeType: RangeType,
+  glType: GLType
+};
+
+export type StringCategorical = TypeBundle<
+  Dictionary<Utf8, SignedInt>, // arrowType
+  string, // jsonType
+  string, // domainType
+  string, // rangeType
+  number // glType
+>;
+
+
+type NumberOut = {
+  rangeType: string,
+  glType: number
+}
+
+type ColorOut = {
+  rangeType: string,
+  glType: [number, number, number]
+}
+
+
+export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
 export type ScaleChannel<
   DomainType extends JSValue,
@@ -77,16 +91,40 @@ export type ScaleChannel<
   range?: [RangeType, RangeType];
 }
 
-export type BooleanChannel = {
-  lambda?: (v: string | number | Date) => boolean;
+export type LambdaChannel<DomainType extends JSValue, RangeType extends JSValue> = {
+  lambda?: (v: DomainType) => RangeType;
   field: string;
 }
 
-// Functions that are defined as strings and executed in JS.
-export type LambdaChannel = {
-  lambda: (val) => unknown;
-  field: string;
+/**
+ * Operations to be performed on the GPU taking a single argument.
+ */
+type OneArgumentOp<ArrowType extends Timestamp | Float | Int> = {
+  op: 'gt' | 'lt' | 'eq';
+  a: number;
+  // This will not need to be defined and can't be overridden;
+  // it just is defined implicitly because we call the function in 
+  // WebGL, not JS.
+  localImplementation?: (arg: ArrowType) => boolean; 
 };
+
+/**
+ * Operations to be performed on the GPU taking two arguments
+ */
+
+type TwoArgumentOp<ArrowType extends Timestamp | Float | Int> = {
+  op: 'within' | 'between';
+  a: number;
+  b: number;
+  // This will not need to be defined and can't be overridden;
+  // it just is defined implicitly because we call the function in 
+  // WebGL, not JS.
+  localImplementation?: (arg: ArrowType) => boolean; 
+};
+
+export type OpChannel<ArrowType extends Timestamp | Float | Int> = {
+  field: string;
+} & ( OneArgumentOp<ArrowType> | TwoArgumentOp<ArrowType> );
 
 export type BufferLocation = {
   buffer: Buffer;
@@ -145,6 +183,7 @@ export type BackgroundOptions = {
   mouseover?: boolean;
 };
 
+// i.e., signed ints.
 type ArrowInt = Int8 | Int16 | Int32;
 
 // Deepscatter does not support all Arrow types; any columns not in the following set
@@ -171,9 +210,6 @@ export type Transformation = (inputTile: Tile) => ArrowBuildable | Promise<Arrow
 export type BoolTransformation = (inputTile: Tile) => 
  Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
 
-
-export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
-
 type ConstantBool = {
   constant: boolean;
 };
@@ -191,10 +227,8 @@ export type ConstantString = {
  */
 
 
-export type ConstantChannel =
-  | ConstantBool
-  | ConstantNumber
-  | ConstantColorChannel;
+export type ConstantChannel<T extends boolean | number | string> =
+  {constant : T}
 
 export type JitterRadiusMethod =
   | 'None' // No jitter
@@ -203,45 +237,31 @@ export type JitterRadiusMethod =
   | 'normal' // static jitters around a central point biased towards the middle.
   | 'circle' // animates a circle around the point.
   | 'time'; // lapses the point in and out of view.
-
-export type BasicColorChannel = {
-  range?: string[] | string;
-  domain?: [number, number];
-};
-
-export type CategoricalColorChannel = {
-  field: string;
-  range?: string | string[];
-  domain?: string[];
-};
-
-export type ColorChannel =
-  | BasicColorChannel
-  | CategoricalColorChannel
-  | ConstantColorChannel;
   
-export type JitterChannel = ScaleChannel & {
+export type JitterChannel<DomainType extends JSValue, RangeType extends number> = ScaleChannel<DomainType, RangeType> & {
   method: JitterRadiusMethod;
-};
+} | ConstantChannel<RangeType>;
 
+type BooleanChannel = 
+  | ConstantChannel<boolean>
+  | OpChannel<Timestamp | Float | Int> 
+  | LambdaChannel<JSValue, boolean>
 // A description of a functional operation to be passsed to the shader.
-export type OpArray = [op: number, a: number, b: number];
 /**
  * And encoding.
  */
 export type Encoding = {
-  x?: RootChannel;
-  y?: RootChannel;
-  color?: null | ColorChannel;
-  size?: null | RootChannel;
-//  shape?: null | RootChannel;
+  x?: ScaleChannel<number, number>;
+  y?: ScaleChannel<number, number>;
+  color?: null | ScaleChannel<JSValue, string> | ConstantChannel<string> | LambdaChannel<JSValue, string>;
+  size?: null | ScaleChannel<number, number> | ConstantChannel<number> | LambdaChannel<JSValue, number>
   filter?: null | BooleanChannel;
   filter2?: null | BooleanChannel;
   foreground?: null | BooleanChannel;
-  jitter_radius?: null | JitterChannel;
-  jitter_speed?: null | RootChannel;
-  x0?: null | RootChannel;
-  y0?: null | RootChannel;
+  jitter_radius?: null | JitterChannel<JSValue, number>;
+  jitter_speed?: null | ScaleChannel<number, number>;
+  x0?: null | ScaleChannel<number, number>;
+  y0?: null | ScaleChannel<number, number>;
 };
 
 export type PointUpdate = {

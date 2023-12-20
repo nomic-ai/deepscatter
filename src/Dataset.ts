@@ -389,7 +389,68 @@ export class Dataset {
         }
       }
       await resolve(start);
+    }
+  /**
 
+   * @param callback The function to invoke on each tile.
+   * @param after Whether to execute the visit in bottom-up order. Default false.
+   * @param filter 
+   */
+  async visit_complete(
+      callback: (tile: Tile) => void,
+      starting_tile: Tile | null,
+      after = false,
+      filter: (t: Tile) => boolean = (x) => true,
+      progress_function : (executed_points: number, total_points: number) => unknown = (executed_points: number, total_points: number) => undefined
+   ) {
+      // Visit all children with a callback function.
+  
+      function get_tile(t: Tile) {
+        await t.download()
+        return t
+      }
+
+      const stack: Tile[] = [starting_tile || this.root_tile];
+      const total_points = stack[0];
+
+      // A list of unfetched promises.
+      const async_stack = new AsyncQueue<Tile[]>([])
+      const after_stack = [];
+
+      let current : Tile;
+      while (stack.length > 0) {
+        current = stack.shift()
+        if (!after) {
+          callback(current);
+          progress_function()
+        } else {
+          after_stack.push(current);
+        }
+        if (!filter(current)) {
+          continue;
+        }
+        // Only create children for downloaded tiles.
+        if (current.download_state == 'Complete') {
+          stack.push(...current.children);
+        } else {
+          async function download(tile) {
+            await tile.download()
+            return tile.children;
+          }
+          async_stack.add(download(current))
+        }
+        // Race to complete from the stack. Wrapped in a 
+        // while loop because a tile might have no children.
+        while (stack.length === 0 && async_stack.length > 0) {
+          stack.concat(await async_stack.apop())
+        }
+      }
+      if (after) {
+        while ((current = after_stack.pop() as Tile)) {
+          callback(current);
+        }
+      }
+>>>>>>> 4e7f14a (more type schanges)
     }
 
   async schema() {
