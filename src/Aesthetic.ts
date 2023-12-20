@@ -44,7 +44,7 @@ export abstract class Aesthetic<
   // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red  
   JSValueType extends DS.JSValue,
   DomainType extends DS.JSValue,
-  ScaleType : ScaleContinuousNumeric<JSValueType, JSValueType> 
+  ScaleType extends ScaleContinuousNumeric<JSValueType, JSValueType> 
   | ScaleOrdinal<DomainType, JSValueType>
   | ScaleOrdinal<DomainType, JSValueType>
 > {
