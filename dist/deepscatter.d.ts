@@ -39,6 +39,7 @@ declare class Scatterplot<T extends Tile> {
     private hooks;
     tooltip_handler: TooltipHTML;
     label_click_handler: LabelClick;
+    handle_highlit_point_change: ChangeToHighlitPointFunction;
     on_zoom?: DS.onZoomCallback;
     private mark_ready;
     /**
@@ -57,7 +58,7 @@ declare class Scatterplot<T extends Tile> {
      * Creates a new selection from a set of parameters, and immediately applies it to the plot.
      * @param params A set of parameters defining a selection.
     */
-    select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration?: number): Promise<void>;
+    select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration?: number): Promise<DataSelection<T>>;
     /**
      *
      * @param params A set of parameters for selecting data based on ids, a boolean column, or a function.
@@ -133,6 +134,8 @@ declare class Scatterplot<T extends Tile> {
     get tooltip_html(): (datum: StructRowProxy<any>, plot: Scatterplot<QuadTile>) => string;
     set label_click(func: any);
     get label_click(): any;
+    set highlit_point_change(func: any);
+    get highlit_point_change(): any;
     set click_function(func: (datum: StructRowProxy<any>, plot: Scatterplot<QuadTile>) => void);
     get click_function(): (datum: StructRowProxy<any>, plot: Scatterplot<QuadTile>) => void;
     /**
@@ -190,6 +193,9 @@ declare class LabelClick extends SettableFunction<void, GeoJsonProperties> {
 }
 declare class ClickFunction extends SettableFunction<void> {
     default(datum: StructRowProxy, plot?: any): void;
+}
+declare class ChangeToHighlitPointFunction extends SettableFunction<void, StructRowProxy[], QuadTile> {
+    default(points: StructRowProxy[], plot?: any): void;
 }
 declare class TooltipHTML extends SettableFunction<string> {
     default(point: StructRowProxy, plot?: any): string;

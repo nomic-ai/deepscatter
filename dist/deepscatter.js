@@ -5682,6 +5682,7 @@ class Zoom {
     const { x_, y_ } = this.scales();
     const xdim = this.scatterplot.dim("x");
     const ydim = this.scatterplot.dim("y");
+    this.scatterplot.highlit_point_change(data);
     const annotations = data.map((d) => ({
       x: x_(xdim.apply(d)),
       y: y_(ydim.apply(d)),
@@ -16794,19 +16795,17 @@ void run_color_fill(in float ease) {
       if (a_last_color_is_constant) {
         last_fill = vec4(u_last_color_constant.rgb, alpha);
       } else {
-        float last_fractional = linstep(u_last_color_domain, a_last_color);
         float color_pos = (u_last_color_map_position * -1. - 1.) / 32. + 0.5 / 32.;
         float overflow_behavior = 1.; // means--clamp
-                
-        if (u_last_color_domain.y == 4096. && u_last_color_domain.x == 0.) {
-          // Assume we're in dictionary land. Unsafe, but whatever.
-          overflow_behavior = 2.;
+        float last_fractional;
+        if (u_wrap_colors_after.x > 0.) {
+          last_fractional = fract(a_last_color / u_wrap_colors_after.x);
+        } else {
+          last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, overflow_behavior);
         }
-
-        last_fractional = domainify(u_last_color_domain, u_last_color_transform, a_last_color, overflow_behavior);
-        last_fill = texture2D(u_color_aesthetic_map, vec2(color_pos, last_fractional));
-        // Alpha channel interpolation already happened.
+        last_fill = texture2D(u_color_aesthetic_map , vec2(color_pos, last_fractional));
         last_fill = vec4(last_fill.rgb, alpha);
+        // last_fill = vec4(0.8, 0.1, 0.1, 1.0);
       }
       // RGB blending is bad--maybe use https://www.shadertoy.com/view/lsdGzN
       // instead?
@@ -36031,8 +36030,8 @@ class Tile {
           type: "dictionary",
           keys: this.record_batch.getChild(name).data[0].dictionary.toArray(),
           extent: [
-            -2047,
-            this.record_batch.getChild(name).data[0].dictionary.length - 2047
+            0,
+            this.record_batch.getChild(name).data[0].dictionary.length
           ]
         });
       }
@@ -36848,6 +36847,7 @@ function check_overlap(tile, bbox) {
   }
   return area(intersection) / area(bbox);
 }
+let dval = 4e4;
 function add_or_delete_column(batch, field_name, data) {
   const tb = {};
   for (const field of batch.schema.fields) {
@@ -36873,7 +36873,20 @@ function add_or_delete_column(batch, field_name, data) {
     } else if (data instanceof Uint8Array) {
       tb[field_name] = makeVector({ type: new Uint8(), data, length: data.length }).data[0];
     } else if (data.data.length > 0) {
-      tb[field_name] = data.data[0];
+      let newval = data.data[0];
+      if (newval.dictionary) {
+        const dicto = newval;
+        const newv = makeVector({
+          data: dicto.values,
+          // indexes into the dictionary
+          dictionary: dicto.dictionary,
+          // keys
+          type: new Dictionary(dicto.type.dictionary, dicto.type.indices, dval++)
+          // increment the identifier.
+        });
+        newval = newv.data[0];
+      }
+      tb[field_name] = newval;
     } else {
       console.warn(`Unknown data format object passed to add or remove columns--treating as Data, but this behavior is deprecated`, data);
       tb[field_name] = data;
@@ -38202,6 +38215,40 @@ class DataSelection {
     }
     return columns;
   }
+  moveCursorToPoint(point) {
+    const ix = point.ix;
+    if (point.ix === void 0) {
+      throw new Error("Unable to move cursor to point, because it has no `ix` property.");
+    }
+    let currentOffset = 0;
+    let relevantTile = void 0;
+    let current_tile_ix = 0;
+    let positionInTile;
+    for (let match_length of this.match_count) {
+      const tile = this.tiles[current_tile_ix];
+      if (tile.min_ix < ix && tile.max_ix > ix) {
+        const mid = bisectLeft([...tile.record_batch.getChild("ix").data[0].values], point.ix);
+        const val = tile.record_batch.get(mid);
+        if (val !== null && val.ix === ix) {
+          relevantTile = tile;
+          positionInTile = mid;
+          break;
+        }
+      }
+      current_tile_ix += 1;
+      currentOffset += match_length;
+    }
+    if (relevantTile === void 0 || positionInTile === void 0) {
+      return null;
+    }
+    const column = relevantTile.record_batch.getChild(this.name);
+    for (let j = 0; j < positionInTile; j++) {
+      if (column.get(j)) {
+        currentOffset += 1;
+      }
+    }
+    this.cursor = currentOffset;
+  }
   async add_or_remove_points(name, ixes, which) {
     let newCursor = 0;
     let tileOfMatch = void 0;
@@ -38536,7 +38583,8 @@ class Scatterplot {
     this.secondary_renderers = {};
     this.selection_history = [];
     this.util = {
-      dictionaryFromArrays
+      dictionaryFromArrays,
+      vectorFromArray
     };
     this.plot_queue = Promise.resolve();
     this.hooks = {};
@@ -38554,6 +38602,7 @@ class Scatterplot {
     this.click_handler = new ClickFunction(this);
     this.tooltip_handler = new TooltipHTML(this);
     this.label_click_handler = new LabelClick(this);
+    this.handle_highlit_point_change = new ChangeToHighlitPointFunction(this);
     if (options.tileProxy) {
       this.tileProxy = options.tileProxy;
     }
@@ -38602,6 +38651,7 @@ class Scatterplot {
         }
       }
     });
+    return selection2;
   }
   /**
    * 
@@ -38611,6 +38661,13 @@ class Scatterplot {
    * See `select_and_plot` for a method that will select data and plot it.
    */
   async select_data(params) {
+    if (params.useNameCache && params.name && this.selection_history.length > 0) {
+      const old_version = this.selection_history.find((x) => x.name === params.name);
+      if (old_version) {
+        this.selection_history = [...this.selection_history.filter((x) => x.name !== params.name), old_version];
+        return old_version.selection;
+      }
+    }
     const selection2 = new DataSelection(this, params);
     await selection2.ready;
     this.selection_history.push({
@@ -38872,6 +38929,14 @@ class Scatterplot {
   get label_click() {
     return this.label_click_handler.f.bind(this.label_click_handler);
   }
+  set highlit_point_change(func) {
+    this.handle_highlit_point_change.f = func;
+  }
+  get highlit_point_change() {
+    return this.handle_highlit_point_change.f.bind(
+      this.handle_highlit_point_change
+    );
+  }
   set click_function(func) {
     this.click_handler.f = func;
   }
@@ -39002,7 +39067,6 @@ class Scatterplot {
       await this.load_dataset(dataSpec);
     }
     if (prefs.transformations) {
-      console.log(prefs);
       for (const [k, v] of Object.entries(prefs.transformations)) {
         const func = Function("datum", v);
         if (!this.dataset.transformations[k]) {
@@ -39187,6 +39251,11 @@ class LabelClick extends SettableFunction {
 class ClickFunction extends SettableFunction {
   default(datum2, plot = void 0) {
     console.log({ ...datum2 });
+    return;
+  }
+}
+class ChangeToHighlitPointFunction extends SettableFunction {
+  default(points, plot = void 0) {
     return;
   }
 }

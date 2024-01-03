@@ -5,6 +5,7 @@ import type * as DS from './shared.d';
 import { Bool, StructRowProxy, Vector } from 'apache-arrow';
 interface SelectParams {
     name: string;
+    useNameCache?: boolean;
     foreground?: boolean;
     batchCallback?: (t: Tile) => Promise<void>;
 }
@@ -193,6 +194,7 @@ export declare class DataSelection<T extends Tile> {
     export(fields: string[], format?: "json"): Promise<{
         [k: string]: any[];
     }>;
+    moveCursorToPoint(point: StructRowProxy | Record<"ix", BigInt | Number>): any;
     private add_or_remove_points;
     get ordering(): void;
     /**

@@ -5,7 +5,7 @@ import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
 import { Dataset, QuadtileDataset, ArrowDataset } from './Dataset';
-import { tableFromIPC, type StructRowProxy } from 'apache-arrow';
+import { tableFromIPC, type StructRowProxy, vectorFromArray } from 'apache-arrow';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
@@ -61,7 +61,8 @@ class Scatterplot<T extends Tile> {
   public selection_history: DS.SelectionRecord<T>[] = [];
   public tileProxy?: DS.TileProxy;
   public util : Record<string, (unknown) => unknown> = {
-    dictionaryFromArrays
+    dictionaryFromArrays,
+    vectorFromArray
   };
   div: Selection<any, any, any, any>;
   bound: boolean;
