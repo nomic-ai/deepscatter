@@ -5,14 +5,14 @@ import {
   scaleSqrt,
   scaleLog,
   scaleIdentity,
-  ScaleLinear,
   ScaleContinuousNumeric,
   ScaleOrdinal,
+  ScaleLinear,
 } from 'd3-scale';
 import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
 import { isOpChannel, isLambdaChannel, isConstantChannel } from './typing';
-import { Dictionary, Int16, Type, Utf8, Vector } from 'apache-arrow';
+import { Dictionary, Float32, Int16, Type, Utf8, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
 import type * as DS from './shared.d'
@@ -40,37 +40,33 @@ export const scales = {
  */
 export abstract class Aesthetic<
   // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
-  GlValueType extends DS.WebGlValue, 
+  ArrowType extends DS.SupportedArrowTypes = Float32,
+  DomainType extends DS.JSValue = number,
+  GlValueType extends DS.WebGlValue = number, 
   // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red  
-  JSValueType extends DS.JSValue,
-  DomainType extends DS.JSValue,
+  JSValueType extends DS.JSValue = number,
+  ChannelType extends DS.ConstantChannel<JSValueType>,
   ScaleType extends ScaleContinuousNumeric<JSValueType, JSValueType> 
-  | ScaleOrdinal<DomainType, JSValueType>
-  | ScaleOrdinal<DomainType, JSValueType>
-> {
+  | ScaleOrdinal<DomainType, JSValueType> = ScaleLinear<JSValueType, JSValueType>> {
   public abstract default_range: [number, number];
   public abstract default_constant: JSValueType;
-  public _constant?: JSValueType;
   public abstract default_transform: DS.Transform;
-  public _transform: DS.Transform = 'linear';
   public scatterplot: DS.Plot;
   public field: string | null = null;
-  public regl: Regl;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
   public aesthetic_map: TextureSet;
-  public _domain?: [DomainType, DomainType];
+  private _domain?: [DomainType, DomainType];
   public _range?: [JSValueType, JSValueType];
   public _func?: (d: JSValueType) => GlValueType;
   public dataset: DS.Dataset;
-  // cache of a d3 scale
-  public _scale? : ScaleType
-  public current_encoding: DS.Channel | null = null;
+  // cache of the d3 scale
+  private _scale? : ScaleType
+  public encoding : DS.Channel: 
   public id: string;
 
   constructor(
     encoding: DS.Channel | null,
     scatterplot: DS.Plot,
-    regl: Regl,
     dataset: DS.Dataset,
     aesthetic_map: TextureSet,
     id: string
@@ -80,23 +76,16 @@ export abstract class Aesthetic<
       throw new Error('Aesthetic map is undefined');
     }
     this.scatterplot = scatterplot;
-    this.regl = regl;
     this.dataset = dataset;
     // A flag that will be turned on and off in AestheticSet.
     this.id = id;
-  }
 
-  update(encoding: string | null | ChannelType) {
-    // null handling.
     if (encoding === undefined) {
-      console.warn('Updates with undefined should be handled upstream of the aesthetic.');
-      return;
+      throw new Error('Updates with undefined should be handled upstream of the aesthetic.');
     }
-    if (encoding === 'null') {
-      throw new Error("Setting encoding with string 'null' is no longer supported. Pass a true null value.")
-    }
+
     if (encoding === null) {
-      this.current_encoding = null;
+      this.encoding = null;
       this.reset_to_defaults();
       return;
     }
@@ -110,20 +99,12 @@ export abstract class Aesthetic<
     if (isNumber(encoding)) {
       const x: ChannelType = {
         constant: encoding,
-      } as unknown as ChannelType;
-      this.current_encoding = x;
+      };
+      this.encoding = x;
       return;
     }
 
-    if (Object.keys(encoding).length === 0) {
-      console.warn(
-        "Resetting parameters with an empty object is deprecated: use 'null'"
-      );
-      this.reset_to_defaults();
-      return;
-    }
-
-    this.current_encoding = encoding;
+    this.encoding = encoding;
 
     if (isConstantChannel(encoding)) {
       return;
@@ -135,6 +116,7 @@ export abstract class Aesthetic<
       return;
     }
 
+
     if (isLambdaChannel(encoding)) {
       const { lambda, field } = encoding;
       if (lambda) {
@@ -143,17 +125,31 @@ export abstract class Aesthetic<
       }
       return;
     }
-    const e = encoding as DS.Channel;
 
     if (encoding['domain'] === undefined) {
       encoding['domain'] = this.default_domain;
     }
     if (encoding['range']) {
-      this._domain = e.domain;
-      this._range = e.range;
+      this._domain = encoding.domain;
+      this._range = encoding.range;
+    }
+  }
+
+  /**
+   * Returns two numbers that indicate the extent of 
+   * the attribute written to webGL.
+   */
+  get GLDomain() : [number, number] {
+    const [min, max] = this.domain;
+
+    if (typeof(min) === "number" && typeof(max) === "number") {
+      return [min, max]
     }
 
-    this._transform = e.transform ?? undefined;
+  }
+
+  get transform() : DS.Transform  {
+    return this.encoding.transform || this.default_transform;
   }
 
   apply(point: Datum): JSValueType {
@@ -167,22 +163,10 @@ export abstract class Aesthetic<
 
   abstract toGLType(val: JSValueType): GlValueType;
 
-  get transform() {
-    if (this._transform) return this._transform;
-    return this.default_transform;
-  }
+  get scale(): ScaleType {
 
-  set transform(transform) {
-    this._transform = transform;
-  }
-
-  get scale(): (arg0: unknown) => JSValueType {
     if (this._scale) {
       return this._scale;
-    }
-
-    if (this.is_dictionary()) {
-      throw new Error('Dictionary scales only supported for colors');
     }
 
     const scaleMaker = scales[this.transform];
@@ -221,12 +205,9 @@ export abstract class Aesthetic<
     if (!column) {
       return [1, 1];
     }
-    // Not sure why this was here.
-    // if (column.type.typeId === Type.Dictionary) {
-    //   return [0, this.aesthetic_map.texture_size];
-    // }
+
     const domain = this.dataset.domain(this.field);
-    return this.dataset.domain(this.field);
+    return domain;
   }
 
   default_data(): Uint8Array | Float32Array | Array<number> {
@@ -234,13 +215,6 @@ export abstract class Aesthetic<
     return Array(this.aesthetic_map.texture_size).fill(
       default_value
     ) as Array<number>;
-  }
-
-  get webGLDomain() {
-    if (this.is_dictionary()) {
-      return [0, 4096];
-    }
-    return this.domain;
   }
 
   get domain() {
@@ -300,13 +274,7 @@ export abstract class Aesthetic<
   }
 
   reset_to_defaults() {
-    this._domain = this.default_domain;
-    this._range = [0, 1];
-    this._transform = undefined;
     this._constant = this.default_constant;
-    this.field = null;
-    this.current_encoding = null;
-    this._scale = undefined;
   }
 
 
@@ -336,10 +304,10 @@ export abstract class Aesthetic<
 
   get constant(): GlValueType {
     if (
-      this.current_encoding !== null &&
-      isConstantChannel(this.current_encoding)
+      this.encoding !== null &&
+      isConstantChannel(this.encoding)
     ) {
-      return this.toGLType(this.current_encoding.constant as JSValueType);
+      return this.toGLType(this.encoding.constant as JSValueType);
     }
     return this.toGLType(this.default_constant);
   }
@@ -406,22 +374,20 @@ abstract class OneDAesthetic extends Aesthetic {
     aesthetic_map: TextureSet
   ) {
     super(scatterplot, regl, dataset, aesthetic_map);
-    this.current_encoding = null;
+    this.encoding = null;
   }
 
   toGLType(a: number) {
     return a;
   }
 
-  static get_default_domain() {
-    return [0, 1] as [number, number];
-  }
   get default_domain() {
     return [0, 1] as [number, number];
   }
 }
 
 export class Size extends OneDAesthetic {
+  field = 'size'
   static get default_constant() {
     return 1.5;
   }
@@ -496,15 +462,15 @@ abstract class BooleanAesthetic extends Aesthetic<
     super.update(encoding);
 
     if (
-      this.current_encoding !== null &&
-      Object.keys(this.current_encoding).length === 0
+      this.encoding !== null &&
+      Object.keys(this.encoding).length === 0
     ) {
-      this.current_encoding = null;
+      this.encoding = null;
     }
   }
 
   ops_to_array(): DS.OpArray {
-    const input = this.current_encoding;
+    const input = this.encoding;
     if (input === null) return [0, 0, 0];
     if (input === undefined) return [0, 0, 0];
     if (!isOpChannel(input)) {
@@ -526,7 +492,7 @@ abstract class BooleanAesthetic extends Aesthetic<
   }
 
   apply(point: Datum): boolean {
-    const channel = this.current_encoding;
+    const channel = this.encoding;
     if (channel === null || channel === undefined) {
       return true;
     }
@@ -548,7 +514,7 @@ abstract class BooleanAesthetic extends Aesthetic<
     if (isLambdaChannel(channel)) {
       if (this._func === undefined) {
         throw new Error(
-          '_func should have been bound' + JSON.stringify(this.current_encoding)
+          '_func should have been bound' + JSON.stringify(this.encoding)
         );
       }
       const val = this.value_for(point);
@@ -593,15 +559,17 @@ abstract class BooleanAesthetic extends Aesthetic<
  * background points will be plotted with much less resolution.
  */
 export class Foreground extends BooleanAesthetic {
-  public current_encoding : DS.BooleanChannel = null;
+  public encoding : DS.BooleanChannel = null;
   _constant = true;
   default_constant = true;
   default_range = [0, 1] as [number, number];
   default_transform: DS.Transform = 'literal';
   get active(): boolean {
+    // We need to test if the foreground aesthetic is in use.
+    // because otherwise it consumes two draw calls.
     if (
-      this.current_encoding === null ||
-      isConstantChannel(this.current_encoding)
+      this.encoding === null ||
+      isConstantChannel(this.encoding)
     ) {
       return false;
     }
@@ -610,7 +578,7 @@ export class Foreground extends BooleanAesthetic {
 }
 
 export class Filter extends BooleanAesthetic {
-  public current_encoding = null;
+  public encoding = null;
   _constant = true;
   default_constant = true;
   default_transform: DS.Transform = 'literal';
@@ -667,7 +635,7 @@ export class Jitter_radius extends Aesthetic<number, number, DS.JitterChannel> {
   public _method: DS.JitterRadiusMethod = 'None';
 
   get method(): DS.JitterRadiusMethod {
-    return this.current_encoding?.method ?? 'None';
+    return this.encoding?.method ?? 'None';
   }
 
   set method(value: DS.JitterRadiusMethod) {

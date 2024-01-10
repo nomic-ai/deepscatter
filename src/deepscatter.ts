@@ -207,7 +207,6 @@ class Scatterplot {
       }
     }
     const selection = new DataSelection(this, params);
-    await selection.ready;
     this.selection_history.push({
       selection,
       name: selection.name,

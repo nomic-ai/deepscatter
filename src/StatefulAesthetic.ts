@@ -43,7 +43,7 @@ import type { Dataset } from './Dataset';
 import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
 
-export class StatefulAesthetic<T extends Aesthetic> {
+export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
   /**
    * A stateful aesthetic holds the history and associated resources for an encoding
    * channel. It holds two Aesthetic objects: the current and the previous scales. These
@@ -111,7 +111,7 @@ export class StatefulAesthetic<T extends Aesthetic> {
     const stringy = JSON.stringify(encoding);
     // Overwrite the last version.
     if (
-      stringy === JSON.stringify(this.current.current_encoding) ||
+      stringy === JSON.stringify(this.current.encoding) ||
       encoding === undefined
     ) {
       // If an undefined encoding is passed, that means

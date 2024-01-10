@@ -195,7 +195,7 @@ export class TextureSet {
       height: this.texture_size,
       type: texture_type,
       format,
-    };
+    } as const;
     // Store the current and the last values for transitions.
     this._one_d_texture = this.regl.texture(params);
     return this._one_d_texture;

@@ -224,11 +224,22 @@ export class Dataset {
     delete this.transformations[name];
   }
 
-  domain(dimension: string, max_ix = 1e6): [number, number] {
-    if (this.extents[dimension]) {
-      return this.extents[dimension];
+  /**
+   * Returns the minimum and maximum values for a named column.
+   * This attempts to use table metadata; if that is not present,
+   * it will at the first attempt calculate the min and max values.
+   * 
+   * 
+   * @param columnName A column in the dataset. 
+   * @returns A pair of numbers. Dates and bigints will be
+   * converted to numbers.
+   */
+
+  domain(columnName: string): [number, number] {
+    if (this.extents[columnName]) {
+      return this.extents[columnName];
     }
-    const dim = this._schema?.fields.find((d) => d.name === dimension) as Field<DS.SupportedArrowTypes>;
+    const dim = this._schema?.fields.find((d) => d.name === columnName) as Field<DS.SupportedArrowTypes>;
     if (dim !== undefined) {
       let min: number | string | undefined = undefined;
       let max: number | string | undefined = undefined;
@@ -255,12 +266,12 @@ export class Dataset {
         throw new Error('Failed to parse min-max as numbers');
       }
       if (min !== undefined) {
-        return (this.extents[dimension] = [min as number, max]);
+        return (this.extents[columnName] = [min as number, max]);
       }
     }
-    return (this.extents[dimension] = extent([
+    return (this.extents[columnName] = extent([
       ...new Vector(this.map(d => d).filter(d => d.ready).map( d =>
-        d.record_batch.getChild(dimension)).filter(d => d !== null)
+        d.record_batch.getChild(columnName)).filter(d => d !== null)
       )]))
   }
 
