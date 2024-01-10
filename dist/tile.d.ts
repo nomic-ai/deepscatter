@@ -41,7 +41,7 @@ export declare abstract class Tile {
     abstract codes: [number, number, number];
     constructor(dataset: Dataset<Tile>);
     get children(): this[];
-    download(): void;
+    download(): Promise<void>;
     delete_column_if_exists(colname: string): void;
     get_column(colname: string): Promise<Vector>;
     private transformation_holder;
