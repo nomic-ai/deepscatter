@@ -1,3 +1,8 @@
+
+# 2.15.1
+
+* Adds a method to `Dataset` called visit_full that returns a promise which iterates over all the tiles in the dataset including those that have not yet loaded. (Their load is triggered.)
+
 # 2.15.0
 
 This would be a bugfix release except that it's possible this might accidentally break code taking advantage of undocumented behavior involving the domain for categorical scales. If you've ever set a scale to have domain [-2047, 2047], the console will now throw a warning and autochange the extent to provide more sensible support for dictionary fields. 

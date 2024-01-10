@@ -74,7 +74,7 @@ export abstract class Tile {
     return this._children;
   }
 
-  download() {
+  download() : Promise<void> {
     throw new Error('Not implemented');
   }
 
@@ -253,7 +253,7 @@ export abstract class Tile {
   }
 
   async schema() {
-    this.download();
+    await this.download();
     await this.promise;
     return this._schema;
   }

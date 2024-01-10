@@ -307,6 +307,52 @@ export abstract class Dataset<T extends Tile> {
     }
   }
 
+ /**
+   * Invoke a function on all tiles in the dataset that have been downloaded.
+   * The general architecture here is taken from the
+   * d3 quadtree functions. That's why, for example, it doesn't
+   * recurse.
+
+   * @param callback The function to invoke on each tile.
+   * @param after Whether to execute the visit in bottom-up order. Default false.
+   * @param filter 
+   */
+
+  async visit_full(
+    callback: (tile: T) => Promise<void>,
+    after = false,
+    starting_tile : T | null = null,
+    filter: (t: T) => boolean = (x) => true,
+    updateFunction: (tile: T, completed, total) => Promise<void>
+  ) {
+
+      // Visit all children with a callback function.
+      // In general recursing quadtrees isn't that fast, but
+      // we rarely have more than ten tiles deep and the
+      // code is much cleaner this way than an async queue.
+
+      let seen = 0;
+      const start = starting_tile || this.root_tile;
+      await start.download();
+      const total = JSON.parse(start.record_batch.schema.metadata.get("total_points"))
+     
+      async function resolve(tile: T) {
+        await tile.download();
+        if (after) {
+          await Promise.all(tile.children.map(resolve))
+          await callback(tile);
+          seen += tile.record_batch.numRows
+          void updateFunction(tile, seen, total)
+        } else {
+          await callback(tile);
+          seen += tile.record_batch.numRows
+          void updateFunction(tile, seen, total)
+          await Promise.all(tile.children.map(resolve))
+        }
+      }
+      await resolve(start);
+    }
+
   async schema() {
     await this.ready;
     if (this._schema) {

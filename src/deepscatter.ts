@@ -206,12 +206,12 @@ class Scatterplot<T extends Tile> {
       }
     }
     const selection = new DataSelection<T>(this, params);
-    await selection.ready;
     this.selection_history.push({
       selection,
       name: selection.name,
       flushed: false,
     });
+    await selection.ready;
     return selection;
   }
 

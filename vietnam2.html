@@ -55,7 +55,7 @@
 
   const prefs = {
     source_url: 'https://bmschmidt.github.io/vietnam_war/',
-    max_points: 100000,
+    max_points: 1000,
     alpha: 10.12, // Target saturation for the full page.
     zoom_balance: 0.12, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
     point_size: 2, // Default point size before application of size scaling
@@ -184,7 +184,7 @@
       scatterplot
         .plotAPI({
           alpha: 3.5,
-          max_points: 10000,
+          max_points: 1000,
           point_size: 5,
           duration: 0.1,
           encoding: {
