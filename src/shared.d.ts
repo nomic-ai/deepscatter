@@ -18,114 +18,6 @@ export type {
 };
 
 
-
-/**
- * A channel represents the information necessary to map a single dimension
- * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
- * to construct a scale and to pass any other necessary information to assist
- * in converting tabular data to visual representation. In some cases it is a scale;
- * in others it is parameters used to define a function on the GPU.
- *
- * The names and design are taken largely from channels as defined in Vega-Lite,
- * but the syntax differs for a number of operations.
- * https://vega.github.io/vega-lite/docs/encoding.html
- */
-
-
-type SignedInt = Int8 | Int16 | Int32
-export type WebGlValue = number | [number, number, number];
-
-// The type in JSON. This does not include Date because only 
-// JSON-serializable types are allowed. 
-export type JSONValue = number | string | boolean;
-
-// The type in javascript. This lets us capture that some things become dates.
-export type JSValue = number | string | boolean | Date;
-export type DomainType = null | ArrowBuildable;
-
-export type TypeBundle<ArrowType, JSONType, DomainType, RangeType, GLType> = {
-  arrowType: ArrowType,
-  jsonType: JSONType,
-  domainType: DomainType,
-  rangeType: RangeType,
-  glType: GLType
-};
-
-export type StringCategorical = TypeBundle<
-  Dictionary<Utf8, SignedInt>, // arrowType
-  string, // jsonType
-  string, // domainType
-  string, // rangeType
-  number // glType
->;
-
-
-type NumberOut = {
-  rangeType: string,
-  glType: number
-}
-
-type ColorOut = {
-  rangeType: string,
-  glType: [number, number, number]
-}
-
-
-export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
-
-export type ScaleChannel<
-  DomainType extends JSValue,
-  RangeType extends JSValue
-> = {
-  /** The name of a column in the data table to be encoded. */
-  field: string;
-  /**
-   * A transformation to apply on the field.
-   * 'literal' maps in the implied dataspace set by 'x', 'y', while
-   * 'linear' transforms the data by the range and domain.
-   */  
-  transform?: Transform;
-  // The domain over which the data extends
-  domain?: [DomainType, DomainType];
-  // The range into which to map the data.
-  range?: [RangeType, RangeType];
-}
-
-export type LambdaChannel<DomainType extends JSValue, RangeType extends JSValue> = {
-  lambda?: (v: DomainType) => RangeType;
-  field: string;
-}
-
-/**
- * Operations to be performed on the GPU taking a single argument.
- */
-type OneArgumentOp<ArrowType extends Timestamp | Float | Int> = {
-  op: 'gt' | 'lt' | 'eq';
-  a: number;
-  // This will not need to be defined and can't be overridden;
-  // it just is defined implicitly because we call the function in 
-  // WebGL, not JS.
-  localImplementation?: (arg: ArrowType) => boolean; 
-};
-
-/**
- * Operations to be performed on the GPU taking two arguments
- */
-
-type TwoArgumentOp<ArrowType extends Timestamp | Float | Int> = {
-  op: 'within' | 'between';
-  a: number;
-  b: number;
-  // This will not need to be defined and can't be overridden;
-  // it just is defined implicitly because we call the function in 
-  // WebGL, not JS.
-  localImplementation?: (arg: ArrowType) => boolean; 
-};
-
-export type OpChannel<ArrowType extends Timestamp | Float | Int> = {
-  field: string;
-} & ( OneArgumentOp<ArrowType> | TwoArgumentOp<ArrowType> );
-
 export type BufferLocation = {
   buffer: Buffer;
   offset: number;
@@ -193,8 +85,8 @@ export type SupportedArrowTypes = Bool | Float | Int | Dictionary<Utf8, ArrowInt
 // An arrow buildable vector is something returned that can be placed onto the scatterplot.
 // Float32Arrays will be dropped straight onto the GPU; other types while be cast
 // to Float32Array before going there.
-
 export type ArrowBuildable = Vector<SupportedArrowTypes> | Float32Array | Uint8Array;
+
 /**
  * A transformation is a batchwise operation that can be used to construct
  * a new column in the data table. It runs asynchronously so that it
@@ -210,9 +102,146 @@ export type Transformation = (inputTile: Tile) => ArrowBuildable | Promise<Arrow
 export type BoolTransformation = (inputTile: Tile) => 
  Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
 
-type ConstantBool = {
-  constant: boolean;
+/**
+ * A channel represents the information necessary to map a single dimension
+ * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
+ * to construct a scale and to pass any other necessary information to assist
+ * in converting tabular data to visual representation. In some cases it is a scale;
+ * in others it is parameters used to define a function on the GPU.
+ *
+ * The names and design are taken largely from channels as defined in Vega-Lite,
+ * but the syntax differs for a number of operations.
+ * https://vega.github.io/vega-lite/docs/encoding.html
+ */
+
+
+type SignedInt = Int8 | Int16 | Int32
+export type WebGlValue = number | [number, number, number];
+
+// The type in JSON. This does not include Date because only 
+// JSON-serializable types are allowed. 
+export type JSONValue = number | string | boolean;
+
+// The type in javascript. This lets us capture that some things become dates.
+export type JSValue = number | string | boolean | Date;
+export type DomainType = null | ArrowBuildable;
+
+export type TypeBundle<ArrowType, JSONType, DomainType, RangeType, GLType> = {
+  arrowType: ArrowType,
+  jsonType: JSONType,
+  domainType: DomainType,
+  rangeType: RangeType,
+  glType: GLType
 };
+
+export type StringCategorical = TypeBundle<
+  Dictionary<Utf8, SignedInt>, // arrowType
+  string, // jsonType
+  string, // domainType
+  string, // rangeType
+  number // glType
+>;
+
+
+type NumberOut = {
+  rangeType: number,
+  glType: number
+}
+
+type ColorOut = {
+  rangeType: string,
+  glType: [number, number, number]
+}
+
+type BoolOut = {
+  rangeType: boolean,
+  glType: 0 | 1
+}
+
+
+
+type CategoryIn = {
+  arrowType: Dictionary<Utf8>,
+  jsonType: string,
+  domainType: string,
+}
+
+type NumberIn = {
+  arrowType: Float | Int,
+  jsonType: number,
+  domainType: number
+}
+
+type DateIn = {
+  arrowType: Timestamp,
+  jsonType: string,
+  domainType: Date
+}
+
+type BoolIn = {
+  arrowType: Bool,
+  jsonType: boolean,
+  domainType: boolean
+}
+
+
+export type OutType = NumberOut | ColorOut | BoolOut
+export type InType = DateIn | BoolIn | NumberIn | CategoryIn
+
+export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
+
+export type ScaleChannel<
+  DomainType extends JSValue,
+  RangeType extends JSValue
+> = {
+  /** The name of a column in the data table to be encoded. */
+  field: string;
+  /**
+   * A transformation to apply on the field.
+   * 'literal' maps in the implied dataspace set by 'x', 'y', while
+   * 'linear' transforms the data by the range and domain.
+   */  
+  transform?: Transform;
+  // The domain over which the data extends
+  domain?: [DomainType, DomainType, ...DomainType[]];
+  // The range into which to map the data.
+  range?: [RangeType, RangeType, ...RangeType[]];
+}
+
+export type LambdaChannel<DomainType extends JSValue, RangeType extends JSValue> = {
+  lambda?: (v: DomainType) => RangeType;
+  field: string;
+}
+
+/**
+ * Operations to be performed on the GPU taking a single argument.
+ */
+type OneArgumentOp<ArrowType extends Timestamp | Float | Int> = {
+  op: 'gt' | 'lt' | 'eq';
+  a: number;
+  // This will not need to be defined and can't be overridden;
+  // it just is defined implicitly because we call the function in 
+  // WebGL, not JS.
+  localImplementation?: (arg: ArrowType) => boolean; 
+};
+
+/**
+ * Operations to be performed on the GPU taking two arguments
+ */
+
+type TwoArgumentOp<ArrowType extends Timestamp | Float | Int> = {
+  op: 'within' | 'between';
+  a: number;
+  b: number;
+  // This will not need to be defined and can't be overridden;
+  // it just is defined implicitly because we call the function in 
+  // WebGL, not JS.
+  localImplementation?: (arg: ArrowType) => boolean; 
+};
+
+export type OpChannel<ArrowType extends Timestamp | Float | Int> = {
+  field: string;
+} & ( OneArgumentOp<ArrowType> | TwoArgumentOp<ArrowType> );
 
 export type ConstantNumber = {
   constant: number;
@@ -221,11 +250,6 @@ export type ConstantNumber = {
 export type ConstantString = {
   constant: string;
 };
-/**
- * A constant color channel must be represented as a string that 
- * is valid HTML. (`blue`, `#EEFF00`, etc.)
- */
-
 
 export type ConstantChannel<T extends boolean | number | string> =
   {constant : T}
