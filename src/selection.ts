@@ -338,6 +338,7 @@ export class DataSelection {
     }
     this.events[event].push(listener);
   }
+  
   private dispatch(event: string, args: any): void {
     if (this.events[event]) {
       this.events[event].forEach(listener => listener(args));

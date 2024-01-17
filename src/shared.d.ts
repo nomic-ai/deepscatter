@@ -7,6 +7,7 @@ import type Scatterplot from './deepscatter';
 import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
 import type { DataSelection } from './selection';
+import { ScaleBand } from 'd3-scale';
 //import { DataSelection } from './selection';
 
 export type {
@@ -143,57 +144,65 @@ export type StringCategorical = TypeBundle<
 >;
 
 
-type NumberOut = {
+export type NumberOut = {
   rangeType: number,
   glType: number
 }
 
-type ColorOut = {
+export type ColorOut = {
   rangeType: string,
   glType: [number, number, number]
 }
 
-type BoolOut = {
+export type BoolOut = {
   rangeType: boolean,
   glType: 0 | 1
 }
 
-
-
-type CategoryIn = {
+export type CategoryIn = {
   arrowType: Dictionary<Utf8>,
   jsonType: string,
   domainType: string,
 }
 
-type NumberIn = {
+export type NumberIn = {
   arrowType: Float | Int,
   jsonType: number,
   domainType: number
 }
 
-type DateIn = {
+export type DateIn = {
   arrowType: Timestamp,
   jsonType: string,
   domainType: Date
 }
 
-type BoolIn = {
+export type BoolIn = {
   arrowType: Bool,
   jsonType: boolean,
   domainType: boolean
 }
 
+export type ConstantIn = {
+  arrowType: null,
+  jsonType: null,
+  domainType: null
+}
 
+export type InType = DateIn | BoolIn | NumberIn | CategoryIn | ConstantIn
+export type ChannelType = BooleanChannel | 
+   LinearScaleChannel |
+   ColorChannel | LambdaChannel | OpChannel
 export type OutType = NumberOut | ColorOut | BoolOut
-export type InType = DateIn | BoolIn | NumberIn | CategoryIn
+
+type ChannelParams = {
+  In: InType,
+  Channel: ChannelType
+}
 
 export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
-export type ScaleChannel<
-  DomainType extends JSValue,
-  RangeType extends JSValue
-> = {
+export type NumericScaleChannel<DomainType extends JSValue = number>  = {
   /** The name of a column in the data table to be encoded. */
   field: string;
   /**
@@ -203,13 +212,15 @@ export type ScaleChannel<
    */  
   transform?: Transform;
   // The domain over which the data extends
-  domain?: [DomainType, DomainType, ...DomainType[]];
+  domain?: [DomainType, DomainType];
   // The range into which to map the data.
-  range?: [RangeType, RangeType, ...RangeType[]];
+  range?: [number, number];
 }
 
-export type LambdaChannel<DomainType extends JSValue, RangeType extends JSValue> = {
-  lambda?: (v: DomainType) => RangeType;
+
+
+export type LambdaChannel<RangeType extends boolean | number | colorstring> = {
+  lambda?: (v: string) => RangeType;
   field: string;
 }
 
@@ -254,38 +265,43 @@ export type ConstantString = {
 export type ConstantChannel<T extends boolean | number | string> =
   {constant : T}
 
-export type JitterRadiusMethod =
+export type JitterMethod =
   | 'None' // No jitter
   | 'spiral' // animates along a log spiral.
   | 'uniform' // static jitters around a central point.
   | 'normal' // static jitters around a central point biased towards the middle.
   | 'circle' // animates a circle around the point.
   | 'time'; // lapses the point in and out of view.
-  
-export type JitterChannel<DomainType extends JSValue, RangeType extends number> = ScaleChannel<DomainType, RangeType> & {
-  method: JitterRadiusMethod;
-} | ConstantChannel<RangeType>;
+
+
+type Colorname = string;
 
 type BooleanChannel = 
   | ConstantChannel<boolean>
   | OpChannel<Timestamp | Float | Int> 
-  | LambdaChannel<JSValue, boolean>
+  | LambdaChannel<boolean>
+
+type ConstantColor = {
+  constant: Colorname
+}
+type ColorScaleChannel = 
+  | 
 // A description of a functional operation to be passsed to the shader.
 /**
  * And encoding.
  */
 export type Encoding = {
-  x?: ScaleChannel<number, number>;
-  y?: ScaleChannel<number, number>;
-  color?: null | ScaleChannel<JSValue, string> | ConstantChannel<string> | LambdaChannel<JSValue, string>;
+  x?: NumericScaleChannel;
+  y?: NumericScaleChannel;
+  color?: null | ConstantChannel<Colorname> | ColorScaleChannel;
   size?: null | ScaleChannel<number, number> | ConstantChannel<number> | LambdaChannel<JSValue, number>
   filter?: null | BooleanChannel;
   filter2?: null | BooleanChannel;
   foreground?: null | BooleanChannel;
-  jitter_radius?: null | JitterChannel<JSValue, number>;
-  jitter_speed?: null | ScaleChannel<number, number>;
-  x0?: null | ScaleChannel<number, number>;
-  y0?: null | ScaleChannel<number, number>;
+  jitter_radius?: null | NumericScaleChannel | ConstantChannel<number>
+  jitter_speed?: null | NumericScaleChannel
+  x0?: null | NumericScaleChannel;
+  y0?: null | NumericScaleChannel;
 };
 
 export type PointUpdate = {
