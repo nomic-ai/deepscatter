@@ -39,29 +39,20 @@ export const scales = {
  * especially for colors.
  */
 export abstract class Aesthetic<
-  // The type of the object passed to webgl. E.g [number, number, number] for [255, 0, 0] = red.
-  ArrowType extends DS.SupportedArrowTypes = Float32,
-  DomainType extends DS.JSValue = number,
-  GlValueType extends DS.WebGlValue = number, 
-  // The type of the object in *javascript* which the user interacts with. E.g string for "#FF0000" = red  
-  JSValueType extends DS.JSValue = number,
-  ChannelType extends DS.ConstantChannel<JSValueType>,
-  ScaleType extends ScaleContinuousNumeric<JSValueType, JSValueType> 
-  | ScaleOrdinal<DomainType, JSValueType> = ScaleLinear<JSValueType, JSValueType>> {
-  public abstract default_range: [number, number];
-  public abstract default_constant: JSValueType;
-  public abstract default_transform: DS.Transform;
+  ChannelType extends DS.ChannelType = DS.ConstantChannel<number>,
+  Input extends DS.InType = DS.NumberIn,
+  Output extends DS.OutType = DS.NumberOut,
+> {
+  public dataset: DS.Dataset;
+  public abstract default_constant: Output['rangeType'];
   public scatterplot: DS.Plot;
   public field: string | null = null;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
-  public aesthetic_map: TextureSet;
-  private _domain?: [DomainType, DomainType];
-  public _range?: [JSValueType, JSValueType];
   public _func?: (d: JSValueType) => GlValueType;
-  public dataset: DS.Dataset;
+  public aesthetic_map: TextureSet;
+
   // cache of the d3 scale
-  private _scale? : ScaleType
-  public encoding : DS.Channel: 
+  public encoding : ChannelType;
   public id: string;
 
   constructor(
@@ -86,7 +77,6 @@ export abstract class Aesthetic<
 
     if (encoding === null) {
       this.encoding = null;
-      this.reset_to_defaults();
       return;
     }
 
@@ -177,7 +167,7 @@ export abstract class Aesthetic<
     return (this._scale = scale);
   }
 
-  get column(): Vector<DS.SupportedArrowTypes> {
+  get column(): Vector<Input['arrowType']> {
     if (this.field === null) {
       throw new Error("Can't retrieve column for aesthetic without a field");
     }
@@ -186,7 +176,7 @@ export abstract class Aesthetic<
       if (col === undefined || col === null) {
         throw new Error("Can't find column " + this.field);
       }
-      return col;
+      return col as Vector<Input['arrowType']>;
     }
     throw new Error('Table is null');
   }
@@ -228,6 +218,7 @@ export abstract class Aesthetic<
     return this._range || this.default_range;
   }
 
+  
   value_for(point: Datum): JSValueType | null {
     if (this.field && point[this.field]) {
       return point[this.field] as JSValueType;
@@ -272,12 +263,6 @@ export abstract class Aesthetic<
     encoding.domain = encoding.domain || this.default_domain;
     return encoding;
   }
-
-  reset_to_defaults() {
-    this._constant = this.default_constant;
-  }
-
-
 
   encode_for_textures(range: [number, number]) {
     const { texture_size } = this.aesthetic_map;
@@ -364,9 +349,25 @@ export abstract class Aesthetic<
   }
 }
 
+abstract class ScaledAesthetic<
+  ChannelType extends DS.ChannelType = DS.ConstantChannel<number>,
+  Input extends DS.InType = DS.NumberIn,
+  Output extends DS.OutType = DS.NumberOut,
+> extends Aesthetic<
+  ChannelType, Input, Output
+>{
+  private _scale? : 
 
-abstract class OneDAesthetic extends Aesthetic {
+
+}
+
+abstract class OneDAesthetic<
+  ChannelType extends 
+>extends Aesthetic {
+
   public _range: [number, number];
+  public abstract default_transform: DS.Transform;
+
   constructor(
     scatterplot: DS.Plot,
     regl: Regl,
@@ -442,9 +443,7 @@ export class Y extends PositionalAesthetic {
 export class Y0 extends Y {}
 
 abstract class BooleanAesthetic extends Aesthetic<
-  0 | 1,
-  boolean,
-  DS.BooleanChannel
+
 > {
   constructor(
     scatterplot: DS.Plot,
