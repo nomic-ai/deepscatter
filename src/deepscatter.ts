@@ -1,5 +1,4 @@
 import { select, Selection } from 'd3-selection';
-import { geoPath, geoIdentity } from 'd3-geo';
 import { max, range } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
