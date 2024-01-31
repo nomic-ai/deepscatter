@@ -190,15 +190,9 @@ export type ConstantIn = {
 }
 
 export type InType = DateIn | BoolIn | NumberIn | CategoryIn | ConstantIn
-export type ChannelType = BooleanChannel | 
-   LinearScaleChannel |
-   ColorChannel | LambdaChannel | OpChannel
+
 export type OutType = NumberOut | ColorOut | BoolOut
 
-type ChannelParams = {
-  In: InType,
-  Channel: ChannelType
-}
 
 export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
@@ -218,6 +212,7 @@ export type NumericScaleChannel<DomainType extends JSValue = number>  = {
 }
 
 
+type colorstring = string;
 
 export type LambdaChannel<RangeType extends boolean | number | colorstring> = {
   lambda?: (v: string) => RangeType;
@@ -265,6 +260,16 @@ export type ConstantString = {
 export type ConstantChannel<T extends boolean | number | string> =
   {constant : T}
 
+export type ChannelType =
+  | BooleanChannel 
+  | OpChannel<Float | Int>
+  | ConstantChannel<string | number | boolean>
+  | NumericScaleChannel<JSValue>;
+
+export type OneDChannels = 
+  | ConstantChannel<number> 
+  | NumericScaleChannel<number | Date>
+
 export type JitterMethod =
   | 'None' // No jitter
   | 'spiral' // animates along a log spiral.
@@ -284,8 +289,23 @@ type BooleanChannel =
 type ConstantColor = {
   constant: Colorname
 }
+
+type CategoricalColorScale = {
+  domain: string[]
+  range: Colorname[];
+}
+
+type LinearColorScale = {
+  domain: [number, number] | [number, number, number]
+  // TODO: implement some codegen for these values
+  range: 'viridis' | 'magma' | 'ylorrd'
+  transform?: "log" | "sqrt" | "linear" | "symlog"
+}
+
 type ColorScaleChannel = 
-  | 
+  | ConstantColor
+  | LinearColorScale
+  | CategoricalColorScale
 // A description of a functional operation to be passsed to the shader.
 /**
  * And encoding.

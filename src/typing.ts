@@ -4,18 +4,20 @@ import type {
   URLLabels, Labelset, 
 } from './shared.d'
 
-export function isOpChannel(input: RootChannel): input is OpChannel {
-  return (input as OpChannel).op !== undefined;
+import type * as DS from './shared.d'
+
+export function isOpChannel(input: DS.ChannelType): input is DS.OpChannel<any> {
+  return input['op'] !== undefined;
 }
 
-export function isLambdaChannel(input: RootChannel): input is LambdaChannel {
-  return (input as LambdaChannel).lambda !== undefined;
+export function isLambdaChannel(input: DS.ChannelType): input is DS.LambdaChannel<any> {
+  return input['lambda'] !== undefined;
 }
 
 export function isConstantChannel(
-  input: RootChannel | ColorChannel
-): input is ConstantChannel {
-  return (input as ConstantChannel).constant !== undefined;
+  input: DS.ChannelType
+): input is DS.ConstantChannel<string | number | boolean> {
+  return input['constant'] !== undefined
 }
 
 export function isURLLabels(labels: Labelcall): labels is URLLabels {

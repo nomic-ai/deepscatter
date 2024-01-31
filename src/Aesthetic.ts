@@ -39,7 +39,7 @@ export const scales = {
  * especially for colors.
  */
 export abstract class Aesthetic<
-  ChannelType extends DS.ChannelType = DS.ConstantChannel<number>,
+  ChannelType extends DS.ChannelType,
   Input extends DS.InType = DS.NumberIn,
   Output extends DS.OutType = DS.NumberOut,
 > {
@@ -48,7 +48,7 @@ export abstract class Aesthetic<
   public scatterplot: DS.Plot;
   public field: string | null = null;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
-  public _func?: (d: JSValueType) => GlValueType;
+  public _func?: (d: Input['arrowType']) => Output['glType'];
   public aesthetic_map: TextureSet;
 
   // cache of the d3 scale
@@ -56,9 +56,8 @@ export abstract class Aesthetic<
   public id: string;
 
   constructor(
-    encoding: DS.Channel | null,
+    encoding: ChannelType | null,
     scatterplot: DS.Plot,
-    dataset: DS.Dataset,
     aesthetic_map: TextureSet,
     id: string
   ) {
@@ -66,8 +65,9 @@ export abstract class Aesthetic<
     if (this.aesthetic_map === undefined) {
       throw new Error('Aesthetic map is undefined');
     }
+    
     this.scatterplot = scatterplot;
-    this.dataset = dataset;
+    this.dataset = scatterplot.dataset;
     // A flag that will be turned on and off in AestheticSet.
     this.id = id;
 
@@ -80,32 +80,25 @@ export abstract class Aesthetic<
       return;
     }
 
-    // Reset the scale
-    this._scale = undefined;
     if (typeof encoding === 'string') {
       encoding = this.convert_string_encoding(encoding) as ChannelType;
     }
 
     if (isNumber(encoding)) {
-      const x: ChannelType = {
-        constant: encoding,
-      };
-      this.encoding = x;
-      return;
+      throw new Error(`As of deepscatter 3.0, you must pass {constant: ${encoding}}, not just "${encoding}`)
     }
 
     this.encoding = encoding;
 
     if (isConstantChannel(encoding)) {
-      return;
+      return
     }
-
+    
     this.field = encoding.field;
 
     if (isOpChannel(encoding)) {
       return;
     }
-
 
     if (isLambdaChannel(encoding)) {
       const { lambda, field } = encoding;
@@ -114,14 +107,6 @@ export abstract class Aesthetic<
         this.post_to_regl_buffer();
       }
       return;
-    }
-
-    if (encoding['domain'] === undefined) {
-      encoding['domain'] = this.default_domain;
-    }
-    if (encoding['range']) {
-      this._domain = encoding.domain;
-      this._range = encoding.range;
     }
   }
 
@@ -136,10 +121,6 @@ export abstract class Aesthetic<
       return [min, max]
     }
 
-  }
-
-  get transform() : DS.Transform  {
-    return this.encoding.transform || this.default_transform;
   }
 
   apply(point: Datum): JSValueType {
@@ -350,31 +331,60 @@ export abstract class Aesthetic<
 }
 
 abstract class ScaledAesthetic<
-  ChannelType extends DS.ChannelType = DS.ConstantChannel<number>,
-  Input extends DS.InType = DS.NumberIn,
-  Output extends DS.OutType = DS.NumberOut,
-> extends Aesthetic<
-  ChannelType, Input, Output
->{
-  private _scale? : 
+    ChannelType extends DS.ChannelType = DS.ConstantChannel<number>,
+    Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn,
+    Output extends DS.OutType = DS.NumberOut | DS.ColorOut
+  > extends Aesthetic<
+    ChannelType, Input, Output
+  > {
 
+    public default_transform : DS.Transform = 'linear';
+    constructor(
+      encoding: ChannelType | null,
+      scatterplot: DS.Plot,
+      aesthetic_map: TextureSet,
+      id: string
+    ) {
+      super(encoding, scatterplot, aesthetic_map, id);
+
+    }
+
+    get transform() : DS.Transform  {
+      if (this.encoding['transform']) {
+        return this.encoding['transform'] as DS.Transform
+      }
+      return this.default_transform;
+    }
 
 }
 
 abstract class OneDAesthetic<
-  ChannelType extends 
->extends Aesthetic {
+  ChannelType extends DS.OneDChannels,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn,
+> extends ScaledAesthetic<ChannelType, Input, DS.NumberOut> {
 
-  public _range: [number, number];
-  public abstract default_transform: DS.Transform;
-
+  public _range: [Input['jsonType'], Input['jsonType']];
+  public _domain: []
   constructor(
+    encoding: ChannelType | null,
     scatterplot: DS.Plot,
-    regl: Regl,
-    dataset: DS.Dataset,
-    aesthetic_map: TextureSet
+    aesthetic_map: TextureSet,
+    id: string
   ) {
-    super(scatterplot, regl, dataset, aesthetic_map);
+    
+    super(encoding, scatterplot, aesthetic_map, id);
+
+    if (isConstantChannel(encoding)) {
+      return
+    }
+    if (encoding.domain === undefined) {
+      encoding.domain = this.default_domain;
+    }
+    
+    if (encoding.range !== undefined) {
+      this._domain = encoding.domain;
+      this._range = encoding.range;
+    }
     this.encoding = null;
   }
 
@@ -443,7 +453,6 @@ export class Y extends PositionalAesthetic {
 export class Y0 extends Y {}
 
 abstract class BooleanAesthetic extends Aesthetic<
-
 > {
   constructor(
     scatterplot: DS.Plot,
