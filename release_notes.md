@@ -28,6 +28,7 @@ This would be a bugfix release except that it's possible this might accidentally
 - The method `Scatterplot.select_and_plot()` used to return nothing;
   it now returns the selection that it creates. This could introduce typescript 
   errors into code.
+
 # 2.14.1
 - Add exports of QuadtileDataset, ArrowDataset, Bitmask, and DataSelection classes as static methods
   on core deepscatter object. In a future release, these may become named exports: for now 
