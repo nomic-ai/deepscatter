@@ -5,7 +5,7 @@ import Scatterplot from '../deepscatter';
 abstract class ScaledAesthetic<
     ChannelType extends DS.ChannelType = DS.ConstantChannel<number>,
     Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn,
-    Output extends DS.OutType = DS.NumberOut | DS.ColorOut
+    Output extends DS.NumberOut | DS.ColorOut = DS.NumberOut
   > extends Aesthetic<
     ChannelType, Input, Output
   > {

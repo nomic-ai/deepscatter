@@ -2,7 +2,7 @@ import type { Dictionary, Float, Float32, Bool, Int, Int16, Int32, Int8, StructR
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
-import type { Tile, QuadTile } from './tile';
+import type { Tile } from './tile';
 import type Scatterplot from './deepscatter';
 import type { ReglRenderer } from './regl_rendering';
 import type { Regl, Buffer } from 'regl';
@@ -15,7 +15,6 @@ export type {
   Dataset,
   ConcreteAesthetic,
   Tile,
-  QuadTile,
 };
 
 
@@ -195,7 +194,12 @@ export type OutType = NumberOut | ColorOut | BoolOut
 
 export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
-export type NumericScaleChannel<DomainType extends JSValue = number>  = {
+type IsoDateString = 
+  `${number}-${number}-${number}` | 
+  `${number}-${number}-${number}T${number}:${number}:${number}.${number}Z`;
+
+
+export type NumericScaleChannel<DomainType extends number | IsoDateString = number>  = {
   /** The name of a column in the data table to be encoded. */
   field: string;
   /**
@@ -295,10 +299,10 @@ type CategoricalColorScale = {
 }
 
 type LinearColorScale = {
-  domain: [number, number] | [number, number, number]
+  domain: [number, number]; // TODO: | [number, number, number]
   // TODO: implement some codegen for these values
   range: 'viridis' | 'magma' | 'ylorrd'
-  transform?: "log" | "sqrt" | "linear" | "symlog"
+  transform?: "log" | "sqrt" | "linear" // TODO: | "symlog"
 }
 
 type ColorScaleChannel = 
