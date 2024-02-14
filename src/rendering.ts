@@ -4,12 +4,12 @@ import { min } from 'd3-array';
 import type Scatterplot from './deepscatter';
 import type { Tile } from './tile';
 import type Zoom from './interaction';
-import type { AestheticSet } from './AestheticSet';
+import type { AestheticSet } from './aesthetics/AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Dataset } from './Dataset';
 import type * as DS from './shared.d'
 import { Table } from 'apache-arrow';
-import { X, Y } from './Aesthetic';
+import { X, Y } from './aesthetics/Aesthetic';
 import { StatefulAesthetic } from './StatefulAesthetic';
 class PlotSetting {
   start: number;

@@ -9,7 +9,7 @@ import type { Renderer } from './rendering';
 import { ReglRenderer } from './regl_rendering';
 import { StructRowProxy } from 'apache-arrow';
 import { Rectangle } from './tile';
-import { PositionalAesthetic } from './Aesthetic';
+import { PositionalAesthetic } from './aesthetics/Aesthetic';
 import type { Dataset } from './Dataset';
 import type * as DS from './shared';
 type Annotation = {
@@ -37,9 +37,9 @@ export default class Zoom {
   public zoomer?: d3.ZoomBehavior<Element, unknown>;
   public transform?: d3.ZoomTransform;
   public _start?: number;
-  public scatterplot: DS.Plot;
+  public scatterplot: Scatterplot;
   private stopTimerAt?: number;
-  constructor(selector: string, prefs: DS.APICall, plot: DS.Plot) {
+  constructor(selector: string, prefs: DS.APICall, plot: Scatterplot) {
     // There can be many canvases that display the zoom, but
     // this is initialized with the topmost most one that
     // also registers events.

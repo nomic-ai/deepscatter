@@ -28,7 +28,6 @@ export type BufferLocation = {
 
 export type Newable<T> = { new (...args: any[]): T };
 export type PointFunction = (p : StructRowProxy) => number
-export type Plot = Scatterplot | Scatterplot;
 
 /**
  * A proxy class that wraps around tile get calls. Used to avoid

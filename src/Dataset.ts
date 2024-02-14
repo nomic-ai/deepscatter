@@ -41,8 +41,8 @@ type Transformation = DS.Transformation;
  */
 export class Dataset {
   public transformations: Record<string, Transformation> = {};
-  protected plot: DS.Plot;
-  private extents: Record<string, [number, number]> = {};
+  protected plot: Scatterplot;
+  private extents: Record<string, [number, number] | [Date, Date]> = {};
   // A 3d identifier for the tile. Usually [z, x, y]
   public _ix_seed = 0;
   public _schema?: Schema;
@@ -57,7 +57,7 @@ export class Dataset {
 
   constructor(
     base_url: string,
-    plot: DS.Plot,
+    plot: Scatterplot,
     options: DS.DatasetOptions = {}
   ) {
     this.plot = plot;
@@ -177,7 +177,7 @@ export class Dataset {
 
   static from_quadfeather(
     url: string,
-    plot: DS.Plot
+    plot: Scatterplot
   ): Dataset {
     const options = {};
     if (plot.tileProxy) {
@@ -229,44 +229,47 @@ export class Dataset {
    * This attempts to use table metadata; if that is not present,
    * it will at the first attempt calculate the min and max values.
    * 
+   * The generic T tracks whether this reads strings from JSON and return dates,
+   * or reads numbers from JSON and returns numbers
    * 
    * @param columnName A column in the dataset. 
    * @returns A pair of numbers. Dates and bigints will be
    * converted to numbers.
    */
 
-  domain(columnName: string): [number, number] {
+  domain<T extends [number, number] | [string, Date] = [number, number]>(columnName: string): [T[1], T[1]] {
+  
     if (this.extents[columnName]) {
       return this.extents[columnName];
     }
     const dim = this._schema?.fields.find((d) => d.name === columnName) as Field<DS.SupportedArrowTypes>;
     if (dim !== undefined) {
-      let min: number | string | undefined = undefined;
-      let max: number | string | undefined = undefined;
+      let min: T[0] | undefined = undefined;
+      let max: T[0] | undefined = undefined;
       const extent1 = dim.metadata.get('extent');
       if (extent1) {
-        [min, max] = JSON.parse(extent1) as [number | string, number | string];
+        [min, max] = JSON.parse(extent1) as [T[0], T[0]]
       }
       const mmin = dim.metadata.get('min');
       if (mmin) {
-        min = JSON.parse(mmin) as number | string;
+        min = JSON.parse(mmin) as T[0]
       }
       const mmax = dim.metadata.get('max');
       if (mmax) {
-        max = JSON.parse(mmax) as number | string;
+        max = JSON.parse(mmax) as T[0]
       }
       // Can pass min, max as strings for dates.
-      if (dim.type.typeId === 10 && typeof min === 'string') {
-        min = Number(new Date(min));
-      }
-      if (dim.type.typeId === 10 && typeof max === 'string') {
-        max = Number(new Date(max));
+      if (dim.type.typeId === 10) {
+        if (typeof min !== 'string' || typeof max !== 'string') {
+          throw new Error("Date field extents in metadata must be passed as strings")
+        }
+        return this.extents[columnName] = [new Date(min), new Date(max)]
       }
       if (typeof max === 'string') {
         throw new Error('Failed to parse min-max as numbers');
       }
       if (min !== undefined) {
-        return (this.extents[columnName] = [min as number, max]);
+        return (this.extents[columnName] = [min as T[1], max as T[1]] as [number, number] | [Date, Date])
       }
     }
     return (this.extents[columnName] = extent([
