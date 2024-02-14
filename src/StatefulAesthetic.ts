@@ -10,8 +10,8 @@ import {
   X0,
   Y0,
   Foreground,
-} from './Aesthetic';
-import { Color } from './ColorAesthetic';
+} from './aesthetics/Aesthetic';
+import { Color } from './aesthetics/ColorAesthetic';
 
 export const dimensions = {
   size: Size,
@@ -41,7 +41,7 @@ export type ConcreteAesthetic =
 
 import type { Dataset } from './Dataset';
 import type { Regl } from 'regl';
-import type { TextureSet } from './AestheticSet';
+import type { TextureSet } from './aesthetics/AestheticSet';
 
 export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
   /**
@@ -56,14 +56,14 @@ export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
   public states: [T, T];
   public dataset: Dataset;
   public regl: Regl;
-  public scatterplot: DS.Plot;
+  public scatterplot: Scatterplot;
   public needs_transitions = false;
   public aesthetic_map: TextureSet;
   public texture_buffers;
   public ids: [string, string];
   private factory : DS.Newable<T>;
   constructor(
-    scatterplot: DS.Plot,
+    scatterplot: Scatterplot,
     regl: Regl,
     dataset: Dataset,
     aesthetic_map: TextureSet,

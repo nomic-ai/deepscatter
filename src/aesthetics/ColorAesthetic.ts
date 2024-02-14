@@ -1,8 +1,8 @@
 import { Aesthetic, scales } from './Aesthetic';
-import type * as DS from './shared.d'
+import type * as DS from '../shared'
 
 import { range as arange, extent, shuffler } from 'd3-array';
-import { isConstantChannel, isOpChannel } from './typing';
+import { isConstantChannel, isOpChannel } from '../typing';
 import {
   scaleLinear,
   scaleSqrt,

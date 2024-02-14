@@ -1,12 +1,12 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
-import { ConcreteAesthetic, dimensions } from './StatefulAesthetic';
-import type Scatterplot from './deepscatter';
-import type { Dataset, QuadtileDataset } from './Dataset';
-import { StatefulAesthetic } from './StatefulAesthetic';
+import { ConcreteAesthetic, dimensions } from '../StatefulAesthetic';
+import type Scatterplot from '../deepscatter';
+import type { Dataset, QuadtileDataset } from '../Dataset';
+import { StatefulAesthetic } from '../StatefulAesthetic';
 import type { Aesthetic } from './Aesthetic';
-import type { Tile } from './tile';
-import type { Encoding } from './shared.d';
+import type { Tile } from '../tile';
+import type { Encoding } from '../shared';
 
 export class AestheticSet {
   public tileSet: Dataset;

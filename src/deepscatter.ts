@@ -51,7 +51,7 @@ interface AdditionalProps {
  * The core type of the module is a single scatterplot that manages
  * all data and renderering.
  */
-class Scatterplot {
+export class Scatterplot {
   public _renderer?: ReglRenderer;
   public width: number;
   public height: number;
@@ -808,8 +808,6 @@ class Scatterplot {
 
 (Scatterplot as Partial<AdditionalProps>).QuadtileDataset = Dataset;
 (Scatterplot as Partial<AdditionalProps>).DataSelection = DataSelection;
-
-export default Scatterplot;
 
 /**
  A function that can be set by a string or directly with a function

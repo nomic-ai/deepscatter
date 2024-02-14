@@ -8,7 +8,7 @@ import { Renderer } from './rendering';
 import gaussian_blur from './glsl/gaussian_blur.frag';
 import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
-import { AestheticSet } from './AestheticSet';
+import { AestheticSet } from './aesthetics/AestheticSet';
 import { rgb } from 'd3-color';
 import type * as DS from './shared'
 import type { Tile } from './tile';
@@ -16,9 +16,9 @@ import REGL from 'regl';
 import { Dataset } from './Dataset';
 import Scatterplot from './deepscatter';
 import { Bool, Data, Dictionary, Float, Int, StructRowProxy, Timestamp, Type, Utf8, Vector } from 'apache-arrow';
-import { Color } from './ColorAesthetic';
+import { Color } from './aesthetics/ColorAesthetic';
 import { StatefulAesthetic } from './StatefulAesthetic';
-import { Aesthetic, Foreground } from './Aesthetic';
+import { Aesthetic, Foreground } from './aesthetics/Aesthetic';
 
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
