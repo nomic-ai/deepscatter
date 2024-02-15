@@ -1,3 +1,6 @@
+# 2.15.3
+
+- properly clear the transformations cache when transformation-defined columns are deleted and then replaced with new transformations.
 
 # 2.15.1
 

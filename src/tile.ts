@@ -82,6 +82,10 @@ export abstract class Tile {
     if (this._batch) {
       this._buffer_manager?.release(colname);
       this._batch = add_or_delete_column(this.record_batch, colname, null);
+      if (this._batch.getChild(colname) === null) {
+        // If it was deleted, we also need to delete any promised resolutions.
+        delete this.transformation_holder[colname];
+      }
     }
   }
 
