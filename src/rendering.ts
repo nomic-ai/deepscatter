@@ -1,13 +1,13 @@
 /* eslint-disable no-underscore-dangle */
 import { select } from 'd3-selection';
 import { min } from 'd3-array';
-import type Scatterplot from './deepscatter';
+import type { Scatterplot } from './deepscatter';
 import type { Tile } from './tile';
 import type Zoom from './interaction';
 import type { AestheticSet } from './aesthetics/AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Dataset } from './Dataset';
-import type * as DS from './shared.d'
+import type * as DS from './shared.d';
 import { Table } from 'apache-arrow';
 import { X, Y } from './aesthetics/Aesthetic';
 import { StatefulAesthetic } from './StatefulAesthetic';
@@ -134,11 +134,7 @@ export class Renderer {
   public _zoom?: Zoom;
   public _initializations: Promise<void>[] = [];
   public render_props: RenderProps = new RenderProps();
-  constructor(
-    selector: string,
-    tileSet: Dataset,
-    scatterplot: Scatterplot
-  ) {
+  constructor(selector: string, tileSet: Dataset, scatterplot: Scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector);
     this.canvas = select(
@@ -162,7 +158,10 @@ export class Renderer {
    * instead of for a whole table.
    */
   get prefs() {
-    const p = { ...this.scatterplot.prefs } as DS.CompletePrefs & {arrow_table?: Table, arrow_buffer?: Uint8Array };
+    const p = { ...this.scatterplot.prefs } as DS.CompletePrefs & {
+      arrow_table?: Table;
+      arrow_buffer?: Uint8Array;
+    };
     // Delete the arrow stuff b/c serializing it is crazy expensive.
     p.arrow_table = undefined;
     p.arrow_buffer = undefined;
@@ -187,7 +186,7 @@ export class Renderer {
     const pixel_area = (width * height) / pixelRatio;
     const total_intended_points = min([
       max_ix,
-      (this.dataset.highest_known_ix) || 1e10,
+      this.dataset.highest_known_ix || 1e10,
     ]);
 
     const total_points = total_intended_points * (1 - discard_share);
@@ -226,8 +225,8 @@ export class Renderer {
     const { dataset: tileSet } = this;
     // Materialize using a tileset method.
 
-    const x = this.aes.dim('x') as StatefulAesthetic<X>
-    const y = this.aes.dim('x') as StatefulAesthetic<Y>
+    const x = this.aes.dim('x') as StatefulAesthetic<X>;
+    const y = this.aes.dim('x') as StatefulAesthetic<Y>;
     const natural_display =
       x.current.field == 'x' &&
       y.current.field == 'y' &&

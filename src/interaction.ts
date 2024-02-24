@@ -69,7 +69,7 @@ export default class Zoom {
     return this;
   }
 
-  zoom_to(k: number, x : number, y : number, duration = 4000) {
+  zoom_to(k: number, x: number, y: number, duration = 4000) {
     const scales = this.scales();
     const { svg_element_selection: canvas, zoomer, width, height } = this;
 
@@ -82,7 +82,8 @@ export default class Zoom {
   }
 
   html_annotation(points: Annotation[]) {
-    const div = this.svg_element_selection.node()!.parentNode.parentNode as unknown as string;
+    const div = this.svg_element_selection.node()!.parentNode
+      .parentNode as unknown as string;
     const els = select(div)
       .selectAll('div.tooltip')
       .data(points)
@@ -98,7 +99,10 @@ export default class Zoom {
             .style('border-radius', '8px')
             .style('padding', '10px')
             .style('background', 'ivory'),
-        (update) => update.html((d) => this.scatterplot.tooltip_html(d.data, this.scatterplot)),
+        (update) =>
+          update.html((d) =>
+            this.scatterplot.tooltip_html(d.data, this.scatterplot)
+          ),
         (exit) => exit.call((e) => e.remove())
       );
 
@@ -145,7 +149,7 @@ export default class Zoom {
         [0, 0],
         [width, height],
       ])
-      .on('zoom', (event : D3ZoomEvent<Element, unknown>) => {
+      .on('zoom', (event: D3ZoomEvent<Element, unknown>) => {
         try {
           document.getElementById('tooltipcircle').remove();
         } catch (error) {
@@ -156,7 +160,7 @@ export default class Zoom {
 
         this.scatterplot.on_zoom?.(event.transform);
         if (event.sourceEvent) {
-          (event.sourceEvent as Event).stopPropagation()
+          (event.sourceEvent as Event).stopPropagation();
         }
       });
 
@@ -174,8 +178,8 @@ export default class Zoom {
     this.scatterplot.highlit_point_change(data);
 
     const annotations: Annotation[] = data.map((d) => ({
-      x: x_(xdim.apply(d)) ,
-      y: y_(ydim.apply(d)) ,
+      x: x_(xdim.apply(d)),
+      y: y_(ydim.apply(d)),
       data: d,
       dx: 0,
       dy: 30,
@@ -216,9 +220,7 @@ export default class Zoom {
 
   add_mouseover() {
     let last_fired = 0;
-    const renderer: ReglRenderer = this.renderers.get(
-      'regl'
-    ) as ReglRenderer;
+    const renderer: ReglRenderer = this.renderers.get('regl') as ReglRenderer;
 
     this.svg_element_selection.on('mousemove', (event: MouseEvent) => {
       // Debouncing this is really important, it turns out.
@@ -247,8 +249,8 @@ export default class Zoom {
     const { x_, y_ } = scales;
 
     return {
-      x: [x_.invert(0) , x_.invert(width) ],
-      y: [y_.invert(0) , y_.invert(height) ],
+      x: [x_.invert(0), x_.invert(width)],
+      y: [y_.invert(0), y_.invert(height)],
     };
   }
 
@@ -276,10 +278,10 @@ export default class Zoom {
     return this._timer;
   }
 
-  data(dataset: undefined) : Dataset;
-  data(dataset: Dataset) : Zoom;
+  data(dataset: undefined): Dataset;
+  data(dataset: Dataset): Zoom;
 
-  data(dataset : Dataset | undefined) {
+  data(dataset: Dataset | undefined) {
     if (dataset === undefined) {
       return this.tileSet;
     }
@@ -375,24 +377,23 @@ export default class Zoom {
     // Force indicates that the tick must run even the timer metadata
     // says we are not animating.
 
-    if (
-      force !== true &&
-      this._timer &&
-      this.stopTimerAt <= Date.now()
-    ) {
+    if (force !== true && this._timer && this.stopTimerAt <= Date.now()) {
       this._timer.stop();
     }
   }
 }
 
-export function window_transform(x_scale: ScaleLinear<number, number, never>, y_scale : ScaleLinear<number, number, never>) {
+export function window_transform(
+  x_scale: ScaleLinear<number, number, never>,
+  y_scale: ScaleLinear<number, number, never>
+) {
   // width and height are svg parameters; x and y scales project from the data x and y into the
   // the webgl space.
 
   // Given two d3 scales in coordinate space, create two matrices that project from the original
   // space into [-1, 1] webgl space.
 
-  function gap(array : number[]) {
+  function gap(array: number[]) {
     // Return the magnitude of a scale.
     return array[1] - array[0];
   }
@@ -406,8 +407,8 @@ export function window_transform(x_scale: ScaleLinear<number, number, never>, y_
   // translates from data space to scaled space.
   const m1 = [
     // transform by the scale;
-    [xmulti, 0, -xmulti * x_mid + (mean(x_scale.range()))],
-    [0, ymulti, -ymulti * y_mid + (mean(y_scale.range()))],
+    [xmulti, 0, -xmulti * x_mid + mean(x_scale.range())],
+    [0, ymulti, -ymulti * y_mid + mean(y_scale.range())],
     [0, 0, 1],
   ];
   // Note--at the end, you need to multiply by this matrix.

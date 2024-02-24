@@ -38,7 +38,7 @@
 </head>
 
 <script type="module">
-  import Scatterplot from './src/deepscatter';
+  import {Scatterplot} from './src/deepscatter';
   import { select } from 'd3-selection';
   window.select = select; // For the click function below.
   const prefs = {
@@ -89,6 +89,7 @@
   ];
 
   const scatterplot = new Scatterplot('#deepscatter');
+  window.scatterplot = scatterplot;
   scatterplot.plotAPI(prefs).then((d) => scatterplot.plotAPI(prefs));
   window.plot = scatterplot; // For debugging
   // Simple animation demonstration.

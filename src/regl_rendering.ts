@@ -10,12 +10,23 @@ import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './aesthetics/AestheticSet';
 import { rgb } from 'd3-color';
-import type * as DS from './shared'
+import type * as DS from './shared';
 import type { Tile } from './tile';
 import REGL from 'regl';
 import { Dataset } from './Dataset';
-import Scatterplot from './deepscatter';
-import { Bool, Data, Dictionary, Float, Int, StructRowProxy, Timestamp, Type, Utf8, Vector } from 'apache-arrow';
+import { Scatterplot } from './deepscatter';
+import {
+  Bool,
+  Data,
+  Dictionary,
+  Float,
+  Int,
+  StructRowProxy,
+  Timestamp,
+  Type,
+  Utf8,
+  Vector,
+} from 'apache-arrow';
 import { Color } from './aesthetics/ColorAesthetic';
 import { StatefulAesthetic } from './StatefulAesthetic';
 import { Aesthetic, Foreground } from './aesthetics/Aesthetic';
@@ -41,13 +52,17 @@ export class ReglRenderer extends Renderer {
   public textures: Record<string, Texture2D> = {};
   public _fill_buffer?: Buffer;
   public contour_vals?: Uint8Array;
-  public contour_alpha_vals? : Float32Array | Uint8Array | Uint16Array;
+  public contour_alpha_vals?: Float32Array | Uint8Array | Uint16Array;
   public tick_num?: number;
   public reglframe?: REGL.Cancellable;
   public _integer_buffer?: Buffer;
   //  public _renderer :  Renderer;
 
-  constructor(selector : string | Node, tileSet: Dataset, scatterplot: Scatterplot) {
+  constructor(
+    selector: string | Node,
+    tileSet: Dataset,
+    scatterplot: Scatterplot
+  ) {
     super(selector, tileSet, scatterplot);
     const c = this.canvas;
     if (this.canvas === undefined) {
@@ -114,12 +129,15 @@ export class ReglRenderer extends Renderer {
     } = this;
     const { transform } = this.zoom;
     const colorScales = this.aes.dim('color');
-    const [currentColor, lastColor] = [colorScales.current as Color, colorScales.last as Color];
+    const [currentColor, lastColor] = [
+      colorScales.current as Color,
+      colorScales.last as Color,
+    ];
     // This allows us to wrap categorical scales according to the number
     // of categories.
     const wrap_colors_after = [
       lastColor.colorscheme_size,
-      currentColor.colorscheme_size
+      currentColor.colorscheme_size,
     ] as [number, number];
     const props = {
       // Copy the aesthetic as a string.
@@ -170,10 +188,11 @@ export class ReglRenderer extends Renderer {
     // Regl is faster if it can render a large number of draw calls together.
     const prop_list = [];
     let call_no = 0;
-    const foreground = this.aes.dim('foreground') as StatefulAesthetic<Foreground>;
+    const foreground = this.aes.dim(
+      'foreground'
+    ) as StatefulAesthetic<Foreground>;
     const needs_background_pass =
-      (foreground.states[0].active) ||
-      (foreground.states[1].active);
+      foreground.states[0].active || foreground.states[1].active;
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
       tile._buffer_manager =
@@ -818,7 +837,8 @@ export class ReglRenderer extends Renderer {
         //        buffer_1: this.integer_buffer
       }, // Filled below.
       uniforms: {
-        //@ts-ignore
+
+        //@ts-expect-error Doesn't know about regl.
         u_update_time: regl.prop('update_time'),
         u_transition_duration(_, props) {
           return props.prefs.duration; // Using seconds, not milliseconds, in there
@@ -836,7 +856,7 @@ export class ReglRenderer extends Renderer {
           if (wrap_colors_after === undefined) {
             throw new Error('wrap_colors_after is undefined');
           }
-          return wrap_colors_after
+          return wrap_colors_after;
         },
         u_use_glyphset: (_, { prefs }) => (prefs.glyph_set ? 1 : 0),
         u_glyphset: (_, { prefs }) => {
@@ -845,7 +865,7 @@ export class ReglRenderer extends Renderer {
           }
           return this.textures.empty_texture;
         },
-        //@ts-ignore
+        //@ts-expect-error Don't know about regl preps.
         u_color_picker_mode: regl.prop('color_picker_mode'),
         u_position_interpolation_mode() {
           // 1 indicates that there should be a continuous loop between the two points.
@@ -986,7 +1006,7 @@ export class ReglRenderer extends Renderer {
           if (t === 'sqrt') return 2;
           if (t === 'log') return 3;
           if (t === 'literal') return 4;
-          throw 'Invalid transform';
+          throw `Invalid transform for ${k} of ${t}` 
         };
         parameters.uniforms[`u_${temporal}${k}_constant`] = () => {
           return this.aes.dim(k)[time].constant;
@@ -1223,7 +1243,7 @@ export class TileBufferManager {
       throw new Error('Tile table not present.');
     }
 
-    type ColumnType = Vector<Dictionary<Utf8> | Float | Bool | Int | Timestamp>
+    type ColumnType = Vector<Dictionary<Utf8> | Float | Bool | Int | Timestamp>;
     let column = tile.record_batch.getChild(key) as null | ColumnType;
 
     if (!column) {
@@ -1252,7 +1272,7 @@ export class TileBufferManager {
       );
     }
 
-    if (!column.type || !(column.type.typeId)) {
+    if (!column.type || !column.type.typeId) {
       throw new Error(`Column ${key} has no type.`);
     }
     // Anything that isn't a single-precision float must be coerced to one.

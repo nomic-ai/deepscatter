@@ -1,8 +1,8 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
-import { ConcreteAesthetic, dimensions } from '../StatefulAesthetic';
-import type Scatterplot from '../deepscatter';
-import type { Dataset, QuadtileDataset } from '../Dataset';
+import { dimensions } from '../StatefulAesthetic';
+import type { Scatterplot } from '../deepscatter';
+import type { Dataset } from '../Dataset';
 import { StatefulAesthetic } from '../StatefulAesthetic';
 import type { Aesthetic } from './Aesthetic';
 import type { Tile } from '../tile';
@@ -16,11 +16,7 @@ export class AestheticSet {
   public position_interpolation: boolean;
   private store: Record<string, StatefulAesthetic<any>>;
   public aesthetic_map: TextureSet;
-  constructor(
-    scatterplot: Scatterplot,
-    regl: Regl,
-    tileSet: Dataset
-  ) {
+  constructor(scatterplot: Scatterplot, regl: Regl, tileSet: Dataset) {
     this.scatterplot = scatterplot;
     this.store = {};
     this.regl = regl;
@@ -87,26 +83,28 @@ export class AestheticSet {
       throw new Error('filter1 is not supported; just say "filter"');
     }
     // TODO: Remove this awfulness. It's part of a transition in 2.15.0.
-    const colorDomain : undefined | [number, number] = encoding.color && encoding.color.domain ? encoding.color['domain'] : undefined;
-    if (colorDomain && colorDomain.length == 2 ) {
+    const colorDomain: undefined | [number, number] =
+      encoding.color && encoding.color.domain
+        ? encoding.color['domain']
+        : undefined;
+    if (colorDomain && colorDomain.length == 2) {
       if (Math.abs(colorDomain[1] - colorDomain[0] - 4096) < 2) {
         console.warn(`Resetting color encoding from -2047 to 0. The old behavior of requiring negative numbers 
           for dictionary schemes is deprecated. If you're actually trying to encode real numbers here, not a dictionary, change to [-4100, 4100] 
           until a future update.
-        `); 
+        `);
         encoding.color['domain'] = [0, 4096];
       }
     }
     // Overwrite position fields.
     this.interpret_position(encoding);
-    for (const k of Object.keys(dimensions as const)) {
-      this.dim(k).update(encoding[k]);
+    for (const k of Object.keys(dimensions)) {
+      this.dim(k as keyof dimensions).update(encoding[k]);
     }
   }
 }
 
 export class TextureSet {
-
   /**
    * A texture set manages memory allocation for scales. It's mostly 
   used for handling color aesthetics (through the set_color function)
@@ -136,7 +134,7 @@ export class TextureSet {
   public set_one_d(id: string, value: number[] | Uint8Array | Float32Array) {
     // id: a unique identifier for the specific aesthetic.
     // value: the array to stash onto the texture.
-    let offset : number;
+    let offset: number;
     const { offsets } = this;
     if (offsets[id]) {
       offset = offsets[id];
@@ -158,7 +156,7 @@ export class TextureSet {
   }
 
   public set_color(id: string, value: Uint8Array) {
-    let offset : number;
+    let offset: number;
     const { offsets } = this;
     if (offsets[id]) {
       offset = offsets[id];

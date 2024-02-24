@@ -1,5 +1,5 @@
 import { Aesthetic, scales } from './Aesthetic';
-import type * as DS from '../shared'
+import type * as DS from '../shared';
 
 import { range as arange, extent, shuffler } from 'd3-array';
 import { isConstantChannel, isOpChannel } from '../typing';
@@ -19,7 +19,10 @@ import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 const palette_size = 4096;
 import { randomLcg } from 'd3-random';
-import { Dictionary, Int, Int32, Utf8, Vector } from 'apache-arrow';
+import { Dictionary, Int, Int32, StructRowProxy, Utf8, Vector } from 'apache-arrow';
+import { ScaledAesthetic } from './ScaledAesthetic';
+import Scatterplot from 'deepscatter';
+import { TextureSet } from './AestheticSet';
 
 function materialize_color_interpolator(
   interpolator: (t: number) => string
@@ -48,7 +51,11 @@ function palette_from_color_strings(colors: readonly string[]): Uint8Array {
 
   const repeat_each = Math.floor(palette_size / colors.length);
   for (let i = 0; i < colors.length; i++) {
-    for (let j = 0; j < repeat_each && (i * repeat_each + j < palette_size); j++) {
+    for (
+      let j = 0;
+      j < repeat_each && i * repeat_each + j < palette_size;
+      j++
+    ) {
       output.set(scheme[i], (i * repeat_each + j) * 4);
     }
   }
@@ -86,7 +93,6 @@ for (const schemename of [
   ];
   color_palettes['okabe'] = palette_from_color_strings(okabe_palette);
   schemes['okabe'] = okabe_palette;
-
 }
 
 const d3Interpolators = [
@@ -140,19 +146,44 @@ for (const interpolator of d3Interpolators) {
     color_palettes.shufbow = shuffle(color_palettes[name]);
   }
 }
-export class Color extends Aesthetic<
-  [number, number, number],
-  string,
-  DS.ColorChannel
+export class Color<
+  ChannelType extends DS.ChannelType,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
+> extends ScaledAesthetic<
+  ChannelType,
+  Input,
+  DS.ColorOut
 > {
   _constant = '#CC5500';
   public texture_type = 'uint8';
   public default_constant = '#CC5500';
   default_transform: DS.Transform = 'linear';
-  get default_range(): [number, number] {
-    return [0, 1];
+
+
+
+  constructor(encoding: ChannelType, scatterplot: Scatterplot, map: TextureSet, id:string) {
+    super(encoding, scatterplot, map, id);
+    this.current_encoding = encoding;
+    if (encoding === null) {
+      encoding = {
+        constant: this.default_constant,
+      };
+    }
+    if (!isConstantChannel(encoding)) {
+      if (encoding.range && typeof encoding.range[0] === 'string') {
+        this.encode_for_textures(encoding.range);
+        this.post_to_regl_buffer();
+      } else if (encoding.range) {
+        this.post_to_regl_buffer();
+      }
+    }
   }
-  current_encoding: null | DS.ColorChannel = null;
+
+
+  get default_range(): [string, string] {
+    return ["white", "blue"];
+  }
+  current_encoding: null | ChannelType = null;
   default_data(): Uint8Array {
     return color_palettes.viridis;
   }
@@ -161,13 +192,19 @@ export class Color extends Aesthetic<
     return 1 as const;
   }
 
-  get colorscheme_size() : number {
+  get colorscheme_size(): number {
     if (this.is_dictionary()) {
-      return ((this.scale).range().length as unknown as number);
+      return this.scale.range().length as unknown as number;
     }
     return -1;
   }
 
+  apply(v: StructRowProxy) : string {
+    if (this.encoding === null || this.field === null) {
+
+    }
+    return this.scale(v[this.field] as Input['domainType'])
+  }
   get scale() {
     if (this._scale) {
       return this._scale;
@@ -187,7 +224,8 @@ export class Color extends Aesthetic<
     if (this.is_dictionary()) {
       const scale = scaleOrdinal().domain(this.domain);
       if (typeof range === 'string' && schemes[range]) {
-        const dictionary = this.arrow_column().data[0].dictionary as Vector<Utf8>;
+        const dictionary = this.arrow_column().data[0]
+          .dictionary as Vector<Utf8>;
         if (dictionary === null) {
           throw new Error('Dictionary is null');
         }
@@ -203,8 +241,10 @@ export class Color extends Aesthetic<
     // If not a dictionary, it's a different type.
     if (typeof range == 'string') {
       // Convert range from 'viridis' to InterpolateViridis.
-      const k = 'interpolate' + capitalize(range) as keyof d3Chromatic
-      const interpolator = d3Chromatic[k] as typeof d3Chromatic.interpolateViridis;
+      const k = ('interpolate' + capitalize(range)) as keyof d3Chromatic;
+      const interpolator = d3Chromatic[
+        k
+      ] as typeof d3Chromatic.interpolateViridis;
       if (interpolator !== undefined) {
         // linear maps to nothing, but.
         // scaleLinear, and scaleLog but
@@ -239,23 +279,6 @@ export class Color extends Aesthetic<
     this.aesthetic_map.set_color(this.id, this.texture_buffer);
   }
 
-  update(encoding: DS.ColorChannel) {
-    super.update(encoding);
-    this.current_encoding = encoding;
-    if (encoding === null) {
-      encoding = {
-        constant: this.default_constant,
-      };
-    }
-    if (!isConstantChannel(encoding)) {
-      if (encoding.range && typeof encoding.range[0] === 'string') {
-        this.encode_for_textures(encoding.range);
-        this.post_to_regl_buffer();
-      } else if (encoding.range) {
-        this.post_to_regl_buffer();
-      }
-    }
-  }
 
   toGLType(color: string) {
     const { r, g, b } = rgb(color);
@@ -270,7 +293,7 @@ export class Color extends Aesthetic<
         return;
       } else {
         let palette: Uint8Array;
-        if (!this.is_dictionary()) {          
+        if (!this.is_dictionary()) {
           palette = palette_from_color_strings(range);
         } else {
           // We need to find the integer identifiers for each of
@@ -303,7 +326,7 @@ export class Color extends Aesthetic<
       return;
     }
     if (range.length === this.aesthetic_map.texture_size * 4) {
-      throw new Error('SETTING FULL RANGE IS DEPRECATED')
+      throw new Error('SETTING FULL RANGE IS DEPRECATED');
     }
     console.error(`request range of ${range} for color ${this.field} unknown`);
   }

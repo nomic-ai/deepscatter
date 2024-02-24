@@ -1,11 +1,11 @@
 import type { GeoJsonObject, GeoJsonProperties } from 'geojson';
 import { Renderer } from './rendering';
 import { BBox, RBush3D } from 'rbush-3d';
-import Scatterplot from './deepscatter';
+import { Scatterplot } from './deepscatter';
 import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
-import type * as DS from './shared'
+import type * as DS from './shared';
 const handler = drag();
 
 function pixel_ratio(scatterplot: Scatterplot): number {
@@ -44,7 +44,9 @@ export class LabelMaker extends Renderer {
   ) {
     super(scatterplot.div.node(), scatterplot._root, scatterplot);
     this.options = options;
-    this.canvas = scatterplot.elements[2].selectAll('canvas').node() as HTMLCanvasElement;
+    this.canvas = scatterplot.elements[2]
+      .selectAll('canvas')
+      .node() as HTMLCanvasElement;
     const svg = scatterplot.elements[3].selectAll('svg').node() as SVGElement;
     const id = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, '---');
     const labgroup = svg.querySelectorAll(`#${id}`);
@@ -185,7 +187,7 @@ export class LabelMaker extends Renderer {
     const bboxes = select(this.labelgroup)
       .selectAll('rect.labelbbox')
       // Keyed by the coordinates.
-      .data(overlaps, (d : BBox) => String(d.minZ) + String(d.minX))
+      .data(overlaps, (d: BBox) => String(d.minZ) + String(d.minX))
       .join((enter) =>
         enter
           .append('rect')
@@ -231,7 +233,9 @@ export class LabelMaker extends Renderer {
         context.strokeStyle = '#71797E';
       } else if (datum.properties[dim.field]) {
         const exists =
-          (dim.scale.domain!() as string[]).indexOf(datum.properties[dim.field]) > -1;
+          (dim.scale.domain!() as string[]).indexOf(
+            datum.properties[dim.field]
+          ) > -1;
         if (exists) {
           context.shadowColor = dim.scale(datum.properties[dim.field]);
           context.strokeStyle = dim.scale(datum.properties[dim.field]);

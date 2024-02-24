@@ -24,9 +24,9 @@ import {
   Int16,
   Int32,
   Int8,
-  tableToIPC
+  tableToIPC,
 } from 'apache-arrow';
-import Scatterplot from './deepscatter';
+import { Scatterplot } from './deepscatter';
 import { wrapArrowTable } from './wrapArrow';
 
 type Key = string;
@@ -64,8 +64,7 @@ export class Dataset {
     this.tileProxy = options.tileProxy;
     this.root_tile = new Tile('0/0/0', null, this, base_url);
     const download = this.root_tile.download();
-    this.promise = download.then(
-      (d) => {
+    this.promise = download.then((d) => {
       const schema = this.root_tile.record_batch.schema;
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
@@ -99,7 +98,7 @@ export class Dataset {
   }
 
   /**
-   * Ensures that all the tiles in a dataset are downloaded that include 
+   * Ensures that all the tiles in a dataset are downloaded that include
    * datapoints of index less than or equal to max_ix.
    * @param max_ix the depth to download to.
    */
@@ -117,17 +116,17 @@ export class Dataset {
 
   /**
    * This allows creation of a new column in your chart.
-   * 
+   *
    * A few thngs to be aware of: the point function may be run millions of times.
    * For best performance, you should not wrap complicated
    * logic in this: instead, generate any data structures outside the function.
-   * 
+   *
    * name: the name to identify the new column in the data.
    * pointFunction: a function that runs on a single row of data. It accepts a single
    * argument, the data point to be transformed: technically this is a StructRowProxy
    * on the underlying Arrow frame, but for most purposes you can treat it as a dict.
    * The point is read-only--you cannot change attributes.
-   * 
+   *
    * For example: suppose you have a ['lat', 'long'] column in your data and want to create a
    * new set of geo coordinates for your data. You can run the following.
    * {
@@ -139,24 +138,28 @@ export class Dataset {
    *  return scale([datum.long, datum.lat])[1]
    * })
    * }
-   * 
-   * Note some constraints: the scale is created *outside* the functions, to avoid the 
+   *
+   * Note some constraints: the scale is created *outside* the functions, to avoid the
    * overhead of instantiating it every time; and the x and y coordinates are created separately
-   * with separate function calls, because it's not possible to assign to both x and y simultaneously. 
+   * with separate function calls, because it's not possible to assign to both x and y simultaneously.
    */
 
-  register_transformation(name: string, pointFunction : DS.PointFunction, prerequisites : string[] = []) {
-    const transform : Transformation = async(tile : Tile) => {
-      // 
-      await Promise.all(prerequisites.map(key => tile.get_column(key)))
-      const returnVal = new Float32Array(tile.record_batch.numRows)
+  register_transformation(
+    name: string,
+    pointFunction: DS.PointFunction,
+    prerequisites: string[] = []
+  ) {
+    const transform: Transformation = async (tile: Tile) => {
+      //
+      await Promise.all(prerequisites.map((key) => tile.get_column(key)));
+      const returnVal = new Float32Array(tile.record_batch.numRows);
       let i = 0;
       for (const row of tile.record_batch) {
-        returnVal[i] = pointFunction(row)
+        returnVal[i] = pointFunction(row);
         i++;
       }
-      return returnVal
-    }
+      return returnVal;
+    };
 
     this.transformations[name] = transform;
   }
@@ -175,17 +178,13 @@ export class Dataset {
     );
   }
 
-  static from_quadfeather(
-    url: string,
-    plot: Scatterplot
-  ): Dataset {
+  static from_quadfeather(url: string, plot: Scatterplot): Dataset {
     const options = {};
     if (plot.tileProxy) {
       options['tileProxy'] = plot.tileProxy;
     }
     return new Dataset(url, plot, options);
   }
-
 
   /**
    * Generate an ArrowDataset from a single Arrow table.
@@ -195,11 +194,8 @@ export class Dataset {
    * @param plot The Scatterplot to use.
    * @returns
    */
-  static from_arrow_table(
-    table: Table,
-    plot: Scatterplot
-  ): Dataset {
-    return wrapArrowTable(tableToIPC(table), plot)
+  static from_arrow_table(table: Table, plot: Scatterplot): Dataset {
+    return wrapArrowTable(tableToIPC(table), plot);
   }
 
   /**
@@ -213,7 +209,7 @@ export class Dataset {
       name in this.transformations
     );
   }
-  
+
   delete_column_if_exists(name: string) {
     // This is a complicated operation to actually free up memory.
     // Clone the record batches, without this data;
@@ -228,59 +224,70 @@ export class Dataset {
    * Returns the minimum and maximum values for a named column.
    * This attempts to use table metadata; if that is not present,
    * it will at the first attempt calculate the min and max values.
-   * 
+   *
    * The generic T tracks whether this reads strings from JSON and return dates,
    * or reads numbers from JSON and returns numbers
-   * 
-   * @param columnName A column in the dataset. 
+   *
+   * @param columnName A column in the dataset.
    * @returns A pair of numbers. Dates and bigints will be
    * converted to numbers.
    */
 
-  domain<T extends [number, number] | [string, Date] = [number, number]>(columnName: string): [T[1], T[1]] {
-  
+  domain<T extends [number, number] | [string, Date] = [number, number]>(
+    columnName: string
+  ): [T[1], T[1]] {
     if (this.extents[columnName]) {
       return this.extents[columnName];
     }
-    const dim = this._schema?.fields.find((d) => d.name === columnName) as Field<DS.SupportedArrowTypes>;
+    const dim = this._schema?.fields.find(
+      (d) => d.name === columnName
+    ) as Field<DS.SupportedArrowTypes>;
     if (dim !== undefined) {
       let min: T[0] | undefined = undefined;
       let max: T[0] | undefined = undefined;
       const extent1 = dim.metadata.get('extent');
       if (extent1) {
-        [min, max] = JSON.parse(extent1) as [T[0], T[0]]
+        [min, max] = JSON.parse(extent1) as [T[0], T[0]];
       }
       const mmin = dim.metadata.get('min');
       if (mmin) {
-        min = JSON.parse(mmin) as T[0]
+        min = JSON.parse(mmin) as T[0];
       }
       const mmax = dim.metadata.get('max');
       if (mmax) {
-        max = JSON.parse(mmax) as T[0]
+        max = JSON.parse(mmax) as T[0];
       }
       // Can pass min, max as strings for dates.
       if (dim.type.typeId === 10) {
         if (typeof min !== 'string' || typeof max !== 'string') {
-          throw new Error("Date field extents in metadata must be passed as strings")
+          throw new Error(
+            'Date field extents in metadata must be passed as strings'
+          );
         }
-        return this.extents[columnName] = [new Date(min), new Date(max)]
+        return (this.extents[columnName] = [new Date(min), new Date(max)]);
       }
       if (typeof max === 'string') {
         throw new Error('Failed to parse min-max as numbers');
       }
       if (min !== undefined) {
-        return (this.extents[columnName] = [min as T[1], max as T[1]] as [number, number] | [Date, Date])
+        return (this.extents[columnName] = [min as T[1], max as T[1]] as
+          | [number, number]
+          | [Date, Date]);
       }
     }
     return (this.extents[columnName] = extent([
-      ...new Vector(this.map(d => d).filter(d => d.ready).map( d =>
-        d.record_batch.getChild(columnName)).filter(d => d !== null)
-      )]))
+      ...new Vector(
+        this.map((d) => d)
+          .filter((d) => d.ready)
+          .map((d) => d.record_batch.getChild(columnName))
+          .filter((d) => d !== null)
+      ),
+    ]));
   }
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {
     const stack: Tile[] = [this.root_tile];
-    let current : Tile;
+    let current: Tile;
     while ((current = stack.shift())) {
       if (
         current.download_state == 'Complete' &&
@@ -336,7 +343,7 @@ export class Dataset {
 
     const stack: Tile[] = [this.root_tile];
     const after_stack = [];
-    let current : Tile;
+    let current: Tile;
     while ((current = stack.shift())) {
       if (!after) {
         callback(current);
@@ -358,7 +365,7 @@ export class Dataset {
     }
   }
 
- /**
+  /**
    * Invoke a function on all tiles in the dataset, downloading those that aren't 
    * here yet..
    * The general architecture here is taken from the
@@ -370,102 +377,41 @@ export class Dataset {
    * @param filter 
    */
 
-    async visit_full(
-      callback: (tile: Tile) => Promise<void>,
-      after = false,
-      starting_tile : Tile | null = null,
-      filter: (t: Tile) => boolean = (x) => true,
-      updateFunction: (tile: Tile, completed, total) => Promise<void>
-    ) {
+  async visit_full(
+    callback: (tile: Tile) => Promise<void>,
+    after = false,
+    starting_tile: Tile | null = null,
+    filter: (t: Tile) => boolean = (x) => true,
+    updateFunction: (tile: Tile, completed, total) => Promise<void>
+  ) {
+    // Visit all children with a callback function.
+    // In general recursing quadtrees isn't that fast, but
+    // we rarely have more than ten tiles deep and the
+    // code is much cleaner this way than an async queue.
 
-      // Visit all children with a callback function.
-      // In general recursing quadtrees isn't that fast, but
-      // we rarely have more than ten tiles deep and the
-      // code is much cleaner this way than an async queue.
+    let seen = 0;
+    const start = starting_tile || this.root_tile;
+    await start.download();
+    const total_points = JSON.parse(
+      start.record_batch.schema.metadata.get('total_points')
+    ) as number;
 
-      let seen = 0;
-      const start = starting_tile || this.root_tile;
-      await start.download();
-      const total = JSON.parse(start.record_batch.schema.metadata.get("total_points"))
-     
-      async function resolve(tile: Tile) {
-        await tile.download();
-        if (after) {
-          await Promise.all(tile.children.map(resolve))
-          await callback(tile);
-          seen += tile.record_batch.numRows
-          void updateFunction(tile, seen, total)
-        } else {
-          await callback(tile);
-          seen += tile.record_batch.numRows
-          void updateFunction(tile, seen, total)
-          await Promise.all(tile.children.map(resolve))
-        }
-      }
-      await resolve(start);
-    }
-  /**
-
-   * @param callback The function to invoke on each tile.
-   * @param after Whether to execute the visit in bottom-up order. Default false.
-   * @param filter 
-   */
-  async visit_complete(
-      callback: (tile: Tile) => void,
-      starting_tile: Tile | null,
-      after = false,
-      filter: (t: Tile) => boolean = (x) => true,
-      progress_function : (executed_points: number, total_points: number) => unknown = (executed_points: number, total_points: number) => undefined
-   ) {
-      // Visit all children with a callback function.
-  
-      function get_tile(t: Tile) {
-        await t.download()
-        return t
-      }
-
-      const stack: Tile[] = [starting_tile || this.root_tile];
-      const total_points = stack[0];
-
-      // A list of unfetched promises.
-      const async_stack = new AsyncQueue<Tile[]>([])
-      const after_stack = [];
-
-      let current : Tile;
-      while (stack.length > 0) {
-        current = stack.shift()
-        if (!after) {
-          callback(current);
-          progress_function()
-        } else {
-          after_stack.push(current);
-        }
-        if (!filter(current)) {
-          continue;
-        }
-        // Only create children for downloaded tiles.
-        if (current.download_state == 'Complete') {
-          stack.push(...current.children);
-        } else {
-          async function download(tile) {
-            await tile.download()
-            return tile.children;
-          }
-          async_stack.add(download(current))
-        }
-        // Race to complete from the stack. Wrapped in a 
-        // while loop because a tile might have no children.
-        while (stack.length === 0 && async_stack.length > 0) {
-          stack.concat(await async_stack.apop())
-        }
-      }
+    async function resolve(tile: Tile) {
+      await tile.download();
       if (after) {
-        while ((current = after_stack.pop() as Tile)) {
-          callback(current);
-        }
+        await Promise.all(tile.children.map(resolve));
+        await callback(tile);
+        seen += tile.record_batch.numRows;
+        void updateFunction(tile, seen, total_points);
+      } else {
+        await callback(tile);
+        seen += tile.record_batch.numRows;
+        void updateFunction(tile, seen, total_points);
+        await Promise.all(tile.children.map(resolve));
       }
->>>>>>> 4e7f14a (more type schanges)
     }
+    await resolve(start);
+  }
 
   async schema() {
     await this.ready;
@@ -486,16 +432,18 @@ export class Dataset {
     const records: Record<string, Float32Array> = {};
     for (const batch of tb.batches) {
       const data = batch.getChild('data').data[0];
-      if (data === null) {throw new Error('tiled columns must contain "data" field.')}
-      const offsets = data.valueOffsets ;
+      if (data === null) {
+        throw new Error('tiled columns must contain "data" field.');
+      }
+      const offsets = data.valueOffsets;
       const values = data.children[0] as Data<List<Float32>>;
       for (let i = 0; i < batch.data.length; i++) {
         const tilename = batch.getChild('_tile').get(i) as string;
         records[tilename] = values.values.slice(
           offsets[i],
           offsets[i + 1]
-        // Type coercion necessary because Float[]
-        // and the backing Float32Array are not recognized as equivalent.
+          // Type coercion necessary because Float[]
+          // and the backing Float32Array are not recognized as equivalent.
         ) as unknown as Float32Array;
       }
     }
@@ -673,7 +621,7 @@ export class Dataset {
     const macrotile_tasks: Record<string, Promise<void>> = {};
     const records: Record<string, ArrowBuildable> = {};
 
-    async function get_table(tile: Tile)  {
+    async function get_table(tile: Tile) {
       const { macrotile } = tile;
       if (macrotile_tasks[macrotile] !== undefined) {
         return await macrotile_tasks[macrotile];
@@ -682,10 +630,12 @@ export class Dataset {
           (buffer) => {
             const tb = tableFromIPC(buffer);
             for (const batch of tb.batches) {
-              const data = batch.getChild('data') as Vector<List<DS.SupportedArrowTypes>>
+              const data = batch.getChild('data') as Vector<
+                List<DS.SupportedArrowTypes>
+              >;
               for (let i = 0; i < batch.data.length; i++) {
                 const tilename = batch.getChild('_tile').get(i) as string;
-                records[tilename] = data.get(i)
+                records[tilename] = data.get(i);
               }
             }
             return;
@@ -786,32 +736,51 @@ export function add_or_delete_column(
   }
   if (data !== null) {
     if (data instanceof Float32Array) {
-      tb[field_name] = makeVector({ type: new Float32(), data, length: data.length }).data[0];
+      tb[field_name] = makeVector({
+        type: new Float32(),
+        data,
+        length: data.length,
+      }).data[0];
     } else if (data instanceof BigInt64Array) {
-      tb[field_name] = makeVector({ type: new Int64(), data, length: data.length }).data[0];
+      tb[field_name] = makeVector({
+        type: new Int64(),
+        data,
+        length: data.length,
+      }).data[0];
     } else if (data instanceof Uint8Array) {
-      tb[field_name] = makeVector({ type: new Uint8(), data, length: data.length }).data[0];
+      tb[field_name] = makeVector({
+        type: new Uint8(),
+        data,
+        length: data.length,
+      }).data[0];
     } else if ((data as Vector<DS.SupportedArrowTypes>).data.length > 0) {
       let newval = data.data[0];
       if (newval.dictionary) {
         const dicto = newval as Data<Dictionary<Utf8, Int8 | Int16 | Int32>>;
         const dictionary_id = max([0, ...batch.schema.dictionaries.keys()]) + 1;
         const newv = makeVector({
-          data: dicto.values,  // indexes into the dictionary
+          data: dicto.values, // indexes into the dictionary
           dictionary: dicto.dictionary as Vector<Utf8>, // keys
-          type: new Dictionary(dicto.type.dictionary, dicto.type.indices, dictionary_id) // increment the identifier.
+          type: new Dictionary(
+            dicto.type.dictionary,
+            dicto.type.indices,
+            dictionary_id
+          ), // increment the identifier.
         });
         newval = newv.data[0];
       }
       tb[field_name] = newval;
     } else {
-      console.warn(`Unknown data format object passed to add or remove columns--treating as Data, but this behavior is deprecated`, data)
-      // Stopgap--maybe somewhere there are 
-      tb[field_name] = data as unknown as Data
+      console.warn(
+        `Unknown data format object passed to add or remove columns--treating as Data, but this behavior is deprecated`,
+        data
+      );
+      // Stopgap--maybe somewhere there are
+      tb[field_name] = data as unknown as Data;
     }
   }
 
-  const new_batch = new RecordBatch(tb)
+  const new_batch = new RecordBatch(tb);
   for (const [k, v] of batch.schema.metadata) {
     new_batch.schema.metadata.set(k, v);
   }
@@ -874,7 +843,7 @@ function supplement_identifiers(
     }
     return updatedFloatArray;
   }
-  // 
+  //
   const hashtab = new Set();
 
   for (const item of Object.keys(ids)) {
@@ -898,48 +867,49 @@ function supplement_identifiers(
   return updatedFloatArray;
 }
 
-
 class AsyncQueue<T> {
   private promises: Promise<T>[] = [];
 
   constructor(promises: Promise<T>[] = []) {
-    this.promises.concat(promises)
+    this.promises.concat(promises);
   }
 
   add(promise: Promise<T>): void {
     // Add a promise onto the queue.
-      this.promises.push(promise);
+    this.promises.push(promise);
   }
 
   private removeFromArray(item: Promise<T>): void {
-      const index = this.promises.indexOf(item);
-      if (index > -1) {
-          this.promises.splice(index, 1);
-      }
+    const index = this.promises.indexOf(item);
+    if (index > -1) {
+      this.promises.splice(index, 1);
+    }
   }
 
   async apop(): Promise<T> {
     /**
      * Pop the first promise to resolve off the queue.
      */
-      if (this.promises.length === 0) {
-          throw new Error("No promises to race");
-      }
+    if (this.promises.length === 0) {
+      throw new Error('No promises to race');
+    }
 
-      return new Promise((resolve, reject) => {
-          this.promises.forEach(promise => {
-              promise.then((value) => {
-                  this.removeFromArray(promise);
-                  resolve(value);
-              }).catch((error) => {
-                  this.removeFromArray(promise);
-                  reject(error);
-              });
+    return new Promise((resolve, reject) => {
+      this.promises.forEach((promise) => {
+        promise
+          .then((value) => {
+            this.removeFromArray(promise);
+            resolve(value);
+          })
+          .catch((error) => {
+            this.removeFromArray(promise);
+            reject(error);
           });
       });
+    });
   }
 
   get length(): number {
-      return this.promises.length;
+    return this.promises.length;
   }
 }

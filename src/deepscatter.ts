@@ -3,7 +3,12 @@ import { max, range } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
-import { tableFromIPC, type StructRowProxy, vectorFromArray, Table } from 'apache-arrow';
+import {
+  tableFromIPC,
+  type StructRowProxy,
+  vectorFromArray,
+  Table,
+} from 'apache-arrow';
 import { Dataset } from './Dataset';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
@@ -12,7 +17,12 @@ import type { ConcreteAesthetic } from './StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { Bitmask, DataSelection } from './selection';
 import { dictionaryFromArrays } from './utilityFunctions';
-import type { BooleanColumnParams, CompositeSelectParams, FunctionSelectParams, IdSelectParams } from './selection';
+import type {
+  BooleanColumnParams,
+  CompositeSelectParams,
+  FunctionSelectParams,
+  IdSelectParams,
+} from './selection';
 import type * as DS from './shared.d';
 import { wrapArrowTable } from './wrapArrow';
 // DOM elements that deepscatter uses.
@@ -60,9 +70,9 @@ export class Scatterplot {
   public secondary_renderers: Record<string, Renderer> = {};
   public selection_history: DS.SelectionRecord[] = [];
   public tileProxy?: DS.TileProxy;
-  public util : Record<string, (unknown) => unknown> = {
+  public util: Record<string, (unknown) => unknown> = {
     dictionaryFromArrays,
-    vectorFromArray
+    vectorFromArray,
   };
   div: Selection<any, any, any, any>;
   bound: boolean;
@@ -92,7 +102,12 @@ export class Scatterplot {
    * @param width The width of the scatterplot (in pixels)
    * @param height The height of the scatterplot (in pixels)
    */
-  constructor(selector: string, width: number, height: number, options: DS.ScatterplotOptions = {}) {
+  constructor(
+    selector: string,
+    width: number,
+    height: number,
+    options: DS.ScatterplotOptions = {}
+  ) {
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
@@ -111,7 +126,7 @@ export class Scatterplot {
       this.tileProxy = options.tileProxy;
     }
     if (options.dataset) {
-      void this.load_dataset(options.dataset)
+      void this.load_dataset(options.dataset);
     }
     this.prefs = { ...default_API_call } as DS.CompletePrefs;
   }
@@ -165,43 +180,63 @@ export class Scatterplot {
         el.append('g').attr('id', 'mousepoints');
         el.append('g').attr('id', 'labelrects');
       }
-      this.elements.push(container as unknown as Selection<SVGSetElement, any, any, any>);
+      this.elements.push(
+        container as unknown as Selection<SVGSetElement, any, any, any>
+      );
     }
     this.bound = true;
   }
 
   /**
    * Creates a new selection from a set of parameters, and immediately applies it to the plot.
-   * @param params A set of parameters defining a selection. 
-  */
-  async select_and_plot(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams, duration=this.prefs.duration) : Promise<DataSelection> {
-    const selection = await this.select_data(params)
-    await selection.ready
+   * @param params A set of parameters defining a selection.
+   */
+  async select_and_plot(
+    params: IdSelectParams | BooleanColumnParams | FunctionSelectParams,
+    duration = this.prefs.duration
+  ): Promise<DataSelection> {
+    const selection = await this.select_data(params);
+    await selection.ready;
     await this.plotAPI({
       duration,
       encoding: {
         foreground: {
           field: selection.name,
           op: 'eq',
-          a: 1
-        }
-      }
-     })
-     return selection;
+          a: 1,
+        },
+      },
+    });
+    return selection;
   }
   /**
-   * 
+   *
    * @param params A set of parameters for selecting data based on ids, a boolean column, or a function.
    * @returns A DataSelection object that can be used to extend the selection.
-   * 
+   *
    * See `select_and_plot` for a method that will select data and plot it.
    */
-  async select_data(params: IdSelectParams | BooleanColumnParams | FunctionSelectParams | CompositeSelectParams) {
-    if (params.useNameCache && params.name && this.selection_history.length > 0) {
-      const old_version = this.selection_history.find((x) => x.name === params.name);
+  async select_data(
+    params:
+      | IdSelectParams
+      | BooleanColumnParams
+      | FunctionSelectParams
+      | CompositeSelectParams
+  ) {
+    if (
+      params.useNameCache &&
+      params.name &&
+      this.selection_history.length > 0
+    ) {
+      const old_version = this.selection_history.find(
+        (x) => x.name === params.name
+      );
       // If we have a cached version, move the cached version to the end and return it.
       if (old_version) {
-        this.selection_history = [...this.selection_history.filter((x) => x.name !== params.name), old_version];
+        this.selection_history = [
+          ...this.selection_history.filter((x) => x.name !== params.name),
+          old_version,
+        ];
         return old_version.selection;
       }
     }
@@ -222,15 +257,13 @@ export class Scatterplot {
    *   **or** a keyed of values like `{'Rome': 3, 'Vienna': 13}` in which case the numeric values will be used.
    * @param key_field The field in which to look for the identifiers.
    */
-  join(
-    name: string,
-    codes: Record<string, number>,
-    key_field: string
-  ) {
-    let true_codes: Record<string, number> 
-    
+  join(name: string, codes: Record<string, number>, key_field: string) {
+    let true_codes: Record<string, number>;
+
     if (Array.isArray(codes)) {
-      true_codes = Object.fromEntries(codes.map((next : string | bigint) => [String(next), 1]))
+      true_codes = Object.fromEntries(
+        codes.map((next: string | bigint) => [String(next), 1])
+      );
     } else {
       this._root.add_label_identifiers(true_codes, name, key_field);
     }
@@ -326,17 +359,23 @@ export class Scatterplot {
     );
   }
 
-
-  async load_dataset(
-    params: DS.DataSpec
-  ) : Promise<DS.Dataset> {
+  async load_dataset(params: DS.DataSpec): Promise<DS.Dataset> {
     if (params.source_url !== undefined) {
-      this._root = Dataset.from_quadfeather(params.source_url, this as unknown as Scatterplot) as unknown as Dataset;
+      this._root = Dataset.from_quadfeather(
+        params.source_url,
+        this as unknown as Scatterplot
+      ) as unknown as Dataset;
     } else if (params.arrow_table !== undefined) {
-      this._root = Dataset.from_arrow_table(params.arrow_table, this as unknown as Scatterplot) as unknown as Dataset;
+      this._root = Dataset.from_arrow_table(
+        params.arrow_table,
+        this as unknown as Scatterplot
+      ) as unknown as Dataset;
     } else if (params.arrow_buffer !== undefined) {
       const tb = tableFromIPC(params.arrow_buffer);
-      this._root = Dataset.from_arrow_table(tb, this as unknown as Scatterplot) as unknown as Dataset;
+      this._root = Dataset.from_arrow_table(
+        tb,
+        this as unknown as Scatterplot
+      ) as unknown as Dataset;
     } else {
       throw new Error('No source_url or arrow_table specified');
     }
@@ -362,7 +401,14 @@ export class Scatterplot {
 
     // Needs the zoom built as well.
 
-    const bkgd = select('#container-for-canvas-2d-background').select('canvas') as Selection<HTMLCanvasElement, unknown, HTMLDivElement, HTMLCanvasElement>;
+    const bkgd = select('#container-for-canvas-2d-background').select(
+      'canvas'
+    ) as Selection<
+      HTMLCanvasElement,
+      unknown,
+      HTMLDivElement,
+      HTMLCanvasElement
+    >;
     const ctx = bkgd.node().getContext('2d');
 
     ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
@@ -410,10 +456,12 @@ export class Scatterplot {
      * loaded tiles. Useful for debugging and illustration.
      */
 
-    const canvas = this.elements[2].selectAll('canvas').node() as HTMLCanvasElement;
-    
-    const ctx = canvas.getContext('2d')
-    
+    const canvas = this.elements[2]
+      .selectAll('canvas')
+      .node() as HTMLCanvasElement;
+
+    const ctx = canvas.getContext('2d');
+
     // as CanvasRenderingContext2D;
 
     ctx.clearRect(0, 0, 10_000, 10_000);
@@ -526,7 +574,7 @@ export class Scatterplot {
     return this.tooltip_handler.f;
   }
 
-  set label_click(func : (d: Record<string, unknown>) => void) {
+  set label_click(func: (d: Record<string, unknown>) => void) {
     this.label_click_handler.f = func;
   }
 
@@ -587,7 +635,7 @@ export class Scatterplot {
     // If there's not a transition time, things might get weird and a flicker
     // is probably OK. Using the *current* transition time means that the start
     // of a set of duration-0 calls (like, e.g., dragging a time slider) will
-    // block but that 
+    // block but that
     return new Promise((resolve) => {
       if (this.prefs.duration < delay) {
         delay = this.prefs.duration;
@@ -662,10 +710,16 @@ export class Scatterplot {
       return;
     }
     if (prefs.click_function) {
-      this.click_function = Function('datum', prefs.click_function) as RowFunction<void>;
+      this.click_function = Function(
+        'datum',
+        prefs.click_function
+      ) as RowFunction<void>;
     }
     if (prefs.tooltip_html) {
-      this.tooltip_html = Function('datum', prefs.tooltip_html) as RowFunction<string>;
+      this.tooltip_html = Function(
+        'datum',
+        prefs.tooltip_html
+      ) as RowFunction<string>;
     }
 
     if (prefs.background_options) {
@@ -690,10 +744,13 @@ export class Scatterplot {
     this.update_prefs(prefs);
 
     if (this._root === undefined) {
-      const { source_url, arrow_table, arrow_buffer } = (prefs as DS.InitialAPICall);
+      const { source_url, arrow_table, arrow_buffer } =
+        prefs as DS.InitialAPICall;
       const dataSpec = { source_url, arrow_table, arrow_buffer } as DS.DataSpec;
       if (Object.values(dataSpec).filter((x) => x !== undefined).length !== 1) {
-        throw new Error('The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer');
+        throw new Error(
+          'The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer'
+        );
       }
       await this.load_dataset(dataSpec);
     }
@@ -702,13 +759,13 @@ export class Scatterplot {
       for (const [k, v] of Object.entries(prefs.transformations)) {
         const func = Function('datum', v) as unknown as DS.PointFunction;
         if (!this.dataset.transformations[k]) {
-          this.dataset.register_transformation(k, func)
+          this.dataset.register_transformation(k, func);
         } else {
-          console.log("Already", k, v)
+          console.log('Already', k, v);
         }
       }
     }
-    
+
     if (this._zoom === undefined) {
       await this.reinitialize();
     }
@@ -734,7 +791,7 @@ export class Scatterplot {
       this._renderer.apply_webgl_scale(prefs);
     }
     if (this._renderer.reglframe) {
-      const r = this._renderer.reglframe
+      const r = this._renderer.reglframe;
       r.cancel();
       this._renderer.reglframe = undefined;
     }
@@ -749,12 +806,16 @@ export class Scatterplot {
         const name = (prefs.labels.name || url) as string;
         if (!this.secondary_renderers[name]) {
           this.stop_labellers();
-          this.add_labels_from_url(url, name, label_field, size_field, {}).catch(
-            (error) => {
-              console.error('Label addition failed.');
-              console.error(error);
-            }
-          );
+          this.add_labels_from_url(
+            url,
+            name,
+            label_field,
+            size_field,
+            {}
+          ).catch((error) => {
+            console.error('Label addition failed.');
+            console.error(error);
+          });
         }
       } else if (isLabelset(prefs.labels)) {
         if (!prefs.labels.name) {
@@ -783,7 +844,7 @@ export class Scatterplot {
    * Return the current state of the query. Can be used to save an API
    * call for use programatically.
    */
-  get query() : DS.APICall {
+  get query(): DS.APICall {
     const p = JSON.parse(JSON.stringify(this.prefs)) as DS.APICall;
     p.zoom = { bbox: this._renderer.zoom.current_corners() };
     return p;
@@ -812,13 +873,8 @@ export class Scatterplot {
 /**
  A function that can be set by a string or directly with a function
 */
-abstract class SettableFunction<
-  FuncType,
-  ArgType = StructRowProxy,
-> {
-  public _f:
-    | undefined
-    | ((datum: ArgType, plot: Scatterplot) => FuncType);
+abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
+  public _f: undefined | ((datum: ArgType, plot: Scatterplot) => FuncType);
   public string_rep: string;
   public plot: Scatterplot;
   constructor(plot: Scatterplot) {
@@ -834,7 +890,7 @@ abstract class SettableFunction<
     }
     return this._f;
   }
-  
+
   set f(f: string | ((datum: ArgType, plot: Scatterplot) => FuncType)) {
     if (typeof f === 'string') {
       if (this.string_rep !== f) {
@@ -888,14 +944,14 @@ class ClickFunction extends SettableFunction<void> {
 class ChangeToHighlitPointFunction extends SettableFunction<
   void,
   StructRowProxy[]
-  > {
-    default(points: StructRowProxy[], plot : Scatterplot = undefined) {
-      return;
-    }
+> {
+  default(points: StructRowProxy[], plot: Scatterplot = undefined) {
+    return;
   }
+}
 
 class TooltipHTML extends SettableFunction<string> {
-  default(point: StructRowProxy, plot : Scatterplot = undefined) {
+  default(point: StructRowProxy, plot: Scatterplot = undefined) {
     // By default, this returns a
     let output = '<dl>';
     const nope: Set<string | null | number | symbol> = new Set([
@@ -924,5 +980,7 @@ class TooltipHTML extends SettableFunction<string> {
   }
 }
 
-
-type RowFunction<T> = (datum: StructRowProxy, plot : Scatterplot | undefined) => T
+type RowFunction<T> = (
+  datum: StructRowProxy,
+  plot: Scatterplot | undefined
+) => T;
