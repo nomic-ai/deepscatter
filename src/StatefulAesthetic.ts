@@ -1,17 +1,20 @@
-import type * as DS from './shared.d'
+import type * as DS from './shared.d';
+import { Aesthetic } from './aesthetics/Aesthetic';
+
 import {
-  Aesthetic,
   X,
   Y,
   Size,
   Jitter_speed,
   Jitter_radius,
-  Filter,
   X0,
   Y0,
-  Foreground,
-} from './aesthetics/Aesthetic';
+} from './aesthetics/ScaledAesthetic';
+
+import { Filter, Foreground } from './aesthetics/BooleanAesthetic';
+
 import { Color } from './aesthetics/ColorAesthetic';
+import { Scatterplot } from './deepscatter';
 
 export const dimensions = {
   size: Size,
@@ -43,13 +46,19 @@ import type { Dataset } from './Dataset';
 import type { Regl } from 'regl';
 import type { TextureSet } from './aesthetics/AestheticSet';
 
-export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
+export class StatefulAesthetic<
+  T extends Aesthetic<
+    DS.ChannelType,
+    DS.InType,
+    DS.OutType
+  >
+> {
   /**
    * A stateful aesthetic holds the history and associated resources for an encoding
    * channel. It holds two Aesthetic objects: the current and the previous scales. These
    * are used for things like smoothly generating interpolated paths between a previous color and a new one.
-   * 
-   * While Aesthetics can be created and destroyed willfully, the stateful aesthetic also holds 
+   *
+   * While Aesthetics can be created and destroyed willfully, the stateful aesthetic also holds
    * a number of memory resources that it is important not to re-allocate willy-nilly. Each encoding
    * channel in a scatterplot has exactly on StatefulAesthetic that persists for the lifetime of the Plot.
    */
@@ -61,7 +70,7 @@ export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
   public aesthetic_map: TextureSet;
   public texture_buffers;
   public ids: [string, string];
-  private factory : DS.Newable<T>;
+  private factory: DS.Newable<T>;
   constructor(
     scatterplot: Scatterplot,
     regl: Regl,
@@ -77,24 +86,19 @@ export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
     this.dataset = dataset;
     this.aesthetic_map = aesthetic_map;
     this.factory = Factory;
-    this.ids = [
-      Math.random().toString(),
-      Math.random().toString()
-    ]
+    this.ids = [Math.random().toString(), Math.random().toString()];
     this.states = [
       new Factory(
+        null, 
         this.scatterplot,
-        this.regl,
-        this.dataset,
         this.aesthetic_map,
-        null
+        this.ids[0]
       ),
       new Factory(
+        null, 
         this.scatterplot,
-        this.regl,
-        this.dataset,
         this.aesthetic_map,
-        null
+        this.ids[1]
       ),
     ] as [T, T];
   }
@@ -107,7 +111,7 @@ export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
     return this.states[1];
   }
 
-  update(encoding: DS.Channel) {
+  update(encoding: DS.ChannelType) {
     const stringy = JSON.stringify(encoding);
     // Overwrite the last version.
     if (
@@ -126,16 +130,14 @@ export class StatefulAesthetic<T extends Aesthetic<any, any, any, any> {
       // Flip the current encoding to the second position.
       this.states.reverse();
       this.ids.reverse();
-      // replace the first encoding with a new one 
+      // replace the first encoding with a new one
       // with the same id (so it will reuse the same buffers)
       this.states[0] = new this.factory(
         encoding,
         this.scatterplot,
-        this.regl,
-        this.dataset,
         this.aesthetic_map,
         this.ids[0]
-      )
+      );
       this.needs_transitions = true;
     }
   }

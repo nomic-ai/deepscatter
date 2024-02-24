@@ -55,12 +55,12 @@ export class Tile {
   codes: number[];
   _already_called = false;
   public child_locations: string[] = [];
-  
+
   constructor(
     key: string,
     parent: Tile | null,
     dataset: Dataset,
-    base_url: string,
+    base_url: string
   ) {
     this.key = key;
     this.promise = Promise.resolve();
@@ -74,6 +74,7 @@ export class Tile {
     // Grab the next identifier off the queue. This should be async safe with the current setup, but
     // the logic might fall apart in truly parallel situations.
     this.numeric_id = tile_identifier++;
+    this.url = base_url;
   }
 
   delete_column_if_exists(colname: string) {
@@ -98,7 +99,7 @@ export class Tile {
     throw new Error(`Column ${colname} not found`);
   }
 
-  private transformation_holder : Record<string, Promise<void>> = {};
+  private transformation_holder: Record<string, Promise<void>> = {};
 
   async apply_transformation(name: string): Promise<void> {
     if (this.transformation_holder[name] !== undefined) {
@@ -109,14 +110,18 @@ export class Tile {
       throw new Error(`Transformation ${name} is not defined`);
     }
 
-    this.transformation_holder[name] = Promise
-      .resolve(transform(this))
-      .then((transformed) => {
+    this.transformation_holder[name] = Promise.resolve(transform(this)).then(
+      (transformed) => {
         if (transformed === undefined) {
           throw new Error(`Transformation ${name} failed`);
         }
-        this._batch = add_or_delete_column(this.record_batch, name, transformed);
-      })
+        this._batch = add_or_delete_column(
+          this.record_batch,
+          name,
+          transformed
+        );
+      }
+    );
     return this.transformation_holder[name];
   }
 
@@ -178,7 +183,7 @@ export class Tile {
         }
       }
     } else {
-      throw new Error("Sorted iteration not supported")
+      throw new Error('Sorted iteration not supported');
       /*
       let children = this.children.map((tile) => {
         const f = {
@@ -265,7 +270,6 @@ export class Tile {
     return this.promise;
   }
 
-
   protected get _schema() {
     // Infer datatypes from the first file.
     if (this.__schema) {
@@ -329,7 +333,6 @@ export class Tile {
     }
   }
 
-
   get extent(): Rectangle {
     if (this._extent) {
       return this._extent;
@@ -351,7 +354,6 @@ export class Tile {
     return this.parent.root_extent;
   }
 
-
   async download_to_depth(max_ix: number): Promise<void> {
     /**
      * Recursive fetch all tiles up to a certain depth. Triggers many unnecessary calls: prefer
@@ -367,7 +369,7 @@ export class Tile {
 
   async get_arrow(
     suffix: string | undefined = undefined
-  ): Promise<RecordBatch> {
+  ): Promise<RecordBatch> {    
     // By default fetches .../0/0/0.feather
     // But if you pass a suffix, gets
     // 0/0/0.suffix.feather
@@ -381,16 +383,17 @@ export class Tile {
     let tb: Table;
     let buffer: ArrayBuffer;
 
-    if (this.dataset.tileProxy !== undefined) { 
+    if (this.dataset.tileProxy !== undefined) {
       const endpoint = new URL(url).pathname;
-      // This method apiCall is crafted to match the 
+      // This method apiCall is crafted to match the
       // ts-nomic package.
-      const bytes = await this.dataset.tileProxy.apiCall(endpoint, 
-        "GET", 
+      const bytes = await this.dataset.tileProxy.apiCall(
+        endpoint,
+        'GET',
         null,
         null,
-        {octetStreamAsUint8 : true}
-        );
+        { octetStreamAsUint8: true }
+      );
       tb = tableFromIPC(bytes);
     } else {
       //TODO: Remove outdated atlas-specific code.
@@ -435,7 +438,7 @@ export class Tile {
 
     this._already_called = true;
     this.download_state = 'In progress';
-    return this._download = this.get_arrow()
+    return (this._download = this.get_arrow()
       .then((batch) => {
         this.ready = true;
         const metadata = batch.schema.metadata;
@@ -468,7 +471,7 @@ export class Tile {
         `);
         console.warn(error);
         throw error;
-      });
+      }));
   }
 
   /**
@@ -504,9 +507,10 @@ export class Tile {
 
   get theoretical_extent(): Rectangle {
     // QUADTREE SPECIFIC CODE.
-    if (this.codes.length !== 3) {
+
+    if (this.codes === undefined || this.codes.length !== 3) {
       // Only three-length-keys are treated as quadtrees.
-      return this.parent.extent;
+      return this.dataset.extent;
     }
     const base = this.dataset.extent;
     const [z, x, y] = this.codes;
@@ -574,7 +578,6 @@ function macrotile_descendants(
 }
 
 function children(tile: string) {
-  
   const [z, x, y] = tile.split('/').map((d) => parseInt(d)) as [
     number,
     number,

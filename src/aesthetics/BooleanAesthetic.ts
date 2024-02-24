@@ -1,6 +1,20 @@
+import type * as DS from '../shared';
+import { Aesthetic, Datum } from './Aesthetic';
+import { Scatterplot } from '../deepscatter';
+import type { TextureSet } from './AestheticSet';
 
-abstract class BooleanAesthetic extends Aesthetic<
-> {
+import { isConstantChannel, isTransform } from '../typing';
+import { Float, Int, Timestamp } from 'apache-arrow';
+
+
+abstract class BooleanAesthetic<
+  ChannelType extends DS.OpChannel<Timestamp | Float | Int> | DS.ConstantChannel<boolean> | DS.LambdaChannel<string | number | boolean>,
+  Input extends DS.InType
+>extends Aesthetic<
+    ChannelType,
+    Input,
+    DS.BoolOut
+  > {
   constructor(
     scatterplot: Scatterplot,
     regl: Regl,
@@ -16,10 +30,7 @@ abstract class BooleanAesthetic extends Aesthetic<
   update(encoding: DS.BooleanChannel | null) {
     super.update(encoding);
 
-    if (
-      this.encoding !== null &&
-      Object.keys(this.encoding).length === 0
-    ) {
+    if (this.encoding !== null && Object.keys(this.encoding).length === 0) {
       this.encoding = null;
     }
   }
@@ -56,13 +67,17 @@ abstract class BooleanAesthetic extends Aesthetic<
     }
     if (isConstantChannel(channel)) {
       // TODO: TS
-      if (channel.constant as unknown as number === 0) {
-        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers")
-        return false
+      if ((channel.constant as unknown as number) === 0) {
+        console.warn(
+          'Deprecated: pass `true` or `false` to boolean fields, not numbers'
+        );
+        return false;
       }
-      if (channel.constant as unknown as number === 1) {
-        console.warn("Deprecated: pass `true` or `false` to boolean fields, not numbers")
-        return true
+      if ((channel.constant as unknown as number) === 1) {
+        console.warn(
+          'Deprecated: pass `true` or `false` to boolean fields, not numbers'
+        );
+        return true;
       }
       return channel.constant;
     }
@@ -114,7 +129,7 @@ abstract class BooleanAesthetic extends Aesthetic<
  * background points will be plotted with much less resolution.
  */
 export class Foreground extends BooleanAesthetic {
-  public encoding : DS.BooleanChannel = null;
+  public encoding: DS.BooleanChannel = null;
   _constant = true;
   default_constant = true;
   default_range = [0, 1] as [number, number];
@@ -122,10 +137,7 @@ export class Foreground extends BooleanAesthetic {
   get active(): boolean {
     // We need to test if the foreground aesthetic is in use.
     // because otherwise it consumes two draw calls.
-    if (
-      this.encoding === null ||
-      isConstantChannel(this.encoding)
-    ) {
+    if (this.encoding === null || isConstantChannel(this.encoding)) {
       return false;
     }
     return true;

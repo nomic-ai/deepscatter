@@ -1,7 +1,7 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "2.15.2-RC-0",
+  "version": "3.0.0-beta",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
     "dist"

@@ -1,11 +1,9 @@
-
-
-import type * as DS from './shared.d'
-const transforms = new Set(['linear', 'sqrt', 'log', 'literal'])
+import type * as DS from './shared.d';
+const transforms = new Set(['linear', 'sqrt', 'log', 'literal']);
 
 export function isTransform(input: unknown): input is DS.Transform {
   if (typeof input === 'string' && transforms.has(input)) {
-    return true
+    return true;
   }
   return false;
 }
@@ -14,14 +12,16 @@ export function isOpChannel(input: DS.ChannelType): input is DS.OpChannel<any> {
   return input['op'] !== undefined;
 }
 
-export function isLambdaChannel(input: DS.ChannelType): input is DS.LambdaChannel<any> {
+export function isLambdaChannel(
+  input: DS.ChannelType
+): input is DS.LambdaChannel<any> {
   return input['lambda'] !== undefined;
 }
 
 export function isConstantChannel(
   input: DS.ChannelType
 ): input is DS.ConstantChannel<string | number | boolean> {
-  return input['constant'] !== undefined
+  return input['constant'] !== undefined;
 }
 
 export function isURLLabels(labels: DS.Labelcall): labels is DS.URLLabels {
