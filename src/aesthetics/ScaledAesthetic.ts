@@ -13,8 +13,7 @@ import {
   ScaleOrdinal,
 } from 'd3-scale';
 import { isConstantChannel, isTransform } from '../typing';
-import { Dictionary, Int, Int32, Type, Utf8, Vector } from 'apache-arrow';
-import { Regl } from 'regl';
+import { Dictionary, Int32, Type, Utf8, Vector } from 'apache-arrow';
 
 export const scales = {
   sqrt: scaleSqrt,
@@ -102,8 +101,9 @@ export abstract class ScaledAesthetic<
     }
     return values as Input['domainType'][];
   }
+
   // TODO: this class can handle integer and booleans passed as well.
-  protected populateCategoricalScale(encoding) {
+  protected populateCategoricalScale() {
 
     this._scale = (scaleOrdinal() as ScaleOrdinal<
       Input['domainType'],
@@ -189,17 +189,19 @@ abstract class OneDAesthetic<
     super(encoding, scatterplot, aesthetic_map, id);
   }
 
+  protected _func?: (d: Input['domainType']) => number;
   apply(point: Datum) {
-    if (this.field === null) {
-      return this.constant;
+    const constant = isConstantChannel(this.encoding) ? this.encoding.constant : this.default_constant
+    if (this.field === null || isConstantChannel(this.encoding)) {
+      return constant;
     }
     const value = point[this.field] as Input['domainType'];
-    if (value === undefined) {
-      return this.constant;
+    if (value === undefined || value === null) {
+      return constant;
     }
-    if (this.categorical)
-    return this.scale(value);
+    if (this.categorical) return this.scale(value);
   }
+
   toGLType(a: number) {
     return a;
   }
@@ -209,33 +211,25 @@ abstract class OneDAesthetic<
   }
 }
 
-export class Size extends OneDAesthetic {
-  static get default_constant() {
-    return 1.5;
-  }
-  _constant = 1;
-  default_constant = 1;
+export class Size<
+  ChannelType extends DS.OneDChannels = DS.OneDChannels,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
+  > extends OneDAesthetic<ChannelType, Input> {
+  default_constant = 1.5;
   get default_range() {
-    return [0, 1] as [number, number];
+    return [0, 1.5] as [number, number];
   }
   default_transform: DS.Transform = 'sqrt';
 }
 
-export abstract class PositionalAesthetic extends OneDAesthetic {
+export abstract class PositionalAesthetic<
+  ChannelType extends DS.OneDChannels = DS.OneDChannels,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
+  > extends OneDAesthetic<ChannelType, Input> {
   default_range: [number, number] = [-1, 1];
   default_constant = 0;
   default_transform: DS.Transform = 'literal';
-
-  _constant = 0;
   
-  constructor(
-    encoding: DS.OneDChannels,
-    scatterplot: Scatterplot,
-    texture_set: TextureSet,
-    id: string
-    ) {
-    super(encoding, scatterplot, texture_set, id);
-  }
   get range(): [number, number] {
     if (this.encoding && this.encoding['range']) {
       return this.encoding['range'] as [number, number]
@@ -244,25 +238,20 @@ export abstract class PositionalAesthetic extends OneDAesthetic {
     }
     return this.default_range;
   }
-
-  static get default_constant() {
-    return 0;
-  }
 }
 
-export class X extends PositionalAesthetic {
-  field = 'x' as const;
-}
+export const X = PositionalAesthetic;
 
-export class X0 extends X {}
+export const X0 = X;
 
-export class Y extends PositionalAesthetic {
-  field = 'y' as const;
-}
+export const Y = PositionalAesthetic;
 
-export class Y0 extends Y {}
+export const Y0 = PositionalAesthetic
 
-export class Jitter_speed extends OneDAesthetic {
+export class Jitter_speed<
+  ChannelType extends DS.OneDChannels = DS.OneDChannels,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
+  > extends OneDAesthetic<ChannelType, Input> {
   default_transform: DS.Transform = 'linear';
   default_range: [number, number] = [0, 1];
   public default_constant = 0.5;

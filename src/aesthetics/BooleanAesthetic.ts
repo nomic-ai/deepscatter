@@ -2,58 +2,68 @@ import type * as DS from '../shared';
 import { Aesthetic, Datum } from './Aesthetic';
 import { Scatterplot } from '../deepscatter';
 import type { TextureSet } from './AestheticSet';
-
-import { isConstantChannel, isTransform } from '../typing';
-import { Float, Int, Timestamp } from 'apache-arrow';
-
+import { isConstantChannel, isLambdaChannel, isOpChannel } from '../typing';
 
 abstract class BooleanAesthetic<
-  ChannelType extends DS.OpChannel<Timestamp | Float | Int> | DS.ConstantChannel<boolean> | DS.LambdaChannel<string | number | boolean>,
+  ChannelType extends DS.OpChannel<number | DS.IsoDateString> | DS.ConstantChannel<boolean> | DS.LambdaChannel<DS.JSValue, string | number | boolean>,
   Input extends DS.InType
 >extends Aesthetic<
     ChannelType,
     Input,
     DS.BoolOut
   > {
+  protected _func : ((d: Input['domainType']) => boolean)
   constructor(
+    encoding: ChannelType | null,
     scatterplot: Scatterplot,
-    regl: Regl,
-    tile: DS.Dataset,
-    map: TextureSet
+    aesthetic_map: TextureSet,
+    id: string
   ) {
-    super(scatterplot, regl, tile, map);
+    super(encoding, scatterplot, aesthetic_map, id);
+    if (isLambdaChannel(encoding)) {
+      this._func = encoding.lambda as ((d: Input['domainType']) => boolean);
+    }
   }
+
   toGLType(a: boolean) {
     return a ? 1 : 0;
   }
 
-  update(encoding: DS.BooleanChannel | null) {
-    super.update(encoding);
-
-    if (this.encoding !== null && Object.keys(this.encoding).length === 0) {
-      this.encoding = null;
+  convertOpDatesToNumbers(channel: DS.OpChannel<DS.IsoDateString | number>) : [number, number] {
+    if (typeof channel.a === 'number') {
+      return [channel.a, channel['b'] === undefined ? -1 : channel['b']] as [number, number]
     }
+    const vals = [+new Date(channel.a), -1] as [number, number]
+    if (channel['b']) {
+      vals[1] = +new Date(channel['b'] as DS.IsoDateString)
+    }
+    return vals
   }
 
-  ops_to_array(): DS.OpArray {
+  // Operations to be applied on the GPU are referenced by passing a function 
+  // index in the first position, and the two permitted operatnds
+  // in the second and third positions.
+  ops_to_array(): [number, number, number] {
     const input = this.encoding;
     if (input === null) return [0, 0, 0];
     if (input === undefined) return [0, 0, 0];
     if (!isOpChannel(input)) {
       return [0, 0, 0];
     }
+    const [a, b] = this.convertOpDatesToNumbers(input);
     if (input.op === 'within') {
-      return [4, input.a, input.b];
+
+      return [4, a, b];
     }
     if (input.op === 'between') {
-      return [4, (input.b - input.a) / 2, (input.b + input.a) / 2];
+      return [4, (b - a) / 2, (b - a) / 2];
     }
-    const val: DS.OpArray = [
+    const val = [
       // Encoding of op as number.
       [null, 'lt', 'gt', 'eq'].indexOf(input.op),
-      input.a,
+      a,
       0,
-    ];
+    ] as [number, number, number];
     return val;
   }
 
@@ -63,21 +73,11 @@ abstract class BooleanAesthetic<
       return true;
     }
     if (isOpChannel(channel)) {
-      return this.apply_op(point, channel);
+      return this.apply_op(point);
     }
     if (isConstantChannel(channel)) {
-      // TODO: TS
-      if ((channel.constant as unknown as number) === 0) {
-        console.warn(
-          'Deprecated: pass `true` or `false` to boolean fields, not numbers'
-        );
-        return false;
-      }
-      if ((channel.constant as unknown as number) === 1) {
-        console.warn(
-          'Deprecated: pass `true` or `false` to boolean fields, not numbers'
-        );
-        return true;
+      if (channel.constant !== true && channel.constant !== false) {
+        throw new Error('Constant channel must be boolean');
       }
       return channel.constant;
     }
@@ -97,9 +97,14 @@ abstract class BooleanAesthetic<
     return true;
   }
 
-  apply_op(point: Datum, channel: DS.OpChannel): boolean {
-    const { op, a } = channel;
-    const p = this.value_for(point) as number;
+  apply_op(point: Datum): boolean {
+    if (!isOpChannel(this.encoding)) {
+      throw new Error('This should have been checked');
+    }
+    const encoding = this.encoding;
+    const { op } = this.encoding;
+    const [a, b] = this.convertOpDatesToNumbers(encoding);
+    const p = +this.value_for(point);
     if (p === null) {
       return false;
     }
@@ -110,10 +115,10 @@ abstract class BooleanAesthetic<
     } else if (op === 'lt') {
       return p < a;
     } else if (op === 'within') {
-      return Math.abs(p - channel.b) < a;
+      return Math.abs(p - b) < a;
     } else if (op === 'between') {
-      const mid = (channel.a + channel.b) / 2;
-      const diff = Math.abs(channel.a - channel.b) / 2;
+      const mid = (a + b) / 2;
+      const diff = Math.abs(a - b) / 2;
       return Math.abs(p - mid) < diff;
     }
     return false;
@@ -128,12 +133,12 @@ abstract class BooleanAesthetic<
  * plotted in the front of the screen: by default
  * background points will be plotted with much less resolution.
  */
-export class Foreground extends BooleanAesthetic {
-  public encoding: DS.BooleanChannel = null;
-  _constant = true;
+export class Foreground<
+  ChannelType extends DS.OpChannel<number | DS.IsoDateString> | DS.ConstantChannel<boolean> | DS.LambdaChannel<DS.JSValue, string | number | boolean>,
+  Input extends DS.InType
+  > extends BooleanAesthetic<ChannelType, Input>  {
   default_constant = true;
-  default_range = [0, 1] as [number, number];
-  default_transform: DS.Transform = 'literal';
+  default_range: [false, true] = [false, true]
   get active(): boolean {
     // We need to test if the foreground aesthetic is in use.
     // because otherwise it consumes two draw calls.
@@ -144,10 +149,10 @@ export class Foreground extends BooleanAesthetic {
   }
 }
 
-export class Filter extends BooleanAesthetic {
-  public encoding = null;
-  _constant = true;
+export class Filter<
+  ChannelType extends DS.OpChannel<number | DS.IsoDateString> | DS.ConstantChannel<boolean> | DS.LambdaChannel<DS.JSValue, string | number | boolean>,
+  Input extends DS.InType
+> extends BooleanAesthetic<ChannelType, Input> {
   default_constant = true;
-  default_transform: DS.Transform = 'literal';
-  default_range: [number, number] = [0, 1];
+  default_range: [false, true] = [false, true]
 }

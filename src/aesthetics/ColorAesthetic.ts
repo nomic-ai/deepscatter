@@ -1,27 +1,20 @@
-import { Aesthetic, scales } from './Aesthetic';
 import type * as DS from '../shared';
 
-import { range as arange, extent, shuffler } from 'd3-array';
-import { isConstantChannel, isOpChannel } from '../typing';
+import { range as arange, shuffler } from 'd3-array';
+import { isConstantChannel } from '../typing';
 import {
-  scaleLinear,
-  scaleSqrt,
-  scaleLog,
-  scaleIdentity,
   scaleOrdinal,
   scaleSequential,
   scaleSequentialLog,
   scaleSequentialPow,
-  scaleImplicit,
-  InterpolatorFactory,
 } from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
 const palette_size = 4096;
 import { randomLcg } from 'd3-random';
-import { Dictionary, Int, Int32, StructRowProxy, Utf8, Vector } from 'apache-arrow';
+import { StructRowProxy, Utf8, Vector } from 'apache-arrow';
 import { ScaledAesthetic } from './ScaledAesthetic';
-import Scatterplot from 'deepscatter';
+import { Scatterplot } from '../deepscatter';
 import { TextureSet } from './AestheticSet';
 
 function materialize_color_interpolator(
@@ -147,124 +140,126 @@ for (const interpolator of d3Interpolators) {
   }
 }
 export class Color<
-  ChannelType extends DS.ChannelType,
+  ChannelType extends DS.ConstantChannel<string> | DS.NumericScaleChannel<number | DS.IsoDateString, string>,
   Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
 > extends ScaledAesthetic<
   ChannelType,
   Input,
   DS.ColorOut
 > {
-  _constant = '#CC5500';
+  protected _func?: (d: Input['domainType']) => string;
+
   public texture_type = 'uint8';
   public default_constant = '#CC5500';
   default_transform: DS.Transform = 'linear';
 
-
-
-  constructor(encoding: ChannelType, scatterplot: Scatterplot, map: TextureSet, id:string) {
+  constructor(encoding: ChannelType | null, scatterplot: Scatterplot, map: TextureSet, id:string) {
     super(encoding, scatterplot, map, id);
-    this.current_encoding = encoding;
-    if (encoding === null) {
-      encoding = {
-        constant: this.default_constant,
-      };
-    }
-    if (!isConstantChannel(encoding)) {
-      if (encoding.range && typeof encoding.range[0] === 'string') {
-        this.encode_for_textures(encoding.range);
+    this.encoding = encoding;
+    if (encoding) {
+      if (isConstantChannel(encoding)) {
+        return
+      }
+      if (encoding['range']) {
+        this.encode_for_textures(encoding['range']);
         this.post_to_regl_buffer();
-      } else if (encoding.range) {
-        this.post_to_regl_buffer();
+      } else {
+        throw new Error("Unexpected color encoding -- must have range." + JSON.stringify(encoding))
       }
     }
   }
-
-
+  
   get default_range(): [string, string] {
     return ["white", "blue"];
   }
-  current_encoding: null | ChannelType = null;
+
   default_data(): Uint8Array {
     return color_palettes.viridis;
   }
+
   get use_map_on_regl() {
     // Always use a map for colors.
     return 1 as const;
   }
 
   get colorscheme_size(): number {
-    if (this.is_dictionary()) {
-      return this.scale.range().length as unknown as number;
+    if (this.categorical) {
+      const scale = this.scale;
+      return scale.range().length as unknown as number;
     }
-    return -1;
+    throw new Error("Unable to determine scale range.")
   }
 
   apply(v: StructRowProxy) : string {
-    if (this.encoding === null || this.field === null) {
-
+    if (this.encoding === null) {
+      return this.default_constant
+    }
+    if (isConstantChannel(this.encoding)) {
+      return this.encoding.constant
     }
     return this.scale(v[this.field] as Input['domainType'])
   }
-  get scale() {
-    if (this._scale) {
-      return this._scale;
-    }
 
-    const range = this.range;
+  // get mmscale() {
+  //   if (this._scale) {
+  //     return this._scale;
+  //   }
 
-    function capitalize(r: string) {
-      // TODO: this can't be right for RdBu, etc. and
-      // aso for ylorrd.
-      if (r === 'ylorrd') {
-        return 'YlOrRd';
-      }
-      return r.charAt(0).toUpperCase() + r.slice(1);
-    }
+  //   const range = this.range;
 
-    if (this.is_dictionary()) {
-      const scale = scaleOrdinal().domain(this.domain);
-      if (typeof range === 'string' && schemes[range]) {
-        const dictionary = this.arrow_column().data[0]
-          .dictionary as Vector<Utf8>;
-        if (dictionary === null) {
-          throw new Error('Dictionary is null');
-        }
-        const keys = dictionary.toArray() as unknown as string[];
-        return (this._scale = scaleOrdinal()
-          .range(schemes[range])
-          .domain(keys));
-      } else {
-        return (this._scale = scale.range(this.range));
-      }
-    }
+  //   function capitalize(r: string) {
+  //     // TODO: this can't be right for RdBu, etc. and
+  //     // aso for ylorrd.
+  //     if (r === 'ylorrd') {
+  //       return 'YlOrRd';
+  //     }
+  //     return r.charAt(0).toUpperCase() + r.slice(1);
+  //   }
 
-    // If not a dictionary, it's a different type.
-    if (typeof range == 'string') {
-      // Convert range from 'viridis' to InterpolateViridis.
-      const k = ('interpolate' + capitalize(range)) as keyof d3Chromatic;
-      const interpolator = d3Chromatic[
-        k
-      ] as typeof d3Chromatic.interpolateViridis;
-      if (interpolator !== undefined) {
-        // linear maps to nothing, but.
-        // scaleLinear, and scaleLog but
-        // scaleSequential and scaleSequentialLog.
-        if (this.transform === 'sqrt') {
-          return (this._scale = scaleSequentialPow(interpolator)
-            .exponent(0.5)
-            .domain(this.domain));
-        } else if (this.transform === 'log') {
-          return (this._scale = scaleSequentialLog(interpolator).domain(
-            this.domain
-          ));
-        } else {
-          return (this._scale = scaleSequential(interpolator).domain(
-            this.domain
-          ));
-        }
-      }
-    }
-  }
+  //   if (this.is_dictionary()) {
+  //     const scale = scaleOrdinal().domain(this.domain);
+  //     if (typeof range === 'string' && schemes[range]) {
+  //       const dictionary = this.arrow_column().data[0]
+  //         .dictionary as Vector<Utf8>;
+  //       if (dictionary === null) {
+  //         throw new Error('Dictionary is null');
+  //       }
+  //       const keys = dictionary.toArray() as unknown as string[];
+  //       return (this._scale = scaleOrdinal()
+  //         .range(schemes[range])
+  //         .domain(keys));
+  //     } else {
+  //       return (this._scale = scale.range(this.range));
+  //     }
+  //   }
+
+  //   // If not a dictionary, it's a different type.
+  //   if (typeof range == 'string') {
+  //     // Convert range from 'viridis' to InterpolateViridis.
+  //     const k = ('interpolate' + capitalize(range)) as keyof d3Chromatic;
+  //     const interpolator = d3Chromatic[
+  //       k
+  //     ] as typeof d3Chromatic.interpolateViridis;
+  //     if (interpolator !== undefined) {
+  //       // linear maps to nothing, but.
+  //       // scaleLinear, and scaleLog but
+  //       // scaleSequential and scaleSequentialLog.
+  //       if (this.transform === 'sqrt') {
+  //         return (this._scale = scaleSequentialPow(interpolator)
+  //           .exponent(0.5)
+  //           .domain(this.domain));
+  //       } else if (this.transform === 'log') {
+  //         return (this._scale = scaleSequentialLog(interpolator).domain(
+  //           this.domain
+  //         ));
+  //       } else {
+  //         return (this._scale = scaleSequential(interpolator).domain(
+  //           this.domain
+  //         ));
+  //       }
+  //     }
+  //   }
+  // }
 
   get texture_buffer() {
     if (this._texture_buffer) {
@@ -285,7 +280,7 @@ export class Color<
     return [r / 255, g / 255, b / 255] as [number, number, number];
   }
 
-  encode_for_textures(range: string | string[]): void {
+  encode_for_textures(range: string | [string, string]): void {
     if (Array.isArray(range)) {
       const key = range.join('/');
       if (color_palettes[key]) {
@@ -298,7 +293,7 @@ export class Color<
         } else {
           // We need to find the integer identifiers for each of
           // the values in the domain.
-          const data_values = this.column.data[0].dictionary.toArray();
+          const data_values = (this.column as Vector<Dictionary<Utf8, Int32>>).data[0].dictionary.toArray();
           const dict_values = Object.fromEntries(
             data_values.map((val: string, i: Number) => [val, i])
           );

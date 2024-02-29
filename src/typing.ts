@@ -8,14 +8,14 @@ export function isTransform(input: unknown): input is DS.Transform {
   return false;
 }
 
-export function isOpChannel(input: DS.ChannelType): input is DS.OpChannel<any> {
+export function isOpChannel(input: DS.ChannelType): input is DS.OpChannel<DS.IsoDateString | number> {
   return input['op'] !== undefined;
 }
 
 export function isLambdaChannel(
   input: DS.ChannelType
-): input is DS.LambdaChannel<any> {
-  return input['lambda'] !== undefined;
+): input is DS.LambdaChannel<DS.JSONValue, string | number | boolean> {
+  return input && input['lambda'] !== undefined;
 }
 
 export function isConstantChannel(
