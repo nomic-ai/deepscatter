@@ -5,8 +5,11 @@ import { range, sum } from 'd3-array';
 import unpackFloat from 'glsl-read-float';
 import Zoom from './interaction';
 import { Renderer } from './rendering';
+//@ts-expect-error no glsl loader types.
 import gaussian_blur from './glsl/gaussian_blur.frag';
+//@ts-expect-error no glsl loader types.
 import vertex_shader from './glsl/general.vert';
+//@ts-expect-error no glsl loader types.
 import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './aesthetics/AestheticSet';
 import { rgb } from 'd3-color';
@@ -486,7 +489,7 @@ export class ReglRenderer extends Renderer {
     this.fbos = this.fbos || {};
     this.textures = this.textures || {};
     this.textures.empty_texture = regl.texture(
-      range(128).map((d) => range(128).map((d) => [0, 0, 0]))
+      range(128).map(() => range(128).map(() => [0, 0, 0]))
     );
 
     this.fbos.minicounter = regl.framebuffer({
@@ -890,12 +893,12 @@ export class ReglRenderer extends Renderer {
         u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
         u_aspect_ratio: ({ viewportWidth, viewportHeight }) =>
           viewportWidth / viewportHeight,
-        //@ts-ignore
+        //@ts-expect-error Don't know about regl props.
         u_zoom_balance: regl.prop('zoom_balance'),
-        u_base_size: (_, { point_size }) => point_size,
-        u_maxix: (_, { max_ix }) => max_ix,
-        u_alpha: (_, { alpha }) => alpha,
-        u_foreground_number: (_, { foreground }) => foreground,
+        u_base_size: (_, { point_size }) => point_size as number,
+        u_maxix: (_, { max_ix }) => max_ix as number,
+        u_alpha: (_, { alpha }) => alpha as number,
+        u_foreground_number: (_, { foreground }) => foreground as number,
         u_foreground_alpha: () => this.render_props.foreground_opacity,
         u_background_rgba: () => {
           const color = this.prefs.background_options.color;
@@ -915,9 +918,9 @@ export class ReglRenderer extends Renderer {
           return props.transform.k;
         },
         // Allow interpolation between different coordinate systems.
-        //@ts-ignore
+        //@ts-expect-error Don't know about regl props.
         u_window_scale: regl.prop('webgl_scale'),
-        //@ts-ignore
+        //@ts-expect-error Don't know about regl props.
         u_last_window_scale: regl.prop('last_webgl_scale'),
         u_time: ({ time }) => time,
         u_filter_numeric() {

@@ -1,7 +1,6 @@
 import type {
   Dictionary,
   Float,
-  Float32,
   Bool,
   Int,
   Int16,
@@ -17,11 +16,12 @@ import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
 import type { ConcreteAesthetic } from './StatefulAesthetic';
 import type { Tile } from './tile';
-import type { Scatterplot } from './deepscatter';
-import type { ReglRenderer } from './regl_rendering';
-import type { Regl, Buffer } from 'regl';
+// import type { Scatterplot } from './deepscatter';
+// import type { ReglRenderer } from './regl_rendering';
+import type { Buffer } from 'regl';
 import type { DataSelection } from './selection';
-import { ScaleBand } from 'd3-scale';
+import { Scatterplot } from './deepscatter';
+// import { ScaleBand } from 'd3-scale';
 //import { DataSelection } from './selection';
 
 export type { Renderer, Dataset, ConcreteAesthetic, Tile };
@@ -33,7 +33,7 @@ export type BufferLocation = {
   byte_size: number; // in bytes;
 };
 
-export type Newable<T> = { new (...args: any[]): T };
+export type Newable<T> = { new (...args: unknown[]): T };
 export type PointFunction = (p: StructRowProxy) => number;
 
 /**
@@ -199,7 +199,7 @@ export type NumberIn = {
 
 export type DateIn = {
   arrowType: Timestamp;
-  jsonType: string;
+  jsonType: IsoDateString;
   domainType: Date;
 };
 
@@ -221,12 +221,18 @@ export type OutType = NumberOut | ColorOut | BoolOut;
 
 export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
 
-type IsoDateString =
+export type IsoDateString =
   | `${number}-${number}-${number}`
   | `${number}-${number}-${number}T${number}:${number}:${number}.${number}Z`;
 
+// Any valid HTML string.
+export type Colorstring = 
+//  | `#${number}${number}${number}${number}${number}${number}`
+  | string;
+
 export type NumericScaleChannel<
-  DomainType extends number | IsoDateString = number
+  DomainType extends number | IsoDateString = number,
+  RangeType extends number | Colorstring = number
 > = {
   /** The name of a column in the data table to be encoded. */
   field: string;
@@ -239,53 +245,47 @@ export type NumericScaleChannel<
   // The domain over which the data extends
   domain?: [DomainType, DomainType];
   // The range into which to map the data.
-  range?: [number, number];
+  range?: [RangeType, RangeType];
 };
 
-type colorstring = string;
 
-export type LambdaChannel<RangeType extends boolean | number | colorstring> = {
-  lambda?: (v: string) => RangeType;
+export type LambdaChannel<
+  DomainType extends JSValue,
+  RangeType extends boolean | number | Colorstring> = 
+{
+  lambda?: (v: DomainType) => RangeType;
   field: string;
 };
 
 /**
  * Operations to be performed on the GPU taking a single argument.
  */
-type OneArgumentOp<ArrowType extends Timestamp | Float | Int> = {
+type OneArgumentOp<JSONType extends number | IsoDateString> = {
   op: 'gt' | 'lt' | 'eq';
-  a: number;
+  a: JSONType;
   // This will not need to be defined and can't be overridden;
   // it just is defined implicitly because we call the function in
   // WebGL, not JS.
-  localImplementation?: (arg: ArrowType) => boolean;
+  // localImplementation?: (arg: JSONType) => boolean;
 };
 
 /**
  * Operations to be performed on the GPU taking two arguments
  */
 
-type TwoArgumentOp<ArrowType extends Timestamp | Float | Int> = {
+type TwoArgumentOp<JSONType extends number | IsoDateString> = {
   op: 'within' | 'between';
-  a: number;
-  b: number;
+  a: JSONType;
+  b: JSONType;
   // This will not need to be defined and can't be overridden;
   // it just is defined implicitly because we call the function in
   // WebGL, not JS.
-  localImplementation?: (arg: ArrowType) => boolean;
+  // localImplementation?: (arg: ArrowType) => boolean;
 };
 
-export type OpChannel<ArrowType extends Timestamp | Float | Int> = {
+export type OpChannel<JSONType extends number | IsoDateString> = {
   field: string;
-} & (OneArgumentOp<ArrowType> | TwoArgumentOp<ArrowType>);
-
-export type ConstantNumber = {
-  constant: number;
-};
-
-export type ConstantString = {
-  constant: string;
-};
+} & (OneArgumentOp<JSONType> | TwoArgumentOp<JSONType>);
 
 export type ConstantChannel<T extends boolean | number | string> = {
   constant: T;
@@ -293,13 +293,14 @@ export type ConstantChannel<T extends boolean | number | string> = {
 
 export type ChannelType =
   | BooleanChannel
-  | OpChannel<Float | Int>
+  | OpChannel<number | IsoDateString>
   | ConstantChannel<string | number | boolean>
-  | NumericScaleChannel<JSValue>;
+  | NumericScaleChannel<number | IsoDateString>
+  | CategoricalColorScale
 
 export type OneDChannels =
   | ConstantChannel<number>
-  | NumericScaleChannel<number | Date>;
+  | NumericScaleChannel<number | IsoDateString>;
 
 export type JitterMethod =
   | 'None' // No jitter
@@ -311,10 +312,10 @@ export type JitterMethod =
 
 type Colorname = string;
 
-type BooleanChannel =
+export type BooleanChannel =
   | ConstantChannel<boolean>
-  | OpChannel<Timestamp | Float | Int>
-  | LambdaChannel<boolean>;
+  | OpChannel<IsoDateString | number>
+  | LambdaChannel<JSValue, boolean>;
 
 type ConstantColor = {
   constant: Colorname;
@@ -346,7 +347,6 @@ export type Encoding = {
   color?: null | ConstantChannel<Colorname> | ColorScaleChannel;
   size?:
     | null
-    | ScaleChannel<number, number>
     | ConstantChannel<number>
     | LambdaChannel<JSValue, number>;
   filter?: null | BooleanChannel;
@@ -445,20 +445,20 @@ export type APICall = {
    * Every time a mouseover happens on a point, this function will be
    * called on that point.
    */
-  click_function?: string;
+  click_function?: RowFunction<void>;
 
   /** A function defined as a string that take the implied argument 'datum'.
    * Every time a mouseover happens on a point, this function will be
    * called on that point; the string that it returns will be inserted into
    * the innerHTML of the tooltip.
    */
-  tooltip_html?: string;
+  tooltip_html?:  RowFunction<string>;
 
   // The color of the screen background.
   background_color?: string;
 
   //
-  transformations?: Record<string, string>;
+  transformations?: Record<string, RowFunction<ArrowBuildable>>;
   encoding?: Encoding;
   labels?: Labelcall;
   background_options?: BackgroundOptions;
@@ -485,3 +485,11 @@ export type CompletePrefs = APICall & {
   zoom_balance: number;
   max_points: number;
 };
+
+
+
+// A function that can be applied to an Arrow row or a similar object.
+export type RowFunction<T> = (
+  datum: StructRowProxy,
+  plot: Scatterplot | undefined
+) => T;

@@ -4,9 +4,9 @@ import { dimensions } from '../StatefulAesthetic';
 import type { Scatterplot } from '../deepscatter';
 import type { Dataset } from '../Dataset';
 import { StatefulAesthetic } from '../StatefulAesthetic';
-import type { Aesthetic } from './Aesthetic';
-import type { Tile } from '../tile';
 import type { Encoding } from '../shared';
+import type * as DS from '../shared';
+import type { Aesthetic } from './Aesthetic';
 
 export class AestheticSet {
   public tileSet: Dataset;
@@ -14,15 +14,26 @@ export class AestheticSet {
   public regl: Regl;
   public encoding: Encoding = {};
   public position_interpolation: boolean;
-  private store: Record<string, StatefulAesthetic<any>>;
+  private store: Record<keyof typeof dimensions, StatefulAesthetic<Aesthetic<DS.ChannelType, DS.InType, DS.OutType>>>;
   public aesthetic_map: TextureSet;
   constructor(scatterplot: Scatterplot, regl: Regl, tileSet: Dataset) {
     this.scatterplot = scatterplot;
-    this.store = {};
+    const store = {};
     this.regl = regl;
     this.tileSet = tileSet;
     this.position_interpolation = false;
     this.aesthetic_map = new TextureSet(this.regl);
+    for (const [name, Maker] of Object.entries(dimensions)) {
+      store[name] 
+        new StatefulAesthetic<typeof dimensions[name]>(
+          scatterplot,
+          regl,
+          tileSet,
+          this.aesthetic_map,
+          Maker
+        )
+    }
+    this.store = store as Record<keyof typeof dimensions, StatefulAesthetic<Aesthetic<DS.ChannelType, DS.InType, DS.OutType>>>;
     return this;
   }
 
@@ -36,22 +47,9 @@ export class AestheticSet {
     if (!dimensions[aesthetic]) {
       throw new Error(`Unknown aesthetic ${aesthetic}`);
     }
-    const Maker = dimensions[aesthetic];
-    const p = this.scatterplot;
-    const regl = this.regl;
-    const map = this.aesthetic_map;
-    const my_dim = new StatefulAesthetic<typeof Maker>(
-      p,
-      regl,
-      this.tileSet,
-      map,
-      Maker
-    );
-    this.store[aesthetic] = my_dim;
-    return my_dim;
   }
 
-  *[Symbol.iterator](): Iterator<[string, StatefulAesthetic<any>]> {
+  *[Symbol.iterator](): Iterator<[string, StatefulAesthetic<Aesthetic<DS.ChannelType, DS.InType, DS.OutType>>]> {
     for (const [k, v] of Object.entries(this.store)) {
       yield [k, v];
     }
@@ -79,9 +77,6 @@ export class AestheticSet {
       // keeping something other than the encoding.
       encoding = {};
     }
-    if (encoding['filter1'] !== undefined) {
-      throw new Error('filter1 is not supported; just say "filter"');
-    }
     // TODO: Remove this awfulness. It's part of a transition in 2.15.0.
     const colorDomain: undefined | [number, number] =
       encoding.color && encoding.color.domain
@@ -98,8 +93,8 @@ export class AestheticSet {
     }
     // Overwrite position fields.
     this.interpret_position(encoding);
-    for (const k of Object.keys(dimensions)) {
-      this.dim(k as keyof dimensions).update(encoding[k]);
+    for (const k in dimensions) {
+      this.dim(k).update(encoding[k] as DS.ChannelType | undefined);
     }
   }
 }

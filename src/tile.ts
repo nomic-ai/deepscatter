@@ -113,7 +113,7 @@ export class Tile {
     this.transformation_holder[name] = Promise.resolve(transform(this)).then(
       (transformed) => {
         if (transformed === undefined) {
-          throw new Error(`Transformation ${name} failed`);
+          throw new Error(`Transformation ${name} failed by returning empty data`);
         }
         this._batch = add_or_delete_column(
           this.record_batch,

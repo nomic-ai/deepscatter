@@ -337,7 +337,7 @@ export class Dataset {
   visit(
     callback: (tile: Tile) => void,
     after = false,
-    filter: (t: Tile) => boolean = (x) => true
+    filter: (t: Tile) => boolean = () => true
   ) {
     // Visit all children with a callback function.
 
@@ -435,7 +435,7 @@ export class Dataset {
       if (data === null) {
         throw new Error('tiled columns must contain "data" field.');
       }
-      const offsets = data.valueOffsets;
+      const offsets = data.valueOffsets as Int32Array;
       const values = data.children[0] as Data<List<Float32>>;
       for (let i = 0; i < batch.data.length; i++) {
         const tilename = batch.getChild('_tile').get(i) as string;
@@ -867,49 +867,49 @@ function supplement_identifiers(
   return updatedFloatArray;
 }
 
-class AsyncQueue<T> {
-  private promises: Promise<T>[] = [];
+// class AsyncQueue<T> {
+//   private promises: Promise<T>[] = [];
 
-  constructor(promises: Promise<T>[] = []) {
-    this.promises.concat(promises);
-  }
+//   constructor(promises: Promise<T>[] = []) {
+//     this.promises.concat(promises);
+//   }
 
-  add(promise: Promise<T>): void {
-    // Add a promise onto the queue.
-    this.promises.push(promise);
-  }
+//   add(promise: Promise<T>): void {
+//     // Add a promise onto the queue.
+//     this.promises.push(promise);
+//   }
 
-  private removeFromArray(item: Promise<T>): void {
-    const index = this.promises.indexOf(item);
-    if (index > -1) {
-      this.promises.splice(index, 1);
-    }
-  }
+//   private removeFromArray(item: Promise<T>): void {
+//     const index = this.promises.indexOf(item);
+//     if (index > -1) {
+//       this.promises.splice(index, 1);
+//     }
+//   }
 
-  async apop(): Promise<T> {
-    /**
-     * Pop the first promise to resolve off the queue.
-     */
-    if (this.promises.length === 0) {
-      throw new Error('No promises to race');
-    }
+//   async apop(): Promise<T> {
+//     /**
+//      * Pop the first promise to resolve off the queue.
+//      */
+//     if (this.promises.length === 0) {
+//       throw new Error('No promises to race');
+//     }
 
-    return new Promise((resolve, reject) => {
-      this.promises.forEach((promise) => {
-        promise
-          .then((value) => {
-            this.removeFromArray(promise);
-            resolve(value);
-          })
-          .catch((error) => {
-            this.removeFromArray(promise);
-            reject(error);
-          });
-      });
-    });
-  }
+//     return new Promise((resolve, reject) => {
+//       this.promises.forEach((promise) => {
+//         promise
+//           .then((value) => {
+//             this.removeFromArray(promise);
+//             resolve(value);
+//           })
+//           .catch((error) => {
+//             this.removeFromArray(promise);
+//             reject(error);
+//           });
+//       });
+//     });
+//   }
 
-  get length(): number {
-    return this.promises.length;
-  }
-}
+//   get length(): number {
+//     return this.promises.length;
+//   }
+// }

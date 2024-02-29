@@ -1,15 +1,8 @@
-/* eslint-disable no-underscore-dangle */
-import { range as arange } from 'd3-array';
-
-import type { Regl, Texture2D } from 'regl';
 import type { TextureSet } from './AestheticSet';
 import {
-  isOpChannel,
-  isLambdaChannel,
   isConstantChannel,
-  isTransform,
 } from '../typing';
-import { Dictionary, Float32, Int16, Type, Utf8, Vector } from 'apache-arrow';
+import { Type, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
 import type * as DS from '../shared';
@@ -36,7 +29,7 @@ export abstract class Aesthetic<
   public scatterplot: Scatterplot;
   public field: string | null = null;
   public _texture_buffer: Float32Array | Uint8Array | null = null;
-  public _func?: (d: Input['arrowType']) => Output['glType'];
+  protected abstract _func?: (d: Input['domainType']) => Output['rangeType'];
   public aesthetic_map: TextureSet;
   public _column? : Vector<Input['arrowType']> | null;
 
@@ -155,7 +148,7 @@ export abstract class Aesthetic<
   /**
    * Returns the default value
    */
-  get constant(): Output['glType'] {
+  get webGLconstant(): Output['glType'] {
     if (this.encoding !== null && isConstantChannel(this.encoding)) {
       return this.toGLType(this.encoding.constant as Output['rangeType']);
     }

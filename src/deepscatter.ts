@@ -1,5 +1,5 @@
-import { select, Selection } from 'd3-selection';
-import { max, range } from 'd3-array';
+import { BaseType, select, Selection } from 'd3-selection';
+import { range } from 'd3-array';
 import merge from 'lodash.merge';
 import Zoom from './interaction';
 import { ReglRenderer } from './regl_rendering';
@@ -66,7 +66,7 @@ export class Scatterplot {
   public width: number;
   public height: number;
   public _root?: Dataset;
-  public elements?: Selection<SVGElement, any, any, any>[];
+  public elements?: Selection<SVGElement, unknown, Element, unknown>[];
   public secondary_renderers: Record<string, Renderer> = {};
   public selection_history: DS.SelectionRecord[] = [];
   public tileProxy?: DS.TileProxy;
@@ -74,7 +74,7 @@ export class Scatterplot {
     dictionaryFromArrays,
     vectorFromArray,
   };
-  div: Selection<any, any, any, any>;
+  div: Selection<BaseType | HTMLDivElement, number, BaseType, unknown>;
   bound: boolean;
   //  d3 : Object;
   public _zoom: Zoom;
@@ -115,7 +115,7 @@ export class Scatterplot {
     this.width = width;
     this.height = height;
     // mark_ready is called when the scatterplot can start drawing..
-    this.ready = new Promise((resolve, reject) => {
+    this.ready = new Promise((resolve) => {
       this.mark_ready = resolve;
     });
     this.click_handler = new ClickFunction(this);
@@ -181,7 +181,7 @@ export class Scatterplot {
         el.append('g').attr('id', 'labelrects');
       }
       this.elements.push(
-        container as unknown as Selection<SVGSetElement, any, any, any>
+        container as unknown as Selection<SVGElement, unknown, Element, unknown>
       );
     }
     this.bound = true;
@@ -511,7 +511,7 @@ export class Scatterplot {
     if (this.prefs.encoding && prefs.encoding) {
       for (const k of Object.keys(this.prefs.encoding)) {
         if (prefs.encoding[k] !== undefined) {
-          this.prefs.encoding[k] = prefs.encoding[k];
+          this.prefs.encoding[k] = prefs.encoding[k] as DS.Encoding;
         }
       }
     }
@@ -710,16 +710,10 @@ export class Scatterplot {
       return;
     }
     if (prefs.click_function) {
-      this.click_function = Function(
-        'datum',
-        prefs.click_function
-      ) as RowFunction<void>;
+      this.click_function = prefs.click_function;      ;
     }
     if (prefs.tooltip_html) {
-      this.tooltip_html = Function(
-        'datum',
-        prefs.tooltip_html
-      ) as RowFunction<string>;
+      this.tooltip_html = prefs.tooltip_html;
     }
 
     if (prefs.background_options) {
@@ -756,12 +750,9 @@ export class Scatterplot {
     }
 
     if (prefs.transformations) {
-      for (const [k, v] of Object.entries(prefs.transformations)) {
-        const func = Function('datum', v) as unknown as DS.PointFunction;
+      for (const [k, func] of Object.entries(prefs.transformations)) {
         if (!this.dataset.transformations[k]) {
           this.dataset.register_transformation(k, func);
-        } else {
-          console.log('Already', k, v);
         }
       }
     }
@@ -891,15 +882,8 @@ abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
     return this._f;
   }
 
-  set f(f: string | ((datum: ArgType, plot: Scatterplot) => FuncType)) {
-    if (typeof f === 'string') {
-      if (this.string_rep !== f) {
-        this.string_rep = f;
-        this._f = Function('datum', 'plot', f);
-      }
-    } else {
-      this._f = f;
-    }
+  set f(f: ((datum: ArgType, plot: Scatterplot) => FuncType)) {
+    this._f = f;
   }
 }
 
@@ -979,8 +963,3 @@ class TooltipHTML extends SettableFunction<string> {
     return `${output}</dl>\n`;
   }
 }
-
-type RowFunction<T> = (
-  datum: StructRowProxy,
-  plot: Scatterplot | undefined
-) => T;
