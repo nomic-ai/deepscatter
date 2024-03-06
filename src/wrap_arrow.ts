@@ -1,8 +1,13 @@
 import { Scatterplot } from './deepscatter';
-import { tableFromIPC, RecordBatch, Table, tableToIPC } from 'apache-arrow';
+import { tableFromIPC, RecordBatch, Table, tableToIPC, Type, Float, Vector } from 'apache-arrow';
 import { Dataset } from './Dataset';
 import { add_or_delete_column } from './Dataset';
 import type * as DS from './shared';
+import { extent } from 'd3-array';
+import { Rectangle } from './tile';
+// This function is used to wrap an arrow table into a deepscatter
+// dataset so that record batches can be fetched asynchronously.
+// The point display order is the same as in the original file.
 
 export function wrapArrowTable(
   tbArray: Uint8Array,
@@ -23,10 +28,26 @@ export function wrapArrowTable(
 
   const proxy = new ArrowProxy(batches);
 
-  return new Dataset(`arrow://`, plot, {
+  const x = tb.getChild('x');
+  const y = tb.getChild('y');
+
+  for (const d of [x, y]) {
+    if (d === null || !d.type || d.type.typeId !== Type.Float) {
+      throw new Error('x and y columns must be present in the arrow table');
+    }
+  }
+  const dataExtent = {
+    x: extent([...(x as Iterable<number>)]),
+    y: extent([...(y as Iterable<number>)])
+  } as Rectangle;
+  
+  return new Dataset(`feather://table`, plot, {
     tileProxy: proxy,
+    tileStructure: 'other',
+    extent: dataExtent
   });
 }
+
 class ArrowProxy implements DS.TileProxy {
   batches: RecordBatch[];
 
@@ -35,13 +56,11 @@ class ArrowProxy implements DS.TileProxy {
   }
 
   apiCall(
-    endpoint: string,
-    method = 'GET',
-    d1 = undefined,
-    d2 = undefined,
-    options = {}
+    endpoint: string
   ): Promise<Uint8Array> {
-    const url = new URL(endpoint);
+    const scopedEndpoint = `feather:${endpoint}`;
+    console.log({scopedEndpoint})
+    const url = new URL(scopedEndpoint);
     const { protocol, pathname } = url;
     if (protocol !== 'feather:') {
       throw new Error(
@@ -53,6 +72,7 @@ class ArrowProxy implements DS.TileProxy {
       .replace('//', '')
       .split('/')
       .map((d) => parseInt(d));
+    
     const rowNum = treeToPosition(z, x);
     const tb = new Table([this.batches[rowNum]]);
     const children = [];
@@ -70,7 +90,7 @@ class ArrowProxy implements DS.TileProxy {
 }
 
 // For a 2d tree, calculate the associated number.
-function treeToPosition(z, x) {
+function treeToPosition(z : number, x : number) {
   let rowNum = 0;
   for (let z_ = 0; z < z; z_++) {
     rowNum += Math.pow(2, z);

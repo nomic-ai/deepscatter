@@ -1,8 +1,8 @@
 import { Dataset } from './Dataset';
-import { Scatterplot } from './deepscatter';
+import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
 import type * as DS from './shared.d';
-import { Bool, StructRowProxy, Vector, makeData } from 'apache-arrow';
+import { Bool, DataType, StructRowProxy, Type, Vector, makeData } from 'apache-arrow';
 import { bisectLeft } from 'd3-array';
 interface SelectParams {
   name: string;
@@ -14,6 +14,7 @@ interface SelectParams {
 export const defaultSelectionParams: SelectParams = {
   name: 'unnamed selection',
   foreground: true,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   batchCallback: (t: Tile) => Promise.resolve(),
 };
 
@@ -23,9 +24,9 @@ export interface IdSelectParams extends SelectParams {
 }
 
 function isIdSelectParam(
-  params: Record<string, any>
+  params: unknown
 ): params is IdSelectParams {
-  return params.ids !== undefined;
+  return params && params['ids'] !== undefined;
 }
 
 export interface BooleanColumnParams extends SelectParams {
@@ -37,9 +38,9 @@ export interface CompositionSelectParams extends SelectParams {
 }
 
 function isBooleanColumnParam(
-  params: Record<string, any>
+  params: unknown
 ): params is BooleanColumnParams {
-  return params.field !== undefined;
+  return params && params['field'] !== undefined;
 }
 
 /**
@@ -144,7 +145,7 @@ async function applyCompositeFunctionToTile(
 
 export interface FunctionSelectParams extends SelectParams {
   name: string;
-  tileFunction: (t: Tile) => Promise<Vector<Bool>> | Promise<Uint8Array>;
+  tileFunction: (t: Tile) => Promise<Vector<Bool>>;
 }
 
 function isPluralSelectParam(
@@ -188,9 +189,12 @@ export class Bitmask {
     this.mask = mask || new Uint8Array(Math.ceil(length / 8));
   }
 
+
   static from_arrow(vector: Vector<Bool>): Bitmask {
     const mask = vector.data[0].values;
-    return new Bitmask(vector.length, mask);
+    // Copy to make sure we don't mess up the old mask in place
+    // TODO: Is this necessary?
+    return new Bitmask(vector.length, new Uint8Array(mask));
   }
 
   to_arrow() {
@@ -203,10 +207,26 @@ export class Bitmask {
     ]);
   }
 
+  // set the ith position to true
   set(i: number) {
     const byte = Math.floor(i / 8);
     const bit = i % 8;
     this.mask[byte] |= 1 << bit;
+  }
+
+  // set the ith position to false
+  unset(i: number) {
+    const byte = Math.floor(i / 8);
+    const bit = i % 8;
+    this.mask[byte] = this.mask[byte] & ~(1 << bit)
+  }
+
+
+  // Is the ith position on the mask set?
+  get(i: number) {
+    const byte = Math.floor(i / 8);
+    const bit = i % 8;
+    return ((1 << bit) & byte) > 0
   }
 
   and(other: Bitmask) {
@@ -316,21 +336,21 @@ export class DataSelection {
       | CompositeSelectParams
   ) {
     this.plot = plot;
-    this.dataset = plot.dataset as Dataset;
+    this.dataset = plot.dataset;
     this.name = params.name;
     let markReady = function () {};
-    this.ready = new Promise((resolve, reject) => {
+    this.ready = new Promise((resolve) => {
       markReady = resolve;
     });
     this.composition = null;
     if (isIdSelectParam(params)) {
-      this.add_identifier_column(params.name, params.ids, params.idField).then(
+      void this.add_identifier_column(params.name, params.ids, params.idField).then(
         markReady
       );
     } else if (isBooleanColumnParam(params)) {
-      this.add_boolean_column(params.name, params.field).then(markReady);
+      void this.add_boolean_column(params.name, params.field).then(markReady);
     } else if (isFunctionSelectParam(params)) {
-      this.add_function_column(params.name, params.tileFunction).then(
+      void this.add_function_column(params.name, params.tileFunction).then(
         markReady
       );
     } else if (isCompositeSelectParam(params)) {
@@ -442,13 +462,13 @@ export class DataSelection {
     return this;
   }
 
-  async removePoints(name, ixes: BigInt[]): Promise<DataSelection> {
+  async removePoints(name : string, ixes: bigint[]): Promise<DataSelection> {
     return this.add_or_remove_points(name, ixes, 'remove');
   }
 
   // Non-editable behavior:
   // if a single point is added, will also adjust the cursor.
-  async addPoints(name, ixes: BigInt[]): Promise<DataSelection> {
+  async addPoints(name : string, ixes: bigint[]): Promise<DataSelection> {
     return this.add_or_remove_points(name, ixes, 'add');
   }
 
@@ -480,12 +500,12 @@ export class DataSelection {
   }
 
   public moveCursorToPoint(
-    point: StructRowProxy | Record<'ix', BigInt | Number>
+    point: StructRowProxy<{'ix': DataType<Type.Int64>} > | Record<'ix', bigint | number>
   ) {
     // The point contains a field called 'ix', which increases in each tile;
     // we use this for moving because it lets us do binary search for relevant tile.
 
-    const ix = point.ix;
+    const ix = point.ix as bigint;
     if (point.ix === undefined) {
       throw new Error(
         'Unable to move cursor to point, because it has no `ix` property.'
@@ -532,8 +552,8 @@ export class DataSelection {
   }
 
   private async add_or_remove_points(
-    name,
-    ixes: BigInt[],
+    newName : string,
+    ixes: bigint[],
     which: 'add' | 'remove'
   ) {
     let newCursor = 0;
@@ -541,23 +561,26 @@ export class DataSelection {
     const tileFunction = async (tile: Tile) => {
       newCursor = -1;
       await this.ready;
+
       // First, get the current version of the tile.
-      let value = (await tile.get_column(this.name)).toArray() as Float32Array;
+      const original = (await tile.get_column(this.name)) as Vector<Bool>
       // Then locate the ix column and look for matches.
-      const ixcol = tile.record_batch.getChild('ix').data[0].values;
-      for (let ix of ixes) {
+      const ixcol = tile.record_batch.getChild('ix').data[0].values as BigInt64Array;
+      const mask = Bitmask.from_arrow(original)
+      for (const ix of ixes) {
         // Since ix is ordered, we can do a fast binary search to see if the
         // point is there--no need for a full scan.
+
+        //@ts-expect-error d3.bisect is not aware it works with bigints as well as numbers
         const mid = bisectLeft([...ixcol], ix as unknown as number);
         const val = tile.record_batch.get(mid);
         // We have to check that there's actually a match,
         // because the binary search identifies where it *would* be.
         if (val !== null && val.ix === ix) {
           // Copy the buffer so we don't overwrite the old one.
-          value = new Float32Array(value);
           // Set the specific value.
           if (which === 'add') {
-            value[mid] = 1;
+            mask.set(mid)
             if (ixes.length === 1) {
               tileOfMatch = tile.key;
               // For single additions, we also move the cursor to the
@@ -565,7 +588,7 @@ export class DataSelection {
               // First we see the number of points earlier on the current tile.
               let offset_in_tile = 0;
               for (let i = 0; i < mid; i++) {
-                if (value[i] > 0) {
+                if (mask.get(i)) {
                   offset_in_tile += 1;
                 }
               }
@@ -574,14 +597,14 @@ export class DataSelection {
             }
           } else {
             // If deleting, we set it to zero.
-            value[mid] = 0;
+            mask.unset(mid)
           }
         }
       }
-      return value;
+      return mask.to_arrow();
     };
     const selection = new DataSelection(this.plot, {
-      name,
+      name: newName,
       tileFunction,
     });
 
@@ -602,7 +625,7 @@ export class DataSelection {
     await selection.ready;
     for (const tile of this.tiles) {
       // This one we actually apply. We'll see if that gets to be slow.
-      await tile.get_column(name);
+      await tile.get_column(newName);
     }
     return selection;
   }

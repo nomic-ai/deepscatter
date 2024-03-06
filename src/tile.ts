@@ -47,7 +47,7 @@ export class Tile {
   public _download?: Promise<void>;
   public ready: boolean;
   __schema?: schema_entry[];
-  public _extent?: { x: MinMax; y: MinMax };
+  public _extent?: Rectangle;
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
   public _buffer_manager?: TileBufferManager;
@@ -469,7 +469,6 @@ export class Tile {
         this.download_state = 'Failed';
         console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
         `);
-        console.warn(error);
         throw error;
       }));
   }
@@ -506,9 +505,10 @@ export class Tile {
   }
 
   get theoretical_extent(): Rectangle {
+
     // QUADTREE SPECIFIC CODE.
 
-    if (this.codes === undefined || this.codes.length !== 3) {
+    if (this.dataset.tileStucture === 'other') {
       // Only three-length-keys are treated as quadtrees.
       return this.dataset.extent;
     }

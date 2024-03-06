@@ -26,8 +26,8 @@ import {
   Int8,
   tableToIPC,
 } from 'apache-arrow';
-import { Scatterplot } from './deepscatter';
-import { wrapArrowTable } from './wrapArrow';
+import { Scatterplot } from './scatterplot';
+import { wrapArrowTable } from './wrap_arrow';
 
 type Key = string;
 
@@ -44,13 +44,15 @@ export class Dataset {
   protected plot: Scatterplot;
   private extents: Record<string, [number, number] | [Date, Date]> = {};
   // A 3d identifier for the tile. Usually [z, x, y]
+  private _extent? : Rectangle;
   public _ix_seed = 0;
   public _schema?: Schema;
   public tileProxy?: DS.TileProxy;
   protected _download_queue: Set<Key> = new Set();
   public promise: Promise<void>;
   public root_tile: Tile;
-
+  // Whether the tileset is structured as a pure quadtree.
+  public readonly tileStucture : DS.TileStructure = 'quadtree';
   /**
    * @param plot The plot to which this dataset belongs.
    **/
@@ -64,7 +66,13 @@ export class Dataset {
     this.tileProxy = options.tileProxy;
     this.root_tile = new Tile('0/0/0', null, this, base_url);
     const download = this.root_tile.download();
-    this.promise = download.then((d) => {
+    if (options.tileStructure) {
+      this.tileStucture = options.tileStructure;
+    }
+    if (options.extent) {
+      this._extent = options.extent;
+    }
+    this.promise = download.then(() => {
       const schema = this.root_tile.record_batch.schema;
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
@@ -89,11 +97,21 @@ export class Dataset {
     });
   }
 
+
   get ready() {
     return this.root_tile.download();
   }
 
-  get extent() {
+  get extent() : Rectangle {
+    if (this._extent) {
+      return this._extent
+    }
+    if (this.tileStucture === 'other') {
+      return this._extent = {
+        x: this.domain('x') as [number, number],
+        y: this.domain('y') as [number, number]
+      }
+    }
     return this.root_tile.extent;
   }
 
@@ -190,7 +208,7 @@ export class Dataset {
    * Generate an ArrowDataset from a single Arrow table.
    *
    * @param table A single Arrow table
-   * @param prefs The API Call to use for renering.
+   * @param prefs The API Call to use for rendering.
    * @param plot The Scatterplot to use.
    * @returns
    */

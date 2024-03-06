@@ -1,16 +1,16 @@
 /* eslint-disable no-underscore-dangle */
-import { select } from 'd3-selection';
+import { BaseType, select } from 'd3-selection';
 import { min } from 'd3-array';
-import type { Scatterplot } from './deepscatter';
+import type { Scatterplot } from './scatterplot';
 import type { Tile } from './tile';
-import type Zoom from './interaction';
+import type {Zoom} from './interaction';
 import type { AestheticSet } from './aesthetics/AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Dataset } from './Dataset';
 import type * as DS from './shared.d';
 import { Table } from 'apache-arrow';
-import { X, Y } from './aesthetics/Aesthetic';
-import { StatefulAesthetic } from './StatefulAesthetic';
+import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
+import { PositionalAesthetic } from './aesthetics/ScaledAesthetic';
 class PlotSetting {
   start: number;
   value: number;
@@ -122,7 +122,7 @@ class RenderProps {
 export class Renderer {
   // A renderer handles drawing to a display element.
   public scatterplot: Scatterplot;
-  public holder: d3.Selection<any, any, any, any>;
+  public holder: d3.Selection<Element, unknown, BaseType, unknown>;
   public canvas: HTMLCanvasElement;
   public dataset: Dataset;
   public width: number;
@@ -132,13 +132,13 @@ export class Renderer {
   public zoom?: Zoom;
   public aes?: AestheticSet;
   public _zoom?: Zoom;
-  public _initializations: Promise<void>[] = [];
+  public _initializations: Promise<void>;
   public render_props: RenderProps = new RenderProps();
-  constructor(selector: string, tileSet: Dataset, scatterplot: Scatterplot) {
+  constructor(selector: string | Node, tileSet: Dataset, scatterplot: Scatterplot) {
     this.scatterplot = scatterplot;
-    this.holder = select(selector);
+    this.holder = select(selector as string);
     this.canvas = select(
-      (this.holder.node() as Element).firstElementChild
+      (this.holder.node()).firstElementChild
     ).node() as HTMLCanvasElement;
     this.dataset = tileSet;
     this.width = +select(this.canvas).attr('width');
@@ -225,8 +225,8 @@ export class Renderer {
     const { dataset: tileSet } = this;
     // Materialize using a tileset method.
 
-    const x = this.aes.dim('x') as StatefulAesthetic<X>;
-    const y = this.aes.dim('x') as StatefulAesthetic<Y>;
+    const x = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
+    const y = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
     const natural_display =
       x.current.field == 'x' &&
       y.current.field == 'y' &&
