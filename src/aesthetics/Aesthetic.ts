@@ -6,7 +6,7 @@ import { Type, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
 import type * as DS from '../shared';
-import { Scatterplot } from '../deepscatter';
+import { Scatterplot } from '../scatterplot';
 
 /**
  * An Aesthetic bundles all operations in mapping from user dataspace to webGL based aesthetics.
@@ -31,12 +31,11 @@ export abstract class Aesthetic<
   public _texture_buffer: Float32Array | Uint8Array | null = null;
   protected abstract _func?: (d: Input['domainType']) => Output['rangeType'];
   public aesthetic_map: TextureSet;
-  public _column? : Vector<Input['arrowType']> | null;
-
+  public column : Vector<Input['arrowType']> | null;
+  
   // cache of the d3 scale
   public encoding: ChannelType;
   public id: string;
-
   constructor(
     encoding: ChannelType | null,
     scatterplot: Scatterplot,
@@ -90,6 +89,10 @@ export abstract class Aesthetic<
   
   abstract toGLType(val: Output['rangeType']): Output['glType'];
 
+  get webGLDomain() {
+    console.log("No method for webGLDomain")
+    return [0, 1] as [number, number]
+  }
   default_data(): Uint8Array | Float32Array | Array<number> {
     const default_value = this.toGLType(this.default_constant);
     return Array(this.aesthetic_map.texture_size).fill(
@@ -115,12 +118,12 @@ export abstract class Aesthetic<
     return this.aesthetic_map.get_position(this.id);
   }
 
-  get texture_buffer() {
+  get texture_buffer() : Uint8Array {
     if (this._texture_buffer) {
-      return this._texture_buffer;
+      return this._texture_buffer as Uint8Array;
     }
-    this._texture_buffer = new Float32Array(this.aesthetic_map.texture_size);
-    this._texture_buffer.set(this.default_data());
+    this._texture_buffer = new Uint8Array(this.aesthetic_map.texture_size * 4);
+    // this._texture_buffer.set(this.default_data());
     return this._texture_buffer;
   }
 
@@ -129,13 +132,13 @@ export abstract class Aesthetic<
   }
 
   arrow_column(): Vector<Input['arrowType']> | null {
-    if (this._column) {
-      return this._column
+    if (this.column) {
+      return this.column
     }
     if (this.field === null || this.field === undefined) {
-      return this._column = null;
+      return this.column = null;
     }
-    return this._column = this.dataset.root_tile.record_batch.getChild(this.field) as Vector<
+    return this.column = this.dataset.root_tile.record_batch.getChild(this.field) as Vector<
       Input['arrowType']
     >;
   }

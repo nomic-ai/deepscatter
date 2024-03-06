@@ -1,19 +1,23 @@
-<script>
+<script lang="ts">
+  
   export let scatterplot;
 
   let value = 'category10';
   const schemes = [
+    'okabe',
     'category10',
     'dark2',
     'pastel2'    
   ]
   function changeColor() {
-    console.log({value})
     scatterplot.plotAPI({
       encoding: {
-        field: scatterplot.prefs.encoding.field,
-        range: value,
-
+        color: {
+          field: scatterplot.prefs.encoding.color.field,
+          range: value,
+//          range: ["red", "yellow", "pink", "purple"],
+//          domain: ["Apple", "Banana", "Strawberry", "Mulberry"]
+        }
       }
     })
   }

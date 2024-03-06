@@ -15,7 +15,7 @@
   <div id="deepscatter"></div>
 </body>
 <script type="module">
-  import Scatterplot from './src/deepscatter';
+  import { Scatterplot, Dataset } from './src/deepscatter';
   import {
     tableFromArrays,
     Table,
@@ -41,7 +41,6 @@
     function make_batch(start = 0, length = 65536) {
       console.log('Making', start);
       const batch_number_here = batch_no++;
-      // make a batch of clifford generator data starting at start and of length length
 
       let x = new Float32Array(length);
       let y = new Float32Array(length);

@@ -2,34 +2,30 @@ import type * as DS from '../shared';
 
 import { range as arange, shuffler } from 'd3-array';
 import { isConstantChannel } from '../typing';
-import {
-  scaleOrdinal,
-  scaleSequential,
-  scaleSequentialLog,
-  scaleSequentialPow,
-} from 'd3-scale';
 import { rgb } from 'd3-color';
 import * as d3Chromatic from 'd3-scale-chromatic';
-const palette_size = 4096;
+const PALETTE_SIZE = 4096;
 import { randomLcg } from 'd3-random';
-import { StructRowProxy, Utf8, Vector } from 'apache-arrow';
+import { Dictionary, Int32, Utf8, Vector } from 'apache-arrow';
 import { ScaledAesthetic } from './ScaledAesthetic';
-import { Scatterplot } from '../deepscatter';
+import { Scatterplot } from '../scatterplot';
 import { TextureSet } from './AestheticSet';
+import { Datum } from './Aesthetic';
+import { ScaleOrdinal } from 'd3-scale';
 
 function materialize_color_interpolator(
   interpolator: (t: number) => string
 ): Uint8Array {
-  const output = new Uint8Array(4 * palette_size);
-  arange(palette_size).forEach((i) => {
-    const p = rgb(interpolator(i / palette_size));
+  const output = new Uint8Array(4 * PALETTE_SIZE);
+  arange(PALETTE_SIZE).forEach((i) => {
+    const p = rgb(interpolator(i / PALETTE_SIZE));
     output.set([p.r, p.g, p.b, 255], i * 4);
   });
   return output;
 }
 
 const color_palettes: Record<string, Uint8Array> = {
-  white: new Uint8Array(4 * palette_size).fill(255),
+  white: new Uint8Array(4 * PALETTE_SIZE).fill(255),
 };
 
 const schemes: Record<string, readonly string[]> = {};
@@ -40,13 +36,13 @@ function palette_from_color_strings(colors: readonly string[]): Uint8Array {
     const col = rgb(color);
     return [col.r, col.g, col.b, 255];
   });
-  const output = new Uint8Array(palette_size * 4);
+  const output = new Uint8Array(PALETTE_SIZE * 4);
 
-  const repeat_each = Math.floor(palette_size / colors.length);
+  const repeat_each = Math.floor(PALETTE_SIZE / colors.length);
   for (let i = 0; i < colors.length; i++) {
     for (
       let j = 0;
-      j < repeat_each && i * repeat_each + j < palette_size;
+      j < repeat_each && i * repeat_each + j < PALETTE_SIZE;
       j++
     ) {
       output.set(scheme[i], (i * repeat_each + j) * 4);
@@ -139,19 +135,21 @@ for (const interpolator of d3Interpolators) {
     color_palettes.shufbow = shuffle(color_palettes[name]);
   }
 }
+
 export class Color<
-  ChannelType extends DS.ConstantChannel<string> | DS.NumericScaleChannel<number | DS.IsoDateString, string>,
-  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
+  ChannelType extends DS.ColorScaleChannel = DS.ColorScaleChannel,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn
 > extends ScaledAesthetic<
   ChannelType,
   Input,
   DS.ColorOut
 > {
   protected _func?: (d: Input['domainType']) => string;
-
+  public _texture_buffer: Uint8Array | null = null;
   public texture_type = 'uint8';
   public default_constant = '#CC5500';
   default_transform: DS.Transform = 'linear';
+
 
   constructor(encoding: ChannelType | null, scatterplot: Scatterplot, map: TextureSet, id:string) {
     super(encoding, scatterplot, map, id);
@@ -162,15 +160,24 @@ export class Color<
       }
       if (encoding['range']) {
         this.encode_for_textures(encoding['range']);
+        console.log("posting to regl buffer")
         this.post_to_regl_buffer();
       } else {
         throw new Error("Unexpected color encoding -- must have range." + JSON.stringify(encoding))
       }
     }
+    if (this.scale.range().length === 0) {
+      throw new Error("Color scale has no range.")
+    }
   }
   
   get default_range(): [string, string] {
     return ["white", "blue"];
+  }
+
+  post_to_regl_buffer() {
+    const color = this.texture_buffer;
+    this.aesthetic_map.set_color(this.id, color);
   }
 
   default_data(): Uint8Array {
@@ -185,19 +192,21 @@ export class Color<
   get colorscheme_size(): number {
     if (this.categorical) {
       const scale = this.scale;
-      return scale.range().length as unknown as number;
+      return scale.range().length;
     }
-    throw new Error("Unable to determine scale range.")
   }
 
-  apply(v: StructRowProxy) : string {
+  apply(v: Datum) : string {
+
     if (this.encoding === null) {
       return this.default_constant
     }
+
     if (isConstantChannel(this.encoding)) {
       return this.encoding.constant
     }
-    return this.scale(v[this.field] as Input['domainType'])
+    const scale = this.scale as ScaleOrdinal<Input['domainType'], string>
+    return scale(v[this.field] as Input['domainType'])
   }
 
   // get mmscale() {
@@ -261,68 +270,55 @@ export class Color<
   //   }
   // }
 
-  get texture_buffer() {
-    if (this._texture_buffer) {
-      return this._texture_buffer;
-    }
-    this._texture_buffer = new Uint8Array(this.aesthetic_map.texture_size * 4);
-    this._texture_buffer.set(this.default_data());
-    return this._texture_buffer;
-  }
-
-  post_to_regl_buffer() {
-    this.aesthetic_map.set_color(this.id, this.texture_buffer);
-  }
-
 
   toGLType(color: string) {
     const { r, g, b } = rgb(color);
     return [r / 255, g / 255, b / 255] as [number, number, number];
   }
 
-  encode_for_textures(range: string | [string, string]): void {
+  encode_for_textures(range: string | [string, string] | string[]): void {
+
     if (Array.isArray(range)) {
       const key = range.join('/');
       if (color_palettes[key]) {
         this.texture_buffer.set(color_palettes[key]);
         return;
-      } else {
-        let palette: Uint8Array;
-        if (!this.is_dictionary()) {
-          palette = palette_from_color_strings(range);
-        } else {
-          // We need to find the integer identifiers for each of
-          // the values in the domain.
-          const data_values = (this.column as Vector<Dictionary<Utf8, Int32>>).data[0].dictionary.toArray();
-          const dict_values = Object.fromEntries(
-            data_values.map((val: string, i: Number) => [val, i])
-          );
-          const colors: string[] = [];
-          for (let i = 0; i < this.domain.length; i++) {
-            const label = this.domain[i];
-            const color = range[i];
-            if (dict_values[label] !== undefined) {
-              colors[dict_values[label]] = color;
-            }
-          }
-          for (let i = 0; i < data_values.length; i++) {
-            if (colors[i] === undefined) {
-              colors[i] = 'gray';
-            }
-          }
-          palette = palette_from_color_strings(colors);
-        }
-        this.texture_buffer.set(palette);
-        return;
       }
+      let palette: Uint8Array;
+      if (!this.is_dictionary()) {
+        palette = palette_from_color_strings(range);
+      } else {
+        // We need to find the integer identifiers for each of
+        // the values in the domain.
+        const vec = (this.column as Vector<Dictionary<Utf8, Int32>>).data[0];
+        const data_values = (vec.dictionary as Vector<Utf8>).toArray() as unknown as Input['domainType'][];;
+        const dict_values: Map<Input['domainType'], number> = new Map();
+        let i = 0;
+        for (const val of data_values) {
+          dict_values.set(val, i++);
+        }
+        const colors: string[] = [];
+        for (let i = 0; i < this.domain.length; i++) {
+          const label = this.domain[i];
+          const color = range[i];
+          if (dict_values.get(label) !== undefined) {
+            colors[dict_values.get(label)] = color;
+          }
+        }
+        for (let i = 0; i < data_values.length; i++) {
+          if (colors[i] === undefined) {
+            colors[i] = 'gray';
+          }
+        }
+        palette = palette_from_color_strings(colors);
+      }
+      this.texture_buffer.set(palette);
+      return;
     }
     if (color_palettes[range]) {
       this.texture_buffer.set(color_palettes[range]);
       return;
     }
-    if (range.length === this.aesthetic_map.texture_size * 4) {
-      throw new Error('SETTING FULL RANGE IS DEPRECATED');
-    }
-    console.error(`request range of ${range} for color ${this.field} unknown`);
+    throw new Error(`request range of ${range} for color ${this.field} unknown`);
   }
 }

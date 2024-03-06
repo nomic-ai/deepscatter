@@ -1,6 +1,6 @@
 import type * as DS from '../shared';
 import { Aesthetic, Datum } from './Aesthetic';
-import { Scatterplot } from '../deepscatter';
+import { Scatterplot } from '../scatterplot';
 import type { TextureSet } from './AestheticSet';
 import { isConstantChannel, isLambdaChannel, isOpChannel } from '../typing';
 
@@ -134,8 +134,8 @@ abstract class BooleanAesthetic<
  * background points will be plotted with much less resolution.
  */
 export class Foreground<
-  ChannelType extends DS.OpChannel<number | DS.IsoDateString> | DS.ConstantChannel<boolean> | DS.LambdaChannel<DS.JSValue, string | number | boolean>,
-  Input extends DS.InType
+  ChannelType extends DS.BooleanChannel = DS.BooleanChannel,
+  Input extends DS.InType = DS.InType
   > extends BooleanAesthetic<ChannelType, Input>  {
   default_constant = true;
   default_range: [false, true] = [false, true]
@@ -150,8 +150,8 @@ export class Foreground<
 }
 
 export class Filter<
-  ChannelType extends DS.OpChannel<number | DS.IsoDateString> | DS.ConstantChannel<boolean> | DS.LambdaChannel<DS.JSValue, string | number | boolean>,
-  Input extends DS.InType
+  ChannelType extends DS.BooleanChannel = DS.BooleanChannel,
+  Input extends DS.InType = DS.InType
 > extends BooleanAesthetic<ChannelType, Input> {
   default_constant = true;
   default_range: [false, true] = [false, true]

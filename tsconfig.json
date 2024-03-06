@@ -2,6 +2,9 @@
   "include": [
     "src/**/*.ts"
   ],
+  "exclude": [
+    "node_modules/**/*"
+  ],
   "compilerOptions": {
     "declarationMap": true,
     "declaration": true,
@@ -10,7 +13,7 @@
     "esModuleInterop": true,
     "noUnusedLocals": true,
     "sourceMap": true,
-    "strict": false,
+    "strict": true,
     "target": "es2020",
     "isolatedModules": true,
     "outDir": "./dist",

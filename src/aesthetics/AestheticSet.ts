@@ -1,12 +1,21 @@
 /* eslint-disable no-param-reassign */
 import type { Regl, Texture2D } from 'regl';
-import { dimensions } from '../StatefulAesthetic';
-import type { Scatterplot } from '../deepscatter';
+import { dimensions } from './StatefulAesthetic';
+import type { Scatterplot } from '../scatterplot';
 import type { Dataset } from '../Dataset';
-import { StatefulAesthetic } from '../StatefulAesthetic';
+import { StatefulAesthetic } from './StatefulAesthetic';
 import type { Encoding } from '../shared';
 import type * as DS from '../shared';
-import type { Aesthetic } from './Aesthetic';
+
+
+type AesMap = {
+  [K in keyof typeof dimensions]: StatefulAesthetic<InstanceType<typeof dimensions[K]>>
+};
+
+type StateList<T> = {
+  current: T;
+  last: T;
+}
 
 export class AestheticSet {
   public tileSet: Dataset;
@@ -14,18 +23,22 @@ export class AestheticSet {
   public regl: Regl;
   public encoding: Encoding = {};
   public position_interpolation: boolean;
-  private store: Record<keyof typeof dimensions, StatefulAesthetic<Aesthetic<DS.ChannelType, DS.InType, DS.OutType>>>;
+  public readonly store: AesMap = {};
   public aesthetic_map: TextureSet;
+  public options: {
+    jitter_method: StateList<DS.JitterMethod>;
+  } = {
+    jitter_method: { current: 'None', last: 'None' }
+  }
   constructor(scatterplot: Scatterplot, regl: Regl, tileSet: Dataset) {
     this.scatterplot = scatterplot;
-    const store = {};
     this.regl = regl;
     this.tileSet = tileSet;
     this.position_interpolation = false;
     this.aesthetic_map = new TextureSet(this.regl);
     for (const [name, Maker] of Object.entries(dimensions)) {
-      store[name] 
-        new StatefulAesthetic<typeof dimensions[name]>(
+      this.store[name] = 
+        new StatefulAesthetic<InstanceType<typeof Maker>>(
           scatterplot,
           regl,
           tileSet,
@@ -33,7 +46,6 @@ export class AestheticSet {
           Maker
         )
     }
-    this.store = store as Record<keyof typeof dimensions, StatefulAesthetic<Aesthetic<DS.ChannelType, DS.InType, DS.OutType>>>;
     return this;
   }
 
@@ -45,14 +57,14 @@ export class AestheticSet {
       return this.store[aesthetic];
     }
     if (!dimensions[aesthetic]) {
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Unknown aesthetic ${aesthetic}`);
     }
   }
 
-  *[Symbol.iterator](): Iterator<[string, StatefulAesthetic<Aesthetic<DS.ChannelType, DS.InType, DS.OutType>>]> {
-    for (const [k, v] of Object.entries(this.store)) {
-      yield [k, v];
-    }
+  *[Symbol.iterator](): Generator<number> {
+    throw new Error("DEPRECATED")
+    yield 3
   }
 
   interpret_position(encoding: Encoding) {
@@ -71,31 +83,37 @@ export class AestheticSet {
   }
 
   apply_encoding(encoding: Encoding) {
+
+    if (encoding['jitter_radius'] && encoding['jitter_radius']['jitter_method']) {
+      console.warn("jitter_radius.jitter_method is deprecated. Use jitter_method instead.")
+      encoding['jitter_method'] = encoding['jitter_radius']['jitter_method'] as DS.JitterMethod;
+      delete encoding['jitter_radius']['jitter_method'];
+    }
     if (encoding === undefined) {
       // pass with nothing--this will clear out the old saved states
       // to avoid regenerating transitions if you keep replotting
       // keeping something other than the encoding.
       encoding = {};
     }
-    // TODO: Remove this awfulness. It's part of a transition in 2.15.0.
-    const colorDomain: undefined | [number, number] =
-      encoding.color && encoding.color.domain
-        ? encoding.color['domain']
-        : undefined;
-    if (colorDomain && colorDomain.length == 2) {
-      if (Math.abs(colorDomain[1] - colorDomain[0] - 4096) < 2) {
-        console.warn(`Resetting color encoding from -2047 to 0. The old behavior of requiring negative numbers 
-          for dictionary schemes is deprecated. If you're actually trying to encode real numbers here, not a dictionary, change to [-4100, 4100] 
-          until a future update.
-        `);
-        encoding.color['domain'] = [0, 4096];
-      }
-    }
-    // Overwrite position fields.
     this.interpret_position(encoding);
     for (const k in dimensions) {
-      this.dim(k).update(encoding[k] as DS.ChannelType | undefined);
+      this.dim(k).update(encoding[k] as DS.ChannelType | null);
     }
+
+    // Apply settings that are not full-on aesthetics.
+    for (const setting of ['jitter_method'] as const) {
+      this.options[setting].last = this.options[setting].current;
+      if (encoding[setting]) {
+        this.options[setting].current = encoding[setting];
+      } else {
+        this.options[setting].current = this.options[setting].last;
+      }
+    }
+  }
+
+
+  jitter_int_format(time : 'last' | 'current') : 0 | 1 | 2 | 3 | 4 | 5 {
+    return encode_jitter_to_int(this.options.jitter_method[time]);
   }
 }
 
@@ -131,6 +149,8 @@ export class TextureSet {
     // value: the array to stash onto the texture.
     let offset: number;
     const { offsets } = this;
+    console.log('offset', offsets);
+
     if (offsets[id]) {
       offset = offsets[id];
     } else {
@@ -181,6 +201,7 @@ export class TextureSet {
       : this.regl.hasExtension('OES_texture_half_float')
       ? 'half float'
       : 'uint8';
+    
     const format = texture_type === 'uint8' ? 'rgba' : 'alpha';
 
     const params = {
@@ -206,4 +227,32 @@ export class TextureSet {
     });
     return this._color_texture;
   }
+}
+
+
+
+// Encode a jitter method for use on the shaders.
+
+function encode_jitter_to_int(jitter: DS.JitterMethod) : 0 | 1 | 2 | 3 | 4 | 5 {
+  if (jitter === 'spiral') {
+    // animated in a logarithmic spiral.
+    return 1;
+  }
+  if (jitter === 'uniform') {
+    // Static jitter inside a circle
+    return 2;
+  }
+  if (jitter === 'normal') {
+    // Static, normally distributed, standard deviation 1.
+    return 3;
+  }
+  if (jitter === 'circle') {
+    // animated, evenly distributed in a circle with radius 1.
+    return 4;
+  }
+  if (jitter === 'time') {
+    // Cycle in and out.
+    return 5;
+  }
+  return 0;
 }

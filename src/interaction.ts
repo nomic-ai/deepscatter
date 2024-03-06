@@ -9,9 +9,10 @@ import type { Renderer } from './rendering';
 import { ReglRenderer } from './regl_rendering';
 import { StructRowProxy } from 'apache-arrow';
 import { Rectangle } from './tile';
-import { PositionalAesthetic } from './aesthetics/Aesthetic';
 import type { Dataset } from './Dataset';
 import type * as DS from './shared';
+import type { Scatterplot } from './scatterplot';
+import { PositionalAesthetic } from './aesthetics/ScaledAesthetic';
 type Annotation = {
   x: number;
   y: number;
@@ -20,7 +21,7 @@ type Annotation = {
   data: StructRowProxy;
 };
 
-export default class Zoom {
+export class Zoom {
   public prefs: DS.APICall;
   public svg_element_selection: d3.Selection<
     d3.ContainerElement,
@@ -175,7 +176,7 @@ export default class Zoom {
     const { x_, y_ } = this.scales();
     const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
-    this.scatterplot.highlit_point_change(data);
+    this.scatterplot.highlit_point_change(data, this.scatterplot);
 
     const annotations: Annotation[] = data.map((d) => ({
       x: x_(xdim.apply(d)),
@@ -190,7 +191,7 @@ export default class Zoom {
     const sel = this.svg_element_selection.select('#mousepoints');
     sel
       .selectAll('circle.label')
-      .data(data, (d_) => d_.ix as number) // Unique identifier to not remove existing.
+      .data(data, (d_ : StructRowProxy) => d_.ix as number) // Unique identifier to not remove existing.
       .join(
         (enter) =>
           enter
@@ -289,6 +290,7 @@ export default class Zoom {
     return this as Zoom;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   scales(equal_units = true): Record<string, ScaleLinear<number, number>> {
     // General x and y scales that map from data space
     // to pixel coordinates, and also

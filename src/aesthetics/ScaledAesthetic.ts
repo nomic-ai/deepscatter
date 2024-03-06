@@ -1,6 +1,6 @@
 import type * as DS from '../shared';
 import { Aesthetic, Datum } from './Aesthetic';
-import { Scatterplot } from '../deepscatter';
+import { Scatterplot } from '../scatterplot';
 import type { TextureSet } from './AestheticSet';
 
 import {
@@ -22,9 +22,9 @@ export const scales = {
   literal: scaleIdentity
 } as const;
 export abstract class ScaledAesthetic<
-  ChannelType extends DS.ChannelType = DS.ConstantChannel<number>,
-  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn,
-  Output extends DS.NumberOut | DS.ColorOut = DS.NumberOut
+  ChannelType extends DS.ChannelType = DS.ChannelType,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn,
+  Output extends DS.NumberOut | DS.ColorOut = DS.NumberOut | DS.ColorOut
 > extends Aesthetic<ChannelType, Input, Output> {
   protected _scale: ScaleContinuousNumeric<
     Input['domainType'],
@@ -54,9 +54,8 @@ export abstract class ScaledAesthetic<
     
     if (this.is_dictionary()) {
       this.categorical = true;
-      this.populateCategoricalScale(encoding);
+      this.populateCategoricalScale();
     } else {
-
       if (scaleType === 'linear') {
         this._scale = scaleLinear() as ScaleContinuousNumeric<
         Input['domainType'],
@@ -102,14 +101,15 @@ export abstract class ScaledAesthetic<
     return values as Input['domainType'][];
   }
 
-  // TODO: this class can handle integer and booleans passed as well.
+  // TODO: this class can eventually handle integer and booleans passed as well.
   protected populateCategoricalScale() {
-
+    console.log("Populating categorical scale")
     this._scale = (scaleOrdinal() as ScaleOrdinal<
       Input['domainType'],
       Output['rangeType']
-    >).domain(this.categoricalValues());
+    >).domain(this.categoricalValues()).range(this.range);
   }
+  
   /**
    * Returns two numbers that indicate the extent of
    * the attribute written to webGL.
@@ -120,6 +120,7 @@ export abstract class ScaledAesthetic<
     if (this.categorical) {
         return [0, this.categoricalValues().length - 1]
     }
+
     if (typeof min === 'number' && typeof max === 'number') {
       return [min, max];
     }
@@ -135,7 +136,30 @@ export abstract class ScaledAesthetic<
   }
 
   get scale() {
-    return this._scale;
+    if (this.categorical) {
+      return this._scale as ScaleOrdinal<Input["domainType"], Output["rangeType"], never>;
+    } else {
+      return this._scale as ScaleContinuousNumeric<Input["domainType"], Output["rangeType"], never>;
+    }
+  }
+
+  apply(point: Datum) {
+    const constant = isConstantChannel(this.encoding) ? this.encoding.constant : this.default_constant
+    if (this.field === null || isConstantChannel(this.encoding)) {
+      return constant as Output["rangeType"];
+    }
+    const value = point[this.field] as Input['domainType'];
+    if (value === undefined || value === null) {
+      return constant as Output["rangeType"];
+    }
+    if (this.categorical) {
+      const scale = this.scale as ScaleOrdinal<Input['domainType'], Output['rangeType']>
+      return scale(value)
+    } else {
+      const scale = this.scale as ScaleContinuousNumeric<Input["domainType"], Output["rangeType"], never>;
+      // Todo why do the types let this be a string?
+      return scale(value as number | Date) ;
+    }
   }
 
   get default_domain(): [number, number] {
@@ -190,17 +214,6 @@ abstract class OneDAesthetic<
   }
 
   protected _func?: (d: Input['domainType']) => number;
-  apply(point: Datum) {
-    const constant = isConstantChannel(this.encoding) ? this.encoding.constant : this.default_constant
-    if (this.field === null || isConstantChannel(this.encoding)) {
-      return constant;
-    }
-    const value = point[this.field] as Input['domainType'];
-    if (value === undefined || value === null) {
-      return constant;
-    }
-    if (this.categorical) return this.scale(value);
-  }
 
   toGLType(a: number) {
     return a;
@@ -213,7 +226,7 @@ abstract class OneDAesthetic<
 
 export class Size<
   ChannelType extends DS.OneDChannels = DS.OneDChannels,
-  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn
   > extends OneDAesthetic<ChannelType, Input> {
   default_constant = 1.5;
   get default_range() {
@@ -222,9 +235,9 @@ export class Size<
   default_transform: DS.Transform = 'sqrt';
 }
 
-export abstract class PositionalAesthetic<
+export class PositionalAesthetic<
   ChannelType extends DS.OneDChannels = DS.OneDChannels,
-  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn
   > extends OneDAesthetic<ChannelType, Input> {
   default_range: [number, number] = [-1, 1];
   default_constant = 0;
@@ -240,13 +253,13 @@ export abstract class PositionalAesthetic<
   }
 }
 
-export const X = PositionalAesthetic;
+// export const X = PositionalAesthetic;
 
-export const X0 = X;
+// export const X0 = X;
 
-export const Y = PositionalAesthetic;
+// export const Y = PositionalAesthetic;
 
-export const Y0 = PositionalAesthetic
+// export const Y0 = PositionalAesthetic
 
 export class Jitter_speed<
   ChannelType extends DS.OneDChannels = DS.OneDChannels,
@@ -258,29 +271,6 @@ export class Jitter_speed<
   _constant = 0;
 }
 
-function encode_jitter_to_int(jitter: string) {
-  if (jitter === 'spiral') {
-    // animated in a logarithmic spiral.
-    return 1;
-  }
-  if (jitter === 'uniform') {
-    // Static jitter inside a circle
-    return 2;
-  }
-  if (jitter === 'normal') {
-    // Static, normally distributed, standard deviation 1.
-    return 3;
-  }
-  if (jitter === 'circle') {
-    // animated, evenly distributed in a circle with radius 1.
-    return 4;
-  }
-  if (jitter === 'time') {
-    // Cycle in and out.
-    return 5;
-  }
-  return 0;
-}
 
 export class Jitter_radius extends OneDAesthetic {
   _constant = 0;
@@ -288,25 +278,14 @@ export class Jitter_radius extends OneDAesthetic {
   toGLType(a: number) {
     return a;
   }
-  public jitter_int_formatted: 0 | 1 | 2 | 3 | 4 | 5 = 0;
   get default_constant() {
     return 0;
   }
+
   default_transform: DS.Transform = 'linear';
 
   get default_range() {
     return [0, 1] as [number, number];
   }
 
-
-  get method(): DS.JitterMethod {
-    if (this.encoding && this.encoding['method']) {
-      return this.encoding['method'] as DS.JitterMethod
-    }
-    return "None"
-  }
-
-  get jitter_int_format() {
-    return encode_jitter_to_int(this.method);
-  }
 }

@@ -1,57 +1,64 @@
-import type * as DS from './shared.d';
-import { Aesthetic } from './aesthetics/Aesthetic';
+import type * as DS from '../shared';
 
 import {
-  X,
-  Y,
   Size,
   Jitter_speed,
   Jitter_radius,
-  X0,
-  Y0,
-} from './aesthetics/ScaledAesthetic';
+  PositionalAesthetic
+} from './ScaledAesthetic';
 
-import { Filter, Foreground } from './aesthetics/BooleanAesthetic';
+import { Filter, Foreground } from './BooleanAesthetic';
 
-import { Color } from './aesthetics/ColorAesthetic';
-import { Scatterplot } from './deepscatter';
+import { Color } from './ColorAesthetic';
+import { Scatterplot } from '../scatterplot';
 
-export const dimensions = {
+type AestheticConstructor<T> = new (...args: [ 
+  encoding: DS.ChannelType | null,
+  scatterplot: Scatterplot,
+  aesthetic_map?: TextureSet,
+  id?: string
+]) => T;
+
+interface IDimensions {
+  [key: string]: AestheticConstructor<ConcreteAesthetic>;
+}
+
+export const dimensions : IDimensions = {
   size: Size,
   jitter_speed: Jitter_speed,
   jitter_radius: Jitter_radius,
   color: Color,
   filter: Filter,
   filter2: Filter,
-  x: X,
-  y: Y,
-  x0: X0,
-  y0: Y0,
-  foreground: Foreground,
+  x: PositionalAesthetic,
+  y: PositionalAesthetic,
+  x0: PositionalAesthetic,
+  y0: PositionalAesthetic,
+  foreground: Foreground
 } as const;
 
 export type ConcreteAesthetic =
-  | X
-  | Y
+  | PositionalAesthetic
   | Size
   | Jitter_speed
   | Jitter_radius
   | Color
-  | X0
-  | Y0
   | Foreground
-  | Filter;
+  | Filter
 
-import type { Dataset } from './Dataset';
+export type ConcreteScaledAesthetic = 
+  | PositionalAesthetic
+  | Size
+  | Jitter_speed
+  | Jitter_radius
+  | Color
+  
+import type { Dataset } from '../Dataset';
 import type { Regl } from 'regl';
-import type { TextureSet } from './aesthetics/AestheticSet';
+import type { TextureSet } from './AestheticSet';
 
 export class StatefulAesthetic<
-  T extends Aesthetic<
-    DS.ChannelType,
-    DS.InType,
-    DS.OutType
-  >
+  T extends ConcreteAesthetic
 > {
   /**
    * A stateful aesthetic holds the history and associated resources for an encoding
