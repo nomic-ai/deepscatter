@@ -4,7 +4,7 @@ import {
   Size,
   Jitter_speed,
   Jitter_radius,
-  PositionalAesthetic
+  X, Y
 } from './ScaledAesthetic';
 
 import { Filter, Foreground } from './BooleanAesthetic';
@@ -30,15 +30,16 @@ export const dimensions : IDimensions = {
   color: Color,
   filter: Filter,
   filter2: Filter,
-  x: PositionalAesthetic,
-  y: PositionalAesthetic,
-  x0: PositionalAesthetic,
-  y0: PositionalAesthetic,
+  x: X,
+  y: Y,
+  x0: X,
+  y0: Y,
   foreground: Foreground
 } as const;
 
 export type ConcreteAesthetic =
-  | PositionalAesthetic
+  | X
+  | Y
   | Size
   | Jitter_speed
   | Jitter_radius
@@ -47,7 +48,8 @@ export type ConcreteAesthetic =
   | Filter
 
 export type ConcreteScaledAesthetic = 
-  | PositionalAesthetic
+  | X
+  | Y
   | Size
   | Jitter_speed
   | Jitter_radius

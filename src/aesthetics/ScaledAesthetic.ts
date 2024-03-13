@@ -11,6 +11,7 @@ import {
   ScaleContinuousNumeric,
   scaleOrdinal,
   ScaleOrdinal,
+  scaleBand,
 } from 'd3-scale';
 import { isConstantChannel, isTransform } from '../typing';
 import { Dictionary, Int32, Type, Utf8, Vector } from 'apache-arrow';
@@ -72,7 +73,7 @@ export abstract class ScaledAesthetic<
         Output['rangeType']
       >;
       } else if (scaleType === 'literal') {
-        this._scale = scaleLinear() as ScaleContinuousNumeric<
+        this._scale = scaleIdentity() as unknown as ScaleContinuousNumeric<
         Input['domainType'],
         Output['rangeType']
       >;
@@ -83,7 +84,21 @@ export abstract class ScaledAesthetic<
       }
       this._scale = (this._scale as ScaleContinuousNumeric<Input["domainType"], Output["rangeType"], never>)
         .domain(this.domain as [number, number])
+        .range(this.range);
     }
+  }
+
+
+  protected categoricalRange() : Output['rangeType'][] {
+    if (this.encoding && this.encoding['range']) {
+      if (typeof this.encoding['range'] === 'string') {
+        throw new Error("Categorical range must be an array of strings except for color fields.")
+      }
+    }
+    const vals = this.categoricalValues().map(d => d.toString());
+
+    const bands = scaleBand().domain(vals).range(this.dataset.extent.x).padding(0.1).round(true).align(0.5)
+    return vals.map(d => bands(d));
   }
 
   protected categoricalValues() : Input['domainType'][] {
@@ -103,26 +118,29 @@ export abstract class ScaledAesthetic<
 
   // TODO: this class can eventually handle integer and booleans passed as well.
   protected populateCategoricalScale() {
-    console.log("Populating categorical scale")
+    
     this._scale = (scaleOrdinal() as ScaleOrdinal<
       Input['domainType'],
       Output['rangeType']
-    >).domain(this.categoricalValues()).range(this.range);
+    >).domain(this.categoricalDomain).range(this.categoricalRange());
   }
   
+  private _webGLDomain: [number, number] | undefined;
   /**
    * Returns two numbers that indicate the extent of
    * the attribute written to webGL.
    */
   get webGLDomain(): [number, number] {
+    if (this._webGLDomain) {
+      return this._webGLDomain;
+    }
+    if (this.categorical) {
+      return this._webGLDomain = [0, this.categoricalDomain.length - 1]
+    }
     const [min, max] = this.domain || [undefined, undefined];
 
-    if (this.categorical) {
-        return [0, this.categoricalValues().length - 1]
-    }
-
     if (typeof min === 'number' && typeof max === 'number') {
-      return [min, max];
+      return this._webGLDomain = [min, max];
     }
     throw new Error("Unable to generate appropriate GL Domain")
   }
@@ -158,7 +176,8 @@ export abstract class ScaledAesthetic<
     } else {
       const scale = this.scale as ScaleContinuousNumeric<Input["domainType"], Output["rangeType"], never>;
       // Todo why do the types let this be a string?
-      return scale(value as number | Date) ;
+      const v = scale(value as number | Date) ;
+      return v
     }
   }
 
@@ -179,6 +198,13 @@ export abstract class ScaledAesthetic<
 
     const domain = this.dataset.domain(this.field);
     return domain;
+  }
+
+  get categoricalDomain(): Input['domainType'][] {
+    if (this.encoding['domain']) {
+      return this.encoding['domain'] as Input['domainType'][];
+    }
+    return this.categoricalValues();
   }
 
   get domain(): [Input['domainType'], Input['domainType']] {
@@ -235,40 +261,55 @@ export class Size<
   default_transform: DS.Transform = 'sqrt';
 }
 
-export class PositionalAesthetic<
+export abstract class PositionalAesthetic<
   ChannelType extends DS.OneDChannels = DS.OneDChannels,
   Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn
   > extends OneDAesthetic<ChannelType, Input> {
-  default_range: [number, number] = [-1, 1];
+  // default_range: [number, number] = [-1, 1];
   default_constant = 0;
   default_transform: DS.Transform = 'literal';
-  
+  abstract axis : 'x' | 'y'
   get range(): [number, number] {
     if (this.encoding && this.encoding['range']) {
       return this.encoding['range'] as [number, number]
-    } else if (this.dataset.extent && this.field && this.dataset.extent[this.field]) {
-      return this.dataset.extent[this.field as 'x' | 'y'];
-    }
+    } 
     return this.default_range;
+  }
+  get default_range(): [number, number] {
+    if (this.dataset.extent && this.axis && this.dataset.extent[this.axis]) {
+      return this.dataset.extent[this.axis];
+    }
+    return [-1, 1]
   }
 }
 
-// export const X = PositionalAesthetic;
+export class X<
+  ChannelType extends DS.OneDChannels = DS.OneDChannels,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn
+> extends PositionalAesthetic<ChannelType, Input> {
+  axis = 'x' as const;
+}
 
-// export const X0 = X;
+export class Y<
+  ChannelType extends DS.OneDChannels = DS.OneDChannels,
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn
+> extends PositionalAesthetic<ChannelType, Input> {
+  axis = 'y' as const;
 
-// export const Y = PositionalAesthetic;
-
-// export const Y0 = PositionalAesthetic
+}
 
 export class Jitter_speed<
   ChannelType extends DS.OneDChannels = DS.OneDChannels,
   Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn
   > extends OneDAesthetic<ChannelType, Input> {
+
   default_transform: DS.Transform = 'linear';
-  default_range: [number, number] = [0, 1];
+  get default_range() : [number, number] {
+    return [0, 1];
+  }
   public default_constant = 0.5;
   _constant = 0;
+
 }
 
 

@@ -1,5 +1,5 @@
 import { Scatterplot } from './deepscatter';
-import { tableFromIPC, RecordBatch, Table, tableToIPC, Type, Float, Vector } from 'apache-arrow';
+import { tableFromIPC, RecordBatch, Table, tableToIPC, Type, vectorFromArray } from 'apache-arrow';
 import { Dataset } from './Dataset';
 import { add_or_delete_column } from './Dataset';
 import type * as DS from './shared';
@@ -13,17 +13,18 @@ export function wrapArrowTable(
   tbArray: Uint8Array,
   plot: Scatterplot
 ): Dataset {
-  const tb = tableFromIPC(tbArray);
+  let tb = tableFromIPC(tbArray);
   let batches = tb.batches;
   if (tb.getChild('ix') === null) {
     let rowNum = 0;
     batches = batches.map((batch) => {
-      const array = new Float32Array(batch.numRows);
+      const array = new Int32Array(batch.numRows);
       for (let i = 0; i < batch.numRows; i++) {
         array[i] = rowNum++;
       }
-      return add_or_delete_column(batch, 'ix', array);
+      return add_or_delete_column(batch, 'ix', vectorFromArray(array));
     });
+    tb = new Table(batches);
   }
 
   const proxy = new ArrowProxy(batches);
@@ -59,7 +60,6 @@ class ArrowProxy implements DS.TileProxy {
     endpoint: string
   ): Promise<Uint8Array> {
     const scopedEndpoint = `feather:${endpoint}`;
-    console.log({scopedEndpoint})
     const url = new URL(scopedEndpoint);
     const { protocol, pathname } = url;
     if (protocol !== 'feather:') {
@@ -71,7 +71,8 @@ class ArrowProxy implements DS.TileProxy {
       .replace('.feather', '')
       .replace('//', '')
       .split('/')
-      .map((d) => parseInt(d));
+      .map((d) => parseInt(d))
+      .filter(d => !isNaN(d));
     
     const rowNum = treeToPosition(z, x);
     const tb = new Table([this.batches[rowNum]]);
@@ -80,8 +81,8 @@ class ArrowProxy implements DS.TileProxy {
       [z + 1, x * 2],
       [z + 1, x * 2 + 1],
     ]) {
-      if (treeToPosition(z_, x_) <= this.batches.length) {
-        children.push([z_, x_]);
+      if (treeToPosition(z_, x_) < this.batches.length) {
+        children.push(`${z_}/${x_}`)
       }
     }
     tb.schema.metadata.set('children', JSON.stringify(children));
@@ -92,8 +93,8 @@ class ArrowProxy implements DS.TileProxy {
 // For a 2d tree, calculate the associated number.
 function treeToPosition(z : number, x : number) {
   let rowNum = 0;
-  for (let z_ = 0; z < z; z_++) {
-    rowNum += Math.pow(2, z);
+  for (let z_ = 0; z_ < z; z_++) {
+    rowNum += Math.pow(2, z_);
   }
   rowNum += x;
   return rowNum;

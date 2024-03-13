@@ -160,7 +160,6 @@ export class Color<
       }
       if (encoding['range']) {
         this.encode_for_textures(encoding['range']);
-        console.log("posting to regl buffer")
         this.post_to_regl_buffer();
       } else {
         throw new Error("Unexpected color encoding -- must have range." + JSON.stringify(encoding))
@@ -173,6 +172,15 @@ export class Color<
   
   get default_range(): [string, string] {
     return ["white", "blue"];
+  }
+
+  protected categoricalRange() : string[] {
+    if (this.encoding && this.encoding['range']) {
+      if (typeof this.encoding['range'] === 'string') {
+        return [...schemes[this.encoding['range']]];
+      }
+    }
+    return this.encoding['range'] as string[];
   }
 
   post_to_regl_buffer() {
@@ -197,7 +205,6 @@ export class Color<
   }
 
   apply(v: Datum) : string {
-
     if (this.encoding === null) {
       return this.default_constant
     }

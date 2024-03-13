@@ -113,7 +113,7 @@ export class Tile {
     this.transformation_holder[name] = Promise.resolve(transform(this)).then(
       (transformed) => {
         if (transformed === undefined) {
-          throw new Error(`Transformation ${name} failed by returning empty data`);
+          throw new Error(`Transformation ${name} failed by returning empty data. All transformation functions must return a typedArray or Arrow Vector.`);
         }
         this._batch = add_or_delete_column(
           this.record_batch,
@@ -378,7 +378,7 @@ export class Tile {
       // 3/4/3
       // suffix: 'text'
       // 3/4/3.text.feather
-      url = url.replace('.feather', `.${suffix}.feather`);
+      url = url.replace(/.feather/, `.${suffix}.feather`);
     }
     let tb: Table;
     let buffer: ArrayBuffer;
@@ -506,11 +506,12 @@ export class Tile {
 
   get theoretical_extent(): Rectangle {
 
-    // QUADTREE SPECIFIC CODE.
-
     if (this.dataset.tileStucture === 'other') {
       // Only three-length-keys are treated as quadtrees.
       return this.dataset.extent;
+    }
+    if (!this.codes) {
+      this.codes = this.key.split('/').map((d) => parseInt(d));
     }
     const base = this.dataset.extent;
     const [z, x, y] = this.codes;

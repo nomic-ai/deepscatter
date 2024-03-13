@@ -16,22 +16,29 @@ Breaking changes:
    import { Scatterplot } from 'deepscatter';
    ```
 
-   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{Dataset, Bitmask, Scatterplot}`.
-
-2. The distinction between QuadTile and ArrowTile 
-   has been eliminated in favor of Tile, and with it the need to provide 
-   generics around them through the system. Similarly, QuadTileDataset and ArrowDataset  are both removed in favor of Dataset.
-   Instead, the TileProxy object is used to provide a wrapper than can turn anything into a
-   dataset. Although datasets are presumed to be  quadtiles right now, formally they can be any
-   any collection of arrow batches structured as a tree. (This is increasingly how I've come to think of the data parts of deepscatter: as a system for navigating dataframes that consist of trees rather than of linear lists of points.)
-3. Deepscatter no longer accepts strings as direct
+   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{Dataset, Bitmask, Scatterplot}`. Bitmasks are efficient, useful forms. 
+2. Apache Arrow is now a peer dependency of deepscatter rather than
+   being bundled into the distribution. Most bundlers will hopefully take care of installation for you, but if you are writing raw HTML code, 
+   it will be necessary to include and re-export it. In general that will look like this.
+   ```
+   import * as Arrow from 'apache-arrow';
+   export { Arrow };
+   ``` 
+   
+   
+3. The distinction between `QuadTile` and `ArrowTile` 
+   has been eliminated in favor of `Tile`, and with it the need to supply 
+   generics around them through the system. Similarly, `QuadTileDataset` and `ArrowDataset` have both been removed in favor of `Dataset`. 
+1. Deepscatter no longer accepts strings as direct
    arguments to `Scatterplot.plotAPI` in places where they were previously cast to functions 
    as lambdas, because linters rightfully get crazy mad about the unsafe use of `eval`. If
    you want to use deepscatter in scrollytelling
    contexts where definining functions as strings inside json is convenient (I still will do this myself in static sites) you must turn them
    into functions *before* passing them into deepscatter.
-4. Shortcuts for passing `position` and `position0` rather than naming the `x` and `y` dimensions explicitly have been removed.
-5. The syntax for expressly passing a categorical scale may change.
+1. Shortcuts for passing `position` and `position0` rather 
+   than naming the `x` and `y` dimensions explicitly have been removed.
+1. 
+1. The syntax for expressly passing a categorical scale may change.
 
 ## Fundamental design changes
 

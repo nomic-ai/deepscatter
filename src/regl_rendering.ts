@@ -121,7 +121,7 @@ export class ReglRenderer extends Renderer {
   get props() : DS.GlobalDrawProps {
     // Stuff needed for regl.
 
-    // Would be better cached per draw call.
+                  // Would be better cached per draw call.
     this.allocate_aesthetic_buffers();
     const {
       prefs,
@@ -246,7 +246,7 @@ export class ReglRenderer extends Renderer {
         5
       );
     } else {
-      console.warn("No good rules here yet.")
+      // console.warn("No good rules here yet.")
       tileSet.download_most_needed_tiles(undefined, prefs.max_points, 5);
     }
     // regl.clear({
@@ -930,8 +930,12 @@ export class ReglRenderer extends Renderer {
     for (const dim of ['filter', 'filter2', 'foreground']) {
       const d = this.aes.dim(dim) as StatefulAesthetic<Foreground | Filter>
       for (const time of [['', 'current'], ['last_', 'last']] as const) {
-        const ops = d[time[1]].ops_to_array()
-        parameters.uniforms[`u_${time[0]}${dim}_numeric`] = ops;
+        parameters.uniforms[`u_${time[0]}${dim}_numeric`] = () => {
+          const ops = d[time[1]].ops_to_array()
+          // console.log(ops, dim, time)
+          // console.log(1)
+          return ops;
+        }
       }
     }
     // store needed buffers

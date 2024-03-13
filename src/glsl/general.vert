@@ -510,7 +510,6 @@ float domainify(in vec2 domain, in float transform, in float attr, in float over
   }
   if (overflow_behavior == 2.) {
     //wrap
-
     return fract(linscale(domain, attr));
   }
   return linscale(domain, attr);
@@ -596,12 +595,11 @@ float texture_float_lookup(in vec2 domain,
     // Literal transforms aren't looked up, just returned as is.
     return attr;
   }
-  float inrange = domainify(domain, transform, attr, 1.);
+  float inrange = domainify(domain, transform, attr, 0.);
   if (texture_position > 0.5) {
     float y_pos = texture_position / 32. - 0.5 / 32.;
     vec4 encoded = texture2D(u_one_d_aesthetic_map, vec2(y_pos, inrange));
     return encoded.a;
-    return RGBAtoFloat(encoded); // unreachable.
   } else {
     return mix(range.x, range.y, inrange);
   }

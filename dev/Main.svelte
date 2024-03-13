@@ -30,6 +30,7 @@
   let scatterplot = null;
   onMount( () => {
     scatterplot = new Scatterplot('#deepscatter');
+    window.scatterplot = scatterplot;
     scatterplot.plotAPI(prefs)
   })
 </script>
