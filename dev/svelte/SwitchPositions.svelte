@@ -7,15 +7,14 @@
       encoding: {
         x: {
           field: scatterplot.prefs.encoding.x.field === 'x' ? 'y' : 'x',
-          transform: 'literal'
+          transform: scatterplot.prefs.encoding.x.field === 'x' ? 'linear': 'literal'
         },
         y: {
           field: scatterplot.prefs.encoding.y.field === 'y' ? 'x' : 'y',
-          transform: 'literal'
+          transform: scatterplot.prefs.encoding.y.field === 'y' ? 'linear': 'literal'
         }
       }
     })
-    console.log(scatterplot.prefs.encoding.x)
   }
 </script>
 

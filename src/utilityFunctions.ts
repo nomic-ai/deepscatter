@@ -78,7 +78,25 @@ function createDictionaryWithVector(
     nullCount: 0,
     data: indices,
     dictionary: labelsArrow,
-  }); // WTF typesciprt why do you make me cast to unknown???
+  });
 
   return returnval;
+}
+
+export function LazyGetter() {
+  return function (target: any, key: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.get;
+
+    descriptor.get = function () {
+      const cacheKey = `_____${key}`;
+
+      if (!this[cacheKey]) {
+        this[cacheKey] = originalMethod.call(this);
+      }
+
+      return this[cacheKey];
+    };
+
+    return descriptor;
+  };
 }

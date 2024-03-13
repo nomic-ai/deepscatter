@@ -229,8 +229,6 @@ export class TextureSet {
   }
 }
 
-
-
 // Encode a jitter method for use on the shaders.
 
 function encode_jitter_to_int(jitter: DS.JitterMethod) : 0 | 1 | 2 | 3 | 4 | 5 {

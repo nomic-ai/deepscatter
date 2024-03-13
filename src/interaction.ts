@@ -126,7 +126,6 @@ export class Zoom {
       const data_aspect_ratio = (x1 - x0) / (y1 - y0);
       if (data_aspect_ratio < aspect_ratio) {
         const extension = data_aspect_ratio / aspect_ratio;
-        console.log(extension, { x0 });
         x0 = x0 - (x1 - x0) * extension;
       }
     }
@@ -173,19 +172,20 @@ export class Zoom {
   }
 
   set_highlit_points(data: StructRowProxy[]) {
-    const { x_, y_ } = this.scales();
+    const { x_, y_, x, y } = this.scales();
     const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
     this.scatterplot.highlit_point_change(data, this.scatterplot);
 
-    const annotations: Annotation[] = data.map((d) => ({
-      x: x_(xdim.apply(d)),
-      y: y_(ydim.apply(d)),
+    const annotations: Annotation[] = data.map((d) => {
+      return {
+      x: x_((xdim.apply(d))),
+      y: y_((ydim.apply(d))),
       data: d,
       dx: 0,
       dy: 30,
-    }));
-
+      }
+    })
     this.html_annotation(annotations);
 
     const sel = this.svg_element_selection.select('#mousepoints');
@@ -290,8 +290,7 @@ export class Zoom {
     return this as Zoom;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  scales(equal_units = true): Record<string, ScaleLinear<number, number>> {
+  scales(): Record<string, ScaleLinear<number, number>> {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.

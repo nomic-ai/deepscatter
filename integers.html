@@ -12,10 +12,13 @@
     <div id="foreground">FOREGROUND:</div>
     <div id="categorical">CATEGORICAL:</div>
   </div>
+  <textarea style="display:none" data-testid="API">
+  
+  </textarea>
   <div id="deepscatter"></div>
 </body>
-<script type="module">
-  import { Scatterplot, Dataset } from './src/deepscatter';
+<script type="module" lang="ts">
+  import { Scatterplot, Dataset, Bitmask } from './src/deepscatter';
   import {
     tableFromArrays,
     Table,
@@ -28,7 +31,7 @@
     Dictionary,
     makeVector
   } from 'apache-arrow';
-  const num_batches = 1;
+  const num_batches = 4;
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
@@ -36,10 +39,13 @@
   }
   let batch_no = 0;
 
-  /* Clifford attractor frame.*/
-  function batch(n_batches) {
+  const queryString = window.location.search;
+  const urlParams = new URLSearchParams(queryString);
+  const filterMethod = urlParams.get('filter-method') || 'bitmask';
+
+  // A function to create a single batch
+  function createTable(n_batches) {
     function make_batch(start = 0, length = 65536) {
-      console.log('Making', start);
       const batch_number_here = batch_no++;
 
       let x = new Float32Array(length);
@@ -62,8 +68,8 @@
             }
           }
         }
-        x[i - start] = x_ / 1024 / 1024;
-        y[i - start] = y_ / 1024 / 1024;
+        x[i - start] = x_;
+        y[i - start] = y_;
         integers[i - start] = i;
       }
 
@@ -79,7 +85,7 @@
       });
     }
     const batches = [];
-    const SIZE = 65536
+    const SIZE = 65536 / 4 / 4;
     for (let i = 0; i < n_batches; i++) {
       const batch = make_batch(i * SIZE, SIZE);
       batches.push(batch);
@@ -90,7 +96,7 @@
     return table;
   }
 
-  const table = batch(num_batches);
+  const table = createTable(num_batches);
   const plot = new Scatterplot('#deepscatter');
 
   function eratosthenes(n) {
@@ -139,7 +145,7 @@
       color: {
         field: 'integers',
         range: 'viridis',
-        domain: [1, 65000],
+        domain: [1, 65000 / 4],
         transform: 'log',
       },
     },
@@ -273,19 +279,32 @@
   };
 
   function bindproductsOf(n) {
-    plot.dataset.transformations[`products of ${n}`] = function (tile) {
-      const integers = tile.record_batch.getChild('integers');
-      window.integers = integers;
-      const output = new Float32Array(integers.length);
-      for (let i = 0; i < integers.length; i += 1) {
-        let int = integers.get(i);
-        if (int % n === 0) {
-          output[i] += 1;
-          int = int / n;
+    if (filterMethod === 'float32') {
+      plot.dataset.transformations[`products of ${n}`] = function (tile) {
+        const integers = tile.record_batch.getChild('integers');
+        const output = new Float32Array(integers.length);
+        for (let i = 0; i < integers.length; i += 1) {
+          let int = integers.get(i);
+          if (int % n === 0) {
+            output[i] += 1;
+            int = int / n;
+          }
         }
+        return output;
+      };
+    } else if (filterMethod === 'bitmask') {
+      plot.dataset.transformations[`products of ${n}`] = async function (tile) {
+        const integers = tile.record_batch.getChild('integers');
+        const mask = new Bitmask(integers.length);
+        for (let i = 0; i < integers.length; i += 1) {
+          let int = integers.get(i);
+          if (int % n === 0) {
+            mask.set(i, true);
+          }
+        }
+        return mask.to_arrow();
       }
-      return output;
-    };
+    }
   }
   const done = new Set();
   function highlight(key) {
@@ -362,6 +381,7 @@
     .addEventListener('click', () =>
       plot.plotAPI({ encoding: { foreground: null, size: {} } })
     );
+
 
 
   function dictionaryFromArrays(indices, labels) {

@@ -276,7 +276,7 @@ export class Dataset {
         max = JSON.parse(mmax) as T[0];
       }
       // Can pass min, max as strings for dates.
-      if (dim.type.typeId === 10) {
+      if (dim.type.typeId === Type.Timestamp) {
         if (typeof min !== 'string' || typeof max !== 'string') {
           throw new Error(
             'Date field extents in metadata must be passed as strings'
@@ -551,6 +551,7 @@ export class Dataset {
    * @returns A list of [tile, point] pairs that match the index.
    */
   findPointRaw(ix: number): [Tile, StructRowProxy, number][] {
+    console.log({ix})
     const matches: [Tile, StructRowProxy, number][] = [];
     this.visit((tile: Tile) => {
       if (
