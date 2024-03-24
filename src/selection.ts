@@ -2,7 +2,14 @@ import { Dataset } from './Dataset';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
 import type * as DS from './shared.d';
-import { Bool, DataType, StructRowProxy, Type, Vector, makeData } from 'apache-arrow';
+import {
+  Bool,
+  DataType,
+  StructRowProxy,
+  Type,
+  Vector,
+  makeData,
+} from 'apache-arrow';
 import { bisectLeft } from 'd3-array';
 interface SelectParams {
   name: string;
@@ -23,9 +30,7 @@ export interface IdSelectParams extends SelectParams {
   idField: string;
 }
 
-function isIdSelectParam(
-  params: unknown
-): params is IdSelectParams {
+function isIdSelectParam(params: unknown): params is IdSelectParams {
   return params && params['ids'] !== undefined;
 }
 
@@ -37,9 +42,7 @@ export interface CompositionSelectParams extends SelectParams {
   composition: Composition;
 }
 
-function isBooleanColumnParam(
-  params: unknown
-): params is BooleanColumnParams {
+function isBooleanColumnParam(params: unknown): params is BooleanColumnParams {
   return params && params['field'] !== undefined;
 }
 
@@ -72,7 +75,7 @@ export interface CompositeSelectParams extends SelectParams {
 }
 
 function isCompositeSelectParam(
-  params: Record<string, any>
+  params: Record<string, any>,
 ): params is CompositeSelectParams {
   return params.composition !== undefined;
 }
@@ -98,7 +101,7 @@ async function extractBitmask(tile: Tile, arg: CompArgs): Promise<Bitmask> {
 
 async function applyCompositeFunctionToTile(
   tile: Tile,
-  args: Composition
+  args: Composition,
 ): Promise<Bitmask> {
   const operator = args[0];
   if (args[0] === 'NOT') {
@@ -120,7 +123,7 @@ async function applyCompositeFunctionToTile(
   } else if (isPluralSelectParam(operator)) {
     const op = args[0];
     const bitmasks = await Promise.all(
-      args.slice(1).map((arg) => extractBitmask(tile, arg))
+      args.slice(1).map((arg) => extractBitmask(tile, arg)),
     );
     const accumulated = bitmasks
       .slice(1)
@@ -149,21 +152,21 @@ export interface FunctionSelectParams extends SelectParams {
 }
 
 function isPluralSelectParam(
-  params: PluralOperation | BinaryOperation | UnaryOperation
+  params: PluralOperation | BinaryOperation | UnaryOperation,
 ): params is PluralOperation {
   const things = new Set(['ANY', 'ALL', 'NONE']);
   return things.has(params[0]);
 }
 
 function isBinarySelectParam(
-  params: PluralOperation | BinaryOperation | UnaryOperation
+  params: PluralOperation | BinaryOperation | UnaryOperation,
 ): params is BinaryOperation {
   const things = new Set(['AND', 'OR', 'XOR', 'NAND']);
   return things.has(params[0]);
 }
 
 function isFunctionSelectParam(
-  params: Record<string, any>
+  params: Record<string, any>,
 ): params is FunctionSelectParams {
   return params.tileFunction !== undefined;
 }
@@ -188,7 +191,6 @@ export class Bitmask {
     this.length = length;
     this.mask = mask || new Uint8Array(Math.ceil(length / 8));
   }
-
 
   static from_arrow(vector: Vector<Bool>): Bitmask {
     const mask = vector.data[0].values;
@@ -218,15 +220,14 @@ export class Bitmask {
   unset(i: number) {
     const byte = Math.floor(i / 8);
     const bit = i % 8;
-    this.mask[byte] = this.mask[byte] & ~(1 << bit)
+    this.mask[byte] = this.mask[byte] & ~(1 << bit);
   }
-
 
   // Is the ith position on the mask set?
   get(i: number) {
     const byte = Math.floor(i / 8);
     const bit = i % 8;
-    return ((1 << bit) & byte) > 0
+    return ((1 << bit) & byte) > 0;
   }
 
   and(other: Bitmask) {
@@ -333,7 +334,7 @@ export class DataSelection {
       | IdSelectParams
       | BooleanColumnParams
       | FunctionSelectParams
-      | CompositeSelectParams
+      | CompositeSelectParams,
   ) {
     this.plot = plot;
     this.dataset = plot.dataset;
@@ -344,14 +345,16 @@ export class DataSelection {
     });
     this.composition = null;
     if (isIdSelectParam(params)) {
-      void this.add_identifier_column(params.name, params.ids, params.idField).then(
-        markReady
-      );
+      void this.add_identifier_column(
+        params.name,
+        params.ids,
+        params.idField,
+      ).then(markReady);
     } else if (isBooleanColumnParam(params)) {
       void this.add_boolean_column(params.name, params.field).then(markReady);
     } else if (isFunctionSelectParam(params)) {
       void this.add_function_column(params.name, params.tileFunction).then(
-        markReady
+        markReady,
       );
     } else if (isCompositeSelectParam(params)) {
       const { name, composition } = params;
@@ -397,12 +400,9 @@ export class DataSelection {
   applyToAllLoadedTiles(): Promise<void> {
     return Promise.all(
       this.dataset.map((tile) => {
-        // Checks that it's loaded.
-        if (tile.ready) {
-          // triggers creation of the dataset column as a side-effect.
-          return tile.get_column(this.name);
-        }
-      })
+        // triggers creation of the dataset column as a side-effect.
+        return tile.get_column(this.name);
+      }),
     ).then(() => {});
   }
 
@@ -462,13 +462,13 @@ export class DataSelection {
     return this;
   }
 
-  async removePoints(name : string, ixes: bigint[]): Promise<DataSelection> {
+  async removePoints(name: string, ixes: bigint[]): Promise<DataSelection> {
     return this.add_or_remove_points(name, ixes, 'remove');
   }
 
   // Non-editable behavior:
   // if a single point is added, will also adjust the cursor.
-  async addPoints(name : string, ixes: bigint[]): Promise<DataSelection> {
+  async addPoints(name: string, ixes: bigint[]): Promise<DataSelection> {
     return this.add_or_remove_points(name, ixes, 'add');
   }
 
@@ -500,7 +500,9 @@ export class DataSelection {
   }
 
   public moveCursorToPoint(
-    point: StructRowProxy<{'ix': DataType<Type.Int64>} > | Record<'ix', bigint | number>
+    point:
+      | StructRowProxy<{ ix: DataType<Type.Int64> }>
+      | Record<'ix', bigint | number>,
   ) {
     // The point contains a field called 'ix', which increases in each tile;
     // we use this for moving because it lets us do binary search for relevant tile.
@@ -508,7 +510,7 @@ export class DataSelection {
     const ix = point.ix as bigint;
     if (point.ix === undefined) {
       throw new Error(
-        'Unable to move cursor to point, because it has no `ix` property.'
+        'Unable to move cursor to point, because it has no `ix` property.',
       );
     }
     let currentOffset = 0;
@@ -521,7 +523,7 @@ export class DataSelection {
       if (tile.min_ix < ix && tile.max_ix > ix) {
         const mid = bisectLeft(
           [...tile.record_batch.getChild('ix').data[0].values],
-          point.ix as number
+          point.ix as number,
         );
         const val = tile.record_batch.get(mid);
         // We have to check that there's actually a match,
@@ -540,7 +542,7 @@ export class DataSelection {
       return null;
     }
     const column = relevantTile.record_batch.getChild(
-      this.name
+      this.name,
     ) as Vector<Bool>;
 
     for (let j = 0; j < positionInTile; j++) {
@@ -552,9 +554,9 @@ export class DataSelection {
   }
 
   private async add_or_remove_points(
-    newName : string,
+    newName: string,
     ixes: bigint[],
-    which: 'add' | 'remove'
+    which: 'add' | 'remove',
   ) {
     let newCursor = 0;
     let tileOfMatch = undefined;
@@ -563,10 +565,11 @@ export class DataSelection {
       await this.ready;
 
       // First, get the current version of the tile.
-      const original = (await tile.get_column(this.name)) as Vector<Bool>
+      const original = (await tile.get_column(this.name)) as Vector<Bool>;
       // Then locate the ix column and look for matches.
-      const ixcol = tile.record_batch.getChild('ix').data[0].values as BigInt64Array;
-      const mask = Bitmask.from_arrow(original)
+      const ixcol = tile.record_batch.getChild('ix').data[0]
+        .values as BigInt64Array;
+      const mask = Bitmask.from_arrow(original);
       for (const ix of ixes) {
         // Since ix is ordered, we can do a fast binary search to see if the
         // point is there--no need for a full scan.
@@ -580,7 +583,7 @@ export class DataSelection {
           // Copy the buffer so we don't overwrite the old one.
           // Set the specific value.
           if (which === 'add') {
-            mask.set(mid)
+            mask.set(mid);
             if (ixes.length === 1) {
               tileOfMatch = tile.key;
               // For single additions, we also move the cursor to the
@@ -597,7 +600,7 @@ export class DataSelection {
             }
           } else {
             // If deleting, we set it to zero.
-            mask.unset(mid)
+            mask.unset(mid);
           }
         }
       }
@@ -640,7 +643,7 @@ export class DataSelection {
    */
   async add_function_column(
     name: string,
-    tileFunction: DS.BoolTransformation
+    tileFunction: DS.BoolTransformation,
   ): Promise<void> {
     if (this.dataset.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
@@ -660,7 +663,7 @@ export class DataSelection {
    */
 
   private wrapWithSelectionMetadata(
-    functionToApply: DS.BoolTransformation
+    functionToApply: DS.BoolTransformation,
   ): DS.BoolTransformation {
     return async (tile: Tile) => {
       const array = await functionToApply(tile);
@@ -707,7 +710,7 @@ export class DataSelection {
     }
     if (i > this.selectionSize) {
       throw new Error(
-        `Index ${i} out of bounds for selection of size ${this.selectionSize}`
+        `Index ${i} out of bounds for selection of size ${this.selectionSize}`,
       );
     }
     let currentOffset = 0;
@@ -725,7 +728,7 @@ export class DataSelection {
       return null;
     }
     const column = relevantTile.record_batch.getChild(
-      this.name
+      this.name,
     ) as Vector<Bool>;
     const offset = i - currentOffset;
     let ix_in_match = 0;
@@ -756,7 +759,7 @@ export class DataSelection {
     name: string,
     codes: string[] | bigint[] | number[],
     key_field: string,
-    options: IdentifierOptions = {}
+    options: IdentifierOptions = {},
   ): Promise<void> {
     if (this.dataset.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);

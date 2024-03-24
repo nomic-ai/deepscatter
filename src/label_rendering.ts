@@ -301,7 +301,6 @@ export class LabelMaker extends Renderer {
         select(event.target).style('opacity', RECT_DEFAULT_OPACITY);
         this.hovered = '' + d.minZ + d.minX;
         event.stopPropagation();
-
       })
       .on('mousemove', function (event : MouseEvent) {
         event.stopPropagation();
