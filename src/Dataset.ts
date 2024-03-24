@@ -34,25 +34,46 @@ type Key = string;
 type ArrowBuildable = DS.ArrowBuildable;
 type Transformation = DS.Transformation;
 
+// Some variables are universally available.
+const defaultTransformations: Record<string, Transformation> = {
+  ix: async function (tile) {
+    // console.warn(`Getting ix ${tile.key}`);
+    const batch = await tile.get_arrow(null);
+    return batch.getChild('ix') as Vector<Int64 | Int32>;
+  },
+  x: async function (tile) {
+    // console.warn(`Getting x ${tile.key}`);
+    const batch = await tile.get_arrow(null);
+    return batch.getChild('x') as Vector<Float32>;
+  },
+  y: async function (tile) {
+    // console.warn(`Getting y ${tile.key}`);
+    const batch = await tile.get_arrow(null);
+    return batch.getChild('y') as Vector<Float32>;
+  },
+};
+
 /**
  * A Dataset manages the production and manipulation of tiles. Each plot has a
  * single dataset; the dataset handles all transformations around data through
  * batchwise operations.
  */
 export class Dataset {
-  public transformations: Record<string, Transformation> = {};
+  public transformations: Record<string, Transformation> =
+    defaultTransformations;
   protected plot: Scatterplot;
   private extents: Record<string, [number, number] | [Date, Date]> = {};
   // A 3d identifier for the tile. Usually [z, x, y]
-  private _extent? : Rectangle;
+  private _extent?: Rectangle;
   public _ix_seed = 0;
   public _schema?: Schema;
   public tileProxy?: DS.TileProxy;
   protected _download_queue: Set<Key> = new Set();
   public promise: Promise<void>;
   public root_tile: Tile;
+  public manifest?: DS.TileManifest;
   // Whether the tileset is structured as a pure quadtree.
-  public readonly tileStucture : DS.TileStructure = 'quadtree';
+  public readonly tileStucture: DS.TileStructure = 'quadtree';
   /**
    * @param plot The plot to which this dataset belongs.
    **/
@@ -60,23 +81,45 @@ export class Dataset {
   constructor(
     base_url: string,
     plot: Scatterplot,
-    options: DS.DatasetOptions = {}
+    options: DS.DatasetOptions = {},
   ) {
     this.plot = plot;
     this.tileProxy = options.tileProxy;
-    this.root_tile = new Tile('0/0/0', null, this, base_url);
-    const download = this.root_tile.download();
+
+    const rootKey = options['rootKey'] || '0/0/0';
     if (options.tileStructure) {
       this.tileStucture = options.tileStructure;
     }
     if (options.extent) {
       this._extent = options.extent;
     }
-    this.promise = download.then(() => {
-      const schema = this.root_tile.record_batch.schema;
+
+    // If no manifest is passed, we still know
+    // that there is a root tile at the root key.
+
+    const defaultManifest: Partial<DS.TileManifest> = {
+      key: rootKey,
+      children: undefined,
+      min_ix: 0,
+      max_ix: Number.MAX_SAFE_INTEGER,
+      ...(options.tileManifest || {}),
+    };
+    // Must come after manifest is set.
+    this.root_tile = new Tile(defaultManifest, null, this, base_url);
+    const preProcessRootTile = this.root_tile.preprocessRootTileInfo();
+
+    this.promise = preProcessRootTile.then(async () => {
+      const batch = await this.root_tile.get_arrow(null);
+      const schema = batch.schema;
+      console.log('HERE');
+      await this.root_tile.loadManifestInfoFromTileMetadata();
+      console.log(this.root_tile.max_ix);
+      console.log('BHERE');
+
+      console.log(this.extent);
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
-        const parsed = JSON.parse(cars) as Record<string, string>;
+        const parsed = JSON.parse(cars as string) as Record<string, string>;
         for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function (tile) {
             const batch = await tile.get_arrow(v);
@@ -85,7 +128,7 @@ export class Dataset {
               throw new Error(
                 `No column named ${k} in sidecar tile ${batch.schema.fields
                   .map((f) => f.name)
-                  .join(', ')}`
+                  .join(', ')}`,
               );
             }
             return column;
@@ -97,20 +140,22 @@ export class Dataset {
     });
   }
 
-
   get ready() {
-    return this.root_tile.download();
+    return this.promise;
   }
 
-  get extent() : Rectangle {
+  get extent(): Rectangle {
     if (this._extent) {
-      return this._extent
+      return this._extent;
     }
     if (this.tileStucture === 'other') {
-      return this._extent = {
+      return (this._extent = {
         x: this.domain('x') as [number, number],
-        y: this.domain('y') as [number, number]
-      }
+        y: this.domain('y') as [number, number],
+      });
+    }
+    if (!this.root_tile.hasLoadedColumn('x')) {
+      throw new Error("Can't access extent without a root tile");
     }
     return this.root_tile.extent;
   }
@@ -120,8 +165,8 @@ export class Dataset {
    * datapoints of index less than or equal to max_ix.
    * @param max_ix the depth to download to.
    */
-  async download_to_depth(max_ix: number) {
-    await this.root_tile.download_to_depth(max_ix);
+  async download_to_depth(max_ix: number, suffix: string | null = null) {
+    await this.root_tile.download_to_depth(max_ix, suffix);
   }
 
   /**
@@ -165,7 +210,7 @@ export class Dataset {
   register_transformation(
     name: string,
     pointFunction: DS.PointFunction,
-    prerequisites: string[] = []
+    prerequisites: string[] = [],
   ) {
     const transform: Transformation = async (tile: Tile) => {
       //
@@ -191,13 +236,13 @@ export class Dataset {
   get table(): Table {
     return new Table(
       this.map((d) => d)
-        .filter((d) => d.ready)
-        .map((d) => d.record_batch)
+        .filter((d) => d.record_batch)
+        .map((d) => d.record_batch),
     );
   }
 
   static from_quadfeather(url: string, plot: Scatterplot): Dataset {
-    const options = {};
+    const options: Partial<DS.DatasetOptions> = {};
     if (plot.tileProxy) {
       options['tileProxy'] = plot.tileProxy;
     }
@@ -252,13 +297,13 @@ export class Dataset {
    */
 
   domain<T extends [number, number] | [string, Date] = [number, number]>(
-    columnName: string
+    columnName: string,
   ): [T[1], T[1]] {
     if (this.extents[columnName]) {
       return this.extents[columnName];
     }
     const dim = this._schema?.fields.find(
-      (d) => d.name === columnName
+      (d) => d.name === columnName,
     ) as Field<DS.SupportedArrowTypes>;
     if (dim !== undefined) {
       let min: T[0] | undefined = undefined;
@@ -279,7 +324,7 @@ export class Dataset {
       if (dim.type.typeId === Type.Timestamp) {
         if (typeof min !== 'string' || typeof max !== 'string') {
           throw new Error(
-            'Date field extents in metadata must be passed as strings'
+            'Date field extents in metadata must be passed as strings',
           );
         }
         return (this.extents[columnName] = [new Date(min), new Date(max)]);
@@ -296,9 +341,9 @@ export class Dataset {
     return (this.extents[columnName] = extent([
       ...new Vector(
         this.map((d) => d)
-          .filter((d) => d.ready)
+          .filter((d) => d.hasLoadedColumn(columnName))
           .map((d) => d.record_batch.getChild(columnName))
-          .filter((d) => d !== null)
+          .filter((d) => d !== null),
       ),
     ]));
   }
@@ -308,7 +353,7 @@ export class Dataset {
     let current: Tile;
     while ((current = stack.shift())) {
       if (
-        current.download_state == 'Complete' &&
+        current.hasLoadedColumn('ix') &&
         (bbox === undefined || current.is_visible(max_ix, bbox))
       ) {
         for (const point of current) {
@@ -319,7 +364,7 @@ export class Dataset {
             yield point;
           }
         }
-        stack.push(...current.children);
+        stack.push(...current.loadedChildren);
       }
     }
   }
@@ -355,13 +400,13 @@ export class Dataset {
   visit(
     callback: (tile: Tile) => void,
     after = false,
-    filter: (t: Tile) => boolean = () => true
+    filter: (t: Tile) => boolean = () => true,
   ) {
     // Visit all children with a callback function.
 
     const stack: Tile[] = [this.root_tile];
     const after_stack = [];
-    let current: Tile;
+    let current: Tile | undefined;
     while ((current = stack.shift())) {
       if (!after) {
         callback(current);
@@ -372,9 +417,7 @@ export class Dataset {
         continue;
       }
       // Only create children for downloaded tiles.
-      if (current.download_state == 'Complete') {
-        stack.push(...current.children);
-      }
+      stack.push(...current.loadedChildren);
     }
     if (after) {
       while ((current = after_stack.pop() as Tile)) {
@@ -399,8 +442,8 @@ export class Dataset {
     callback: (tile: Tile) => Promise<void>,
     after = false,
     starting_tile: Tile | null = null,
-    filter: (t: Tile) => boolean = (x) => true,
-    updateFunction: (tile: Tile, completed, total) => Promise<void>
+    filter: (t: Tile) => boolean = () => true,
+    updateFunction: (tile: Tile, completed, total) => Promise<void>,
   ) {
     // Visit all children with a callback function.
     // In general recursing quadtrees isn't that fast, but
@@ -409,15 +452,18 @@ export class Dataset {
 
     let seen = 0;
     const start = starting_tile || this.root_tile;
-    await start.download();
+    await start.loadManifestInfoFromTileMetadata();
     const total_points = JSON.parse(
-      start.record_batch.schema.metadata.get('total_points')
+      start.record_batch.schema.metadata.get('total_points'),
     ) as number;
 
     async function resolve(tile: Tile) {
-      await tile.download();
+      await tile.loadManifestInfoFromTileMetadata();
+      if (!filter(tile)) {
+        return;
+      }
       if (after) {
-        await Promise.all(tile.children.map(resolve));
+        await Promise.all(tile.loadedChildren.map(resolve));
         await callback(tile);
         seen += tile.record_batch.numRows;
         void updateFunction(tile, seen, total_points);
@@ -425,13 +471,14 @@ export class Dataset {
         await callback(tile);
         seen += tile.record_batch.numRows;
         void updateFunction(tile, seen, total_points);
-        await Promise.all(tile.children.map(resolve));
+        await Promise.all(tile.loadedChildren.map(resolve));
       }
     }
     await resolve(start);
   }
 
   async schema() {
+    throw new Error('Schema access is deprecated');
     await this.ready;
     if (this._schema) {
       return this._schema;
@@ -459,7 +506,7 @@ export class Dataset {
         const tilename = batch.getChild('_tile').get(i) as string;
         records[tilename] = values.values.slice(
           offsets[i],
-          offsets[i + 1]
+          offsets[i + 1],
           // Type coercion necessary because Float[]
           // and the backing Float32Array are not recognized as equivalent.
         ) as unknown as Float32Array;
@@ -495,11 +542,11 @@ export class Dataset {
   add_label_identifiers(
     ids: Record<string, number>,
     field_name: string,
-    key_field = '_id'
+    key_field = '_id',
   ) {
     if (this.transformations[field_name]) {
       throw new Error(
-        `Can't overwrite existing transformation for ${field_name}`
+        `Can't overwrite existing transformation for ${field_name}`,
       );
     }
     this.transformations[field_name] = function (tile: Tile) {
@@ -507,7 +554,7 @@ export class Dataset {
         tile.record_batch,
         ids,
         field_name,
-        key_field
+        key_field,
       );
     };
   }
@@ -551,17 +598,10 @@ export class Dataset {
    * @returns A list of [tile, point] pairs that match the index.
    */
   findPointRaw(ix: number): [Tile, StructRowProxy, number][] {
-    console.log({ix})
+    console.log({ ix });
     const matches: [Tile, StructRowProxy, number][] = [];
     this.visit((tile: Tile) => {
-      if (
-        !(
-          tile.ready &&
-          tile.record_batch &&
-          tile.min_ix <= ix &&
-          tile.max_ix >= ix
-        )
-      ) {
+      if (!(tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
         return;
       }
       const ixcol = tile.record_batch.getChild('ix') as Vector<Int>;
@@ -577,11 +617,11 @@ export class Dataset {
   download_most_needed_tiles(
     bbox: Rectangle | undefined,
     max_ix: number,
-    queue_length = 4
+    queue_length = 8,
   ) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
-      unneeded parts of the database. So the tile handles its own queue for dispatching
+      unneeded parts of the dataset. So the dataset handles its own queue for dispatching
       downloads in case tiles have slipped from view while parents were requested.
     */
 
@@ -591,34 +631,35 @@ export class Dataset {
       return;
     }
 
-    const scores: [number, Tile, Rectangle][] = [];
+    const scores: [number, Tile][] = [];
 
     function callback(tile: Tile) {
-      if (bbox === undefined) {
-        // Just depth.
-        return 1 / tile.codes[0];
-      }
-      if (tile.download_state === 'Unattempted') {
-        const distance = check_overlap(tile, bbox);
-        scores.push([distance, tile, bbox]);
+      if (!tile.hasLoadedColumn('x')) {
+        if (bbox === undefined) {
+          // Just depth.
+          scores.push([1 / tile.min_ix, tile]);
+        } else {
+          const distance = check_overlap(tile, bbox);
+          scores.push([distance, tile]);
+        }
       }
     }
 
     this.visit(callback);
+    scores.sort((a, b) => a[0] - b[0]);
 
-    scores.sort((a, b) => Number(a[0]) - Number(b[0]));
     while (scores.length > 0 && queue.size < queue_length) {
       const upnext = scores.pop();
       if (upnext === undefined) {
         throw new Error('Ran out of tiles unexpectedly');
       }
-      const [distance, tile, _] = upnext;
+      const [distance, tile] = upnext;
       if ((tile.min_ix && tile.min_ix > max_ix) || distance <= 0) {
         continue;
       }
       queue.add(tile.key);
       tile
-        .download()
+        .loadManifestInfoFromTileMetadata()
         .then(() => queue.delete(tile.key))
         .catch((error) => {
           console.warn('Error on', tile.key);
@@ -635,7 +676,7 @@ export class Dataset {
    */
   add_macrotiled_column(
     field_name: string,
-    transformation: (ids: string[]) => Promise<Uint8Array>
+    transformation: (ids: string[]) => Promise<Uint8Array>,
   ): void {
     const macrotile_tasks: Record<string, Promise<void>> = {};
     const records: Record<string, ArrowBuildable> = {};
@@ -658,7 +699,7 @@ export class Dataset {
               }
             }
             return;
-          }
+          },
         );
         return macrotile_tasks[macrotile];
       }
@@ -729,26 +770,25 @@ function check_overlap(tile: Tile, bbox: Rectangle): number {
  * @returns
  */
 export function add_or_delete_column(
-  batch: RecordBatch,
+  batch: RecordBatch | undefined,
   field_name: string,
-  data: ArrowBuildable | null
+  data: ArrowBuildable | null,
 ): RecordBatch {
   const tb: Record<string, Data> = {};
-  for (const field of batch.schema.fields) {
+
+  for (const field of batch?.schema.fields || []) {
     if (field.name === field_name) {
       if (data === null) {
         // Then it's dropped.
         continue;
       } else {
-        throw new Error(`Name ${field.name} already exists, can't add.`);
+        console.warn(`Name ${field.name} already exists, can't add.`);
+        return batch as RecordBatch;
       }
     }
     const current = batch.getChild(field.name);
     const coldata = current.data[0] as Data;
     tb[field.name] = coldata;
-  }
-  if (data === null) {
-    // should have already happened.
   }
   if (data === undefined) {
     throw new Error('Must pass data to bind_column');
@@ -776,14 +816,15 @@ export function add_or_delete_column(
       let newval = data.data[0];
       if (newval.dictionary) {
         const dicto = newval as Data<Dictionary<Utf8, Int8 | Int16 | Int32>>;
-        const dictionary_id = max([0, ...batch.schema.dictionaries.keys()]) + 1;
+        const existingKeys = batch?.schema.dictionaries.keys() || [];
+        const dictionary_id = max([0, ...existingKeys]) + 1;
         const newv = makeVector({
           data: dicto.values, // indexes into the dictionary
           dictionary: dicto.dictionary as Vector<Utf8>, // keys
           type: new Dictionary(
             dicto.type.dictionary,
             dicto.type.indices,
-            dictionary_id
+            dictionary_id,
           ), // increment the identifier.
         });
         newval = newv.data[0];
@@ -792,7 +833,7 @@ export function add_or_delete_column(
     } else {
       console.warn(
         `Unknown data format object passed to add or remove columns--treating as Data, but this behavior is deprecated`,
-        data
+        data,
       );
       // Stopgap--maybe somewhere there are
       tb[field_name] = data as unknown as Data;
@@ -800,12 +841,12 @@ export function add_or_delete_column(
   }
 
   const new_batch = new RecordBatch(tb);
-  for (const [k, v] of batch.schema.metadata) {
+  for (const [k, v] of batch?.schema.metadata || []) {
     new_batch.schema.metadata.set(k, v);
   }
-  for (const oldfield of batch.schema.fields) {
+  for (const oldfield of batch?.schema.fields || []) {
     const newfield = new_batch.schema.fields.find(
-      (d) => d.name === oldfield.name
+      (d) => d.name === oldfield.name,
     );
     if (newfield !== undefined) {
       for (const [k, v] of oldfield.metadata) {
@@ -819,11 +860,11 @@ export function add_or_delete_column(
   // Store the creation time on the table metadata.
   if (data !== null) {
     const this_field = new_batch.schema.fields.find(
-      (d) => d.name === field_name
+      (d) => d.name === field_name,
     );
     this_field?.metadata.set(
       'created by deepscatter',
-      new Date().toISOString()
+      new Date().toISOString(),
     );
   }
   return new_batch;
@@ -841,7 +882,7 @@ function supplement_identifiers(
   batch: RecordBatch,
   ids: Record<string, number>,
   field_name: string,
-  key_field = '_id'
+  key_field = '_id',
 ): ArrowBuildable {
   /* Add the identifiers from the batch to the ids array */
   // A quick lookup before performing a costly string decode.
@@ -870,8 +911,9 @@ function supplement_identifiers(
     hashtab.add(code);
   }
 
-  const offsets = kfield.data[0].valueOffsets;
+  const offsets = (kfield as Vector<Utf8>).data[0].valueOffsets;
   const values = kfield.data[0].values;
+
   // For every identifier, look if it's in the id array.
   for (let i = 0; i < batch.numRows; i++) {
     const code = values.slice(offsets[i], offsets[i + 1]) as Uint8Array;

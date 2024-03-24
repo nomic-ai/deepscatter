@@ -1,9 +1,16 @@
 /* eslint-disable no-underscore-dangle */
-import wrapREGL, { Framebuffer2D, Regl, Texture2D, Buffer, DrawCommand, DrawConfig } from 'regl';
+import wrapREGL, {
+  Framebuffer2D,
+  Regl,
+  Texture2D,
+  Buffer,
+  DrawCommand,
+  DrawConfig,
+} from 'regl';
 import { range, sum } from 'd3-array';
 // import { contours } from 'd3-contour';
 import unpackFloat from 'glsl-read-float';
-import {Zoom} from './interaction';
+import { Zoom } from './interaction';
 import { Renderer } from './rendering';
 //@ts-expect-error no glsl loader types.
 import gaussian_blur from './glsl/gaussian_blur.frag';
@@ -17,7 +24,10 @@ import type * as DS from './shared';
 import type { Tile } from './tile';
 import REGL from 'regl';
 import { Dataset } from './Dataset';
-import { ConcreteScaledAesthetic, dimensions } from './aesthetics/StatefulAesthetic';
+import {
+  ConcreteScaledAesthetic,
+  dimensions,
+} from './aesthetics/StatefulAesthetic';
 import { Scatterplot } from './scatterplot';
 import {
   Bool,
@@ -41,7 +51,7 @@ export class ReglRenderer extends Renderer {
   public buffer_size = 1024 * 1024 * 64; // Use GPU memory in blocks of 64 MB buffers by default.
   private _buffers: MultipurposeBufferSet;
   public _initializations: Promise<void>;
-  public tileSet: Dataset;
+  public dataset: Dataset;
   public zoom?: Zoom;
   public _zoom?: Zoom;
   public most_recent_restart?: number;
@@ -63,7 +73,7 @@ export class ReglRenderer extends Renderer {
   constructor(
     selector: string | Node,
     tileSet: Dataset,
-    scatterplot: Scatterplot
+    scatterplot: Scatterplot,
   ) {
     super(selector, tileSet, scatterplot);
     const c = this.canvas;
@@ -81,7 +91,7 @@ export class ReglRenderer extends Renderer {
       ],
       canvas: c,
     });
-    this.tileSet = tileSet;
+    this.dataset = tileSet;
 
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
 
@@ -91,7 +101,7 @@ export class ReglRenderer extends Renderer {
     // Not the right way, for sure.
     this._initializations = Promise.all([
       // some things that need to be initialized before the renderer is loaded.
-      this.tileSet.promise.then(() => {
+      this.dataset.promise.then(() => {
         this.remake_renderer();
         this._webgl_scale_history = [
           this.default_webgl_scale,
@@ -112,16 +122,16 @@ export class ReglRenderer extends Renderer {
   data(dataset: Dataset) {
     if (dataset === undefined) {
       // throw
-      return this.tileSet;
+      return this.dataset;
     }
-    this.tileSet = dataset;
+    this.dataset = dataset;
     return this;
   }
 
-  get props() : DS.GlobalDrawProps {
+  get props(): DS.GlobalDrawProps {
     // Stuff needed for regl.
 
-                  // Would be better cached per draw call.
+    // Would be better cached per draw call.
     this.allocate_aesthetic_buffers();
     const {
       prefs,
@@ -129,7 +139,7 @@ export class ReglRenderer extends Renderer {
       buffer_num_to_variable,
       variable_to_buffer_num,
     } = this;
-    const { transform } = this.zoom;
+    const transform = this.zoom.transform;
     const colorScales = this.aes.dim('color');
     const [currentColor, lastColor] = [
       colorScales.current,
@@ -141,13 +151,13 @@ export class ReglRenderer extends Renderer {
       lastColor.colorscheme_size,
       currentColor.colorscheme_size,
     ] as [number, number];
-    const props : DS.GlobalDrawProps = {
+    const props: DS.GlobalDrawProps = {
       // Copy the aesthetic as a string.
       aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
       corners: this.zoom.current_corners(),
       zoom_balance: prefs.zoom_balance,
-      transform,
+      transform: transform,
       max_ix: this.max_ix,
       point_size: this.point_size,
       alpha: this.optimal_alpha,
@@ -171,7 +181,17 @@ export class ReglRenderer extends Renderer {
         [transform.k, 0, transform.x],
         [0, transform.k, transform.y],
         [0, 0, 1],
-      ].flat() as  [number, number, number, number, number, number, number, number, number]
+      ].flat() as [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+      ],
     };
 
     // Clone.
@@ -186,12 +206,12 @@ export class ReglRenderer extends Renderer {
     return this._default_webgl_scale;
   }
 
-  render_points(props : DS.GlobalDrawProps) {
+  render_points(props: DS.GlobalDrawProps) {
     // Regl is faster if it can render a large number of draw calls together.
-    const prop_list : DS.TileDrawProps[] = [];
+    const prop_list: DS.TileDrawProps[] = [];
     let call_no = 0;
     const foreground = this.aes.dim(
-      'foreground'
+      'foreground',
     ) as StatefulAesthetic<Foreground>;
     const needs_background_pass =
       foreground.states[0].active || foreground.states[1].active;
@@ -210,7 +230,7 @@ export class ReglRenderer extends Renderer {
         number: call_no++,
         foreground: needs_background_pass ? 1 : -1,
         tile_id: tile.numeric_id,
-        ...props
+        ...props,
       } as DS.TileDrawProps;
       prop_list.push(this_props);
       if (needs_background_pass) {
@@ -234,20 +254,20 @@ export class ReglRenderer extends Renderer {
    * Actions that run on a single animation tick.
    */
   tick() {
-    const { prefs, tileSet, props } = this;
+    const { prefs, dataset, props } = this;
     this.tick_num = this.tick_num || 0;
     this.tick_num++;
 
     // Set a download call in motion.
     if (this._use_scale_to_download_tiles) {
-      tileSet.download_most_needed_tiles(
+      dataset.download_most_needed_tiles(
         this.zoom.current_corners(),
         this.props.max_ix,
-        5
+        5,
       );
     } else {
       // console.warn("No good rules here yet.")
-      tileSet.download_most_needed_tiles(undefined, prefs.max_points, 5);
+      dataset.download_most_needed_tiles(undefined, prefs.max_points, 5);
     }
     // regl.clear({
     //   color: [0.9, 0.9, 0.93, 0],
@@ -256,7 +276,7 @@ export class ReglRenderer extends Renderer {
     const start = Date.now();
 
     async function pop_deferred_functions(
-      deferred_functions: (() => void | Promise<void>)[]
+      deferred_functions: (() => void | Promise<void>)[],
     ) {
       while (Date.now() - start < 10 && deferred_functions.length > 0) {
         // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
@@ -286,7 +306,7 @@ export class ReglRenderer extends Renderer {
   single_blur_pass(
     fbo1: Framebuffer2D,
     fbo2: Framebuffer2D,
-    direction: [number, number]
+    direction: [number, number],
   ) {
     const { regl } = this;
     fbo2.use(() => {
@@ -336,7 +356,7 @@ export class ReglRenderer extends Renderer {
     }
   }
 
-  render_all(props : DS.GlobalDrawProps) {
+  render_all(props: DS.GlobalDrawProps) {
     const { regl } = this;
 
     this.fbos.points.use(() => {
@@ -486,7 +506,7 @@ export class ReglRenderer extends Renderer {
     this.fbos = this.fbos || {};
     this.textures = this.textures || {};
     this.textures.empty_texture = regl.texture(
-      range(128).map(() => range(128).map(() => [0, 0, 0]))
+      range(128).map(() => range(128).map(() => [0, 0, 0])),
     );
 
     this.fbos.minicounter = regl.framebuffer({
@@ -635,7 +655,7 @@ export class ReglRenderer extends Renderer {
     this.aes = saved_aes;
   }
    */
-  n_visible(only_color = -1) : number {
+  n_visible(only_color = -1): number {
     let { width, height } = this;
     width = Math.floor(width);
     height = Math.floor(height);
@@ -645,7 +665,7 @@ export class ReglRenderer extends Renderer {
 
     const { props } = this;
     props.only_color = only_color;
-    let v : number;
+    let v: number;
     this.fbos.contour.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
       // read onto the contour vals.
@@ -699,11 +719,11 @@ export class ReglRenderer extends Renderer {
   color_pick_single(
     x: number,
     y: number,
-    field: 'ix_in_tile' | 'ix' | 'tile_id' = 'tile_id'
+    field: 'ix_in_tile' | 'ix' | 'tile_id' = 'tile_id',
   ) {
     const { props, height } = this;
-    props.color_picker_mode =
-      ['ix', 'tile_id', 'ix_in_tile'].indexOf(field) + 1 as 1 | 2 | 3;
+    props.color_picker_mode = (['ix', 'tile_id', 'ix_in_tile'].indexOf(field) +
+      1) as 1 | 2 | 3;
 
     let color_at_point: [number, number, number, number] = [0, 0, 0, 0];
     this.fbos.colorpicker.use(() => {
@@ -814,12 +834,12 @@ export class ReglRenderer extends Renderer {
     const { regl } = this;
     // This should be scoped somewhere to allow resizing.
     type P = DS.TileDrawProps;
-    const parameters : DrawConfig<unknown, unknown, DS.TileDrawProps> = {
+    const parameters: DrawConfig<unknown, unknown, DS.TileDrawProps> = {
       depth: { enable: false },
       stencil: { enable: false },
       blend: {
         //@ts-expect-error Behavior of regl not working here.
-        enable(_ : unknown, { color_picker_mode }) {
+        enable(_: unknown, { color_picker_mode }) {
           return (color_picker_mode as number) < 0.5;
         },
         func: {
@@ -851,7 +871,7 @@ export class ReglRenderer extends Renderer {
           // Other values plot a specific value of the color-encoded field.
           return -2;
         },
-        u_wrap_colors_after: (_, { wrap_colors_after } : P) => {
+        u_wrap_colors_after: (_, { wrap_colors_after }: P) => {
           if (wrap_colors_after === undefined) {
             throw new Error('wrap_colors_after is undefined');
           }
@@ -928,21 +948,24 @@ export class ReglRenderer extends Renderer {
 
     // Define the operations to be implemented for the filter types.
     for (const dim of ['filter', 'filter2', 'foreground']) {
-      const d = this.aes.dim(dim) as StatefulAesthetic<Foreground | Filter>
-      for (const time of [['', 'current'], ['last_', 'last']] as const) {
+      const d = this.aes.dim(dim) as StatefulAesthetic<Foreground | Filter>;
+      for (const time of [
+        ['', 'current'],
+        ['last_', 'last'],
+      ] as const) {
         parameters.uniforms[`u_${time[0]}${dim}_numeric`] = () => {
-          const ops = d[time[1]].ops_to_array()
+          const ops = d[time[1]].ops_to_array();
           // console.log(ops, dim, time)
           // console.log(1)
           return ops;
-        }
+        };
       }
     }
     // store needed buffers
     for (const i of range(0, 16)) {
       parameters.attributes[`buffer_${i}`] = (
         _,
-        { manager, buffer_num_to_variable } : P
+        { manager, buffer_num_to_variable }: P,
       ) => {
         const c = manager.regl_elements.get(buffer_num_to_variable[i]);
         return c || { constant: 0 };
@@ -968,8 +991,10 @@ export class ReglRenderer extends Renderer {
         parameters.uniforms[`u_${temporal}${dim}_map_position`] = () => {
           return d[time].map_position;
         };
-        parameters.uniforms[`u_${temporal}${dim}_buffer_num`] = 
-          (_,{ aes_to_buffer_num } : P) => {
+        parameters.uniforms[`u_${temporal}${dim}_buffer_num`] = (
+          _,
+          { aes_to_buffer_num }: P,
+        ) => {
           const val = aes_to_buffer_num[`${dim}--${time}`];
           if (val === undefined) {
             return -1;
@@ -993,10 +1018,12 @@ export class ReglRenderer extends Renderer {
             if (t === 'linear') return 1;
             else if (t === 'sqrt') return 2;
             else if (t === 'log') return 3;
-            else if (t === 'literal') return 4;               
-            else throw new Error(`Invalid transform for ${dim} of ${t}`)
+            else if (t === 'literal') return 4;
+            else
+              throw new Error(
+                `Invalid transform for ${dim} of ${scaled_d[time].transform}`,
+              );
           };
-
         }
       }
       // Copy the parameters from the data name.
@@ -1112,7 +1139,8 @@ export class TileBufferManager {
   // binds elements directly to the tile, so it's safe
   // to re-run this multiple times on the same tile.
 
-  // In an ideal world, these might all be methods directly on tile, but since they relate to Regl,
+  // In an ideal world, these might all be methods directly on tile,
+  // but since they relate to Regl,
   // I want them in this file instead.
 
   public tile: Tile;
@@ -1158,7 +1186,6 @@ export class TileBufferManager {
         }
       }
     }
-
     for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
       if (!this.ready_or_not_here_it_comes(key).ready) {
         return false;
@@ -1188,10 +1215,11 @@ export class TileBufferManager {
       return { ready: false, promise: null };
     }
     if (current === undefined) {
-      if (!this.tile.ready) {
-        // Can't build b/c no tile ready.
-        return { ready: false, promise: null };
-      }
+      // if (!this.tile.ready) {
+      //   // Can't build b/c no tile ready.
+      //   return { ready: false, promise: null };
+      // }
+      //
       // Request that the buffer be created before returning false.
       regl_elements.set(key, null);
       const created = new Promise<void>((resolve) => {
@@ -1211,49 +1239,42 @@ export class TileBufferManager {
    * @returns Nothing, not even if the column isn't currently defined.
    */
   release(colname: string): void {
-    let current : DS.BufferLocation;
-    if ((current = this.regl_elements.get(colname))) {
+    const current = this.regl_elements.get(colname);
+    if (current) {
       this.renderer.buffers.free_block(current);
     }
   }
   get count() {
-    // Returns the number of points in this table.
-    //    console.log('ROWS', this.tile.record_batch.numRows);
     return this.tile.record_batch.numRows;
   }
 
   async create_buffer_data(key: string): Promise<Float32Array> {
     const { tile } = this;
-    if (!tile.ready) {
-      throw new Error('Tile table not present.');
+    if (tile.key === '4/4/9') {
+      console.log('MAKING', key, tile.key);
     }
-
     type ColumnType = Vector<Dictionary<Utf8> | Float | Bool | Int | Timestamp>;
-    let column = tile.record_batch.getChild(key) as null | ColumnType;
 
-    if (!column) {
-      const transformation = tile.dataset.transformations[key];
-      if (transformation !== undefined) {
+    if (!tile.hasLoadedColumn(key)) {
+      if (tile.dataset.transformations[key] !== undefined) {
         // Sometimes the transformation for creating the column may be defined but not yet applied.
         // If so, apply it right away.
         await tile.apply_transformation(key);
-        column = tile.record_batch.getChild(key) as ColumnType;
-        if (!column) {
-          throw new Error(`${key} was not created.`);
-        }
       } else {
         const col_names = tile.record_batch.schema.fields.map((d) => d.name);
         throw new Error(
           `Requested ${key} but table only has columns ["${col_names.join(
-            '", "'
-          )}]"`
+            '", "',
+          )}]"`,
         );
       }
     }
 
+    const column = tile.record_batch.getChild(key) as ColumnType;
+
     if (column.data.length !== 1) {
       throw new Error(
-        `Column ${key} has ${column.data.length} buffers, not 1.`
+        `Column ${key} has ${column.data.length} buffers, not 1.`,
       );
     }
 
@@ -1278,7 +1299,10 @@ export class TileBufferManager {
         for (let i = 0; i < tile.record_batch.numRows; i++) {
           buffer[i] = column.get(i) ? 1 : 0;
         }
-      } else if (source_buffer.stride === 2 && column.type.typeId === Type.Timestamp) {
+      } else if (
+        source_buffer.stride === 2 &&
+        column.type.typeId === Type.Timestamp
+      ) {
         // 64-bit timestamped are internally represented as two 32-bit ints in the arrow arrays.
         // This does a moderately expensive copy as a stopgap.
         // This problem may creep up in other 64-bit types as we go, so keep an eye out.
@@ -1293,12 +1317,12 @@ export class TileBufferManager {
           timetype === 0
             ? 1e-3 // second
             : timetype === 1
-            ? 1 // millisecond
-            : timetype === 2
-            ? 1e3 // microsecond
-            : timetype === 3
-            ? 1e6 // nanosecond
-            : 42;
+              ? 1 // millisecond
+              : timetype === 2
+                ? 1e3 // microsecond
+                : timetype === 3
+                  ? 1e6 // nanosecond
+                  : 42;
         if (divisor === 42) {
           throw new Error(`Unknown time type ${timetype}`);
         }
@@ -1384,7 +1408,7 @@ class MultipurposeBufferSet {
         type: 'float',
         length: this.buffer_size,
         usage: 'dynamic',
-      })
+      }),
     );
   }
   /**

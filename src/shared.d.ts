@@ -46,7 +46,7 @@ export interface TileProxy {
     method: 'GET' | 'POST', // Generally, the HTTP method.
     parameter1: unknown, // For internal use.
     parameter2: unknown, // For internal use.
-    options: Record<string, boolean | string | number>
+    options: Record<string, boolean | string | number>,
   ) => Promise<Uint8Array>;
 }
 
@@ -55,20 +55,35 @@ export type ScatterplotOptions = {
   dataset?: DataSpec;
 };
 
+// The orientation of the dataset. Quadtree datasets
+// allow certain optimizations.
 export type TileStructure = 'quadtree' | 'other';
+
+export type TileManifest = {
+  key: string;
+  // The number of data points in that specific tile.
+  nPoints?: number;
+  // undefined children indicates a need for the
+  children: TileManifest[] | undefined;
+  min_ix: number;
+  max_ix: number;
+  extent: Rectangle;
+};
 
 export type DatasetOptions = {
   // A TileProxy object to handle fetching tiles.
   tileProxy?: TileProxy;
-  // The strategy used for creating the tree of linked tiles. 
+  // The strategy used for creating the tree of linked tiles.
   // For quadtree data (the default) additional information
   // may be inferred.
-  tileStructure?: TileStructure
+  tileStructure?: TileStructure;
   // A manifest listing all the tiles in the dataset.
-  // passed.
-  tileManifest?: string
+  // Currently this must be passed as a recursive structure.
+  tileManifest?: Partial<TileManifest>;
   // The x/y extent of the data.
   extent?: Rectangle;
+  // The key to access the root tile. If not passed, will default to 0/0/0;
+  rootKey?: string;
 };
 
 export interface SelectionRecord {
@@ -118,7 +133,7 @@ export type ArrowBuildable =
   | Float32Array
   | Uint8Array;
 
-type MaybePromise<T> = T | Promise<T>
+type MaybePromise<T> = T | Promise<T>;
 /**
  * A transformation is a batchwise operation that can be used to construct
  * a new column in the data table. It runs asynchronously so that it
@@ -129,14 +144,11 @@ type MaybePromise<T> = T | Promise<T>
  * inputTile.record_batch.numRows, it will fail in an undefined way.
  * This is not a guarantee I know how to enforce in the type system.
  */
-export type Transformation = (
-  inputTile: Tile
-) => MaybePromise<ArrowBuildable>;
+export type Transformation = (inputTile: Tile) => MaybePromise<ArrowBuildable>;
 
 export type BoolTransformation = (
-  inputTile: Tile
-) =>
-  | MaybePromise<Vector<Bool>>
+  inputTile: Tile,
+) => MaybePromise<Vector<Bool>>;
 
 /**
  * A channel represents the information necessary to map a single dimension
@@ -233,13 +245,13 @@ export type IsoDateString =
   | `${number}-${number}-${number}T${number}:${number}:${number}.${number}Z`;
 
 // Any valid HTML string.
-export type Colorstring = 
-//  | `#${number}${number}${number}${number}${number}${number}`
-  | string;
+export type Colorstring =
+  //  | `#${number}${number}${number}${number}${number}${number}`
+  string;
 
 export type NumericScaleChannel<
   DomainType extends number | IsoDateString = number,
-  RangeType extends number | Colorstring = number
+  RangeType extends number | Colorstring = number,
 > = {
   /** The name of a column in the data table to be encoded. */
   field: string;
@@ -255,11 +267,10 @@ export type NumericScaleChannel<
   range?: [RangeType, RangeType];
 };
 
-
 export type LambdaChannel<
   DomainType extends JSValue,
-  RangeType extends boolean | number | Colorstring> = 
-{
+  RangeType extends boolean | number | Colorstring,
+> = {
   lambda?: (v: DomainType) => RangeType;
   field: string;
 };
@@ -298,7 +309,6 @@ export type ConstantChannel<T extends boolean | number | string> = {
   constant: T;
 };
 
-
 export type OneDChannels =
   | ConstantChannel<number>
   | NumericScaleChannel<number | IsoDateString>;
@@ -318,13 +328,12 @@ export type BooleanChannel =
 
 type Colorname = string;
 
-
 export type ChannelType =
   | BooleanChannel
   | OpChannel<number | IsoDateString>
   | ConstantChannel<string | number | boolean>
   | NumericScaleChannel<number | IsoDateString>
-  | CategoricalColorScale
+  | CategoricalColorScale;
 
 export type CategoricalColorScale = {
   field: string;
@@ -333,7 +342,7 @@ export type CategoricalColorScale = {
 };
 
 type LinearColorScale = {
-  field: string,
+  field: string;
   domain: [number, number]; // TODO: | [number, number, number]
   // TODO: implement some codegen for these values
   range: 'viridis' | 'magma' | 'ylorrd';
@@ -353,10 +362,7 @@ export type Encoding = {
   x?: null | NumericScaleChannel;
   y?: null | NumericScaleChannel;
   color?: null | ColorScaleChannel;
-  size?:
-    | null
-    | ConstantChannel<number>
-    | LambdaChannel<JSValue, number>;
+  size?: null | ConstantChannel<number> | LambdaChannel<JSValue, number>;
   filter?: null | BooleanChannel;
   filter2?: null | BooleanChannel;
   foreground?: null | BooleanChannel;
@@ -370,18 +376,18 @@ export type Encoding = {
   jitter_method?: JitterMethod;
 };
 
-export type DimensionKeys = 
-  | "size" 
-  | "jitter_speed" 
-  | "jitter_radius" 
-  | "color" 
-  | "filter" 
-  | "filter2" 
-  | "x" 
-  | "y" 
-  | "x0" 
-  | "y0" 
-  | "foreground"
+export type DimensionKeys =
+  | 'size'
+  | 'jitter_speed'
+  | 'jitter_radius'
+  | 'color'
+  | 'filter'
+  | 'filter2'
+  | 'x'
+  | 'y'
+  | 'x0'
+  | 'y0'
+  | 'foreground';
 
 export type PointUpdate = {
   column_name: string;
@@ -449,7 +455,7 @@ export type Labelset = {
 };
 export type Labelcall = Labelset | URLLabels;
 
-// An APICall is a specification of the chart. It provides the primary way to 
+// An APICall is a specification of the chart. It provides the primary way to
 // alter a chart's state. Most parts are JSON serializable, but functional callbacks
 // for tooltips, clicks, and changes to the highlit point are not.
 
@@ -480,7 +486,7 @@ export type APICall = {
    * called on that point; the string that it returns will be inserted into
    * the innerHTML of the tooltip.
    */
-  tooltip_html?:  RowFunction<string>;
+  tooltip_html?: RowFunction<string>;
 
   // The color of the screen background.
   background_color?: string;
@@ -517,24 +523,21 @@ export type CompletePrefs = APICall & {
   max_points: number;
 };
 
-
-
 // A function that can be applied to an Arrow StructRowProxy or a similar object.
 // It takes the point and the full scatterplot as arguments.
 export type RowFunction<T> = (
   datum: StructRowProxy,
-  plot?: Scatterplot | undefined
+  plot?: Scatterplot | undefined,
 ) => T;
 
-
-type ZoomRow = [number, number, number]
-type ZoomMatrix = [ZoomRow, ZoomRow, ZoomRow]
+type ZoomRow = [number, number, number];
+type ZoomMatrix = [ZoomRow, ZoomRow, ZoomRow];
 
 ///////////
 
 // Props that are needed for all the draws in a single tick.
 export type GlobalDrawProps = {
-  aes : {encoding: Encoding};
+  aes: { encoding: Encoding };
   colors_as_grid: 0 | 1;
   corners: Rectangle;
   zoom_balance: number;
@@ -547,7 +550,7 @@ export type GlobalDrawProps = {
   relative_time: number;
   // string_index: number;
   prefs: APICall;
-  wrap_colors_after : [number, number];
+  wrap_colors_after: [number, number];
   start_time: number;
   webgl_scale: number[];
   last_webgl_scale: number[];
@@ -557,18 +560,25 @@ export type GlobalDrawProps = {
   aes_to_buffer_num: Record<string, number>;
   variable_to_buffer_num: Record<string, number>;
   color_picker_mode: 0 | 1 | 2 | 3;
-  zoom_matrix: [number, number, number, 
-    number, number, number,
-    number, number, number ];
-  position_interpolation: boolean,
+  zoom_matrix: [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  position_interpolation: boolean;
   only_color?: number;
-}
+};
 
 // Props that are needed to draw a single tile.
 export type TileDrawProps = GlobalDrawProps & {
-  manager: TileBufferManager,
-  number: number,
-  foreground: 1 | 0 | -1,
-  tile_id: number
-}
-
+  manager: TileBufferManager;
+  number: number;
+  foreground: 1 | 0 | -1;
+  tile_id: number;
+};

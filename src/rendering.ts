@@ -3,7 +3,7 @@ import { BaseType, select } from 'd3-selection';
 import { min } from 'd3-array';
 import type { Scatterplot } from './scatterplot';
 import type { Tile } from './tile';
-import type {Zoom} from './interaction';
+import type { Zoom } from './interaction';
 import type { AestheticSet } from './aesthetics/AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Dataset } from './Dataset';
@@ -19,7 +19,7 @@ class PlotSetting {
   transform: 'geometric' | 'arithmetic' = 'arithmetic';
   constructor(
     start: number,
-    transform: 'geometric' | 'arithmetic' = 'arithmetic' as const
+    transform: 'geometric' | 'arithmetic' = 'arithmetic' as const,
   ) {
     this.transform = transform;
     this.start = start;
@@ -87,11 +87,11 @@ class RenderProps {
     this.pointSize.update(prefs.point_size, duration);
     this.foregroundOpacity.update(
       prefs.background_options.opacity[1],
-      duration
+      duration,
     );
     this.backgroundOpacity.update(
       prefs.background_options.opacity[0],
-      duration
+      duration,
     );
     this.foregroundSize.update(prefs.background_options.size[1], duration);
     this.backgroundSize.update(prefs.background_options.size[0], duration);
@@ -127,18 +127,22 @@ export class Renderer {
   public dataset: Dataset;
   public width: number;
   public height: number;
+  // The renderer handles periodic dispatches of calls
   public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
   public zoom?: Zoom;
   public aes?: AestheticSet;
   public _zoom?: Zoom;
-  public _initializations: Promise<void>;
   public render_props: RenderProps = new RenderProps();
-  constructor(selector: string | Node, tileSet: Dataset, scatterplot: Scatterplot) {
+  constructor(
+    selector: string | Node,
+    tileSet: Dataset,
+    scatterplot: Scatterplot,
+  ) {
     this.scatterplot = scatterplot;
     this.holder = select(selector as string);
     this.canvas = select(
-      (this.holder.node()).firstElementChild
+      this.holder.node().firstElementChild,
     ).node() as HTMLCanvasElement;
     this.dataset = tileSet;
     this.width = +select(this.canvas).attr('width');
@@ -213,7 +217,7 @@ export class Renderer {
     if (!this._use_scale_to_download_tiles) {
       return max_points;
     }
-    const { k } = this.zoom.transform;
+    const k = this.zoom.transform.k;
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
     return (max_points * k * k) / point_size_adjust / point_size_adjust;
   }
@@ -239,7 +243,7 @@ export class Renderer {
           .filter((tile) => {
             const visible = tile.is_visible(
               max_ix,
-              this.zoom.current_corners()
+              this.zoom.current_corners(),
             );
             return visible;
           })

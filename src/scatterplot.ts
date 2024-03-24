@@ -3,11 +3,7 @@ import { range } from 'd3-array';
 import merge from 'lodash.merge';
 import { Zoom } from './interaction';
 import { ReglRenderer } from './regl_rendering';
-import {
-  tableFromIPC,
-  type StructRowProxy,
-  vectorFromArray,
-} from 'apache-arrow';
+import { tableFromIPC, type StructRowProxy } from 'apache-arrow';
 import { Dataset } from './Dataset';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
@@ -15,7 +11,6 @@ import { Renderer } from './rendering';
 import type { ConcreteAesthetic } from './aesthetics/StatefulAesthetic';
 import { isURLLabels, isLabelset } from './typing';
 import { DataSelection } from './selection';
-import { dictionaryFromArrays } from './utilityFunctions';
 import type {
   BooleanColumnParams,
   CompositeSelectParams,
@@ -70,14 +65,10 @@ export class Scatterplot {
   public secondary_renderers: Record<string, Renderer> = {};
   public selection_history: DS.SelectionRecord[] = [];
   public tileProxy?: DS.TileProxy;
-  public util: Record<string, (unknown) => unknown> = {
-    dictionaryFromArrays,
-    vectorFromArray,
-  };
-  div: Selection<BaseType | HTMLDivElement, number, BaseType, unknown>;
-  bound: boolean;
+  public div?: Selection<BaseType | HTMLDivElement, number, BaseType, unknown>;
+  public bound: boolean;
   //  d3 : Object;
-  public _zoom: Zoom;
+  public _zoom?: Zoom;
   // The queue of draw calls are a chain of promises.
   private plot_queue: Promise<void> = Promise.resolve();
   public prefs: DS.CompletePrefs;
@@ -101,23 +92,23 @@ export class Scatterplot {
    * @param selector Either a DOM selector for the div in which the scatterplot will
    * live, or a div element itself. If this is undefined, the scatterplot will
    * not be fully created until you call `bind`.
-   * 
-   * @param width The width of the scatterplot (in pixels). If not passed will be 
+   *
+   * @param width The width of the scatterplot (in pixels). If not passed will be
    * inferred from the div.
-   * @param height The height of the scatterplot (in pixels). If not passed will be inferred from the 
+   * @param height The height of the scatterplot (in pixels). If not passed will be inferred from the
    */
   constructor(
     selector: string | HTMLDivElement | undefined,
     width?: number,
     height?: number,
-    options: DS.ScatterplotOptions = {}
+    options: DS.ScatterplotOptions = {},
   ) {
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
     }
-    this.width = width;
-    this.height = height;
+    this.width = width || window.innerWidth;
+    this.height = height || window.innerHeight;
     // mark_ready is called when the scatterplot can start drawing..
     this.ready = new Promise((resolve) => {
       this.mark_ready = resolve;
@@ -138,12 +129,16 @@ export class Scatterplot {
   /**
    * Attaches the scatterplot to a div element (either as a css selector or as a DOM element).
    * This is a permanent relationship.
-   * 
+   *
    * @param selector A selector for the root element of the deepscatter; must already exist.
    * @param width Width of the plot, in pixels.
    * @param height Height of the plot, in pixels.
    */
-  public bind(selector: string | HTMLDivElement, width: number, height: number) {
+  public bind(
+    selector: string | HTMLDivElement,
+    width: number | undefined,
+    height: number | undefined,
+  ) {
     // Attach a plot to a particular DOM element.
     // Binding is a permanent relationship. Maybe shouldn't be, but is.
 
@@ -192,7 +187,12 @@ export class Scatterplot {
         el.append('g').attr('id', 'labelrects');
       }
       this.elements.push(
-        container as unknown as Selection<SVGElement, unknown, Element, unknown>
+        container as unknown as Selection<
+          SVGElement,
+          unknown,
+          Element,
+          unknown
+        >,
       );
     }
     this.bound = true;
@@ -204,7 +204,7 @@ export class Scatterplot {
    */
   async select_and_plot(
     params: IdSelectParams | BooleanColumnParams | FunctionSelectParams,
-    duration = this.prefs.duration
+    duration = this.prefs.duration,
   ): Promise<DataSelection> {
     const selection = await this.select_data(params);
     await selection.ready;
@@ -232,7 +232,7 @@ export class Scatterplot {
       | IdSelectParams
       | BooleanColumnParams
       | FunctionSelectParams
-      | CompositeSelectParams
+      | CompositeSelectParams,
   ) {
     if (
       params.useNameCache &&
@@ -240,7 +240,7 @@ export class Scatterplot {
       this.selection_history.length > 0
     ) {
       const old_version = this.selection_history.find(
-        (x) => x.name === params.name
+        (x) => x.name === params.name,
       );
       // If we have a cached version, move the cached version to the end and return it.
       if (old_version) {
@@ -273,7 +273,7 @@ export class Scatterplot {
 
     if (Array.isArray(codes)) {
       true_codes = Object.fromEntries(
-        codes.map((next: string | bigint) => [String(next), 1])
+        codes.map((next: string | bigint) => [String(next), 1]),
       );
     } else {
       this._root.add_label_identifiers(true_codes, name, key_field);
@@ -285,10 +285,11 @@ export class Scatterplot {
     name: string,
     label_key: string,
     size_key: string | undefined,
-    options: DS.LabelOptions
+    options: DS.LabelOptions,
   ): Promise<void> {
     await this.ready;
-    await this._root.promise;
+
+    await this.dataset.promise;
     return fetch(url)
       .then(async (data) => {
         const features = await (data.json() as Promise<FeatureCollection>);
@@ -325,7 +326,7 @@ export class Scatterplot {
     name: string,
     label_key: string,
     size_key: string | undefined,
-    options: DS.LabelOptions = {}
+    options: DS.LabelOptions = {},
   ) {
     const labels = new LabelMaker(this, name, options);
     labels.update(features, label_key, size_key);
@@ -366,27 +367,18 @@ export class Scatterplot {
       labelset.name,
       'text',
       'size',
-      labelset.options || {}
+      labelset.options || {},
     );
   }
 
   async load_dataset(params: DS.DataSpec): Promise<DS.Dataset> {
     if (params.source_url !== undefined) {
-      this._root = Dataset.from_quadfeather(
-        params.source_url,
-        this
-      );
+      this._root = Dataset.from_quadfeather(params.source_url, this);
     } else if (params.arrow_table !== undefined) {
-      this._root = Dataset.from_arrow_table(
-        params.arrow_table,
-        this
-      );
+      this._root = Dataset.from_arrow_table(params.arrow_table, this);
     } else if (params.arrow_buffer !== undefined) {
       const tb = tableFromIPC(params.arrow_buffer);
-      this._root = Dataset.from_arrow_table(
-        tb,
-        this
-      );
+      this._root = Dataset.from_arrow_table(tb, this);
     } else {
       throw new Error('No source_url or arrow_table specified');
     }
@@ -397,23 +389,23 @@ export class Scatterplot {
   async reinitialize() {
     const { prefs } = this;
 
-    await this._root.ready;
+    await this.dataset.ready;
 
     this._renderer = new ReglRenderer(
       '#container-for-webgl-canvas',
-      this._root,
-      this
+      this.dataset,
+      this,
     );
 
     this._zoom = new Zoom('#deepscatter-svg', this.prefs, this);
-    this._zoom.attach_tiles(this._root);
+    this._zoom.attach_tiles(this.dataset);
     this._zoom.attach_renderer('regl', this._renderer);
     this._zoom.initialize_zoom();
 
     // Needs the zoom built as well.
 
     const bkgd = select('#container-for-canvas-2d-background').select(
-      'canvas'
+      'canvas',
     ) as Selection<
       HTMLCanvasElement,
       unknown,
@@ -422,11 +414,12 @@ export class Scatterplot {
     >;
     const ctx = bkgd.node().getContext('2d');
 
+    if (ctx === null) throw new Error("Can't acquire canvas context");
     ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
     void this._renderer.initialize();
-    void this._root.promise.then(() => this.mark_ready());
+    void this.dataset.promise.then(() => this.mark_ready());
     return this.ready;
   }
 
@@ -482,7 +475,8 @@ export class Scatterplot {
     for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
-          if (!tile.codes || tile.codes[0] != i) {
+          const codes = tile.key.split('/').map((d) => +d);
+          if (!codes || codes[0] != i) {
             continue;
           }
           if (!tile.extent) {
@@ -490,11 +484,11 @@ export class Scatterplot {
           } // Still loading
           const [x1, x2] = tile.extent.x.map((x: number) => x_(x));
           const [y1, y2] = tile.extent.y.map((y: number) => y_(y));
-          const depth = tile.codes[0];
+          const depth = codes[0];
           ctx.lineWidth = 8 / Math.sqrt(depth);
           ctx.globalAlpha = 0.33;
           ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-          if (tile.download_state !== 'Unattempted') {
+          if (tile.hasLoadedColumn('ix')) {
             ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
           }
           ctx.globalAlpha = 1;
@@ -585,22 +579,26 @@ export class Scatterplot {
     return this.tooltip_handler.f;
   }
 
-  set label_click(func: (d: Record<string, unknown>, scatterplot: Scatterplot) => void) {
+  set label_click(
+    func: (d: Record<string, unknown>, scatterplot: Scatterplot) => void,
+  ) {
     this.label_click_handler.f = func;
   }
 
-  get label_click() : LabelClick['f'] {
-    return this.label_click_handler.f.bind(this.label_click_handler) as LabelClick['f'];
+  get label_click(): LabelClick['f'] {
+    return this.label_click_handler.f.bind(this.label_click_handler);
   }
 
-  set highlit_point_change(func :  (datum: StructRowProxy[], plot: Scatterplot) => void) {
+  set highlit_point_change(
+    func: (datum: StructRowProxy[], plot: Scatterplot) => void,
+  ) {
     this.handle_highlit_point_change.f = func;
   }
 
-  get highlit_point_change() : ChangeToHighlitPointFunction['f'] {
+  get highlit_point_change(): ChangeToHighlitPointFunction['f'] {
     return this.handle_highlit_point_change.f.bind(
-      this.handle_highlit_point_change
-    ) as ChangeToHighlitPointFunction['f']
+      this.handle_highlit_point_change,
+    );
   }
 
   set click_function(func) {
@@ -721,7 +719,7 @@ export class Scatterplot {
       return;
     }
     if (prefs.click_function) {
-      this.click_function = prefs.click_function;      ;
+      this.click_function = prefs.click_function;
     }
     if (prefs.tooltip_html) {
       this.tooltip_html = prefs.tooltip_html;
@@ -754,7 +752,7 @@ export class Scatterplot {
       const dataSpec = { source_url, arrow_table, arrow_buffer } as DS.DataSpec;
       if (Object.values(dataSpec).filter((x) => x !== undefined).length !== 1) {
         throw new Error(
-          'The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer'
+          'The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer',
         );
       }
       await this.load_dataset(dataSpec);
@@ -810,7 +808,7 @@ export class Scatterplot {
             name,
             label_field,
             size_field,
-            {}
+            {},
           ).catch((error) => {
             console.error('Label addition failed.');
             console.error(error);
@@ -883,7 +881,7 @@ abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
     return this._f;
   }
 
-  set f(f: ((datum: ArgType, plot: Scatterplot) => FuncType)) {
+  set f(f: (datum: ArgType, plot: Scatterplot) => FuncType) {
     this._f = f;
   }
 }
@@ -895,10 +893,10 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
   default(
     feature: GeoJsonProperties,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    plot : Scatterplot = undefined,
-    labelset: LabelMaker | undefined = undefined
+    plot: Scatterplot = undefined,
+    labelset: LabelMaker | undefined = undefined,
   ) {
-    let filter: DS.LambdaChannel<string, boolean> | null
+    let filter: DS.LambdaChannel<string, boolean> | null;
     if (feature === null) {
       return;
     }
@@ -911,7 +909,7 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
       const value = feature[k] as string;
       filter = {
         field: labelset.label_key,
-        lambda: (d) => d === value
+        lambda: (d) => d === value,
       };
     }
     void this.plot.plotAPI({
@@ -922,7 +920,7 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
 
 class ClickFunction extends SettableFunction<void> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default(datum: StructRowProxy, plot : Scatterplot | undefined = undefined) {
+  default(datum: StructRowProxy, plot: Scatterplot | undefined = undefined) {
     console.log({ ...datum });
     return;
   }

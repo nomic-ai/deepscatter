@@ -1,60 +1,72 @@
 # 3.0.0
 
-3.0.0 introduces fewer major new features than some previous 2.0 releases, but it includes a number of pent-up *breaking* changes. The underlying motivation for many of these is to allow library to now fully pass typescript compilation tests, with all the stability benefits that provides.
+3.0.0 introduces fewer major new features than some previous 2.0 releases, but it includes a number of pent-up _breaking_ changes. The underlying motivation for many of these is to allow library to now fully pass typescript compilation tests, with all the stability benefits that provides.
 
 Breaking changes:
+
 1. The library is now structured as named exports,
    rather than a single default export. Instead of
-   
+
    ```js
    import Scatterplot from 'deepscatter';
    ```
-  
+
    a typical first line will be
 
    ```js
    import { Scatterplot } from 'deepscatter';
    ```
 
-   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{Dataset, Bitmask, Scatterplot}`. Bitmasks are efficient, useful forms. 
+   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{Dataset, Bitmask, Scatterplot}`. Bitmasks are efficient, useful forms.
+
 2. Apache Arrow is now a peer dependency of deepscatter rather than
-   being bundled into the distribution. Most bundlers will hopefully take care of installation for you, but if you are writing raw HTML code, 
+   being bundled into the distribution. Most bundlers will hopefully take care of installation for you, but if you are writing raw HTML code,
    it will be necessary to include and re-export it. In general that will look like this.
    ```
    import * as Arrow from 'apache-arrow';
    export { Arrow };
-   ``` 
-   
-   
-3. The distinction between `QuadTile` and `ArrowTile` 
-   has been eliminated in favor of `Tile`, and with it the need to supply 
-   generics around them through the system. Similarly, `QuadTileDataset` and `ArrowDataset` have both been removed in favor of `Dataset`. 
-1. Deepscatter no longer accepts strings as direct
-   arguments to `Scatterplot.plotAPI` in places where they were previously cast to functions 
+   ```
+3. The distinction between `QuadTile` and `ArrowTile`
+   has been eliminated in favor of `Tile`, and with it the need to supply
+   generics around them through the system. Similarly, `QuadTileDataset` and `ArrowDataset` have both been removed in favor of `Dataset`.
+
+4. Deepscatter no longer accepts strings as direct
+   arguments to `Scatterplot.plotAPI` in places where they were previously cast to functions
    as lambdas, because linters rightfully get crazy mad about the unsafe use of `eval`. If
    you want to use deepscatter in scrollytelling
    contexts where definining functions as strings inside json is convenient (I still will do this myself in static sites) you must turn them
-   into functions *before* passing them into deepscatter.
-1. Shortcuts for passing `position` and `position0` rather 
+   into functions _before_ passing them into deepscatter.
+
+5. Shortcuts for passing `position` and `position0` rather
    than naming the `x` and `y` dimensions explicitly have been removed.
-1. 
-1. The syntax for expressly passing a categorical scale may change.
+6. Tile objects no longer have `ready` and `promise` states.
+   This is because tiles
+   other than the first no longer necessarily download any data at all. Code that blocked on these states should instead block on the dataset's `ready` promise; code needing to know if a particular tile has a record batch can check for the presence of `tile.record_batch`, but this no
+   long guarantees that any particular data columns (including 'x', 'y', and 'ix') are present. The purpose of this change is to allow
+   certain parts of the quadtree to be lazily loaded for only certain
+   tiles without necessarily loading the entire dataset.
+
+   Much of the data metadata previously stored directly on the tile
+   object (this as childLocations, min_ix, max_ix, highest_known_ix, etc.) is now located in an object called `manifest` that is used to manage children. This is designed to
+   make it possible (though not yet necessary) to pre-load a single file enumerating all the tiles in the dataset.
+
+7. The syntax for expressly passing a categorical scale may change.
 
 ## Fundamental design changes
 
-1. Previously `Aesthetic` objects were stateful; 
-   they are now stateless, with all necessary state held in the pair of `StatefulAesthetic` that defines them. This allows for tighter binding and type safety with d3 scales; it should 
-2. The preferred tile input type has changed. 
-    (There will be associated changes to the quadfeather package as well). Although for the sake of back-compatibility the special keys `x`, `y`, and `ix` will still work, deepscatter now falls back to those as defaults, preferring to find them wrapped in a struct field called `_deepscatter`.
+1. Previously `Aesthetic` objects were stateful;
+   they are now stateless, with all necessary state held in the pair of `StatefulAesthetic` that defines them. This allows for tighter binding and type safety with d3 scales; it should
+2. The preferred tile input type has changed.
+   (There will be associated changes to the quadfeather package as well). Although for the sake of back-compatibility the special keys `x`, `y`, and `ix` will still work, deepscatter now falls back to those as defaults, preferring to find them wrapped in a struct field called `_deepscatter`.
 3. Boolean channels are no longer passed with `op` commands
 
 # 2.15.1
 
-* Adds a method to `Dataset` called visit_full that returns a promise which iterates over all the tiles in the dataset including those that have not yet loaded. (Their load is triggered.)
+- Adds a method to `Dataset` called visit_full that returns a promise which iterates over all the tiles in the dataset including those that have not yet loaded. (Their load is triggered.)
 
 # 2.15.0
 
-This would be a bugfix release except that it's possible this might accidentally break code taking advantage of undocumented behavior involving the domain for categorical scales. If you've ever set a scale to have domain [-2047, 2047], the console will now throw a warning and autochange the extent to provide more sensible support for dictionary fields. 
+This would be a bugfix release except that it's possible this might accidentally break code taking advantage of undocumented behavior involving the domain for categorical scales. If you've ever set a scale to have domain [-2047, 2047], the console will now throw a warning and autochange the extent to provide more sensible support for dictionary fields.
 
 - Fix off-by-one bug in color schemes affecting legend appearance for more than 2,048 categories.
   Because of variable rules around floating point precision, the number of categories you can display will vary
@@ -65,35 +77,38 @@ This would be a bugfix release except that it's possible this might accidentally
 - add a new scatterplot setter/getter method `highlit_point_change`. Like `click_handler`, `tooltip_html`, etc. Whatever function
   you place here will be called on the list of points that are currently highlighted (i.e., that have a svg circle over them). In
   all standard cases this list will be of length zero (there's no point under the cursor) or one (there's a point under
-  the cursor that's bigger). This can be useful for calling events when--for example--the user switches to a no-highlighted 
+  the cursor that's bigger). This can be useful for calling events when--for example--the user switches to a no-highlighted
   point state. In general I suspect that this could be superior to tooltip_html unless you're actually using the tooltip.
-- Add an optional method `useNameCache` to `scatterplot.select_data`. This makes it easier for users to maintain their own 
-  namespaces for selections. By default, attempting to create a new selection with 
-  the same name as an existing selection raises an error, because having two selections with *different* rules but the same name
+- Add an optional method `useNameCache` to `scatterplot.select_data`. This makes it easier for users to maintain their own
+  namespaces for selections. By default, attempting to create a new selection with
+  the same name as an existing selection raises an error, because having two selections with _different_ rules but the same name
   could result in some crazy errors where different parts of the map rendered different rules. With a name cache, the first rule
   used will be the one that's kept, and the second will be ignored.
 - add method `Selection.moveCursorToPoint(point)`. This allows a selection's cursor
   (the thing we use in Nomic Atlas to show a point on mouseover) to be fast-forwarded so that it's over a given point.
 - The method `Scatterplot.select_and_plot()` used to return nothing;
-  it now returns the selection that it creates. This could introduce typescript 
+  it now returns the selection that it creates. This could introduce typescript
   errors into code.
 
 # 2.14.1
+
 - Add exports of QuadtileDataset, ArrowDataset, Bitmask, and DataSelection classes as static methods
-  on core deepscatter object. In a future release, these may become named exports: for now 
+  on core deepscatter object. In a future release, these may become named exports: for now
   Scatterplot is staying the one and only export, as a default for back-compatabiility.
 - Improve Bitmask class to include ANY and ALL compositors in selections, misc small fixes.
+
 # 2.14.0
-- Allow defining transformation functions by points, not just record batches, 
+
+- Allow defining transformation functions by points, not just record batches,
   so that you can define new functions without knowing the Apache Arrow spec front to back.
-- Create new function at deepscatter.utils.createDictionaryWithVector for use inside transformations that 
+- Create new function at deepscatter.utils.createDictionaryWithVector for use inside transformations that
   need to return a dictionary. This is unfortunately complicated, because utf-8 serialization and deserialization is an Arrow achilles heel. I've designed the function to be [curryable](https://en.wikipedia.org/wiki/Currying) so that an initial dictionary set can be used multiple times without incurring huge deserialization costs.
 - Bump Arrow to 13.0.0
 - Fix for bugs in domains.
 - Update dataset methods to allow instantiating from an arrow table represented
   as a Uint8Array, which is simpler and avoids some conflicts in Apache Arrow versions.
 - Allow creating a dataset in the constructor, before the initial
-  plotAPI call,  which allows more
+  plotAPI call, which allows more
   precise staging of data and allows access to most dataset capabilities without binding to the DOM.
 - Support for Arrow Boolean types in transformations/selections.
 - New `Bitmask` type wrapping Boolean arrays on batches
@@ -106,20 +121,22 @@ This would be a bugfix release except that it's possible this might accidentally
 
 Add `select_and_plot` shortcut on `Deepscatter` object to plot a selection immediately
 on creation.
- 
+
 # 2.13.2
 
 - Publish type definitions. at dist/deepscatter.d.ts
   and adjacent files.
 
 # 2.13.0
+
 - Introduce new 'selection' fundamental; selections allow
   managing a variety of common operations on sets of points,
   including iteration, creation of a column from a list of ids,
-  and (WIP) unioning, intersection, and other operations on 
+  and (WIP) unioning, intersection, and other operations on
   arrow columns and bitmasks.
 - More comprehensive type annotations
 - Remove random jitter on point size above 5 pixels.
+
 # 2.12.0
 
 - Allow accessing dataset at `scatterplot.dataset`, rather than the confusing `scatterplot._root`.
