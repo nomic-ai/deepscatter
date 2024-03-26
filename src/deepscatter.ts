@@ -1,4 +1,4 @@
 export { Scatterplot } from './scatterplot';
-export { Bitmask } from './selection'
+export { Bitmask, DataSelection } from './selection';
 export { Dataset } from './Dataset';
-
+export { LabelMaker } from './label_rendering';

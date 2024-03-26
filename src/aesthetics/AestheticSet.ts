@@ -7,15 +7,16 @@ import { StatefulAesthetic } from './StatefulAesthetic';
 import type { Encoding } from '../shared';
 import type * as DS from '../shared';
 
-
 type AesMap = {
-  [K in keyof typeof dimensions]: StatefulAesthetic<InstanceType<typeof dimensions[K]>>
+  [K in keyof typeof dimensions]: StatefulAesthetic<
+    InstanceType<(typeof dimensions)[K]>
+  >;
 };
 
 type StateList<T> = {
   current: T;
   last: T;
-}
+};
 
 export class AestheticSet {
   public tileSet: Dataset;
@@ -28,8 +29,8 @@ export class AestheticSet {
   public options: {
     jitter_method: StateList<DS.JitterMethod>;
   } = {
-    jitter_method: { current: 'None', last: 'None' }
-  }
+    jitter_method: { current: 'None', last: 'None' },
+  };
   constructor(scatterplot: Scatterplot, regl: Regl, tileSet: Dataset) {
     this.scatterplot = scatterplot;
     this.regl = regl;
@@ -37,14 +38,13 @@ export class AestheticSet {
     this.position_interpolation = false;
     this.aesthetic_map = new TextureSet(this.regl);
     for (const [name, Maker] of Object.entries(dimensions)) {
-      this.store[name] = 
-        new StatefulAesthetic<InstanceType<typeof Maker>>(
-          scatterplot,
-          regl,
-          tileSet,
-          this.aesthetic_map,
-          Maker
-        )
+      this.store[name] = new StatefulAesthetic<InstanceType<typeof Maker>>(
+        scatterplot,
+        regl,
+        tileSet,
+        this.aesthetic_map,
+        Maker,
+      );
     }
     return this;
   }
@@ -63,8 +63,8 @@ export class AestheticSet {
   }
 
   *[Symbol.iterator](): Generator<number> {
-    throw new Error("DEPRECATED")
-    yield 3
+    throw new Error('DEPRECATED');
+    yield 3;
   }
 
   interpret_position(encoding: Encoding) {
@@ -83,10 +83,16 @@ export class AestheticSet {
   }
 
   apply_encoding(encoding: Encoding) {
-
-    if (encoding['jitter_radius'] && encoding['jitter_radius']['jitter_method']) {
-      console.warn("jitter_radius.jitter_method is deprecated. Use jitter_method instead.")
-      encoding['jitter_method'] = encoding['jitter_radius']['jitter_method'] as DS.JitterMethod;
+    if (
+      encoding['jitter_radius'] &&
+      encoding['jitter_radius']['jitter_method']
+    ) {
+      console.warn(
+        'jitter_radius.jitter_method is deprecated. Use jitter_method instead.',
+      );
+      encoding['jitter_method'] = encoding['jitter_radius'][
+        'jitter_method'
+      ] as DS.JitterMethod;
       delete encoding['jitter_radius']['jitter_method'];
     }
     if (encoding === undefined) {
@@ -111,8 +117,7 @@ export class AestheticSet {
     }
   }
 
-
-  jitter_int_format(time : 'last' | 'current') : 0 | 1 | 2 | 3 | 4 | 5 {
+  jitter_int_format(time: 'last' | 'current'): 0 | 1 | 2 | 3 | 4 | 5 {
     return encode_jitter_to_int(this.options.jitter_method[time]);
   }
 }
@@ -166,7 +171,7 @@ export class TextureSet {
         height: this.texture_size,
       },
       offset,
-      0
+      0,
     );
   }
 
@@ -186,7 +191,7 @@ export class TextureSet {
         height: this.texture_size,
       },
       -offset - 1,
-      0
+      0,
     );
     // -offset because we're coding the color buffer
     // on the negative side of the number line.
@@ -199,9 +204,9 @@ export class TextureSet {
     const texture_type = this.regl.hasExtension('OES_texture_float')
       ? 'float'
       : this.regl.hasExtension('OES_texture_half_float')
-      ? 'half float'
-      : 'uint8';
-    
+        ? 'half float'
+        : 'uint8';
+
     const format = texture_type === 'uint8' ? 'rgba' : 'alpha';
 
     const params = {
@@ -231,7 +236,7 @@ export class TextureSet {
 
 // Encode a jitter method for use on the shaders.
 
-function encode_jitter_to_int(jitter: DS.JitterMethod) : 0 | 1 | 2 | 3 | 4 | 5 {
+function encode_jitter_to_int(jitter: DS.JitterMethod): 0 | 1 | 2 | 3 | 4 | 5 {
   if (jitter === 'spiral') {
     // animated in a logarithmic spiral.
     return 1;

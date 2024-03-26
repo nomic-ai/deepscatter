@@ -72,7 +72,9 @@ export class Dataset {
   public promise: Promise<void>;
   public root_tile: Tile;
   public manifest?: DS.TileManifest;
+
   // Whether the tileset is structured as a pure quadtree.
+
   public readonly tileStucture: DS.TileStructure = 'quadtree';
   /**
    * @param plot The plot to which this dataset belongs.
@@ -90,6 +92,7 @@ export class Dataset {
     if (options.tileStructure) {
       this.tileStucture = options.tileStructure;
     }
+
     if (options.extent) {
       this._extent = options.extent;
     }

@@ -785,7 +785,7 @@ export class Scatterplot {
     }
 
     this._renderer.most_recent_restart = Date.now();
-    this._renderer.aes.apply_encoding(prefs.encoding);
+    this._renderer.aes.apply_encoding(prefs.encoding ?? {});
 
     if (this._renderer.reglframe) {
       const r = this._renderer.reglframe;
