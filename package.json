@@ -19,8 +19,8 @@
   "scripts": {
     "dev": "vite --mode dev --port 3344 --host",
     "format": "prettier --write src",
-    "build": "vite build && tsc || true",
-    "prepublishOnly": "vite build && tsc || true && typedoc --skipErrorChecking src/*",
+    "build": "vite build && tsc",
+    "prepublishOnly": "vite build && tsc && typedoc --skipErrorChecking src/*",
     "test": "playwright test",
     "lint": "eslint src"
   },
