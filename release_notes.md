@@ -1,3 +1,7 @@
+# 2.15.3
+
+Improvements to docstrings around `visit_full` method. (2.15.2 conflicted out as a pre-release)
+
 # 2.15.1
 
 - Adds a method to `Dataset` called visit_full that returns a promise which iterates over all the tiles in the dataset including those that have not yet loaded. (Their load is triggered.)
