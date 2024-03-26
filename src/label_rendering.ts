@@ -1,15 +1,15 @@
 import type { GeoJsonObject, GeoJsonProperties } from 'geojson';
 import { Renderer } from './rendering';
-import { RBush3D } from 'rbush-3d';
-import Scatterplot from './deepscatter';
+import { BBox, RBush3D } from 'rbush-3d';
+import { Scatterplot } from './scatterplot';
 import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
-import type { Tile } from './tile';
-import type * as DS from './shared'
-const handler = drag();
+import type * as DS from './shared';
+import { Color } from './aesthetics/ColorAesthetic';
+const handler = drag<SVGRectElement, BBox>();
 
-function pixel_ratio(scatterplot: Scatterplot<any>): number {
+function pixel_ratio(scatterplot: Scatterplot): number {
   // pixelspace
   const [px1, px2] = scatterplot._zoom.scales().x.range() as [number, number];
   // dataspace
@@ -19,7 +19,7 @@ function pixel_ratio(scatterplot: Scatterplot<any>): number {
 }
 // Should be 0 except in testing.
 const RECT_DEFAULT_OPACITY = 0;
-export class LabelMaker<T extends Tile> extends Renderer<T> {
+export class LabelMaker extends Renderer {
   /**
    * A LabelMaker
    */
@@ -39,14 +39,16 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
    * @param options
    */
   constructor(
-    scatterplot: Scatterplot<DS.TileType>,
+    scatterplot: Scatterplot,
     id_raw: string,
     options: DS.LabelOptions = {}
   ) {
-    super(scatterplot.div.node(), scatterplot._root, scatterplot);
+    super(scatterplot.div.node() as HTMLDivElement, scatterplot._root, scatterplot);
     this.options = options;
-    this.canvas = scatterplot.elements![2].selectAll('canvas').node();
-    const svg = scatterplot.elements![3].selectAll('svg').node() as SVGElement;
+    this.canvas = scatterplot.elements[2]
+      .selectAll('canvas')
+      .node() as HTMLCanvasElement;
+    const svg = scatterplot.elements[3].selectAll('svg').node() as SVGElement;
     const id = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, '---');
     const labgroup = svg.querySelectorAll(`#${id}`);
     // eslint-disable-next-line unicorn/prefer-ternary
@@ -55,7 +57,7 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
         .select('#labelrects')
         .append('g')
         .attr('id', id)
-        .node() as SVGGElement;
+        .node();
     } else {
       this.labelgroup = labgroup[1] as SVGGElement;
     }
@@ -63,7 +65,7 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
     if (this.canvas === undefined) {
       throw new Error('WTF?');
     }
-    this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+    this.ctx = this.canvas.getContext('2d');
 
     this.tree = new DepthTree(
       this.ctx,
@@ -144,7 +146,7 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
           properties[label_key] !== undefined &&
           properties[label_key] !== null
         ) {
-          label = properties[label_key];
+          label = `${properties[label_key]}`
         }
         const p: RawPoint = {
           x: geometry.coordinates[0] + Math.random() * 0.1,
@@ -170,7 +172,7 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
     context.globalAlpha = 1;
 
     const size_adjust = 1; //Math.exp(Math.log(transform.k) * 0.25);
-    const corners = this.zoom.current_corners()!;
+    const corners = this.zoom.current_corners();
     const overlaps = this.tree.search({
       minX: corners.x[0],
       minY: corners.y[0],
@@ -182,11 +184,11 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
 
     //    context.fillStyle = "rgba(0, 0, 0, 0)";
     context.clearRect(0, 0, 4096, 4096);
-    const dim = this.scatterplot.dim('color');
+    const dim = this.scatterplot.dim('color') as Color;
     const bboxes = select(this.labelgroup)
       .selectAll('rect.labelbbox')
       // Keyed by the coordinates.
-      .data(overlaps, (d) => '' + d.minZ + d.minX)
+      .data(overlaps, (d: BBox) => String(d.minZ) + String(d.minX))
       .join((enter) =>
         enter
           .append('rect')
@@ -194,15 +196,13 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
           .style('opacity', RECT_DEFAULT_OPACITY)
       );
 
-    const { scatterplot, label_key } = this;
-    const labeler = this;
     const Y_BUFFER = 5;
 
     // Go through and draw the canvas events.
     for (const d of overlaps) {
       const datum = d.data as RawPoint;
-      const x = x_(datum.x) as number;
-      const y = y_(datum.y) as number;
+      const x = x_(datum.x);
+      const y = y_(datum.y);
 
       context.globalAlpha = 1;
       context.fillStyle = 'white';
@@ -232,11 +232,19 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
         context.shadowColor = '#71797E';
         context.strokeStyle = '#71797E';
       } else if (datum.properties[dim.field]) {
+        const val = datum.properties[dim.field] as string;
+        if (typeof val !== 'string') {
+          throw new Error('Color scale must be categorical');
+        }
         const exists =
-          dim.scale.domain().indexOf(datum.properties[dim.field]) > -1;
+          (dim.scale.domain() as string[]).indexOf(
+            datum.properties[dim.field] as string
+          ) > -1;
         if (exists) {
-          context.shadowColor = dim.scale(datum.properties[dim.field]);
-          context.strokeStyle = dim.scale(datum.properties[dim.field]);
+          //@ts-expect-error -- it's a string
+          context.shadowColor = dim.scale(val);
+          //@ts-expect-error -- it's a string
+          context.strokeStyle = dim.scale(val);
         } else {
           context.shadowColor = 'gray';
           context.strokeStyle = 'gray';
@@ -271,66 +279,47 @@ export class LabelMaker<T extends Tile> extends Renderer<T> {
       .attr('class', 'labelbbox')
       .attr(
         'x',
-        (d) => x_(d.data.x) - (d.data.pixel_width * this.tree.pixel_ratio) / 2
+        (d: P3d) => x_(d.data.x) - (d.data.pixel_width * this.tree.pixel_ratio) / 2
       )
       .attr(
         'y',
-        (d) =>
+        (d: P3d) =>
           y_(d.data.y) -
           (d.data.pixel_height * this.tree.pixel_ratio) / 2 -
           Y_BUFFER
       )
-      .attr('width', (d) => d.data.pixel_width * this.tree.pixel_ratio)
+      .attr('width', (d : P3d) => d.data.pixel_width * this.tree.pixel_ratio)
       .attr('stroke', 'red')
       .attr(
         'height',
-        (d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
+        (d: P3d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
       )
-      .attr('display', (d) => {
-        return d.data.properties.__display || 'inline';
+      .attr('display', (d : P3d) => {
+        return d.data.properties.__display as string || 'inline';
       })
       .on('mouseover', (event, d) => {
         select(event.target).style('opacity', RECT_DEFAULT_OPACITY);
         this.hovered = '' + d.minZ + d.minX;
         event.stopPropagation();
-        return;
-        const command = {
-          duration: 350,
-          encoding: {
-            filter: {
-              field: label_key,
-              lambda: `d => d === "${d.data.text}"`,
-            },
-          },
-        };
-        void scatterplot.plotAPI(command);
       })
-      .on('mousemove', function (event, d) {
+      .on('mousemove', function (event : MouseEvent) {
         event.stopPropagation();
       })
-      .on('click', (event, d) => {
-        this.scatterplot.label_click(d.data, this.scatterplot, this);
+      .on('click', (event, d: P3d) => {
+        this.scatterplot.label_click(d.data, this.scatterplot);
       })
-      .on('mouseout', (event, d) => {
+      .on('mouseout', (event) => {
         this.hovered = undefined;
         event.stopPropagation();
         return;
-        const command = {
-          duration: 350,
-          encoding: {
-            filter: {},
-          },
-        };
-        this.scatterplot.plotAPI(command);
-        select(event.target).style('opacity', 0);
       });
 
     if (this.options.draggable_labels) {
-      handler.on('drag', (event, d) => {
+      handler.on('drag', (event: MouseEvent, d: P3d) => {
         d.data.x = x_.invert(event.x);
         d.data.y = y_.invert(event.y);
       });
-      handler.on('end', (event, d) => {
+      handler.on('end', (event, d : P3d) => {
         console.log({ text: d.data.text, x: d.data.x, y: d.data.y });
       });
       bboxes.call(handler);
@@ -378,12 +367,13 @@ function getContext(): CanvasRenderingContext2D {
   canvas.height = 400;
 
   // Get the drawing context
-  context = canvas.getContext('2d') as CanvasRenderingContext2D;
+  context = canvas.getContext('2d');
   return context;
 }
 
 function measure_text(d: RawPoint, pixel_ratio: number, margin: number) {
-  // Uses a global context that it calls into existence for measuring; using the deepscatter
+  // Uses a global context that it calls into existence for measuring;
+  // using the deepscatter
   // canvas gets too confused with state information.
   const context = getContext();
   // Called for the side-effect of setting `d.aspect_ratio` on the passed item.
@@ -524,7 +514,7 @@ class DepthTree extends RBush3D {
         ...measure_text(point, this.pixel_ratio, this.margin),
       };
     } else {
-      measured = point;
+      measured = point as Point;
     }
     const p3d = this.to3d(measured, mindepth, this.maxdepth);
     if (!this.collides(p3d)) {
@@ -547,7 +537,7 @@ class DepthTree extends RBush3D {
     // The depth until which we're hidden; from min_depth (.1 ish) to max_depth(100 ish)
     let hidden_until = -1;
     // The node hiding this one.
-    let hidden_by;
+    let hidden_by : P3d;
     for (const overlapper of this.search(p3d)) {
       // Find the most closely overlapping 3d block.
       // Although the other ones will retain 3d blocks'
@@ -560,7 +550,7 @@ class DepthTree extends RBush3D {
 
       if (blocked_until > hidden_until) {
         hidden_until = blocked_until;
-        hidden_by = overlapper;
+        hidden_by = overlapper as P3d;
       }
     }
 

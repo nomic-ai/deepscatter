@@ -1,87 +1,28 @@
-import type { Dictionary, Float, Float32, Int, Int16, Int32, Int8, StructRowProxy, Table, Timestamp, Utf8, Vector } from 'apache-arrow';
+import type {
+  Dictionary,
+  Float,
+  Bool,
+  Int,
+  Int16,
+  Int32,
+  Int8,
+  StructRowProxy,
+  Table,
+  Timestamp,
+  Utf8,
+  Vector,
+} from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Dataset } from './Dataset';
-import type { ArrowDataset } from './Dataset';
-import type { ConcreteAesthetic } from './StatefulAesthetic';
-import type { Tile, QuadTile, ArrowTile } from './tile';
-import type Scatterplot from './deepscatter';
-import type { ReglRenderer } from './regl_rendering';
-import type { Regl, Buffer } from 'regl';
-import { Bool } from 'apache-arrow';
+import type { ConcreteAesthetic } from './aesthetics/StatefulAesthetic';
+import type { Buffer } from 'regl';
 import type { DataSelection } from './selection';
-//import { DataSelection } from './selection';
-
-export type {
-  Renderer,
-  ArrowDataset,
-  Dataset,
-  ConcreteAesthetic,
-  Tile,
-  QuadTile,
-};
-
-/**
- * Operations to be performed on the GPU taking a single argument.
- */
-type OneArgumentOp = {
-  op: 'gt' | 'lt' | 'eq';
-  field: string;
-  a: number;
-};
-
-/**
- * Operations to be performed on the GPU taking two arguments
- */
-
-type TwoArgumentOp = {
-  op: 'within' | 'between';
-  field: string;
-  a: number;
-  b: number;
-};
-
-export type Newable<T> = { new (...args: any[]): T };
-export type PointFunction = (p : StructRowProxy) => number
-export type Plot = Scatterplot<QuadTile> | Scatterplot<ArrowTile>;
-export type OpChannel = OneArgumentOp | TwoArgumentOp;
-
-interface InitializedScatterplot<T extends Tile> {
-  _root: Dataset<T>;
-  _renderer: ReglRenderer<T>;
-}
-
-/**
- * A proxy class that wraps around tile get calls. Used to avoid
- * putting Nomic login logic in deepscatter while fetching 
- * tiles with authentication.
- *
- */
-export interface TileProxy {
-  apiCall: (endpoint: string, method : "GET", d1 : unknown, d2 : unknown , options : Record<string, boolean | string | number> ) => Promise<Uint8Array>;
-}
-
-export type ScatterplotOptions = {
-  tileProxy?: TileProxy;
-  dataset?: DataSpec;
-};
-
-export type QuadtileOptions = {
-  tileProxy?: TileProxy;
-};
-
-export interface SelectionRecord<T extends Tile>  {
-  selection: DataSelection<T> | null;
-  name: string;
-  flushed: boolean;
-}
-
-// Functions that are defined as strings and executed in JS.
-export type LambdaChannel = {
-  lambda: string;
-  field: string;
-  domain?: [number, number];
-  range?: [number, number];
-};
+import { Scatterplot } from './scatterplot';
+import { ZoomTransform } from 'd3-zoom';
+import { TileBufferManager } from './regl_rendering';
+import type { Tile } from './tile';
+import type { Rectangle } from './tile';
+export type { Renderer, Dataset, ConcreteAesthetic };
 
 export type BufferLocation = {
   buffer: Buffer;
@@ -90,9 +31,66 @@ export type BufferLocation = {
   byte_size: number; // in bytes;
 };
 
-export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
+export type Newable<T> = { new (...args: unknown[]): T };
+export type PointFunction<T = number> = (p: StructRowProxy) => T;
 
-type FunctionalChannel = LambdaChannel | OpChannel;
+/**
+ * A proxy class that wraps around tile get calls. Used to avoid
+ * putting Nomic login logic in deepscatter while fetching
+ * tiles with authentication.
+ *
+ */
+export interface TileProxy {
+  apiCall: (
+    endpoint: string,
+    method: 'GET' | 'POST', // Generally, the HTTP method.
+    parameter1: unknown, // For internal use.
+    parameter2: unknown, // For internal use.
+    options: Record<string, boolean | string | number>,
+  ) => Promise<Uint8Array>;
+}
+
+export type ScatterplotOptions = {
+  tileProxy?: TileProxy;
+  dataset?: DataSpec;
+};
+
+// The orientation of the dataset. Quadtree datasets
+// allow certain optimizations.
+export type TileStructure = 'quadtree' | 'other';
+
+export type TileManifest = {
+  key: string;
+  // The number of data points in that specific tile.
+  nPoints?: number;
+  // undefined children indicates a need for the
+  children: TileManifest[] | undefined;
+  min_ix: number;
+  max_ix: number;
+  extent: Rectangle;
+};
+
+export type DatasetOptions = {
+  // A TileProxy object to handle fetching tiles.
+  tileProxy?: TileProxy;
+  // The strategy used for creating the tree of linked tiles.
+  // For quadtree data (the default) additional information
+  // may be inferred.
+  tileStructure?: TileStructure;
+  // A manifest listing all the tiles in the dataset.
+  // Currently this must be passed as a recursive structure.
+  tileManifest?: Partial<TileManifest>;
+  // The x/y extent of the data.
+  extent?: Rectangle;
+  // The key to access the root tile. If not passed, will default to 0/0/0;
+  rootKey?: string;
+};
+
+export interface SelectionRecord {
+  selection: DataSelection | null;
+  name: string;
+  flushed: boolean;
+}
 
 export type BackgroundOptions = {
   // The color of background points. Hex codes or HTML
@@ -108,33 +106,50 @@ export type BackgroundOptions = {
    * A multiplier against the point's size. Default 0.66.
    * A single value describes the background; an array
    * describes the foreground and background separately.
-  */
+   */
   size?: number | [number, number];
 
   // Whether the background points sho`uld respond on mouseover.
   mouseover?: boolean;
 };
 
-type ConstantBool = {
-  constant: boolean;
-};
+// i.e., signed ints.
+type ArrowInt = Int8 | Int16 | Int32;
 
-export type ConstantNumber = {
-  constant: number;
-};
+// Deepscatter does not support all Arrow types; any columns not in the following set
+// cannot be rendered on the map.
+export type SupportedArrowTypes =
+  | Bool
+  | Float
+  | Int
+  | Dictionary<Utf8, ArrowInt>
+  | Timestamp;
 
+// An arrow buildable vector is something returned that can be placed onto the scatterplot.
+// Float32Arrays will be dropped straight onto the GPU; other types while be cast
+// to Float32Array before going there.
+export type ArrowBuildable =
+  | Vector<SupportedArrowTypes>
+  | Float32Array
+  | Uint8Array;
+
+type MaybePromise<T> = T | Promise<T>;
 /**
- * A constant color channel must be represented as a string that 
- * is valid HTML. (`blue`, `#EEFF00`, etc.)
+ * A transformation is a batchwise operation that can be used to construct
+ * a new column in the data table. It runs asynchronously so that it
+ * can make network calls: it's defined as a recordbatch -> column operation
+ * rather than a point -> value operation for speed.
+ *
+ * If the resulting vector or float32array is not the same length as
+ * inputTile.record_batch.numRows, it will fail in an undefined way.
+ * This is not a guarantee I know how to enforce in the type system.
  */
-export type ConstantColorChannel = {
-  constant: string;
-};
+export type Transformation = (inputTile: Tile) => MaybePromise<ArrowBuildable>;
 
-export type ConstantChannel =
-  | ConstantBool
-  | ConstantNumber
-  | ConstantColorChannel;
+export type BoolTransformation = (
+  inputTile: Tile,
+) => MaybePromise<Vector<Bool>>;
+
 /**
  * A channel represents the information necessary to map a single dimension
  * (x, y, color, jitter, etc.) from dataspace to a visual encoding. It is used
@@ -146,7 +161,98 @@ export type ConstantChannel =
  * but the syntax differs for a number of operations.
  * https://vega.github.io/vega-lite/docs/encoding.html
  */
-export interface BasicChannel {
+
+type SignedInt = Int8 | Int16 | Int32;
+export type WebGlValue = number | [number, number, number];
+
+// The type in JSON. This does not include Date because only
+// JSON-serializable types are allowed.
+export type JSONValue = number | string | boolean;
+
+// The type in javascript. This lets us capture that some things become dates.
+export type JSValue = number | string | boolean | Date;
+export type DomainType = null | ArrowBuildable;
+
+export type TypeBundle<ArrowType, JSONType, DomainType, RangeType, GLType> = {
+  arrowType: ArrowType;
+  jsonType: JSONType;
+  domainType: DomainType;
+  rangeType: RangeType;
+  glType: GLType;
+};
+
+export type StringCategorical = TypeBundle<
+  Dictionary<Utf8, SignedInt>, // arrowType
+  string, // jsonType
+  string, // domainType
+  string, // rangeType
+  number // glType
+>;
+
+export type NumberOut = {
+  rangeType: number;
+  glType: number;
+};
+
+export type ColorOut = {
+  rangeType: string;
+  glType: [number, number, number];
+};
+
+export type BoolOut = {
+  rangeType: boolean;
+  glType: 0 | 1;
+};
+
+export type CategoryIn = {
+  arrowType: Dictionary<Utf8>;
+  jsonType: string;
+  domainType: string;
+};
+
+export type NumberIn = {
+  arrowType: Float | Int;
+  jsonType: number;
+  domainType: number;
+};
+
+export type DateIn = {
+  arrowType: Timestamp;
+  jsonType: IsoDateString;
+  domainType: Date;
+};
+
+export type BoolIn = {
+  arrowType: Bool;
+  jsonType: boolean;
+  domainType: boolean;
+};
+
+export type ConstantIn = {
+  arrowType: null;
+  jsonType: null;
+  domainType: null;
+};
+
+export type InType = DateIn | BoolIn | NumberIn | CategoryIn | ConstantIn;
+
+export type OutType = NumberOut | ColorOut | BoolOut;
+
+export type Transform = 'log' | 'sqrt' | 'linear' | 'literal';
+
+export type IsoDateString =
+  | `${number}-${number}-${number}`
+  | `${number}-${number}-${number}T${number}:${number}:${number}.${number}Z`;
+
+// Any valid HTML string.
+export type Colorstring =
+  //  | `#${number}${number}${number}${number}${number}${number}`
+  string;
+
+export type NumericScaleChannel<
+  DomainType extends number | IsoDateString = number,
+  RangeType extends number | Colorstring = number,
+> = {
   /** The name of a column in the data table to be encoded. */
   field: string;
   /**
@@ -156,102 +262,132 @@ export interface BasicChannel {
    */
   transform?: Transform;
   // The domain over which the data extends
-  domain?: [number, number];
+  domain?: [DomainType, DomainType];
   // The range into which to map the data.
-  range?: [number, number];
-}
+  range?: [RangeType, RangeType];
+};
 
-export type JitterRadiusMethod =
-  | 'None' // 
+export type LambdaChannel<
+  DomainType extends JSValue,
+  RangeType extends boolean | number | Colorstring,
+> = {
+  lambda?: (v: DomainType) => RangeType;
+  field: string;
+};
+
+/**
+ * Operations to be performed on the GPU taking a single argument.
+ */
+type OneArgumentOp<JSONType extends number | IsoDateString> = {
+  op: 'gt' | 'lt' | 'eq';
+  a: JSONType;
+  // This will not need to be defined and can't be overridden;
+  // it just is defined implicitly because we call the function in
+  // WebGL, not JS.
+  // localImplementation?: (arg: JSONType) => boolean;
+};
+
+/**
+ * Operations to be performed on the GPU taking two arguments
+ */
+
+type TwoArgumentOp<JSONType extends number | IsoDateString> = {
+  op: 'within' | 'between';
+  a: JSONType;
+  b: JSONType;
+  // This will not need to be defined and can't be overridden;
+  // it just is defined implicitly because we call the function in
+  // WebGL, not JS.
+  // localImplementation?: (arg: ArrowType) => boolean;
+};
+
+export type OpChannel<JSONType extends number | IsoDateString> = {
+  field: string;
+} & (OneArgumentOp<JSONType> | TwoArgumentOp<JSONType>);
+
+export type ConstantChannel<T extends boolean | number | string> = {
+  constant: T;
+};
+
+export type OneDChannels =
+  | ConstantChannel<number>
+  | NumericScaleChannel<number | IsoDateString>;
+
+export type JitterMethod =
+  | 'None' // No jitter
   | 'spiral' // animates along a log spiral.
   | 'uniform' // static jitters around a central point.
   | 'normal' // static jitters around a central point biased towards the middle.
   | 'circle' // animates a circle around the point.
   | 'time'; // lapses the point in and out of view.
 
-export interface CategoricalChannel {
-  field: string;
-}
+export type BooleanChannel =
+  | ConstantChannel<boolean>
+  | OpChannel<IsoDateString | number>
+  | LambdaChannel<JSValue, boolean>;
 
-type ArrowInt = Int8 | Int16 | Int32;
+type Colorname = string;
 
-// Deepscatter does not support all Arrow types; any columns not in the following set
-// cannot be rendered on the map.
-export type SupportedArrowTypes = Bool | Float | Int | Dictionary<Utf8, ArrowInt> | Timestamp
-
-// An arrow buildable vector is something returned that can be placed onto the scatterplot.
-// Float32Arrays will be dropped straight onto the GPU; other types while be cast
-// to Float32Array before going there.
-
-export type ArrowBuildable = Vector<SupportedArrowTypes> | Float32Array | Uint8Array;
-/**
- * A transformation is a batchwise operation that can be used to construct
- * a new column in the data table. It runs asynchronously so that it
- * can make network calls: it's defined as a recordbatch -> column operation
- * rather than a point -> value operation for speed.
- * 
- * If the resulting vector or float32array is not the same length as 
- * inputTile.record_batch.numRows, it will fail in an undefined way.
- * This is not a guarantee I know how to enforce in the type system.
- */
-export type Transformation<T> = (inputTile: T) => ArrowBuildable | Promise<ArrowBuildable>;
-
-export type BoolTransformation<T> = (inputTile: T) => Float32Array | Promise<Float32Array> | Uint8Array | Promise<Uint8Array> | Vector<Bool> | Promise<Vector<Bool>>
-
-export type BasicColorChannel = BasicChannel & {
-  range?: string[] | string;
-  domain?: [number, number];
-};
-
-export type CategoricalColorChannel = CategoricalChannel & {
-  range?: string | string[];
-  domain?: string[];
-};
-
-export type ColorChannel =
-  | BasicColorChannel
-  | CategoricalColorChannel
-  | ConstantColorChannel;
-
-export type BooleanChannel = FunctionalChannel | ConstantBool;
-
-export type RootChannel =
+export type ChannelType =
   | BooleanChannel
-  | BasicChannel
-  | string
-  | OpChannel
-  | ConstantColorChannel
-  | ConstantChannel
-  | LambdaChannel;
+  | OpChannel<number | IsoDateString>
+  | ConstantChannel<string | number | boolean>
+  | NumericScaleChannel<number | IsoDateString>
+  | CategoricalColorScale;
 
-export type JitterChannel = RootChannel & {
-  method: JitterRadiusMethod;
+export type CategoricalColorScale = {
+  field: string;
+  domain: string | [string, string, ...string[]];
+  range: Colorname[];
 };
+
+type LinearColorScale = {
+  field: string;
+  domain: [number, number]; // TODO: | [number, number, number]
+  // TODO: implement some codegen for these values
+  range: 'viridis' | 'magma' | 'ylorrd';
+  transform?: 'log' | 'sqrt' | 'linear'; // TODO: | "symlog"
+};
+
+export type ColorScaleChannel =
+  | ConstantChannel<Colorname>
+  | LinearColorScale
+  | CategoricalColorScale;
 
 // A description of a functional operation to be passsed to the shader.
-export type OpArray = [op: number, a: number, b: number];
 /**
  * And encoding.
  */
 export type Encoding = {
-  x?: RootChannel;
-  y?: RootChannel;
-  color?: null | ColorChannel;
-  size?: null | RootChannel;
-  shape?: null | RootChannel;
-  filter?: null | FunctionalChannel;
-  filter2?: null | FunctionalChannel;
-  jitter_radius?: null | JitterChannel;
-  jitter_speed?: null | RootChannel;
-  x0?: null | RootChannel;
-  y0?: null | RootChannel;
-  position?: string;
-  position0?: string;
-  foreground?: null | FunctionalChannel;
+  x?: null | NumericScaleChannel;
+  y?: null | NumericScaleChannel;
+  color?: null | ColorScaleChannel;
+  size?: null | ConstantChannel<number> | LambdaChannel<JSValue, number>;
+  filter?: null | BooleanChannel;
+  filter2?: null | BooleanChannel;
+  foreground?: null | BooleanChannel;
+  jitter_radius?: null | NumericScaleChannel | ConstantChannel<number>;
+  jitter_speed?: null | NumericScaleChannel;
+  x0?: null | NumericScaleChannel;
+  y0?: null | NumericScaleChannel;
+
+  // The jitter method to use.
+  // Only has an effect if a constant on a field is also applied to `encoding.jitter_radius`.
+  jitter_method?: JitterMethod;
 };
 
-type ColumnTimeLookups = Record<string, Date>;
-type TileKey = `${number}/${number}/${number}`;
+export type DimensionKeys =
+  | 'size'
+  | 'jitter_speed'
+  | 'jitter_radius'
+  | 'color'
+  | 'filter'
+  | 'filter2'
+  | 'x'
+  | 'y'
+  | 'x0'
+  | 'y0'
+  | 'foreground';
 
 export type PointUpdate = {
   column_name: string;
@@ -276,7 +412,7 @@ export type Dimension = keyof Encoding;
  * A DataSpec is a record that describes how to load data into the
  * scatterplot. It can be one of three things:
  * 1. A URL to a quadtile source.
- * 2. An Arrow Table object. (Use this with care! Minor differences in JS Apache Arrow builds 
+ * 2. An Arrow Table object. (Use this with care! Minor differences in JS Apache Arrow builds
  * can cause this to fail in deeply confusing ways.)
  * 3. A Uint8Array containing a serialized Arrow Table. (This is safer than passing an Arrow Table.)
  */
@@ -295,9 +431,10 @@ export type DataSpec = Record<string, never> &
 export type onZoomCallback = (transform: d3.ZoomTransform) => null;
 
 export type Label = {
-  x: number;
-  y: number;
-  text: string;
+  x: number; // in data space.
+  y: number; // in data space.
+  text: string; // The text to appear on the label.
+  size?: number; // The size of the label (in pt)
 };
 export type URLLabels = {
   url: string;
@@ -316,9 +453,12 @@ export type Labelset = {
   name: string;
   options?: LabelOptions;
 };
-export type Labelcall = Labelset | URLLabels | null;
+export type Labelcall = Labelset | URLLabels;
 
-// An APICall is a JSON-serializable specification of the chart.
+// An APICall is a specification of the chart. It provides the primary way to
+// alter a chart's state. Most parts are JSON serializable, but functional callbacks
+// for tooltips, clicks, and changes to the highlit point are not.
+
 export type APICall = {
   /** The magnification coefficient for a zooming item */
   zoom_balance?: number;
@@ -335,14 +475,27 @@ export type APICall = {
   /** Overall screen saturation target at average point density */
   alpha?: number;
 
-  /** A function defind as a string that takes implied argument 'datum' */
-  click_function?: string;
+  /** A function defind as a string that takes implied argument 'datum'
+   * Every time a click happens on a point, this function will be
+   * called on that point.
+   */
+  click_function?: RowFunction<void>;
+
+  /** A function defined as a string that take the implied argument 'datum'.
+   * Every time a mouseover happens on a point, this function will be
+   * called on that point; the string that it returns will be inserted into
+   * the innerHTML of the tooltip.
+   */
+  tooltip_html?: RowFunction<string>;
 
   // The color of the screen background.
   background_color?: string;
 
-  // 
-  transformations?: Record<string, string>;
+  // a set of functions by name from the existing data to a number.
+  // These are used to transform the data, and can create new columns
+  // in your dataset.
+
+  transformations?: Record<string, (d: StructRowProxy) => number>;
   encoding?: Encoding;
   labels?: Labelcall;
   background_options?: BackgroundOptions;
@@ -370,8 +523,62 @@ export type CompletePrefs = APICall & {
   max_points: number;
 };
 
-type RenderPrefs = CompletePrefs & {
-  arrow_table?: Table;
-  //arrow_buffer?: Buffer;
+// A function that can be applied to an Arrow StructRowProxy or a similar object.
+// It takes the point and the full scatterplot as arguments.
+export type RowFunction<T> = (
+  datum: StructRowProxy,
+  plot?: Scatterplot | undefined,
+) => T;
+
+type ZoomRow = [number, number, number];
+type ZoomMatrix = [ZoomRow, ZoomRow, ZoomRow];
+
+///////////
+
+// Props that are needed for all the draws in a single tick.
+export type GlobalDrawProps = {
+  aes: { encoding: Encoding };
+  colors_as_grid: 0 | 1;
+  corners: Rectangle;
+  zoom_balance: number;
+  transform: ZoomTransform;
+  max_ix: number;
+  point_size: number;
+  alpha: number;
+  time: number;
+  update_time: number;
+  relative_time: number;
+  // string_index: number;
+  prefs: APICall;
+  wrap_colors_after: [number, number];
+  start_time: number;
+  webgl_scale: number[];
+  last_webgl_scale: number[];
+  use_scale_for_tiles: boolean;
+  grid_mode: 1 | 0;
+  buffer_num_to_variable: string[];
+  aes_to_buffer_num: Record<string, number>;
+  variable_to_buffer_num: Record<string, number>;
+  color_picker_mode: 0 | 1 | 2 | 3;
+  zoom_matrix: [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  position_interpolation: boolean;
+  only_color?: number;
 };
-export type TileType = QuadTile | ArrowTile;
+
+// Props that are needed to draw a single tile.
+export type TileDrawProps = GlobalDrawProps & {
+  manager: TileBufferManager;
+  number: number;
+  foreground: 1 | 0 | -1;
+  tile_id: number;
+};

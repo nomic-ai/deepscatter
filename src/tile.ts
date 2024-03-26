@@ -1,14 +1,12 @@
-import { extent } from 'd3-array';
-
 import {
-  Table,
   Vector,
   tableFromIPC,
   RecordBatch,
   StructRowProxy,
+  Schema,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Dataset';
-import type { Dataset, QuadtileDataset } from './Dataset';
+import type { Dataset } from './Dataset';
 type MinMax = [number, number];
 
 export type Rectangle = {
@@ -16,14 +14,27 @@ export type Rectangle = {
   y: MinMax;
 };
 
-interface schema_entry {
-  name: string;
-  type: string;
-  extent: Array<any>;
-  keys?: Array<any>;
-}
+// interface schema_entry {
+//   name: string;
+//   type: string;
+//   extent: Array<any>;
+//   keys?: Array<any>;
+// }
 
 import type { TileBufferManager } from './regl_rendering';
+import type { ArrowBuildable, TileManifest } from './shared';
+
+export type RecordBatchCache =
+  | {
+      batch: Promise<RecordBatch>;
+      ready: false;
+    }
+  | {
+      batch: Promise<RecordBatch>;
+      schema: Schema;
+      ready: true;
+    };
+
 // Keep a global index of tile numbers. These are used to identify points.
 let tile_identifier = 0;
 
@@ -32,50 +43,75 @@ let tile_identifier = 0;
  * and to associate metadata with it, in the context of a larger dataset.
  *
  */
-export abstract class Tile {
-  public max_ix = -1;
+export class Tile {
+  // public max_ix = -1;
   readonly key: string; // A unique identifier for this tile.
-  promise: Promise<void>;
-  download_state: string;
-  public _batch?: RecordBatch;
-  parent: this | null;
-  public _children: Array<this> = [];
+  protected _batch?: RecordBatch;
+  parent: Tile | null;
+  private _children: Array<Tile> = [];
   public _highest_known_ix?: number;
-  public _min_ix?: number;
-  public _max_ix?: number;
-  public dataset: Dataset<Tile>;
-  public _download?: Promise<void>;
-  public ready: boolean;
-  __schema?: schema_entry[];
-  public _extent?: { x: MinMax; y: MinMax };
+  public dataset: Dataset;
+  public _transformations: Record<string, Promise<ArrowBuildable>> = {};
+  public _downloadPrimaryData?: Promise<TileManifest>;
+  //private _promiseOfChildren? = Promise<void>;
+  private partialManifest: Partial<TileManifest>;
+  private manifest?: TileManifest;
+
+  // A cache of fetchCalls for downloaded arrow tables, including any table schema metadata.
+  // Tables may contain more than a single column, so this prevents multiple dispatch.
+  //private _promiseOfChildren: Promise<Tile[]>;
+
+  private arrowFetchCalls: Map<string | null, RecordBatchCache> = new Map();
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
-  public _buffer_manager?: TileBufferManager<this>;
-  abstract codes: [number, number, number];
+  public _buffer_manager?: TileBufferManager;
+  url: string;
+  //public child_locations: string[] = [];
 
-  
-  constructor(dataset: Dataset<Tile>) {
-    // Accepts prefs only for the case of the root tile.
-    this.promise = Promise.resolve();
-    this.download_state = 'Unattempted';
-    this.key = String(Math.random());
-    this.parent = null;
+  constructor(
+    key: string | Partial<TileManifest>,
+    parent: Tile | null,
+    dataset: Dataset,
+    base_url: string,
+  ) {
+    // If it's just initiated with a key, build that into a minimal manifest.
+    let manifest: Partial<TileManifest>;
+    if (typeof key === 'string') {
+      manifest = { key };
+    } else {
+      manifest = key;
+    }
+    this.key = manifest.key as string;
+    if (manifest.min_ix === undefined) {
+      manifest.min_ix = parent ? parent.max_ix + 1 : 0;
+    }
+    if (manifest.max_ix === undefined) {
+      manifest.max_ix = manifest.min_ix + 1e5;
+    }
+    this.parent = parent;
     this.dataset = dataset;
-    this.ready = false;
+
     if (dataset === undefined) {
       throw new Error('No dataset provided');
     }
     // Grab the next identifier off the queue. This should be async safe with the current setup, but
     // the logic might fall apart in truly parallel situations.
     this.numeric_id = tile_identifier++;
-  }
+    this.url = base_url;
 
-  get children() {
-    return this._children;
-  }
+    // const p = new Promise((resolve) => {
+    //   this._registerChildren = resolve;
+    // });
+    // this._promiseOfChildren = p as Promise<void>;
 
-  download() : Promise<void> {
-    throw new Error('Not implemented');
+    if (manifest.children) {
+      this._registerChildren(
+        manifest.children.map((tile) => {
+          return new Tile(tile, this, this.dataset, base_url);
+        }),
+      );
+    }
+    this.partialManifest = manifest;
   }
 
   delete_column_if_exists(colname: string) {
@@ -86,21 +122,21 @@ export abstract class Tile {
   }
 
   async get_column(colname: string): Promise<Vector> {
-    if (this._batch === undefined) {
-      await this.promise;
-    }
-    const existing = this.record_batch.getChild(colname);
+    const existing = this._batch?.getChild(colname);
     if (existing) {
       return existing;
     }
     if (this.dataset.transformations[colname]) {
       await this.apply_transformation(colname);
-      return this.record_batch.getChild(colname);
+      return this.record_batch.getChild(colname) as Vector;
     }
     throw new Error(`Column ${colname} not found`);
   }
+  private _registerChildren(value: Tile[]) {
+    this._children = value;
+  }
 
-  private transformation_holder : Record<string, Promise<void>> = {};
+  private transformation_holder: Record<string, Promise<void>> = {};
 
   async apply_transformation(name: string): Promise<void> {
     if (this.transformation_holder[name] !== undefined) {
@@ -111,20 +147,34 @@ export abstract class Tile {
       throw new Error(`Transformation ${name} is not defined`);
     }
 
-    this.transformation_holder[name] = Promise
-      .resolve(transform(this))
-      .then((transformed) => {
+    this.transformation_holder[name] = Promise.resolve(transform(this)).then(
+      (transformed) => {
         if (transformed === undefined) {
-          throw new Error(`Transformation ${name} failed`);
+          throw new Error(
+            `Transformation ${name} failed by returning empty data. ` +
+              `All transformation functions must return a typedArray or Arrow Vector.`,
+          );
         }
-        this._batch = add_or_delete_column(this.record_batch, name, transformed);
-      })
+        this._batch = add_or_delete_column(this._batch, name, transformed);
+      },
+    );
     return this.transformation_holder[name];
   }
 
   add_column(name: string, data: Float32Array) {
     this._batch = add_or_delete_column(this.record_batch, name, data);
     return this._batch;
+  }
+
+  /**
+   * Checks if the tile has
+   *
+   *
+   * @param col The name of the field to check for.
+   * @returns
+   */
+  hasLoadedColumn(col: string) {
+    return !!this._batch && !!this._batch.getChild(col);
   }
 
   is_visible(max_ix: number, viewport_limits: Rectangle | undefined): boolean {
@@ -155,7 +205,7 @@ export abstract class Tile {
 
   *points(
     bounding: Rectangle | undefined,
-    sorted = false
+    sorted = false,
   ): Iterable<StructRowProxy> {
     //if (!this.is_visible(1e100, bounding)) {
     //  return;
@@ -165,10 +215,10 @@ export abstract class Tile {
         yield p;
       }
     }
-    //    console.log("Exhausted points on ", this.key)
     if (sorted === false) {
-      for (const child of this.children) {
-        if (!child.ready) {
+      for (const child of this.loadedChildren) {
+        // TODO: fix
+        if (!child.record_batch) {
           continue;
         }
         if (bounding && !child.is_visible(1e100, bounding)) {
@@ -181,7 +231,7 @@ export abstract class Tile {
         }
       }
     } else {
-      throw new Error("Sorted iteration not supported")
+      throw new Error('Sorted iteration not supported');
       /*
       let children = this.children.map((tile) => {
         const f = {
@@ -238,90 +288,29 @@ export abstract class Tile {
     if (this._batch) {
       return this._batch;
     }
-    // Constitute table if there's a present buffer.
-    throw new Error('Attempted to access table on tile without table buffer.');
+    throw new Error(
+      `Attempted to access table on tile ${this.key} without table buffer.`,
+    );
   }
 
-  get min_ix() {
-    if (this._min_ix !== undefined) {
-      return this._min_ix;
+  get max_ix(): number {
+    if (this.manifest?.max_ix !== undefined) {
+      return this.manifest.max_ix;
     }
     if (this.parent) {
       return this.parent.max_ix + 1;
     }
-    return 0;
+    return -1;
   }
 
-  async schema() {
-    await this.download();
-    await this.promise;
-    return this._schema;
-  }
-
-  /**
-   *
-   * @param callback A function (possibly async) to execute before this cell is ready.
-   * @returns A promise that includes the callback and all previous promises.
-   */
-  extend_promise(callback: () => Promise<void>) {
-    this.promise = this.promise.then(() => callback());
-    return this.promise;
-  }
-
-
-  protected get _schema() {
-    // Infer datatypes from the first file.
-    if (this.__schema) {
-      return this.__schema;
+  get min_ix() {
+    if (this.manifest?.min_ix !== undefined) {
+      return this.manifest.min_ix;
     }
-    const attributes: schema_entry[] = [];
-    for (const field of this.record_batch.schema.fields) {
-      const { name, type } = field;
-      if (type?.typeId == 5) {
-        // character
-        attributes.push({
-          name,
-          type: 'string',
-          extent: [],
-        });
-      }
-      if (type && type.dictionary) {
-        attributes.push({
-          name,
-          type: 'dictionary',
-          keys: this.record_batch.getChild(name).data[0].dictionary.toArray(),
-          extent: [
-            0,
-            this.record_batch.getChild(name).data[0].dictionary.length,
-          ],
-        });
-      }
-      if (type && type.typeId == 8) {
-        attributes.push({
-          name,
-          type: 'date',
-          extent: extent(this.record_batch.getChild(name).data[0].values),
-        });
-      }
-      if (type?.typeId === 10) {
-        // MUST HANDLE RESOLUTIONS HERE.
-        return [10, 100];
-        attributes.push({
-          name,
-          type: 'datetime',
-          extent: this.dataset.domain(name),
-        });
-      }
-      if (type && type.typeId == 3) {
-        attributes.push({
-          name,
-          type: 'float',
-          extent: extent(this.record_batch.getChild(name).data[0].values),
-        });
-      }
+    if (this.parent) {
+      return this.parent.max_ix + 1;
     }
-    this.__schema = attributes;
-    return attributes;
+    return -1;
   }
 
   *yielder() {
@@ -333,177 +322,234 @@ export abstract class Tile {
   }
 
   get extent(): Rectangle {
-    if (this._extent) {
-      return this._extent;
+    if (this.manifest?.extent) {
+      return this.manifest.extent;
     }
-    return {
-      x: [Number.MIN_VALUE, Number.MAX_VALUE],
-      y: [Number.MIN_VALUE, Number.MAX_VALUE],
-    };
+    return this.theoretical_extent;
   }
 
   [Symbol.iterator](): IterableIterator<StructRowProxy> {
     return this.yielder();
   }
 
-  get root_extent(): Rectangle {
-    if (this.parent === null) {
-      // infinite extent
-      return {
-        x: [Number.MIN_VALUE, Number.MAX_VALUE],
-        y: [Number.MIN_VALUE, Number.MAX_VALUE],
-      };
-    }
-    return this.parent.root_extent;
-  }
-}
-
-export class QuadTile extends Tile {
-  url: string;
-  key: string;
-  public _children: Array<this> = [];
-  codes: [number, number, number];
-  _already_called = false;
-  public child_locations: string[] = [];
-  constructor(
-    base_url: string,
-    key: string,
-    parent: QuadTile | null,
-    dataset: QuadtileDataset
-  ) {
-    super(dataset);
-    this.url = base_url;
-    this.parent = parent as this;
-    this.key = key;
-    const [z, x, y] = key.split('/').map((d) => Number.parseInt(d));
-    this.codes = [z, x, y];
-  }
-
-  get extent(): Rectangle {
-    if (this._extent) {
-      return this._extent;
-    }
-    return this.theoretical_extent;
-  }
-
-  async download_to_depth(max_ix: number): Promise<void> {
+  async download_to_depth(
+    max_ix: number,
+    suffix: string | null,
+  ): Promise<void> {
     /**
-     * Recursive fetch all tiles up to a certain depth. Triggers many unnecessary calls: prefer
+     * Recursive fetch all tiles up to a certain depth.
+     * Triggers many unnecessary calls: prefer
      * download instead if possible.
      */
-    await this.download();
-    let promises: Array<Promise<void>> = [];
-    if (this.max_ix < max_ix) {
-      promises = this.children.map((child) => child.download_to_depth(max_ix));
+    if (suffix === null) {
+      await this.loadManifestInfoFromTileMetadata();
+    } else {
+      await this.get_arrow(suffix);
     }
-    await Promise.all(promises);
+    if (this.max_ix < max_ix) {
+      await Promise.all(
+        this.loadedChildren.map(
+          (child): Promise<void> => child.download_to_depth(max_ix, suffix),
+        ),
+      );
+    }
   }
 
-  async get_arrow(
-    suffix: string | undefined = undefined
-  ): Promise<RecordBatch> {
+  // Retrieves an Arrow record batch from a remove location and attaches
+  // all columns in it to the tile's record batch, creating the record batch
+  // if it does not already exist.
+  get_arrow(suffix: string | null): Promise<RecordBatch> {
+    if (suffix === undefined) {
+      throw new Error('EMPTY SUFFIX');
+    }
     // By default fetches .../0/0/0.feather
     // But if you pass a suffix, gets
     // 0/0/0.suffix.feather
+
+    // Use a cache to avoid dispatching multiple web requests.
+    const existing = this.arrowFetchCalls.get(suffix);
+    if (existing) {
+      return existing.batch;
+    }
+
     let url = `${this.url}/${this.key}.feather`;
-    if (suffix) {
+    if (suffix !== null) {
       // 3/4/3
       // suffix: 'text'
       // 3/4/3.text.feather
-      url = url.replace('.feather', `.${suffix}.feather`);
+      url = url.replace(/.feather/, `.${suffix}.feather`);
     }
-    let tb: Table;
-    let buffer: ArrayBuffer;
 
-    if (this.dataset.tileProxy !== undefined) { 
+    let bufferPromise: Promise<ArrayBuffer>;
+
+    if (this.dataset.tileProxy !== undefined) {
       const endpoint = new URL(url).pathname;
-      // This method apiCall is crafted to match the 
-      // ts-nomic package.
-      const bytes = await this.dataset.tileProxy.apiCall(endpoint, 
-        "GET", 
-        null,
-        null,
-        {octetStreamAsUint8 : true}
-        );
-      tb = tableFromIPC(bytes);
+
+      // This method apiCall is crafted to match the
+      // ts-nomic package, but can accept other authentication.
+      bufferPromise = this.dataset.tileProxy
+        .apiCall(endpoint, 'GET', null, null, { octetStreamAsUint8: true })
+        .then((d) => d.buffer as ArrayBuffer);
     } else {
-      //TODO: Remove outdated atlas-specific code.
-      let headers = {};
-      if (window.localStorage.getItem('isLoggedIn') === 'true') {
-        url = url.replace('/public', '');
-        const accessToken = localStorage.getItem('access_token');
-        headers = {
-          Authorization: `Bearer ${accessToken}`,
-        };
-      }
       const request: RequestInit = {
         method: 'GET',
-        ...headers,
       };
-      const response = await fetch(url, request);
-      buffer = await response.arrayBuffer();
-      tb = tableFromIPC(buffer);
-    }
-    if (tb.batches.length > 1) {
-      console.warn(
-        `More than one record batch at ${url}; all but first batch will be ignored.`
+      bufferPromise = fetch(url, request).then((response) =>
+        response.arrayBuffer(),
       );
     }
-    const batch = tb.batches[0];
-    if (suffix === undefined) {
-      this.download_state = 'Complete';
-      this._batch = tb.batches[0];
-    }
+    const batch = bufferPromise.then((buffer) => {
+      return tableFromIPC(buffer).batches[0];
+    });
+
+    this.arrowFetchCalls.set(suffix, {
+      ready: false,
+      batch,
+    });
+    void batch.then((b) => {
+      this.arrowFetchCalls.set(suffix, {
+        ready: true,
+        batch,
+        schema: b.schema,
+      });
+      if (
+        b.schema.metadata.get('children') &&
+        this.loadedChildren.length === 0
+      ) {
+        const children = JSON.parse(
+          b.schema.metadata.get('children') || '[]',
+        ) as string[];
+        for (const child of children) {
+          this._children.push(new Tile(child, this, this.dataset, this.url));
+        }
+      }
+    });
+
     return batch;
   }
 
-  async download(): Promise<void> {
+  async populateManifest(): Promise<TileManifest> {
+    if (this.manifest) {
+      return this.manifest;
+    }
+    if (this.partialManifest.children) {
+      this.manifest = {
+        key: this.key,
+        children: this.partialManifest.children,
+        min_ix: this.min_ix,
+        max_ix: this.max_ix,
+        extent: this.extent,
+        ...this.partialManifest,
+      };
+      return this.manifest;
+    } else {
+      this.manifest = await this.loadManifestInfoFromTileMetadata();
+    }
+    return this.manifest;
+  }
+
+  preprocessRootTileInfo(): Promise<void> {
+    return this.get_arrow(null).then((batch) => {
+      if (!this._batch) {
+        this._batch = batch;
+      }
+      // For every column in the root tile,
+      // define a transformation for other children that says
+      // 'load the main batch and pull out this column'.
+      const { dataset } = this;
+
+      for (const field of batch.schema.fields) {
+        if (!dataset.transformations[field.name]) {
+          dataset.transformations[field.name] = async (tile: Tile) => {
+            const batch = await tile.get_arrow(null);
+            return batch.getChild(field.name) as Vector;
+          };
+        }
+      }
+    });
+  }
+
+  async loadManifestInfoFromTileMetadata(): Promise<TileManifest> {
     // This should only be called once per tile.
-    if (this._download !== undefined) {
-      return this._download;
+    if (this._downloadPrimaryData !== undefined) {
+      return this._downloadPrimaryData;
     }
 
-    if (this._already_called) {
-      throw 'Illegally attempting to download twice';
-    }
-
-    this._already_called = true;
-    this.download_state = 'In progress';
-
-    return this._download = this.get_arrow()
+    const manifest: Partial<TileManifest> = {};
+    this._downloadPrimaryData = this.get_arrow(null)
       .then((batch) => {
-        this.ready = true;
+        if (this._batch) {
+          if (!this._batch.getChild('ix')) {
+            throw new Error("Can't overwrite _batch safely");
+          } else {
+            // pass, there isn't anything to do.
+          }
+        } else {
+          this._batch = batch;
+        }
+        // For every column in the root tile,
+        // define a transformation for other children that says
+        // 'load the main batch and pull out this column'.
+        const { dataset } = this;
+
+        for (const field of batch.schema.fields) {
+          if (!dataset.transformations[field.name]) {
+            dataset.transformations[field.name] = async (tile: Tile) => {
+              const batch = await tile.get_arrow(null);
+              return batch.getChild(field.name) as Vector;
+            };
+          }
+        }
+
+        // PARSE METADATA //
         const metadata = batch.schema.metadata;
         const extent = metadata.get('extent');
         if (extent) {
-          this._extent = JSON.parse(extent) as Rectangle;
+          manifest.extent = JSON.parse(extent) as Rectangle;
+        } else {
+          console.warn('No extent in manifest');
         }
 
         const children = metadata.get('children');
 
         if (children) {
-          this.child_locations = JSON.parse(children) as string[];
+          this._registerChildren(
+            (JSON.parse(children) as string[]).map((key) => {
+              const t = new Tile(key, this, this.dataset, this.url);
+              return t;
+            }),
+          );
         }
+
+        // TODO: make ix optionally parsed from metadata, not column.
         const ixes = batch.getChild('ix');
 
         if (ixes === null) {
           throw 'No ix column in table';
         }
-        this._min_ix = Number(ixes.get(0));
-        this.max_ix = Number(ixes.get(ixes.length - 1));
-        if (this._min_ix > this.max_ix) {
-          this.max_ix = this._min_ix + 1e5;
-          this._min_ix = 0;
+        manifest.min_ix = Number(ixes.get(0));
+        manifest.max_ix = Number(ixes.get(ixes.length - 1));
+        if (manifest.min_ix > manifest.max_ix) {
+          console.error(
+            'Corrupted metadata for tile: ',
+            this.key,
+            'attempting recovery',
+          );
+          manifest.max_ix = manifest.min_ix + 1e5;
+          manifest.min_ix = 0;
         }
         this.highest_known_ix = this.max_ix;
+        this.manifest = manifest as TileManifest;
+        return this.manifest;
       })
       .catch((error) => {
-        this.download_state = 'Failed';
-        console.error(`Error: Remote Tile at ${this.url}/${this.key}.feather not found.
-        `);
-        console.warn(error);
+        console.error(
+          `Error: Remote Tile at ${this.url}/${this.key}.feather not found.
+        `,
+        );
         throw error;
       });
+    return this._downloadPrimaryData;
   }
 
   /**
@@ -521,31 +567,25 @@ export class QuadTile extends Tile {
     return macrotile_siblings(this.key);
   }
 
-  get children(): Array<this> {
+  // The children that have actually been created already.
+  get loadedChildren(): Array<Tile> {
     // create or return children.
 
-    if (this.download_state !== 'Complete') {
-      return [];
-    }
-    const constructor = this.constructor as new (
-      k: string,
-      l: string,
-      m: this,
-      data: typeof this.dataset
-    ) => this;
-    if (this._children.length < this.child_locations.length) {
-      for (const key of this.child_locations) {
-        const child = new constructor(this.url, key, this, this.dataset);
-        this._children.push(child);
-      }
-    }
+    // if (this._children === null) {
+    //   throw new Error(
+    //     'Attempted to access children on a tile before they were determined',
+    //   );
+    // }
     return this._children;
   }
 
   get theoretical_extent(): Rectangle {
-    // QUADTREE SPECIFIC CODE.
+    if (this.dataset.tileStucture === 'other') {
+      // Only three-length-keys are treated as quadtrees.
+      return this.dataset.extent;
+    }
     const base = this.dataset.extent;
-    const [z, x, y] = this.codes;
+    const [z, x, y] = this.key.split('/').map((d) => parseInt(d));
 
     const x_step = base.x[1] - base.x[0];
     const each_x = x_step / 2 ** z;
@@ -560,90 +600,6 @@ export class QuadTile extends Tile {
   }
 }
 
-export class ArrowTile extends Tile {
-  batch_num: number;
-  full_tab: Table;
-  codes: [number, number, number];
-  constructor(
-    table: Table,
-    dataset: Dataset<ArrowTile>,
-    batch_num: number,
-    parent: null | ArrowTile = null
-  ) {
-    super(dataset);
-    this.full_tab = table;
-    this._batch = table.batches[batch_num];
-    this.download_state = 'Complete';
-    this.batch_num = batch_num;
-    this.codes = [0, parent === null ? -1 : parent.batch_num, batch_num]
-    // On arrow tables, it's reasonable to just add a new index by order.
-    if (this._batch.getChild('ix') === null) {
-      console.warn('Manually setting ix');
-      const batch = this._batch;
-      const array = new Float32Array(batch.numRows);
-      const seed = this.dataset._ix_seed;
-      this.dataset._ix_seed += batch.numRows;
-      for (let i = 0; i < batch.numRows; i++) {
-        array[i] = i + seed;
-      }
-      this._min_ix = seed;
-      this._max_ix = seed + batch.numRows;
-      // This bubbles up to parents.
-      this.highest_known_ix = this._max_ix;
-      this._batch = add_or_delete_column(this.record_batch, 'ix', array);
-    }
-    this._extent = {
-      x: extent(this._batch.getChild('x')),
-      y: extent(this._batch.getChild('y')),
-    };
-    // Ugh, typescript.
-    this.parent = parent as unknown as this;
-
-    const row_last = this._batch.get(this._batch.numRows - 1);
-    if (row_last === null) {
-      throw 'No rows in table';
-    }
-    this.max_ix = Number(row_last.ix);
-    this.highest_known_ix = Number(this.max_ix);
-    const row_1 = this._batch.get(0);
-    if (row_1 === null) {
-      throw 'No rows in table';
-    }
-    this._min_ix = Number(row_1.ix);
-    this.highest_known_ix = Number(this.max_ix);
-    this.create_children();
-    this.ready = true;
-  }
-  create_children() {
-    let ix = this.batch_num * 4;
-    while (++ix <= this.batch_num * 4 + 4) {
-      if (ix < this.full_tab.batches.length) {
-        this._children.push(
-          // TODO: fix type
-          new ArrowTile(this.full_tab, this.dataset, ix, this) as unknown as this
-        );
-      }
-    }
-    for (const child of this._children) {
-      for (const dim of ['x', 'y'] as const) {
-        this._extent[dim][0] = Math.min(
-          this._extent[dim][0],
-          child._extent[dim][0]
-        );
-        this._extent[dim][1] = Math.max(
-          this._extent[dim][1],
-          child._extent[dim][1]
-        );
-      }
-    }
-  }
-
-  download(): Promise<RecordBatch> {
-    return Promise.resolve(this._batch);
-  }
-  
-}
-
 type Point = [number, number];
 
 export function p_in_rect(p: Point, rect: Rectangle | undefined) {
@@ -654,6 +610,7 @@ export function p_in_rect(p: Point, rect: Rectangle | undefined) {
     p[0] < rect.x[1] && p[0] > rect.x[0] && p[1] < rect.y[1] && p[1] > rect.y[0]
   );
 }
+
 function macrotile(key: string, size = 2, parents = 2) {
   let [z, x, y] = key.split('/').map((d) => parseInt(d));
   let moves = 0;
@@ -674,7 +631,7 @@ const descendant_cache = new Map<string, string[]>();
 function macrotile_descendants(
   macrokey: string,
   size = 2,
-  parents = 2
+  parents = 2,
 ): Array<string> {
   if (descendant_cache.has(macrokey)) {
     return descendant_cache.get(macrokey);
@@ -697,11 +654,14 @@ function children(tile: string) {
   const [z, x, y] = tile.split('/').map((d) => parseInt(d)) as [
     number,
     number,
-    number
+    number,
   ];
   const children = [];
   for (let i = 0; i < 4; i++) {
     children.push(`${z + 1}/${x * 2 + (i % 2)}/${y * 2 + Math.floor(i / 2)}`);
   }
-  return children as string[];
+  return children;
 }
+
+// Deprecated, for backwards compatibility.
+export const QuadTile = Tile;

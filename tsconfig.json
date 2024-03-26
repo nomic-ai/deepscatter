@@ -2,6 +2,9 @@
   "include": [
     "src/**/*.ts"
   ],
+  "exclude": [
+    "node_modules/**/*"
+  ],
   "compilerOptions": {
     "declarationMap": true,
     "declaration": true,
@@ -9,6 +12,7 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "noUnusedLocals": true,
+    "experimentalDecorators": true,
     "sourceMap": true,
     "strict": false,
     "target": "es2020",
