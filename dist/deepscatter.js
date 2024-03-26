@@ -35997,7 +35997,7 @@ class Tile {
     return 0;
   }
   async schema() {
-    this.download();
+    await this.download();
     await this.promise;
     return this._schema;
   }
@@ -36555,6 +36555,38 @@ class Dataset {
         callback(current);
       }
     }
+  }
+  /**
+     * Invoke a function on all tiles in the dataset, downloading those that aren't 
+     * here yet..
+     * The general architecture here is taken from the
+     * d3 quadtree functions. That's why, for example, it doesn't
+     * recurse.
+  
+     * @param callback The function to invoke on each tile.
+     * @param after Whether to execute the visit in bottom-up order. Default false.
+     * @param filter 
+     */
+  async visit_full(callback, after = false, starting_tile = null, filter2 = (x) => true, updateFunction) {
+    let seen = 0;
+    const start2 = starting_tile || this.root_tile;
+    await start2.download();
+    const total = JSON.parse(start2.record_batch.schema.metadata.get("total_points"));
+    async function resolve(tile) {
+      await tile.download();
+      if (after) {
+        await Promise.all(tile.children.map(resolve));
+        await callback(tile);
+        seen += tile.record_batch.numRows;
+        void updateFunction(tile, seen, total);
+      } else {
+        await callback(tile);
+        seen += tile.record_batch.numRows;
+        void updateFunction(tile, seen, total);
+        await Promise.all(tile.children.map(resolve));
+      }
+    }
+    await resolve(start2);
   }
   async schema() {
     await this.ready;
@@ -38669,12 +38701,12 @@ class Scatterplot {
       }
     }
     const selection2 = new DataSelection(this, params);
-    await selection2.ready;
     this.selection_history.push({
       selection: selection2,
       name: selection2.name,
       flushed: false
     });
+    await selection2.ready;
     return selection2;
   }
   /**

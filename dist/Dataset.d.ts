@@ -109,6 +109,18 @@ export declare abstract class Dataset<T extends Tile> {
      * @param filter
      */
     visit(callback: (tile: T) => void, after?: boolean, filter?: (t: T) => boolean): void;
+    /**
+      * Invoke a function on all tiles in the dataset, downloading those that aren't
+      * here yet..
+      * The general architecture here is taken from the
+      * d3 quadtree functions. That's why, for example, it doesn't
+      * recurse.
+   
+      * @param callback The function to invoke on each tile.
+      * @param after Whether to execute the visit in bottom-up order. Default false.
+      * @param filter
+      */
+    visit_full(callback: (tile: T) => Promise<void>, after: boolean, starting_tile: T | null, filter: (t: T) => boolean, updateFunction: (tile: T, completed: any, total: any) => Promise<void>): Promise<void>;
     schema(): Promise<Schema<any>>;
     /**
      *
