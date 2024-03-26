@@ -110,7 +110,8 @@ export declare abstract class Dataset<T extends Tile> {
      */
     visit(callback: (tile: T) => void, after?: boolean, filter?: (t: T) => boolean): void;
     /**
-      * Invoke a function on all tiles in the dataset that have been downloaded.
+      * Invoke a function on all tiles in the dataset, downloading those that aren't
+      * here yet..
       * The general architecture here is taken from the
       * d3 quadtree functions. That's why, for example, it doesn't
       * recurse.
