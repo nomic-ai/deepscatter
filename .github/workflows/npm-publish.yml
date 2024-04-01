@@ -22,7 +22,7 @@ jobs:
       - run: npm version prerelease --preid=next
       - run: npm publish --tag next
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       - name: Deploy TSDoc to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
