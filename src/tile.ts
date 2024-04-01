@@ -81,7 +81,7 @@ export class Tile {
     } else {
       manifest = key;
     }
-    this.key = manifest.key as string;
+    this.key = manifest.key;
     if (manifest.min_ix === undefined) {
       manifest.min_ix = parent ? parent.max_ix + 1 : 0;
     }
@@ -128,7 +128,7 @@ export class Tile {
     }
     if (this.dataset.transformations[colname]) {
       await this.apply_transformation(colname);
-      return this.record_batch.getChild(colname) as Vector;
+      return this.record_batch.getChild(colname);
     }
     throw new Error(`Column ${colname} not found`);
   }
@@ -439,6 +439,7 @@ export class Tile {
         min_ix: this.min_ix,
         max_ix: this.max_ix,
         extent: this.extent,
+        nPoints: this.partialManifest.nPoints,
         ...this.partialManifest,
       };
       return this.manifest;
@@ -462,7 +463,7 @@ export class Tile {
         if (!dataset.transformations[field.name]) {
           dataset.transformations[field.name] = async (tile: Tile) => {
             const batch = await tile.get_arrow(null);
-            return batch.getChild(field.name) as Vector;
+            return batch.getChild(field.name);
           };
         }
       }
@@ -496,7 +497,7 @@ export class Tile {
           if (!dataset.transformations[field.name]) {
             dataset.transformations[field.name] = async (tile: Tile) => {
               const batch = await tile.get_arrow(null);
-              return batch.getChild(field.name) as Vector;
+              return batch.getChild(field.name);
             };
           }
         }
@@ -539,7 +540,14 @@ export class Tile {
           manifest.min_ix = 0;
         }
         this.highest_known_ix = this.max_ix;
-        this.manifest = manifest as TileManifest;
+        this.manifest = {
+          key: this.key,
+          children: manifest.children,
+          min_ix: manifest.min_ix,
+          max_ix: manifest.max_ix,
+          extent: manifest.extent,
+          nPoints: batch.numRows,
+        };
         return this.manifest;
       })
       .catch((error) => {
@@ -656,7 +664,7 @@ function children(tile: string) {
     number,
     number,
   ];
-  const children = [];
+  const children = [] as string[];
   for (let i = 0; i < 4; i++) {
     children.push(`${z + 1}/${x * 2 + (i % 2)}/${y * 2 + Math.floor(i / 2)}`);
   }
@@ -665,3 +673,21 @@ function children(tile: string) {
 
 // Deprecated, for backwards compatibility.
 export const QuadTile = Tile;
+
+[
+  {
+    space: 'organization',
+    access_role: 'owner',
+    permissions: {
+      organization_delete: true,
+      organization_members_read: true,
+      organization_members_write: true,
+      organization_metadata_read: true,
+      organization_metadata_write: true,
+      organization_api_keys_write: true,
+      organization_api_keys_read: true,
+      organization_projects_read: true,
+      organization_projects_write: true,
+    },
+  },
+];

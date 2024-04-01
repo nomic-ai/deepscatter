@@ -17,7 +17,7 @@ Breaking changes:
    import { Scatterplot } from 'deepscatter';
    ```
 
-   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{Dataset, Bitmask, Scatterplot}`. Bitmasks are efficient, useful forms.
+   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{ Dataset, Bitmask, Scatterplot, dictionaryFromArrays, LabelMaker }`. Bitmasks are efficient, useful ways to refer to update and refer to selection masks.
 
 2. Apache Arrow is now a peer dependency of deepscatter rather than
    being bundled into the distribution. Most bundlers will hopefully take care of installation for you, but if you are writing raw HTML code,

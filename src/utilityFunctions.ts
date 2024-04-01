@@ -20,11 +20,11 @@ let currentDictNumber = 7540;
 
 // Function overloads to make this curryable.
 export function dictionaryFromArrays(
-  labels: string[]
+  labels: string[],
 ): (indices: IndicesType) => Vector<DictionaryType>;
 export function dictionaryFromArrays(
   labels: string[],
-  indices: IndicesType
+  indices: IndicesType,
 ): Vector<DictionaryType>;
 
 /**
@@ -35,7 +35,7 @@ export function dictionaryFromArrays(
  */
 export function dictionaryFromArrays(
   labels: string[],
-  indices?: IndicesType
+  indices?: IndicesType,
 ): Vector<DictionaryType> | ((indices: IndicesType) => Vector<DictionaryType>) {
   // Run vectorFromArray only once to create labelsArrow.
   const labelsArrow: Vector<Utf8> = vectorFromArray(labels, new Utf8());
@@ -51,7 +51,7 @@ export function dictionaryFromArrays(
 
 function createDictionaryWithVector(
   labelsArrow: Vector<Utf8>,
-  indices: IndicesType
+  indices: IndicesType,
 ): Vector<DictionaryType> {
   let t;
 
@@ -63,14 +63,14 @@ function createDictionaryWithVector(
     t = new Int32();
   } else {
     throw new Error(
-      'values must be an array of signed integers, 32 bit or smaller.'
+      'values must be an array of signed integers, 32 bit or smaller.',
     );
   }
   const type = new Dictionary(
     labelsArrow.type,
     t,
     currentDictNumber++,
-    false
+    false,
   ) as Dictionary<Utf8, Int8 | Int16 | Int32>;
   const returnval = makeVector({
     type,

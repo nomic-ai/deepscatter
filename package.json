@@ -1,9 +1,9 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "3.0.0-beta",
+  "version": "3.0.0-beta-1",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
-  "files": [
+  "files": [ 
     "dist"
   ],
   "types": "./dist/deepscatter.d.ts",
@@ -41,7 +41,7 @@
   },
   "homepage": "https://github.com/nomic-ai/deepscatter#readme",
   "peerDependencies": {
-    "apache-arrow": "^8.0.0"
+    "apache-arrow": "^15.0.2"
   },
   "dependencies": {
     "d3-array": "^3.2.4",
@@ -75,7 +75,6 @@
     "@types/lodash.merge": "^4.6.9",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
-    "apache-arrow": "15.0.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-formatter-summary-chart": "^0.3.0",
@@ -89,6 +88,7 @@
     "svelte": "^4.2.12",
     "terser": "^5.28.1",
     "typedoc": "^0.25.8",
+    "typescript": "^5.4.3",
     "vite": "^5.1.4"
   }
 }

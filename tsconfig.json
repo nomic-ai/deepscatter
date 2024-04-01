@@ -19,6 +19,7 @@
     "isolatedModules": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    "lib": ["DOM"],
     "noEmitOnError": false,
     "emitDeclarationOnly": true,
   },
