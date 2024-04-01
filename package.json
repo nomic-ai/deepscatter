@@ -1,9 +1,9 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "3.0.0-beta-1",
+  "version": "3.0.0-next.0",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
-  "files": [ 
+  "files": [
     "dist"
   ],
   "types": "./dist/deepscatter.d.ts",
