@@ -39,9 +39,15 @@ export type RecordBatchCache =
 let tile_identifier = 0;
 
 /**
- * A Tile is, essentially, code to create an Arrow RecordBatch
- * and to associate metadata with it, in the context of a larger dataset.
- *
+ * A Tile is a collection of points in the dataset that are grouped together:
+ * it represents the basic unit of operation for most batched operations in
+ * deepscatter including network packets, GPU calculations,
+ * transformations on data, and render calls. It corresponds to a record batch
+ * of data in the Arrow format, but a tile object can be instantiated without
+ * having the record batch present, and includes instructions for building it.
+ * The Tile object also holds its own place in a tree (usually, but not always,
+ * a quadtree), and is responsible for certain information about all of its descendants
+ * in the tree as well as itself.
  */
 export class Tile {
   // public max_ix = -1;

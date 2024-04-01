@@ -32,6 +32,7 @@ import { wrapArrowTable } from './wrap_arrow';
 type Key = string;
 
 type ArrowBuildable = DS.ArrowBuildable;
+
 type Transformation = DS.Transformation;
 
 // Some variables are universally available.

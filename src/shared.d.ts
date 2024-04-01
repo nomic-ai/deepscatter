@@ -134,6 +134,7 @@ export type ArrowBuildable =
   | Uint8Array;
 
 type MaybePromise<T> = T | Promise<T>;
+
 /**
  * A transformation is a batchwise operation that can be used to construct
  * a new column in the data table. It runs asynchronously so that it

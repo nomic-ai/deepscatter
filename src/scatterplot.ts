@@ -251,7 +251,7 @@ export class Scatterplot {
         return old_version.selection;
       }
     }
-    const selection = new DataSelection(this, params);
+    const selection = new DataSelection(this.dataset, params);
     this.selection_history.push({
       selection,
       name: selection.name,

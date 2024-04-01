@@ -66,6 +66,12 @@ type BinaryOperation = 'AND' | 'OR' | 'XOR';
 type UnaryOperation = 'NOT';
 
 type CompArgs = DataSelection | Composition;
+
+/**
+ * A composition represents an operation on selections. The syntax is basically
+ * a lisp-like list of operations and selections. The first element is the operation,
+ * and the rest of the elements are the arguments.
+ */
 type Composition =
   | [UnaryOperation, CompArgs]
   | [BinaryOperation, CompArgs, CompArgs]
@@ -329,15 +335,14 @@ export class DataSelection {
   private events: { [key: string]: Array<(args) => void> } = {};
 
   constructor(
-    plot: Scatterplot,
+    dataset: Dataset,
     params:
       | IdSelectParams
       | BooleanColumnParams
       | FunctionSelectParams
       | CompositeSelectParams,
   ) {
-    this.plot = plot;
-    this.dataset = plot.dataset;
+    this.dataset = dataset;
     this.name = params.name;
     let markReady = function () {};
     this.ready = new Promise((resolve) => {
@@ -424,7 +429,7 @@ export class DataSelection {
    * selection that is the union of the two.
    */
   union(other: DataSelection, name: string | undefined): DataSelection {
-    return new DataSelection(this.plot, {
+    return new DataSelection(this.dataset, {
       name: name || this.name + ' union ' + other.name,
       composition: ['OR', this, other],
     });
@@ -438,7 +443,7 @@ export class DataSelection {
    * disjunctive normal form constructor.
    */
   intersection(other: DataSelection, name: string | undefined): DataSelection {
-    return new DataSelection(this.plot, {
+    return new DataSelection(this.dataset, {
       name: name || this.name + ' intersection ' + other.name,
       composition: ['AND', this, other],
     });
@@ -606,7 +611,7 @@ export class DataSelection {
       }
       return mask.to_arrow();
     };
-    const selection = new DataSelection(this.plot, {
+    const selection = new DataSelection(this.dataset, {
       name: newName,
       tileFunction,
     });
@@ -648,7 +653,7 @@ export class DataSelection {
     if (this.dataset.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
     }
-    this.plot.dataset.transformations[name] =
+    this.dataset.transformations[name] =
       this.wrapWithSelectionMetadata(tileFunction);
     // Await the application to the root tile, which may be necessary
     await this.dataset.root_tile.apply_transformation(name);
@@ -766,42 +771,21 @@ export class DataSelection {
     }
     if (typeof codes[0] === 'string') {
       const matcher = stringmatcher(key_field, codes as string[]);
-      this.plot.dataset.transformations[name] =
+      this.dataset.transformations[name] =
         this.wrapWithSelectionMetadata(matcher);
       await this.dataset.root_tile.apply_transformation(name);
     } else if (typeof codes[0] === 'bigint') {
       const matcher = bigintmatcher(key_field, codes as bigint[]);
-      this.plot.dataset.transformations[name] =
+      this.dataset.transformations[name] =
         this.wrapWithSelectionMetadata(matcher);
       await this.dataset.root_tile.apply_transformation(name);
     } else {
       console.error('Unable to match type', typeof codes[0]);
     }
-    if (options.plot_after) {
-      return this.apply_to_foreground({});
-    }
   }
 
   async add_boolean_column(name: string, field: string): Promise<void> {
     throw new Error('Method not implemented.');
-  }
-
-  apply_to_foreground(params: DS.BackgroundOptions): Promise<void> {
-    const field = this.name;
-    const background_options: DS.BackgroundOptions = {
-      size: [0.5, 10],
-      ...params,
-    };
-    return this.plot.plotAPI({
-      background_options,
-      encoding: {
-        foreground: {
-          field,
-          op: 'gt',
-          a: 0,
-        },
-      },
-    });
   }
 }
 
