@@ -86,11 +86,13 @@ function isCompositeSelectParam(
   return params.composition !== undefined;
 }
 
-function isComposition(elems: any): elems is Composition {
+function isComposition(elems: unknown): elems is Composition {
   if (elems === undefined) throw new Error('Undefined composition');
   if (!elems) return false;
-  if (!elems.length) return false;
-  const op = elems[0];
+  if (!Array.isArray(elems)) return false;
+  const op = elems[0] as unknown;
+  if (typeof op !== 'string') return false;
+  console.log('OP', op, elems);
   return ['AND', 'OR', 'XOR', 'NOT', 'ANY', 'ALL'].indexOf(op) == 0;
 }
 
@@ -113,7 +115,7 @@ async function applyCompositeFunctionToTile(
   if (args[0] === 'NOT') {
     const bitmask = await extractBitmask(tile, args[1]);
     return bitmask.not();
-  } else if (isBinarySelectParam(operator)) {
+  } else if (isBinarySelectOperation(operator)) {
     const [op, arg1, arg2] = args;
     const bitmask1 = await extractBitmask(tile, arg1);
     const bitmask2 = await extractBitmask(tile, arg2);
@@ -126,7 +128,7 @@ async function applyCompositeFunctionToTile(
     } else {
       throw new Error('Unknown binary operation');
     }
-  } else if (isPluralSelectParam(operator)) {
+  } else if (isPluralSelectOperator(operator)) {
     const op = args[0];
     const bitmasks = await Promise.all(
       args.slice(1).map((arg) => extractBitmask(tile, arg)),
@@ -157,18 +159,18 @@ export interface FunctionSelectParams extends SelectParams {
   tileFunction: (t: Tile) => Promise<Vector<Bool>>;
 }
 
-function isPluralSelectParam(
+function isPluralSelectOperator(
   params: PluralOperation | BinaryOperation | UnaryOperation,
 ): params is PluralOperation {
   const things = new Set(['ANY', 'ALL', 'NONE']);
-  return things.has(params[0]);
+  return things.has(params);
 }
 
-function isBinarySelectParam(
+function isBinarySelectOperation(
   params: PluralOperation | BinaryOperation | UnaryOperation,
 ): params is BinaryOperation {
   const things = new Set(['AND', 'OR', 'XOR', 'NAND']);
-  return things.has(params[0]);
+  return things.has(params);
 }
 
 function isFunctionSelectParam(
@@ -343,6 +345,9 @@ export class DataSelection {
       | CompositeSelectParams,
   ) {
     this.dataset = dataset;
+    if (dataset === undefined) {
+      throw new Error("Can't create a selection without a dataset");
+    }
     this.name = params.name;
     let markReady = function () {};
     this.ready = new Promise((resolve) => {
@@ -405,6 +410,7 @@ export class DataSelection {
   applyToAllLoadedTiles(): Promise<void> {
     return Promise.all(
       this.dataset.map((tile) => {
+        console.log('TILE', tile.key);
         // triggers creation of the dataset column as a side-effect.
         return tile.get_column(this.name);
       }),
@@ -721,7 +727,7 @@ export class DataSelection {
     let currentOffset = 0;
     let relevantTile: Tile = undefined;
     let current_tile_ix = 0;
-    for (let match_length of this.match_count) {
+    for (const match_length of this.match_count) {
       if (i < currentOffset + match_length) {
         relevantTile = this.tiles[current_tile_ix];
         break;
@@ -750,7 +756,7 @@ export class DataSelection {
 
   // Iterate over the points in raw order.
   *[Symbol.iterator]() {
-    for (let tile of this.tiles) {
+    for (const tile of this.tiles) {
       const column = tile.record_batch.getChild(this.name) as Vector<Bool>;
       for (let i = 0; i < column.length; i++) {
         if (column.get(i)) {

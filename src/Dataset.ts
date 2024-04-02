@@ -115,12 +115,7 @@ export class Dataset {
     this.promise = preProcessRootTile.then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
-      console.log('HERE');
       await this.root_tile.loadManifestInfoFromTileMetadata();
-      console.log(this.root_tile.max_ix);
-      console.log('BHERE');
-
-      console.log(this.extent);
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
         const parsed = JSON.parse(cars as string) as Record<string, string>;
@@ -602,7 +597,6 @@ export class Dataset {
    * @returns A list of [tile, point] pairs that match the index.
    */
   findPointRaw(ix: number): [Tile, StructRowProxy, number][] {
-    console.log({ ix });
     const matches: [Tile, StructRowProxy, number][] = [];
     this.visit((tile: Tile) => {
       if (!(tile.record_batch && tile.min_ix <= ix && tile.max_ix >= ix)) {
