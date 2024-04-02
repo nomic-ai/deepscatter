@@ -1,15 +1,14 @@
-name: Publish to npm and GitHub Pages
-
+name: Publish @next release to npm
 on:
-  # push:
-  #   branches:
-  #     - dev
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Define branch name'
-        required: true
-        default: 'dev'
+  push:
+    branches:
+      - dev
+  # workflow_dispatch:
+  #   inputs:
+  #     branch:
+  #       description: 'Define branch name'
+  #       required: true
+  #       default: 'dev'
 
 jobs:
   publish:

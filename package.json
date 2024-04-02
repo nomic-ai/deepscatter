@@ -22,6 +22,7 @@
     "build": "vite build && tsc",
     "prepublishOnly": "vite build && tsc && typedoc --skipErrorChecking src/*",
     "test": "playwright test",
+    "test:node": "node tests/dataset.spec.js",
     "lint": "eslint src",
     "docs": "typedoc --out docs src/deepscatter.ts"
   },
