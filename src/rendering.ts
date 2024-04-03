@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable no-underscore-dangle */
 import { BaseType, select } from 'd3-selection';
 import { min } from 'd3-array';
@@ -130,7 +131,6 @@ export class Renderer {
   // The renderer handles periodic dispatches of calls
   public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
-  public zoom?: Zoom;
   public aes?: AestheticSet;
   public _zoom?: Zoom;
   public render_props: RenderProps = new RenderProps();
@@ -142,7 +142,7 @@ export class Renderer {
     this.scatterplot = scatterplot;
     this.holder = select(selector as string);
     this.canvas = select(
-      this.holder.node().firstElementChild,
+      this.holder!.node()!.firstElementChild,
     ).node() as HTMLCanvasElement;
     this.dataset = tileSet;
     this.width = +select(this.canvas).attr('width');
@@ -191,8 +191,7 @@ export class Renderer {
     const total_intended_points = min([
       max_ix,
       this.dataset.highest_known_ix || 1e10,
-    ]);
-
+    ]) as number;
     const total_points = total_intended_points * (1 - discard_share);
 
     const size_adjust = Math.exp(Math.log(k) * zoom_balance);
@@ -217,7 +216,7 @@ export class Renderer {
     if (!this._use_scale_to_download_tiles) {
       return max_points;
     }
-    const k = this.zoom.transform.k;
+    const k = this.zoom.transform!.k;
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
     return (max_points * k * k) / point_size_adjust / point_size_adjust;
   }
@@ -229,6 +228,7 @@ export class Renderer {
     const { dataset: tileSet } = this;
     // Materialize using a tileset method.
 
+    if (!this.aes) throw new Error('Aesthetic missing');
     const x = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
     const y = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
     const natural_display =
@@ -252,8 +252,13 @@ export class Renderer {
     return all_tiles;
   }
 
+  get zoom(): Zoom {
+    if (this._zoom === undefined) throw new Error('Zoom state not yet bound');
+    return this._zoom as Zoom;
+  }
+
   bind_zoom(zoom: Zoom) {
-    this.zoom = zoom;
+    this._zoom = zoom;
     return this;
   }
 

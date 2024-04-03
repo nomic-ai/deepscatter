@@ -1,7 +1,5 @@
 import type { TextureSet } from './AestheticSet';
-import {
-  isConstantChannel,
-} from '../typing';
+import { isConstantChannel } from '../typing';
 import { Type, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
@@ -22,7 +20,7 @@ import { Scatterplot } from '../scatterplot';
 export abstract class Aesthetic<
   ChannelType extends DS.ChannelType,
   Input extends DS.InType = DS.NumberIn,
-  Output extends DS.OutType = DS.NumberOut
+  Output extends DS.OutType = DS.NumberOut,
 > {
   public abstract default_constant: Output['rangeType'];
   public abstract default_range: [Output['rangeType'], Output['rangeType']];
@@ -31,8 +29,8 @@ export abstract class Aesthetic<
   public _texture_buffer: Float32Array | Uint8Array | null = null;
   protected abstract _func?: (d: Input['domainType']) => Output['rangeType'];
   public aesthetic_map: TextureSet;
-  public column : Vector<Input['arrowType']> | null;
-  
+  public column: Vector<Input['arrowType']> | null = null;
+
   // cache of the d3 scale
   public encoding: ChannelType;
   public id: string;
@@ -40,15 +38,14 @@ export abstract class Aesthetic<
     encoding: ChannelType | null,
     scatterplot: Scatterplot,
     aesthetic_map: TextureSet,
-    id: string
+    id: string,
   ) {
     this.aesthetic_map = aesthetic_map;
     if (this.aesthetic_map === undefined) {
-
       throw new Error('Aesthetic map is undefined');
     }
     if (typeof this.aesthetic_map === 'function') {
-      throw new Error("WTF")
+      throw new Error('WTF');
     }
     this.scatterplot = scatterplot;
 
@@ -57,7 +54,7 @@ export abstract class Aesthetic<
 
     if (encoding === undefined) {
       throw new Error(
-        'Updates with undefined should be handled upstream of the aesthetic.'
+        'Updates with undefined should be handled upstream of the aesthetic.',
       );
     }
 
@@ -68,7 +65,7 @@ export abstract class Aesthetic<
 
     if (isNumber(encoding)) {
       throw new Error(
-        `As of deepscatter 3.0, you must pass {constant: ${encoding}}, not just "${encoding}`
+        `As of deepscatter 3.0, you must pass {constant: ${encoding}}, not just "${encoding}`,
       );
     }
 
@@ -86,17 +83,17 @@ export abstract class Aesthetic<
   }
 
   abstract apply(point: Datum): Output['rangeType'];
-  
+
   abstract toGLType(val: Output['rangeType']): Output['glType'];
 
   get webGLDomain() {
-    console.log("No method for webGLDomain")
-    return [0, 1] as [number, number]
+    console.log('No method for webGLDomain');
+    return [0, 1] as [number, number];
   }
   default_data(): Uint8Array | Float32Array | Array<number> {
     const default_value = this.toGLType(this.default_constant);
     return Array(this.aesthetic_map.texture_size).fill(
-      default_value
+      default_value,
     ) as Array<number>;
   }
 
@@ -118,7 +115,7 @@ export abstract class Aesthetic<
     return this.aesthetic_map.get_position(this.id);
   }
 
-  get texture_buffer() : Uint8Array {
+  get texture_buffer(): Uint8Array {
     if (this._texture_buffer) {
       return this._texture_buffer as Uint8Array;
     }
@@ -133,14 +130,14 @@ export abstract class Aesthetic<
 
   arrow_column(): Vector<Input['arrowType']> | null {
     if (this.column) {
-      return this.column
+      return this.column;
     }
     if (this.field === null || this.field === undefined) {
-      return this.column = null;
+      return (this.column = null);
     }
-    return this.column = this.dataset.root_tile.record_batch.getChild(this.field) as Vector<
-      Input['arrowType']
-    >;
+    return (this.column = this.dataset.root_tile.record_batch.getChild(
+      this.field,
+    ) as Vector<Input['arrowType']>);
   }
 
   is_dictionary(): boolean {

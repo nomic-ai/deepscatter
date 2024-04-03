@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 import type { GeoJsonObject, GeoJsonProperties } from 'geojson';
 import { Renderer } from './rendering';
 import { BBox, RBush3D } from 'rbush-3d';
@@ -7,13 +8,15 @@ import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
 import type * as DS from './shared';
 import { Color } from './aesthetics/ColorAesthetic';
+import type { Zoom } from './interaction';
+
 const handler = drag<SVGRectElement, BBox>();
 
 function pixel_ratio(scatterplot: Scatterplot): number {
   // pixelspace
-  const [px1, px2] = scatterplot._zoom.scales().x.range() as [number, number];
+  const [px1, px2] = scatterplot._zoom!.scales().x.range() as [number, number];
   // dataspace
-  const [dx1, dx2] = scatterplot._zoom.scales().x.domain() as [number, number];
+  const [dx1, dx2] = scatterplot._zoom!.scales().x.domain() as [number, number];
   const ratio = (px2 - px1) / (dx2 - dx1);
   return ratio;
 }
@@ -41,14 +44,18 @@ export class LabelMaker extends Renderer {
   constructor(
     scatterplot: Scatterplot,
     id_raw: string,
-    options: DS.LabelOptions = {}
+    options: DS.LabelOptions = {},
   ) {
-    super(scatterplot.div.node() as HTMLDivElement, scatterplot._root, scatterplot);
+    super(
+      scatterplot.div!.node() as HTMLDivElement,
+      scatterplot.dataset,
+      scatterplot,
+    );
     this.options = options;
-    this.canvas = scatterplot.elements[2]
-      .selectAll('canvas')
+    this.canvas = scatterplot
+      .elements![2].selectAll('canvas')
       .node() as HTMLCanvasElement;
-    const svg = scatterplot.elements[3].selectAll('svg').node() as SVGElement;
+    const svg = scatterplot.elements![3].selectAll('svg').node() as SVGElement;
     const id = id_raw.replace(/[!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~]/g, '---');
     const labgroup = svg.querySelectorAll(`#${id}`);
     // eslint-disable-next-line unicorn/prefer-ternary
@@ -57,7 +64,7 @@ export class LabelMaker extends Renderer {
         .select('#labelrects')
         .append('g')
         .attr('id', id)
-        .node();
+        .node() as SVGGElement;
     } else {
       this.labelgroup = labgroup[1] as SVGGElement;
     }
@@ -65,21 +72,21 @@ export class LabelMaker extends Renderer {
     if (this.canvas === undefined) {
       throw new Error('WTF?');
     }
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
 
     this.tree = new DepthTree(
       this.ctx,
       pixel_ratio(scatterplot),
       0.5,
       [0.5, 1e6],
-      options.margin === undefined ? 30 : options.margin
+      options.margin === undefined ? 30 : options.margin,
     );
 
     /*    this.tree.accessor = (x, y) => {
       const f = scatterplot._zoom.scales();
       return [f.x(x), f.y(y)];
     };*/
-    this.bind_zoom(scatterplot._renderer.zoom);
+    this.bind_zoom(scatterplot._renderer!.zoom!);
   }
 
   /**
@@ -128,7 +135,7 @@ export class LabelMaker extends Renderer {
   public update(
     featureset: GeoJSON.FeatureCollection,
     label_key: string,
-    size_key: string | undefined
+    size_key: string | undefined,
     //    color_key
   ) {
     // Insert an entire feature collection all at once.
@@ -140,13 +147,17 @@ export class LabelMaker extends Renderer {
       }
       if (geometry.type === 'Point') {
         // The size can be specified; if not, it defaults to 16pt.
-        const size = (properties[size_key] as number) ?? 16;
+        const size =
+          size_key && properties[size_key]
+            ? (properties[size_key] as number)
+            : 16;
+
         let label = '';
         if (
           properties[label_key] !== undefined &&
           properties[label_key] !== null
         ) {
-          label = `${properties[label_key]}`
+          label = `${properties[label_key]}`;
         }
         const p: RawPoint = {
           x: geometry.coordinates[0] + Math.random() * 0.1,
@@ -193,7 +204,7 @@ export class LabelMaker extends Renderer {
         enter
           .append('rect')
           .attr('class', 'labellbox')
-          .style('opacity', RECT_DEFAULT_OPACITY)
+          .style('opacity', RECT_DEFAULT_OPACITY),
       );
 
     const Y_BUFFER = 5;
@@ -238,7 +249,7 @@ export class LabelMaker extends Renderer {
         }
         const exists =
           (dim.scale.domain() as string[]).indexOf(
-            datum.properties[dim.field] as string
+            datum.properties[dim.field] as string,
           ) > -1;
         if (exists) {
           //@ts-expect-error -- it's a string
@@ -279,30 +290,31 @@ export class LabelMaker extends Renderer {
       .attr('class', 'labelbbox')
       .attr(
         'x',
-        (d: P3d) => x_(d.data.x) - (d.data.pixel_width * this.tree.pixel_ratio) / 2
+        (d: P3d) =>
+          x_(d.data.x) - (d.data.pixel_width * this.tree.pixel_ratio) / 2,
       )
       .attr(
         'y',
         (d: P3d) =>
           y_(d.data.y) -
           (d.data.pixel_height * this.tree.pixel_ratio) / 2 -
-          Y_BUFFER
+          Y_BUFFER,
       )
-      .attr('width', (d : P3d) => d.data.pixel_width * this.tree.pixel_ratio)
+      .attr('width', (d: P3d) => d.data.pixel_width * this.tree.pixel_ratio)
       .attr('stroke', 'red')
       .attr(
         'height',
-        (d: P3d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2
+        (d: P3d) => d.data.pixel_height * this.tree.pixel_ratio + Y_BUFFER * 2,
       )
-      .attr('display', (d : P3d) => {
-        return d.data.properties.__display as string || 'inline';
+      .attr('display', (d: P3d) => {
+        return (d.data.properties.__display as string) || 'inline';
       })
       .on('mouseover', (event, d) => {
         select(event.target).style('opacity', RECT_DEFAULT_OPACITY);
         this.hovered = '' + d.minZ + d.minX;
         event.stopPropagation();
       })
-      .on('mousemove', function (event : MouseEvent) {
+      .on('mousemove', function (event: MouseEvent) {
         event.stopPropagation();
       })
       .on('click', (event, d: P3d) => {
@@ -319,7 +331,7 @@ export class LabelMaker extends Renderer {
         d.data.x = x_.invert(event.x);
         d.data.y = y_.invert(event.y);
       });
-      handler.on('end', (event, d : P3d) => {
+      handler.on('end', (event, d: P3d) => {
         console.log({ text: d.data.text, x: d.data.x, y: d.data.y });
       });
       bboxes.call(handler);
@@ -430,7 +442,7 @@ class DepthTree extends RBush3D {
     pixel_ratio: number,
     scale_factor = 0.5,
     zoom = [0.1, 1000],
-    margin = 10 // in screen pixels
+    margin = 10, // in screen pixels
   ) {
     // scale factor used to determine how quickly points scale.
     // Not implemented.
@@ -537,7 +549,7 @@ class DepthTree extends RBush3D {
     // The depth until which we're hidden; from min_depth (.1 ish) to max_depth(100 ish)
     let hidden_until = -1;
     // The node hiding this one.
-    let hidden_by : P3d;
+    let hidden_by: P3d;
     for (const overlapper of this.search(p3d)) {
       // Find the most closely overlapping 3d block.
       // Although the other ones will retain 3d blocks'

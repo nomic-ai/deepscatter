@@ -207,6 +207,9 @@ export class Scatterplot {
     duration = this.prefs.duration,
   ): Promise<DataSelection> {
     const selection = await this.select_data(params);
+    if (selection === null) {
+      throw new Error(`Invalid selection: ${JSON.stringify(params)}`);
+    }
     await selection.ready;
     await this.plotAPI({
       duration,
@@ -268,7 +271,11 @@ export class Scatterplot {
    *   **or** a keyed of values like `{'Rome': 3, 'Vienna': 13}` in which case the numeric values will be used.
    * @param key_field The field in which to look for the identifiers.
    */
-  join(name: string, codes: Record<string, number>, key_field: string) {
+  join(
+    name: string,
+    codes: Record<string, number> | string[],
+    key_field: string,
+  ) {
     let true_codes: Record<string, number>;
 
     if (Array.isArray(codes)) {
@@ -276,8 +283,10 @@ export class Scatterplot {
         codes.map((next: string | bigint) => [String(next), 1]),
       );
     } else {
-      this._root.add_label_identifiers(true_codes, name, key_field);
+      true_codes = codes;
     }
+
+    this.dataset.add_label_identifiers(true_codes, name, key_field);
   }
 
   async add_labels_from_url(
@@ -412,7 +421,7 @@ export class Scatterplot {
       HTMLDivElement,
       HTMLCanvasElement
     >;
-    const ctx = bkgd.node().getContext('2d');
+    const ctx = bkgd.node()!.getContext('2d');
 
     if (ctx === null) throw new Error("Can't acquire canvas context");
     ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
@@ -460,18 +469,18 @@ export class Scatterplot {
      * loaded tiles. Useful for debugging and illustration.
      */
 
-    const canvas = this.elements[2]
-      .selectAll('canvas')
-      .node() as HTMLCanvasElement;
+    const canvas = this.elements![2].selectAll(
+      'canvas',
+    ).node() as HTMLCanvasElement;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 
     // as CanvasRenderingContext2D;
 
     ctx.clearRect(0, 0, 10_000, 10_000);
-    const { x_, y_ } = this._zoom.scales();
+    const { x_, y_ } = this._zoom!.scales();
     ctx.strokeStyle = '#888888';
-    const tiles = this._root.map((t) => t);
+    const tiles = this.dataset.map((t) => t);
     for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
@@ -507,16 +516,18 @@ export class Scatterplot {
     this._renderer?.regl?.destroy();
 
     const node = this.div?.node() as Node;
-    node.parentElement.replaceChildren();
+    node.parentElement!.replaceChildren();
   }
 
   update_prefs(prefs: DS.APICall) {
     // Stash the previous values for interpolation.
 
     if (this.prefs.encoding && prefs.encoding) {
-      for (const k of Object.keys(this.prefs.encoding)) {
+      for (const k of Object.keys(
+        this.prefs.encoding,
+      ) as (keyof DS.Encoding)[]) {
         if (prefs.encoding[k] !== undefined) {
-          this.prefs.encoding[k] = prefs.encoding[k] as DS.Encoding;
+          this.prefs.encoding[k] = prefs.encoding[k];
         }
       }
     }
@@ -553,7 +564,7 @@ export class Scatterplot {
       if (v && v['label_key'] !== undefined) {
         (this.secondary_renderers[k] as LabelMaker).stop();
         (this.secondary_renderers[k] as LabelMaker).delete();
-        this.secondary_renderers[k] = undefined;
+        delete this.secondary_renderers[k];
       }
     }
   }
@@ -567,7 +578,7 @@ export class Scatterplot {
    */
 
   public dim(dimension: DS.Dimension): ConcreteAesthetic {
-    return this._renderer.aes.dim(dimension).current;
+    return this._renderer!.aes.dim(dimension)!.current;
   }
 
   set tooltip_html(func) {
@@ -769,32 +780,33 @@ export class Scatterplot {
     if (this._zoom === undefined) {
       await this.reinitialize();
     }
-
-    this._renderer.render_props.apply_prefs(this.prefs);
+    const renderer = this._renderer as ReglRenderer;
+    const zoom = this._zoom as Zoom;
+    this._renderer!.render_props.apply_prefs(this.prefs);
 
     const { width, height } = this;
     this.update_prefs(prefs);
 
     if (prefs.zoom !== undefined) {
       if (prefs.zoom === null) {
-        this._zoom.zoom_to(1, width / 2, height / 2);
+        zoom.zoom_to(1, width / 2, height / 2);
         prefs.zoom = undefined;
       } else if (prefs.zoom?.bbox) {
-        this._zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration);
+        zoom.zoom_to_bbox(prefs.zoom.bbox, prefs.duration);
       }
     }
 
-    this._renderer.most_recent_restart = Date.now();
-    this._renderer.aes.apply_encoding(prefs.encoding ?? {});
+    renderer.most_recent_restart = Date.now();
+    renderer.aes.apply_encoding(prefs.encoding ?? {});
 
-    if (this._renderer.reglframe) {
-      const r = this._renderer.reglframe;
+    if (renderer.reglframe) {
+      const r = renderer.reglframe;
       r.cancel();
-      this._renderer.reglframe = undefined;
+      renderer.reglframe = undefined;
     }
 
-    this._renderer.reglframe = this._renderer.regl.frame(() => {
-      this._renderer.tick();
+    renderer.reglframe = renderer.regl.frame(() => {
+      renderer.tick();
     });
 
     if (prefs.labels !== undefined) {
@@ -827,7 +839,7 @@ export class Scatterplot {
       }
     }
 
-    this._zoom.restart_timer(60_000);
+    zoom.restart_timer(60_000);
   }
 
   get root_batch() {
@@ -843,13 +855,27 @@ export class Scatterplot {
    */
   get query(): DS.APICall {
     const p = JSON.parse(JSON.stringify(this.prefs)) as DS.APICall;
-    p.zoom = { bbox: this._renderer.zoom.current_corners() };
+    p.zoom = { bbox: this.renderer.zoom.current_corners() };
     return p;
+  }
+
+  get renderer(): ReglRenderer {
+    if (this._renderer === undefined) {
+      throw new Error('No renderer has been initialized');
+    }
+    return this._renderer;
+  }
+
+  get zoom(): Zoom {
+    if (this._zoom === undefined) {
+      throw new Error('No zoom has been initialized');
+    }
+    return this._zoom;
   }
 
   sample_points(n = 10): Record<string, number | string>[] {
     const vals: Record<string, number | string>[] = [];
-    for (const p of this._root.points(this._zoom.current_corners())) {
+    for (const p of this.dataset.points(this.zoom.current_corners())) {
       vals.push({ ...p });
       if (vals.length >= n * 3) {
         break;
@@ -893,7 +919,7 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
   default(
     feature: GeoJsonProperties,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    plot: Scatterplot = undefined,
+    plot: Scatterplot | undefined = undefined,
     labelset: LabelMaker | undefined = undefined,
   ) {
     let filter: DS.LambdaChannel<string, boolean> | null;
@@ -931,14 +957,14 @@ class ChangeToHighlitPointFunction extends SettableFunction<
   StructRowProxy[]
 > {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default(points: StructRowProxy[], plot: Scatterplot = undefined) {
+  default(points: StructRowProxy[], plot: Scatterplot | undefined = undefined) {
     return;
   }
 }
 
 class TooltipHTML extends SettableFunction<string> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default(point: StructRowProxy, plot: Scatterplot = undefined) {
+  default(point: StructRowProxy, plot: Scatterplot | undefined = undefined) {
     // By default, this returns a
     let output = '<dl>';
     const nope: Set<string | null | number | symbol> = new Set([

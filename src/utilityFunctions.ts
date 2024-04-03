@@ -9,7 +9,7 @@ import {
   makeVector,
 } from 'apache-arrow';
 
-type IndicesType = null | Int8Array | Int16Array | Int32Array;
+type IndicesType = Int8Array | Int16Array | Int32Array;
 type DictionaryType = Dictionary<Utf8, Int8 | Int16 | Int32>;
 
 // We need to keep track of the current dictionary number
@@ -81,22 +81,4 @@ function createDictionaryWithVector(
   });
 
   return returnval;
-}
-
-export function LazyGetter() {
-  return function (target: any, key: string, descriptor: PropertyDescriptor) {
-    const originalMethod = descriptor.get;
-
-    descriptor.get = function () {
-      const cacheKey = `_____${key}`;
-
-      if (!this[cacheKey]) {
-        this[cacheKey] = originalMethod.call(this);
-      }
-
-      return this[cacheKey];
-    };
-
-    return descriptor;
-  };
 }

@@ -1,4 +1,6 @@
 /* eslint-disable no-underscore-dangle */
+/* eslint-disable @typescript-eslint/unbound-method */
+
 import { select } from 'd3-selection';
 import { timer } from 'd3-timer';
 import { D3ZoomEvent, zoom, zoomIdentity } from 'd3-zoom';
@@ -78,7 +80,6 @@ export class Zoom {
       .translate(width / 2, height / 2)
       .scale(k)
       .translate(-scales.x(x), -scales.y(y));
-
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
 
@@ -102,9 +103,9 @@ export class Zoom {
             .style('background', 'ivory'),
         (update) =>
           update.html((d) =>
-            this.scatterplot.tooltip_html(d.data, this.scatterplot)
+            this.scatterplot.tooltip_html(d.data, this.scatterplot),
           ),
-        (exit) => exit.call((e) => e.remove())
+        (exit) => exit.call((e) => e.remove()),
       );
 
     els
@@ -150,11 +151,7 @@ export class Zoom {
         [width, height],
       ])
       .on('zoom', (event: D3ZoomEvent<Element, unknown>) => {
-        try {
-          document.getElementById('tooltipcircle').remove();
-        } catch (error) {
-          // console.log(error);
-        }
+        document.getElementById('tooltipcircle')?.remove();
         this.transform = event.transform;
         this.restart_timer(10 * 1000);
 
@@ -179,19 +176,19 @@ export class Zoom {
 
     const annotations: Annotation[] = data.map((d) => {
       return {
-      x: x_((xdim.apply(d))),
-      y: y_((ydim.apply(d))),
-      data: d,
-      dx: 0,
-      dy: 30,
-      }
-    })
+        x: x_(xdim.apply(d)),
+        y: y_(ydim.apply(d)),
+        data: d,
+        dx: 0,
+        dy: 30,
+      };
+    });
     this.html_annotation(annotations);
 
     const sel = this.svg_element_selection.select('#mousepoints');
     sel
       .selectAll('circle.label')
-      .data(data, (d_ : StructRowProxy) => d_.ix as number) // Unique identifier to not remove existing.
+      .data(data, (d_: StructRowProxy) => d_.ix as number) // Unique identifier to not remove existing.
       .join(
         (enter) =>
           enter
@@ -208,7 +205,7 @@ export class Zoom {
         (exit) =>
           exit.call((e) => {
             e.remove();
-          })
+          }),
       )
       .on('click', (ev, dd) => {
         this.scatterplot.click_function(dd, this.scatterplot);
@@ -238,14 +235,16 @@ export class Zoom {
     });
   }
 
-  current_corners(): Rectangle | undefined {
+  current_corners(): Rectangle {
     // The corners of the current zoom transform, in data coordinates.
     const { width, height } = this;
 
     // Use the rescaled versions of the scales.
     const scales = this.scales();
     if (scales === undefined) {
-      return;
+      throw new Error(
+        'Attempting to get map view before scales have been created',
+      );
     }
     const { x_, y_ } = scales;
 
@@ -386,7 +385,7 @@ export class Zoom {
 
 export function window_transform(
   x_scale: ScaleLinear<number, number, never>,
-  y_scale: ScaleLinear<number, number, never>
+  y_scale: ScaleLinear<number, number, never>,
 ) {
   // width and height are svg parameters; x and y scales project from the data x and y into the
   // the webgl space.

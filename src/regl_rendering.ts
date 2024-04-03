@@ -6,6 +6,7 @@ import wrapREGL, {
   Buffer,
   DrawCommand,
   DrawConfig,
+  DefaultContext,
 } from 'regl';
 import { range, sum } from 'd3-array';
 // import { contours } from 'd3-contour';
@@ -44,6 +45,7 @@ import {
 import { Color } from './aesthetics/ColorAesthetic';
 import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
 import { Filter, Foreground } from './aesthetics/BooleanAesthetic';
+import { ZoomTransform } from 'd3-zoom';
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
   public regl: Regl;
@@ -52,7 +54,6 @@ export class ReglRenderer extends Renderer {
   private _buffers: MultipurposeBufferSet;
   public _initializations: Promise<void>;
   public dataset: Dataset;
-  public zoom?: Zoom;
   public _zoom?: Zoom;
   public most_recent_restart?: number;
   public _default_webgl_scale?: number[];
@@ -133,14 +134,20 @@ export class ReglRenderer extends Renderer {
 
     // Would be better cached per draw call.
     this.allocate_aesthetic_buffers();
+    if (!this.zoom) {
+      throw new Error('Unable to draw before zoom state set up.');
+    }
+    if (!this.most_recent_restart)
+      throw new Error('Failed to populate restart');
     const {
       prefs,
       aes_to_buffer_num,
       buffer_num_to_variable,
       variable_to_buffer_num,
     } = this;
-    const transform = this.zoom.transform;
-    const colorScales = this.aes.dim('color');
+    const transform: ZoomTransform = this.zoom
+      .transform as unknown as ZoomTransform;
+    const colorScales = this.aes.dim('color') as StatefulAesthetic<Color>;
     const [currentColor, lastColor] = [
       colorScales.current,
       colorScales.last,
@@ -172,9 +179,9 @@ export class ReglRenderer extends Renderer {
       last_webgl_scale: this._webgl_scale_history[1],
       use_scale_for_tiles: this._use_scale_to_download_tiles,
       grid_mode: 0,
-      buffer_num_to_variable,
-      aes_to_buffer_num,
-      variable_to_buffer_num,
+      buffer_num_to_variable: buffer_num_to_variable!,
+      aes_to_buffer_num: aes_to_buffer_num!,
+      variable_to_buffer_num: variable_to_buffer_num!,
       color_picker_mode: 0, // whether to draw as a color picker.
       position_interpolation: this.aes.position_interpolation,
       zoom_matrix: [
@@ -297,8 +304,7 @@ export class ReglRenderer extends Renderer {
     try {
       this.render_all(props);
     } catch (error) {
-      console.warn('ERROR NOTED');
-      this.reglframe.cancel();
+      this.reglframe!.cancel();
       throw error;
     }
   }
@@ -665,16 +671,16 @@ export class ReglRenderer extends Renderer {
 
     const { props } = this;
     props.only_color = only_color;
-    let v: number;
+    let v: number = -1;
     this.fbos.contour.use(() => {
       this.regl.clear({ color: [0, 0, 0, 0] });
       // read onto the contour vals.
       this.render_points(props);
-      this.regl.read(this.contour_vals);
+      this.regl.read(this.contour_vals as Uint8Array);
       // Could be done faster on the GPU itself.
       // But would require writing to float textures, which
       // can be hard.
-      v = sum(this.contour_vals);
+      v = sum(this.contour_vals as Uint8Array);
     });
     return v;
   }
@@ -757,29 +763,6 @@ export class ReglRenderer extends Renderer {
     return point_as_int;
   }
 
-  /* blur(fbo) {
-  var passes = [];
-  var radii = [Math.round(
-    Math.max(1, state.bloom.radius * pixelRatio / state.bloom.downsample))];
-  for (var radius = nextPow2(radii[0]) / 2; radius >= 1; radius /= 2) {
-    radii.push(radius);
-  }
-  radii.forEach(radius => {
-    for (var pass = 0; pass < state.bloom.blur.passes; pass++) {
-      passes.push({
-        kernel: 13,
-        src: bloomFbo[0],
-        dst: bloomFbo[1],
-        direction: [radius, 0]
-      }, {
-        kernel: 13,
-        src: bloomFbo[1],
-        dst: bloomFbo[0],
-        direction: [0, radius]
-      });
-    }
-  })
-} */
   get fill_buffer() {
     //
     if (!this._fill_buffer) {
@@ -811,14 +794,14 @@ export class ReglRenderer extends Renderer {
       this.regl.clear({ color: [0, 0, 0, 0] });
       // read onto the contour vals.
       this.render_points(props);
-      this.regl.read(this.contour_vals);
+      this.regl.read(this.contour_vals!);
     });
 
     // 3-pass blur
     this.blur(this.fbos.contour, this.fbos.ping, 3);
 
     this.fbos.contour.use(() => {
-      this.regl.read(this.contour_vals);
+      this.regl.read(this.contour_vals!);
     });
 
     let i = 0;
@@ -834,6 +817,7 @@ export class ReglRenderer extends Renderer {
     const { regl } = this;
     // This should be scoped somewhere to allow resizing.
     type P = DS.TileDrawProps;
+    type C = DefaultContext;
     const parameters: DrawConfig<unknown, unknown, DS.TileDrawProps> = {
       depth: { enable: false },
       stencil: { enable: false },
@@ -862,7 +846,7 @@ export class ReglRenderer extends Renderer {
         u_transition_duration(_, props: P) {
           return props.prefs.duration; // Using seconds, not milliseconds, in there
         },
-        u_only_color(_, props: P) {
+        u_only_color(_: C, props: P) {
           if (props.only_color !== undefined) {
             return props.only_color;
           }
@@ -871,7 +855,7 @@ export class ReglRenderer extends Renderer {
           // Other values plot a specific value of the color-encoded field.
           return -2;
         },
-        u_wrap_colors_after: (_, { wrap_colors_after }: P) => {
+        u_wrap_colors_after: (_: unknown, { wrap_colors_after }: P) => {
           if (wrap_colors_after === undefined) {
             throw new Error('wrap_colors_after is undefined');
           }
@@ -893,7 +877,7 @@ export class ReglRenderer extends Renderer {
           }
           return 0;
         },
-        u_grid_mode: (_, { grid_mode }: P) => grid_mode,
+        u_grid_mode: (_: C, { grid_mode }: P) => grid_mode,
         u_colors_as_grid: (_, { colors_as_grid }: P) => colors_as_grid,
         /*        u_constant_color: () => (this.aes.dim("color").current.constant !== undefined
           ? this.aes.dim("color").current.constant
@@ -901,19 +885,19 @@ export class ReglRenderer extends Renderer {
         u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
           ? this.aes.dim("color").last.constant
           : [-1, -1, -1]),*/
-        u_tile_id: (_, props: P) => props.tile_id,
-        u_width: ({ viewportWidth }) => viewportWidth as number,
-        u_height: ({ viewportHeight }) => viewportHeight as number,
+        u_tile_id: (_: C, props: P) => props.tile_id,
+        u_width: ({ viewportWidth }: C) => viewportWidth,
+        u_height: ({ viewportHeight }: C) => viewportHeight,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
         u_color_aesthetic_map: this.aes.aesthetic_map.color_texture,
-        u_aspect_ratio: ({ viewportWidth, viewportHeight }) =>
+        u_aspect_ratio: ({ viewportWidth, viewportHeight }: C) =>
           viewportWidth / viewportHeight,
         //@ts-expect-error Don't know about regl props.
         u_zoom_balance: regl.prop('zoom_balance'),
-        u_base_size: (_, { point_size }) => point_size as number,
-        u_maxix: (_, { max_ix }) => max_ix as number,
-        u_alpha: (_, { alpha }) => alpha as number,
-        u_foreground_number: (_, { foreground }) => foreground as number,
+        u_base_size: (_: C, { point_size }: P) => point_size,
+        u_maxix: (_: C, { max_ix }: P) => max_ix,
+        u_alpha: (_: C, { alpha }: P) => alpha,
+        u_foreground_number: (_: C, { foreground }: P) => foreground as number,
         u_foreground_alpha: () => this.render_props.foreground_opacity,
         u_background_rgba: () => {
           const color = this.prefs.background_options.color;
@@ -929,7 +913,7 @@ export class ReglRenderer extends Renderer {
           this.prefs.background_options.mouseover ? 1 : 0,
         u_background_size: () => this.render_props.background_size,
         u_foreground_size: () => this.render_props.foreground_size,
-        u_k: (_, props: P) => {
+        u_k: (_: DefaultContext, props: P) => {
           return props.transform.k;
         },
         // Allow interpolation between different coordinate systems.
@@ -940,7 +924,7 @@ export class ReglRenderer extends Renderer {
         u_time: ({ time }: P) => time,
         u_jitter: () => this.aes.jitter_int_format('current'),
         u_last_jitter: () => this.aes.jitter_int_format('last'),
-        u_zoom(_, props: P) {
+        u_zoom(_: C, props: P) {
           return props.zoom_matrix;
         },
       },
@@ -1285,10 +1269,7 @@ export class TileBufferManager {
     if (!column.type || column.type.typeId !== Type.Float32) {
       const buffer = new Float32Array(tile.record_batch.numRows);
       const source_buffer = column.data[0];
-
-      if (column.type['dictionary']) {
-        // We set the dictionary values down by 2047 so that we can use
-        // even half-precision floats for direct indexing.
+      if (column.type.typeId === Type.Dictionary) {
         for (let i = 0; i < tile.record_batch.numRows; i++) {
           buffer[i] = (source_buffer as Data<Dictionary<Utf8>>).values[i];
         }
