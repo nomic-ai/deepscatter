@@ -525,12 +525,17 @@ export class Scatterplot {
     if (this.prefs.encoding && prefs.encoding) {
       for (const k of Object.keys(
         this.prefs.encoding,
-      ) as (keyof DS.Encoding)[]) {
+      ) as (keyof typeof this.prefs.encoding)[]) {
         if (prefs.encoding[k] !== undefined) {
-          this.prefs.encoding[k] = prefs.encoding[k];
+          const v = prefs.encoding[k];
+          // TODO: fix
+          // @ts-expect-error -- I can't make this work.
+          this.prefs.encoding[k] =
+            v as (typeof this.prefs.encoding)[keyof typeof this.prefs.encoding];
         }
       }
     }
+
     merge(this.prefs, prefs);
   }
   /**

@@ -8,7 +8,6 @@ import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
 import type * as DS from './shared';
 import { Color } from './aesthetics/ColorAesthetic';
-import type { Zoom } from './interaction';
 
 const handler = drag<SVGRectElement, BBox>();
 
