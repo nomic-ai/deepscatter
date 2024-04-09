@@ -545,7 +545,7 @@ export class Tile {
           manifest.max_ix = manifest.min_ix + 1e5;
           manifest.min_ix = 0;
         }
-        this.highest_known_ix = this.max_ix;
+        this.highest_known_ix = manifest.max_ix;
         this.manifest = {
           key: this.key,
           children: manifest.children,

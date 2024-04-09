@@ -104,6 +104,7 @@ class RenderProps {
     return this.targetOpacity.value;
   }
   get point_size() {
+    // console.log('GETTING POINT SIZE', this.pointSize.value);
     return this.pointSize.value;
   }
   get foreground_opacity() {
@@ -185,15 +186,16 @@ export class Renderer {
     const k = this.zoom?.transform?.k ?? 1;
     const target_share = alpha / 100;
     const fraction_of_total_visible = 1 / k ** 2;
-    const pixelRatio = window.devicePixelRatio || 1;
+    const pixelRatio = window?.devicePixelRatio || 1;
 
     const pixel_area = (width * height) / pixelRatio;
     const total_intended_points = min([
       max_ix,
       this.dataset.highest_known_ix || 1e10,
     ]) as number;
-    const total_points = total_intended_points * (1 - discard_share);
 
+    const total_points = total_intended_points * (1 - discard_share);
+    //console.log({ total_points });
     const size_adjust = Math.exp(Math.log(k) * zoom_balance);
     const area_of_point =
       Math.PI * ((size_adjust * point_size) / pixelRatio / 2) ** 2;
@@ -214,11 +216,11 @@ export class Renderer {
     const { prefs } = this;
     const { max_points } = this.render_props;
     if (!this._use_scale_to_download_tiles) {
-      return max_points;
+      return max_points + 1;
     }
     const k = this.zoom.transform!.k;
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
-    return (max_points * k * k) / point_size_adjust / point_size_adjust;
+    return (max_points * k * k) / point_size_adjust / point_size_adjust + 0.5;
   }
 
   visible_tiles(): Array<Tile> {

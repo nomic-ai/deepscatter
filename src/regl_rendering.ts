@@ -200,6 +200,7 @@ export class ReglRenderer extends Renderer {
         number,
       ],
     };
+    // console.log(props.alpha, 'alpha');
 
     // Clone.
     return JSON.parse(JSON.stringify(props)) as DS.GlobalDrawProps;
@@ -896,7 +897,10 @@ export class ReglRenderer extends Renderer {
         u_zoom_balance: regl.prop('zoom_balance'),
         u_base_size: (_: C, { point_size }: P) => point_size,
         u_maxix: (_: C, { max_ix }: P) => max_ix,
-        u_alpha: (_: C, { alpha }: P) => alpha,
+        u_alpha: (_: C, { alpha }: P) => {
+          //console.log(alpha);
+          return alpha;
+        },
         u_foreground_number: (_: C, { foreground }: P) => foreground as number,
         u_foreground_alpha: () => this.render_props.foreground_opacity,
         u_background_rgba: () => {
@@ -914,6 +918,9 @@ export class ReglRenderer extends Renderer {
         u_background_size: () => this.render_props.background_size,
         u_foreground_size: () => this.render_props.foreground_size,
         u_k: (_: DefaultContext, props: P) => {
+          if (Math.random() < 0.01) {
+            //console.log(props.transform.k);
+          }
           return props.transform.k;
         },
         // Allow interpolation between different coordinate systems.
@@ -1234,9 +1241,6 @@ export class TileBufferManager {
 
   async create_buffer_data(key: string): Promise<Float32Array> {
     const { tile } = this;
-    if (tile.key === '4/4/9') {
-      console.log('MAKING', key, tile.key);
-    }
     type ColumnType = Vector<Dictionary<Utf8> | Float | Bool | Int | Timestamp>;
 
     if (!tile.hasLoadedColumn(key)) {

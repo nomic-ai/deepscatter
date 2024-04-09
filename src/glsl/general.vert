@@ -9,7 +9,6 @@ uniform vec2 u_wrap_colors_after;
 uniform float u_jitter;
 uniform float u_last_jitter;
 
-
 // Whether to plot only a single category.
 uniform float u_only_color;
 uniform float u_grid_mode;
@@ -595,13 +594,16 @@ float texture_float_lookup(in vec2 domain,
     // Literal transforms aren't looked up, just returned as is.
     return attr;
   }
+
   float inrange = domainify(domain, transform, attr, 0.);
   if (texture_position > 0.5) {
     float y_pos = texture_position / 32. - 0.5 / 32.;
     vec4 encoded = texture2D(u_one_d_aesthetic_map, vec2(y_pos, inrange));
     return encoded.a;
   } else {
-    return mix(range.x, range.y, inrange);
+    // return 0.25;
+    // return inrange;
+    return mix(domain.x, domain.y, inrange);
   }
 }
 
@@ -1257,7 +1259,8 @@ void main() {
   float size_multiplier = texture_float_lookup(
     u_size_domain,
     u_size_range,
-    u_size_transform, a_size,
+    u_size_transform,
+    a_size,
     u_size_map_position);
 
   float last_size_multiplier = texture_float_lookup(
@@ -1267,11 +1270,10 @@ void main() {
   size_multiplier = u_base_size * 
      mix(last_size_multiplier, size_multiplier, ease);
   
-  float depth_size_adjust = (1.0 - ix / (u_maxix));
-
+  // float depth_size_adjust = (1.0 - ix / (u_maxix));
 
   point_size_adjust = exp(log(u_k) * u_zoom_balance) ;// * depth_size_adjust;
-//  point_size_adjust = exp(log(u_k) * u_zoom_balance);
+
   gl_PointSize = point_size_adjust * size_multiplier;
 
   if (gl_PointSize <= 5.1) {
@@ -1341,6 +1343,7 @@ void main() {
     fill = packFloat(ix_in_tile + 1.);
   } else {
     run_color_fill(ease);
+    // fill = packFloat(ix + 1.);
   }
 
   // Are we in a mode where we need to plot foreground and background?
@@ -1383,7 +1386,6 @@ void main() {
   }
     
   point_size = gl_PointSize;
-
 /*  if (u_use_glyphset > 0. && point_size > 5.0) {
     float random_letter = floor(64. * ix_to_random(ix, 1.3));
     letter_pos = vec2(
