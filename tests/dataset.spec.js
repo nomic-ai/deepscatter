@@ -31,9 +31,6 @@ test('Test composition of selections', async () => {
     tileFunction: selectFunctionForFactorsOf(3),
   });
 
-  // await selectThree.ready;
-  // await selectThree.applyToAllLoadedTiles();
-
   const selectSix = new DataSelection(dataset, {
     name: 'six',
     composition: ['ALL', selectThree, selectEvens],

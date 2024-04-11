@@ -384,10 +384,10 @@ export class Scatterplot {
     if (params.source_url !== undefined) {
       this._root = Dataset.from_quadfeather(params.source_url, this);
     } else if (params.arrow_table !== undefined) {
-      this._root = Dataset.from_arrow_table(params.arrow_table, this);
+      this._root = Dataset.fromArrowTable(params.arrow_table, this);
     } else if (params.arrow_buffer !== undefined) {
       const tb = tableFromIPC(params.arrow_buffer);
-      this._root = Dataset.from_arrow_table(tb, this);
+      this._root = Dataset.fromArrowTable(tb, this);
     } else {
       throw new Error('No source_url or arrow_table specified');
     }
@@ -399,13 +399,15 @@ export class Scatterplot {
     const { prefs } = this;
 
     await this.dataset.ready;
+    console.log('HERE');
+    await this.dataset.root_tile.get_column('x');
+    console.log('HERE 2');
 
     this._renderer = new ReglRenderer(
       '#container-for-webgl-canvas',
       this.dataset,
       this,
     );
-
     this._zoom = new Zoom('#deepscatter-svg', this.prefs, this);
     this._zoom.attach_tiles(this.dataset);
     this._zoom.attach_renderer('regl', this._renderer);
@@ -516,7 +518,7 @@ export class Scatterplot {
     this._renderer?.regl?.destroy();
 
     const node = this.div?.node() as Node;
-    node.parentElement!.replaceChildren();
+    node.parentElement.replaceChildren();
   }
 
   update_prefs(prefs: DS.APICall) {
@@ -785,6 +787,7 @@ export class Scatterplot {
     if (this._zoom === undefined) {
       await this.reinitialize();
     }
+
     const renderer = this._renderer as ReglRenderer;
     const zoom = this._zoom as Zoom;
     this._renderer!.render_props.apply_prefs(this.prefs);

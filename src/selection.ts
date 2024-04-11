@@ -410,7 +410,6 @@ export class DataSelection {
   applyToAllLoadedTiles(): Promise<void> {
     return Promise.all(
       this.dataset.map((tile) => {
-        console.log('TILE', tile.key);
         // triggers creation of the dataset column as a side-effect.
         return tile.get_column(this.name);
       }),

@@ -62,7 +62,7 @@ const defaultTransformations: Record<string, Transformation> = {
 export class Dataset {
   public transformations: Record<string, Transformation> =
     defaultTransformations;
-  protected plot: Scatterplot;
+  public _plot: Scatterplot | null;
   private extents: Record<string, [number, number] | [Date, Date]> = {};
   // A 3d identifier for the tile. Usually [z, x, y]
   private _extent?: Rectangle;
@@ -83,10 +83,10 @@ export class Dataset {
 
   constructor(
     base_url: string,
-    plot: Scatterplot,
+    plot: Scatterplot | null = null,
     options: DS.DatasetOptions = {},
   ) {
-    this.plot = plot;
+    this._plot = plot;
     this.tileProxy = options.tileProxy;
 
     const rootKey = options['rootKey'] || '0/0/0';
@@ -115,10 +115,16 @@ export class Dataset {
     this.promise = preProcessRootTile.then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
-      await this.root_tile.loadManifestInfoFromTileMetadata();
+      console.log('BBB HERE');
+      this.root_tile.manifest =
+        await this.root_tile.deriveManifestInfoFromTileMetadata();
+      console.log('BBBB HERE');
+
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
+        console.log('BBB HERE');
         const parsed = JSON.parse(cars as string) as Record<string, string>;
+        console.log('HERE');
         for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function (tile) {
             const batch = await tile.get_arrow(v);
@@ -136,7 +142,16 @@ export class Dataset {
       } else {
         // "NO SIDECARS"
       }
+      console.log(this.root_tile.manifest);
     });
+  }
+
+  get plot() {
+    if (this._plot === undefined) {
+      throw new Error('Plot not yet bound');
+    } else {
+      return this._plot;
+    }
   }
 
   get ready() {
@@ -156,7 +171,7 @@ export class Dataset {
     if (!this.root_tile.hasLoadedColumn('x')) {
       throw new Error("Can't access extent without a root tile");
     }
-    return this.root_tile.extent;
+    return this.root_tile.manifest.extent;
   }
 
   /**
@@ -256,7 +271,7 @@ export class Dataset {
    * @param plot The Scatterplot to use.
    * @returns
    */
-  static from_arrow_table(table: Table, plot: Scatterplot): Dataset {
+  static fromArrowTable(table: Table, plot: Scatterplot): Dataset {
     return wrapArrowTable(tableToIPC(table), plot);
   }
 
@@ -451,13 +466,13 @@ export class Dataset {
 
     let seen = 0;
     const start = starting_tile || this.root_tile;
-    await start.loadManifestInfoFromTileMetadata();
+    await start.deriveManifestInfoFromTileMetadata();
     const total_points = JSON.parse(
       start.record_batch.schema.metadata.get('total_points'),
     ) as number;
 
     async function resolve(tile: Tile) {
-      await tile.loadManifestInfoFromTileMetadata();
+      await tile.deriveManifestInfoFromTileMetadata();
       if (!filter(tile)) {
         return;
       }
@@ -616,6 +631,7 @@ export class Dataset {
     bbox: Rectangle | undefined,
     max_ix: number,
     queue_length = 8,
+    fields: string[] = ['x', 'y', 'ix'],
   ) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
@@ -655,10 +671,16 @@ export class Dataset {
       if ((tile.min_ix && tile.min_ix > max_ix) || distance <= 0) {
         continue;
       }
+      console.log(tile.key);
       queue.add(tile.key);
-      tile
-        .loadManifestInfoFromTileMetadata()
-        .then(() => queue.delete(tile.key))
+
+      Promise.all([
+        tile.populateManifest(),
+        ...fields.map((fieldname) => tile.get_column(fieldname)),
+      ])
+        .then(() => {
+          queue.delete(tile.key);
+        })
         .catch((error) => {
           console.warn('Error on', tile.key);
           queue.delete(tile.key);
@@ -780,8 +802,7 @@ export function add_or_delete_column(
         // Then it's dropped.
         continue;
       } else {
-        console.warn(`Name ${field.name} already exists, can't add.`);
-        return batch as RecordBatch;
+        return batch;
       }
     }
     const current = batch.getChild(field.name);

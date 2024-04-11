@@ -23,6 +23,7 @@ export type Rectangle = {
 
 import type { TileBufferManager } from './regl_rendering';
 import type { ArrowBuildable, TileManifest } from './shared';
+import { isCompleteManifest } from './typing';
 
 export type RecordBatchCache =
   | {
@@ -58,10 +59,10 @@ export class Tile {
   public _highest_known_ix?: number;
   public dataset: Dataset;
   public _transformations: Record<string, Promise<ArrowBuildable>> = {};
-  public _downloadPrimaryData?: Promise<TileManifest>;
+  public _deriveManifestFromTileMetadata?: Promise<TileManifest>;
   //private _promiseOfChildren? = Promise<void>;
-  private partialManifest: Partial<TileManifest>;
-  private manifest?: TileManifest;
+  private _partialManifest: Partial<TileManifest>;
+  private _completeManifest?: TileManifest;
 
   // A cache of fetchCalls for downloaded arrow tables, including any table schema metadata.
   // Tables may contain more than a single column, so this prevents multiple dispatch.
@@ -88,12 +89,12 @@ export class Tile {
       manifest = key;
     }
     this.key = manifest.key;
-    if (manifest.min_ix === undefined) {
-      manifest.min_ix = parent ? parent.max_ix + 1 : 0;
-    }
-    if (manifest.max_ix === undefined) {
-      manifest.max_ix = manifest.min_ix + 1e5;
-    }
+    // if (manifest.min_ix === undefined) {
+    //   manifest.min_ix = parent ? parent.max_ix + 1 : 0;
+    // }
+    // if (manifest.max_ix === undefined) {
+    //   manifest.max_ix = manifest.min_ix + 1e5;
+    // }
     this.parent = parent;
     this.dataset = dataset;
 
@@ -105,19 +106,9 @@ export class Tile {
     this.numeric_id = tile_identifier++;
     this.url = base_url;
 
-    // const p = new Promise((resolve) => {
-    //   this._registerChildren = resolve;
-    // });
-    // this._promiseOfChildren = p as Promise<void>;
+    if (isCompleteManifest(manifest)) this.manifest = manifest;
 
-    if (manifest.children) {
-      this._registerChildren(
-        manifest.children.map((tile) => {
-          return new Tile(tile, this, this.dataset, base_url);
-        }),
-      );
-    }
-    this.partialManifest = manifest;
+    this._partialManifest = manifest;
   }
 
   delete_column_if_exists(colname: string) {
@@ -137,9 +128,6 @@ export class Tile {
       return this.record_batch.getChild(colname);
     }
     throw new Error(`Column ${colname} not found`);
-  }
-  private _registerChildren(value: Tile[]) {
-    this._children = value;
   }
 
   private transformation_holder: Record<string, Promise<void>> = {};
@@ -275,17 +263,40 @@ export class Tile {
     }
   }
 
+  get manifest(): TileManifest {
+    if (!this._completeManifest)
+      throw new Error('Attempted to access manifest on partially loaded tile.');
+
+    return this._completeManifest;
+  }
+
+  set manifest(manifest: TileManifest) {
+    // Setting the manifest is the thing that spawns children.
+    if (!manifest.children) {
+      console.error({ manifest });
+      throw new Error('Attempted to set an incomplete manifest.');
+    }
+    this._children = manifest.children.map((k: TileManifest | string) => {
+      return new Tile(k, this, this.dataset, this.url);
+    });
+    this.highest_known_ix = manifest.max_ix;
+    this._completeManifest = manifest;
+  }
+
   set highest_known_ix(val) {
     // Do nothing if it isn't actually higher.
     if (this._highest_known_ix == undefined || this._highest_known_ix < val) {
       this._highest_known_ix = val;
       if (this.parent) {
-        // bubble value to parent.
+        // bubble value to parent, with same logic.
         this.parent.highest_known_ix = val;
       }
     }
   }
 
+  // This number represent the highest-indexed point that has been loaded *on or below* this on
+  // the quadtree. It can be useful for decisions about which portions of the quadtree to plumb,
+  // and for decisions about rendering colors
   get highest_known_ix(): number {
     return this._highest_known_ix || -1;
   }
@@ -310,7 +321,7 @@ export class Tile {
   }
 
   get min_ix() {
-    if (this.manifest?.min_ix !== undefined) {
+    if (this._completeManifest && this.manifest?.min_ix !== undefined) {
       return this.manifest.min_ix;
     }
     if (this.parent) {
@@ -328,7 +339,7 @@ export class Tile {
   }
 
   get extent(): Rectangle {
-    if (this.manifest?.extent) {
+    if (this._completeManifest && this.manifest?.extent) {
       return this.manifest.extent;
     }
     return this.theoretical_extent;
@@ -348,7 +359,7 @@ export class Tile {
      * download instead if possible.
      */
     if (suffix === null) {
-      await this.loadManifestInfoFromTileMetadata();
+      await this.deriveManifestInfoFromTileMetadata();
     } else {
       await this.get_arrow(suffix);
     }
@@ -412,45 +423,33 @@ export class Tile {
       ready: false,
       batch,
     });
+
     void batch.then((b) => {
       this.arrowFetchCalls.set(suffix, {
         ready: true,
         batch,
         schema: b.schema,
       });
-      if (
-        b.schema.metadata.get('children') &&
-        this.loadedChildren.length === 0
-      ) {
-        const children = JSON.parse(
-          b.schema.metadata.get('children') || '[]',
-        ) as string[];
-        for (const child of children) {
-          this._children.push(new Tile(child, this, this.dataset, this.url));
-        }
-      }
     });
 
     return batch;
   }
 
   async populateManifest(): Promise<TileManifest> {
-    if (this.manifest) {
-      return this.manifest;
-    }
-    if (this.partialManifest.children) {
+    if (this._completeManifest) {
+      // pass
+    } else if (this._partialManifest.children) {
       this.manifest = {
+        ...this._partialManifest,
         key: this.key,
-        children: this.partialManifest.children,
+        children: this._partialManifest.children,
         min_ix: this.min_ix,
         max_ix: this.max_ix,
         extent: this.extent,
-        nPoints: this.partialManifest.nPoints,
-        ...this.partialManifest,
+        nPoints: this._partialManifest.nPoints,
       };
-      return this.manifest;
     } else {
-      this.manifest = await this.loadManifestInfoFromTileMetadata();
+      this.manifest = await this.deriveManifestInfoFromTileMetadata();
     }
     return this.manifest;
   }
@@ -476,15 +475,27 @@ export class Tile {
     });
   }
 
-  async loadManifestInfoFromTileMetadata(): Promise<TileManifest> {
+  private async _forceLoadChildren(
+    recurse = false,
+    maxIx: number = Number.MAX_VALUE,
+  ) {
+    await this.populateManifest();
+    if (recurse && this.manifest.max_ix < maxIx) {
+      for (const child of this._children) {
+        await child._forceLoadChildren(recurse, maxIx);
+      }
+    }
+  }
+
+  async deriveManifestInfoFromTileMetadata(): Promise<TileManifest> {
     // This should only be called once per tile.
-    if (this._downloadPrimaryData !== undefined) {
-      return this._downloadPrimaryData;
+    if (this._deriveManifestFromTileMetadata !== undefined) {
+      return this._deriveManifestFromTileMetadata;
     }
 
     const manifest: Partial<TileManifest> = {};
-    this._downloadPrimaryData = this.get_arrow(null)
-      .then((batch) => {
+    this._deriveManifestFromTileMetadata = this.get_arrow(null).then(
+      (batch) => {
         if (this._batch) {
           if (!this._batch.getChild('ix')) {
             throw new Error("Can't overwrite _batch safely");
@@ -514,18 +525,13 @@ export class Tile {
         if (extent) {
           manifest.extent = JSON.parse(extent) as Rectangle;
         } else {
-          console.warn('No extent in manifest');
+          manifest.extent = this.theoretical_extent;
         }
 
         const children = metadata.get('children');
 
         if (children) {
-          this._registerChildren(
-            (JSON.parse(children) as string[]).map((key) => {
-              const t = new Tile(key, this, this.dataset, this.url);
-              return t;
-            }),
-          );
+          manifest.children = JSON.parse(children) as TileManifest[] | string[];
         }
 
         // TODO: make ix optionally parsed from metadata, not column.
@@ -545,25 +551,19 @@ export class Tile {
           manifest.max_ix = manifest.min_ix + 1e5;
           manifest.min_ix = 0;
         }
-        this.highest_known_ix = manifest.max_ix;
-        this.manifest = {
+        const fullManifest = {
           key: this.key,
           children: manifest.children,
           min_ix: manifest.min_ix,
           max_ix: manifest.max_ix,
           extent: manifest.extent,
           nPoints: batch.numRows,
-        };
-        return this.manifest;
-      })
-      .catch((error) => {
-        console.error(
-          `Error: Remote Tile at ${this.url}/${this.key}.feather not found.
-        `,
-        );
-        throw error;
-      });
-    return this._downloadPrimaryData;
+        } as TileManifest;
+        return fullManifest;
+      },
+    );
+
+    return this._deriveManifestFromTileMetadata;
   }
 
   /**
@@ -573,6 +573,7 @@ export class Tile {
    * has just 5. (4 + 1). Note a macro tile with the name [2/0/0] does not actually include
    * the tile [2/0/0] itself, but rather the tiles [4/0/0], [4/1/0], [4/0/1], [4/1/1], [5/0/0] etc.
    */
+
   get macrotile(): string {
     return macrotile(this.key);
   }
@@ -591,6 +592,20 @@ export class Tile {
     //   );
     // }
     return this._children;
+  }
+
+  async allChildren(): Promise<Array<Tile>> {
+    if (this._children.length) {
+      return this._children;
+    }
+    if (this._partialManifest?.children) {
+      for (const child of this.manifest.children) {
+        const childTile = new Tile(child, this, this.dataset, this.url);
+        this._children.push(childTile);
+      }
+      return this._children;
+    }
+    this.manifest = await this.populateManifest();
   }
 
   get theoretical_extent(): Rectangle {
@@ -616,6 +631,7 @@ export class Tile {
 
 type Point = [number, number];
 
+// Is a point in a rectangle
 export function p_in_rect(p: Point, rect: Rectangle | undefined) {
   if (rect === undefined) {
     return true;
@@ -652,11 +668,11 @@ function macrotile_descendants(
   }
   const parent_tiles = [[macrokey]];
   while (parent_tiles.length < parents) {
-    parent_tiles.unshift(parent_tiles[0].map(children).flat());
+    parent_tiles.unshift(parent_tiles[0].map(quadtreeChildrenNames).flat());
   }
-  const sibling_tiles = [parent_tiles[0].map(children).flat()];
+  const sibling_tiles = [parent_tiles[0].map(quadtreeChildrenNames).flat()];
   while (sibling_tiles.length < size) {
-    sibling_tiles.unshift(sibling_tiles[0].map(children).flat());
+    sibling_tiles.unshift(sibling_tiles[0].map(quadtreeChildrenNames).flat());
   }
   sibling_tiles.reverse();
   const descendants = sibling_tiles.flat();
@@ -664,7 +680,7 @@ function macrotile_descendants(
   return descendants;
 }
 
-function children(tile: string) {
+function quadtreeChildrenNames(tile: string) {
   const [z, x, y] = tile.split('/').map((d) => parseInt(d)) as [
     number,
     number,

@@ -63,8 +63,7 @@ export type TileManifest = {
   key: string;
   // The number of data points in that specific tile.
   nPoints: number;
-  // undefined children indicates a need for the
-  children: TileManifest[] | undefined;
+  children: TileManifest[] | string[];
   min_ix: number;
   max_ix: number;
   extent: Rectangle;

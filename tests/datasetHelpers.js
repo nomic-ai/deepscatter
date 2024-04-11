@@ -68,5 +68,5 @@ function createTable(n_batches) {
 export function createIntegerDataset() {
   const num_batches = 4;
   const table = createTable(num_batches);
-  return Dataset.from_arrow_table(table);
+  return Dataset.fromArrowTable(table);
 }

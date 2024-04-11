@@ -19,9 +19,11 @@
   "scripts": {
     "dev": "vite --mode dev --port 3344 --host",
     "format": "prettier --write src",
+
     "build": "vite build && tsc",
     "prepublishOnly": "vite build && tsc && typedoc --skipErrorChecking src/*",
-    "test": "playwright test",
+    "test": "vite build && npm run test:node",
+    "test:playwright": "playwright test",
     "test:node": "node tests/dataset.spec.js",
     "lint": "eslint src",
     "docs": "typedoc --out docs src/deepscatter.ts"

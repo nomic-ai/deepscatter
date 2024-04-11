@@ -8,18 +8,20 @@ export function isTransform(input: unknown): input is DS.Transform {
   return false;
 }
 
-export function isOpChannel(input: DS.ChannelType): input is DS.OpChannel<DS.IsoDateString | number> {
+export function isOpChannel(
+  input: DS.ChannelType,
+): input is DS.OpChannel<DS.IsoDateString | number> {
   return input['op'] !== undefined;
 }
 
 export function isLambdaChannel(
-  input: DS.ChannelType
+  input: DS.ChannelType,
 ): input is DS.LambdaChannel<DS.JSONValue, string | number | boolean> {
   return input && input['lambda'] !== undefined;
 }
 
 export function isConstantChannel(
-  input: DS.ChannelType
+  input: DS.ChannelType,
 ): input is DS.ConstantChannel<string | number | boolean> {
   return input['constant'] !== undefined;
 }
@@ -30,4 +32,23 @@ export function isURLLabels(labels: DS.Labelcall): labels is DS.URLLabels {
 
 export function isLabelset(labels: DS.Labelcall): labels is DS.Labelset {
   return labels !== null && (labels as DS.Labelset).labels !== undefined;
+}
+
+// There must be a general function here huh.
+export function isCompleteManifest(
+  manifest: Partial<DS.TileManifest>,
+): manifest is DS.TileManifest {
+  for (const k of [
+    'key',
+    'nPoints',
+    'children',
+    'min_ix',
+    'max_ix',
+    'extent',
+  ]) {
+    if (manifest[k] === undefined) {
+      return false;
+    }
+  }
+  return true;
 }
