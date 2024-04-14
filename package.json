@@ -1,7 +1,7 @@
 {
   "name": "deepscatter",
   "type": "module",
-  "version": "3.0.0-next.2",
+  "version": "3.0.0-next.3",
   "description": "Fast, animated zoomable scatterplots scaling to billions of points",
   "files": [
     "dist"
@@ -19,7 +19,6 @@
   "scripts": {
     "dev": "vite --mode dev --port 3344 --host",
     "format": "prettier --write src",
-
     "build": "vite build && tsc",
     "prepublishOnly": "vite build && tsc && typedoc --skipErrorChecking src/*",
     "test": "vite build && npm run test:node",
@@ -60,11 +59,9 @@
     "d3-timer": "^3.0.1",
     "d3-transition": "^3.0.1",
     "d3-zoom": "^3.0.0",
-    "fast-json-stable-stringify": "^2.1.0",
     "glsl-easings": "^1.0.0",
     "glsl-fast-gaussian-blur": "^1.0.2",
     "glsl-read-float": "^1.1.0",
-    "json-stable-stringify": "^1.1.1",
     "lodash.merge": "^4.6.2",
     "rbush-3d": "^0.0.4",
     "regl": "^2.1.0"

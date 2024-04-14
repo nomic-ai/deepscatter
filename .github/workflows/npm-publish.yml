@@ -3,12 +3,6 @@ on:
   push:
     branches:
       - dev
-  # workflow_dispatch:
-  #   inputs:
-  #     branch:
-  #       description: 'Define branch name'
-  #       required: true
-  #       default: 'dev'
 
 jobs:
   publish:
@@ -25,6 +19,12 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git config --global user.name "GitHub Actions"
       - run: npm version prerelease --preid=next
+      - name: Commit bumped version
+        run: |
+          git add package.json package-lock.json
+          git commit -m "Bump version to $(node -p "require('./package.json').version")"
+          git push
+
       - run: npm publish --tag next
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
