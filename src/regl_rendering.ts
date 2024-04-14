@@ -265,22 +265,26 @@ export class ReglRenderer extends Renderer {
     const { prefs, dataset, props } = this;
     this.tick_num = this.tick_num || 0;
     this.tick_num++;
-
     // Set a download call in motion.
     if (this._use_scale_to_download_tiles) {
-      dataset.download_most_needed_tiles(
+      dataset.spawnDownloads(
         this.zoom.current_corners(),
         this.props.max_ix,
         5,
+        this.needeedFields,
+        'high',
       );
     } else {
       // console.warn("No good rules here yet.")
-      dataset.download_most_needed_tiles(undefined, prefs.max_points, 5);
+      dataset.spawnDownloads(
+        undefined,
+        prefs.max_points,
+        5,
+        this.needeedFields,
+        'high',
+      );
     }
-    // regl.clear({
-    //   color: [0.9, 0.9, 0.93, 0],
-    //   depth: 1,
-    // });
+
     const start = Date.now();
 
     async function pop_deferred_functions(
@@ -305,7 +309,7 @@ export class ReglRenderer extends Renderer {
     try {
       this.render_all(props);
     } catch (error) {
-      this.reglframe!.cancel();
+      this.reglframe.cancel();
       throw error;
     }
   }
@@ -1086,10 +1090,9 @@ export class TileBufferManager {
   /**
    *
    * @param
-   * @returns
+   * @returns Is the buffer ready with all the requested aesthetics for the current plot?
    */
   ready() {
-    // Is the buffer ready with all the aesthetics for the current plot?
     const { renderer } = this;
 
     // We don't allocate buffers for dimensions until they're needed.
@@ -1103,51 +1106,19 @@ export class TileBufferManager {
       }
     }
     for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
-      if (!this.ready_or_not_here_it_comes(key).ready) {
-        return false;
+      const current = this.regl_elements.get(key);
+      if (current === null || current === undefined) {
+        if (this.tile.hasLoadedColumn(key)) {
+          this.create_regl_buffer(key);
+        } else {
+          return false;
+        }
       }
     }
     return true;
   }
-  /**
-   * Creates a deferred call that will populate the regl buffer
-   * when there's some free time.
-   *
-   * @param key a string representing the requested column; must either exist in the
-   * record batch or have a means for creating it asynchronously in 'transformations.'
-   * @returns both an instantly available object called 'ready' that says if we're ready
-   * to go: and, if the tile is ready, a promise that starts the update going and resolves
-   * once it's ready.
-   */
-  ready_or_not_here_it_comes(key: string): {
-    ready: boolean;
-    promise: null | Promise<void>;
-  } {
-    const { renderer, regl_elements } = this;
 
-    const current = this.regl_elements.get(key);
-    if (current === null) {
-      // It's in the process of being built.
-      return { ready: false, promise: null };
-    }
-    if (current === undefined) {
-      // if (!this.tile.ready) {
-      //   // Can't build b/c no tile ready.
-      //   return { ready: false, promise: null };
-      // }
-      //
-      // Request that the buffer be created before returning false.
-      regl_elements.set(key, null);
-      const created = new Promise<void>((resolve) => {
-        renderer.deferred_functions.push(async () => {
-          await this.create_regl_buffer(key);
-          resolve();
-        });
-      });
-      return { ready: false, promise: created };
-    }
-    return { ready: true, promise: Promise.resolve() };
-  }
+  async awaitReady() {}
   /**
    *
    * @param colname the name of the column to release
@@ -1164,17 +1135,24 @@ export class TileBufferManager {
     return this.tile.record_batch.numRows;
   }
 
-  async create_buffer_data(key: string): Promise<Float32Array> {
+  create_buffer_data(key: string): Float32Array {
     const { tile } = this;
     type ColumnType = Vector<Dictionary<Utf8> | Float | Bool | Int | Timestamp>;
 
     if (!tile.hasLoadedColumn(key)) {
       if (tile.dataset.transformations[key] !== undefined) {
-        // Sometimes the transformation for creating the column may be defined but not yet applied.
-        // If so, apply it right away.
-        await tile.apply_transformation(key);
+        throw new Error(
+          'Attempted to create buffer data on an unloaded transformation',
+        );
       } else {
-        const col_names = tile.record_batch.schema.fields.map((d) => d.name);
+        let col_names = [
+          ...tile.record_batch.schema.fields.map((d) => d.name),
+          ...Object.keys(tile.dataset.transformations),
+        ];
+        if (!key.startsWith('_')) {
+          // Don't warn internal columns unless the user is in internal-column land.
+          col_names = col_names.filter((d) => !d.startsWith('_'));
+        }
         throw new Error(
           `Requested ${key} but table only has columns ["${col_names.join(
             '", "',
@@ -1254,9 +1232,12 @@ export class TileBufferManager {
     return column.data[0].values as Float32Array;
   }
 
-  async create_regl_buffer(key: string): Promise<void> {
+  create_regl_buffer(key: string): void {
     const { regl_elements, renderer } = this;
-    const data = await this.create_buffer_data(key);
+    if (regl_elements.has(key)) {
+      return;
+    }
+    const data = this.create_buffer_data(key);
     if (data.constructor !== Float32Array) {
       console.warn(typeof data, data);
       throw new Error('Buffer data must be a Float32Array');
@@ -1377,4 +1358,24 @@ class MultipurposeBufferSet {
     this.pointer += items * bytes_per_item;
     return value;
   }
+}
+
+/**
+ *
+ * @param prefs The preferences object to be used.
+ *
+ * @returns The fields that need to be allocated in the buffers for
+ * a tile to be drawn.
+ */
+export function neededFieldsToPlot(prefs: DS.CompletePrefs): Set<string> {
+  const needed_keys: Set<string> = new Set();
+  if (!prefs.encoding) {
+    return needed_keys;
+  }
+  for (const [_, v] of Object.entries(prefs.encoding)) {
+    if (v && typeof v !== 'string' && v['field'] !== undefined) {
+      needed_keys.add(v['field'] as string);
+    }
+  }
+  return needed_keys;
 }

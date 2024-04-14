@@ -177,6 +177,21 @@ export class Renderer {
     return this.render_props.alpha;
   }
 
+  get needeedFields(): string[] {
+    const { aes } = this;
+    const needed = new Set<string>();
+    if (aes) {
+      for (const [_k, v] of Object.entries(aes.store)) {
+        if (v instanceof StatefulAesthetic) {
+          for (const f of v.neededFields) {
+            needed.add(f);
+          }
+        }
+      }
+    }
+    return [...needed, 'ix'];
+  }
+
   get optimal_alpha() {
     // This extends a formula suggested by Ricky Reusser to include
     // discard share.

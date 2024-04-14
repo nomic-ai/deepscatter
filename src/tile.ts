@@ -130,6 +130,19 @@ export class Tile {
     throw new Error(`Column ${colname} not found`);
   }
 
+  /**
+   *
+   * @param fields A list of keys to be created if they don't exist.
+   * Must have registered transformations.
+   */
+  async require_columns(fields: Iterable<string>): Promise<void> {
+    await Promise.all([
+      this.populateManifest(),
+      ...[...fields].map((fieldname) =>
+        this.get_column(fieldname).then(() => undefined),
+      ),
+    ]);
+  }
   private transformation_holder: Record<string, Promise<void>> = {};
 
   async apply_transformation(name: string): Promise<void> {
@@ -435,9 +448,17 @@ export class Tile {
     return batch;
   }
 
-  async populateManifest(): Promise<TileManifest> {
+  /**
+   * Guarantees that the basic elements of the tile manifest are populated,
+   * such that we know where we are in the quadtree and can make decisions
+   * about which columns to fetch, what the children are, what points are included
+   * in this tile, etc.
+   *
+   * @returns void
+   */
+  async populateManifest(): Promise<void> {
     if (this._completeManifest) {
-      // pass
+      return;
     } else if (this._partialManifest.children) {
       this.manifest = {
         ...this._partialManifest,
@@ -451,7 +472,6 @@ export class Tile {
     } else {
       this.manifest = await this.deriveManifestInfoFromTileMetadata();
     }
-    return this.manifest;
   }
 
   preprocessRootTileInfo(): Promise<void> {
@@ -473,18 +493,6 @@ export class Tile {
         }
       }
     });
-  }
-
-  private async _forceLoadChildren(
-    recurse = false,
-    maxIx: number = Number.MAX_VALUE,
-  ) {
-    await this.populateManifest();
-    if (recurse && this.manifest.max_ix < maxIx) {
-      for (const child of this._children) {
-        await child._forceLoadChildren(recurse, maxIx);
-      }
-    }
   }
 
   async deriveManifestInfoFromTileMetadata(): Promise<TileManifest> {
@@ -605,7 +613,7 @@ export class Tile {
       }
       return this._children;
     }
-    this.manifest = await this.populateManifest();
+    await this.populateManifest();
   }
 
   get theoretical_extent(): Rectangle {

@@ -2,7 +2,7 @@ import { BaseType, select, Selection } from 'd3-selection';
 import { range } from 'd3-array';
 import merge from 'lodash.merge';
 import { Zoom } from './interaction';
-import { ReglRenderer } from './regl_rendering';
+import { neededFieldsToPlot, ReglRenderer } from './regl_rendering';
 import { tableFromIPC, type StructRowProxy } from 'apache-arrow';
 import { Dataset } from './Dataset';
 import type { FeatureCollection } from 'geojson';
@@ -669,35 +669,26 @@ export class Scatterplot {
       if (this.prefs.duration < delay) {
         delay = this.prefs.duration;
       }
-      const needed_keys: Set<string> = new Set();
+      const needed_keys: Set<string> = neededFieldsToPlot(this.prefs);
       if (!prefs.encoding) {
         resolve();
       }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      for (const [_, v] of Object.entries(prefs.encoding)) {
-        if (v && typeof v !== 'string' && v['field'] !== undefined) {
-          needed_keys.add(v['field'] as string);
-        }
-      }
+      const starttime = Date.now();
 
       if (this._renderer) {
         const promises: Promise<void>[] = [];
-        const sine_qua_non: Promise<void>[] = [];
+        const sine_qua_non: Promise<void>[] = [
+          this.dataset.root_tile.require_columns(needed_keys),
+        ];
+
+        // Immediately
         for (const tile of this._renderer.visible_tiles()) {
           // Allow unready tiles to stay unready; who know's what's going on there.
           const manager = tile._buffer_manager;
           if (manager !== undefined && manager.ready()) {
             for (const key of needed_keys) {
-              const { ready, promise } =
-                manager.ready_or_not_here_it_comes(key);
-              if (!ready) {
-                if (promise !== null) {
-                  promises.push(promise);
-                  if (tile.key === '0/0/0') {
-                    // we really need this one done.
-                    sine_qua_non.push(promise);
-                  }
-                }
+              if (tile.hasLoadedColumn(key)) {
+                manager.create_regl_buffer(key);
               }
             }
           }
@@ -705,7 +696,6 @@ export class Scatterplot {
         if (promises.length === 0) {
           resolve();
         } else {
-          const starttime = Date.now();
           // It's important to get at least the first promise done,
           // because it's used to determine some details about state.
           void Promise.all(sine_qua_non).then(() => {

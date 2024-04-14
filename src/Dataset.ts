@@ -29,7 +29,7 @@ import {
 import { Scatterplot } from './scatterplot';
 import { wrapArrowTable } from './wrap_arrow';
 
-type Key = string;
+type TransformationStatus = 'queued' | 'in progress' | 'complete' | 'failed';
 
 type ArrowBuildable = DS.ArrowBuildable;
 
@@ -69,11 +69,21 @@ export class Dataset {
   public _ix_seed = 0;
   public _schema?: Schema;
   public tileProxy?: DS.TileProxy;
-  protected _download_queue: Set<Key> = new Set();
+  protected _transformation_fetch_queue: Set<{
+    // The function to call that guarantees the column(s) are loaded.
+    func: () => Promise<void>;
+    // The status of the transformation.
+    status: TransformationStatus;
+    // The urgency of the transformation.
+    priority: 'high' | 'low';
+    // An optional resolve function to call when the call is complete.
+    resolve?: () => void;
+  }> = new Set();
   public promise: Promise<void>;
   public root_tile: Tile;
   public manifest?: DS.TileManifest;
-
+  public fetcherId?: number;
+  private _downloaderId?: number;
   // Whether the tileset is structured as a pure quadtree.
 
   public readonly tileStucture: DS.TileStructure = 'quadtree';
@@ -115,16 +125,12 @@ export class Dataset {
     this.promise = preProcessRootTile.then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
-      console.log('BBB HERE');
       this.root_tile.manifest =
         await this.root_tile.deriveManifestInfoFromTileMetadata();
-      console.log('BBBB HERE');
 
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
-        console.log('BBB HERE');
-        const parsed = JSON.parse(cars as string) as Record<string, string>;
-        console.log('HERE');
+        const parsed = JSON.parse(cars) as Record<string, string>;
         for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function (tile) {
             const batch = await tile.get_arrow(v);
@@ -142,7 +148,6 @@ export class Dataset {
       } else {
         // "NO SIDECARS"
       }
-      console.log(this.root_tile.manifest);
     });
   }
 
@@ -491,12 +496,8 @@ export class Dataset {
     await resolve(start);
   }
 
-  async schema() {
+  schema() {
     throw new Error('Schema access is deprecated');
-    await this.ready;
-    if (this._schema) {
-      return this._schema;
-    }
     this._schema = this.root_tile.record_batch.schema;
     return this.root_tile.record_batch.schema;
   }
@@ -627,11 +628,24 @@ export class Dataset {
     return matches;
   }
 
-  download_most_needed_tiles(
+  /**
+   * Deepscatter manages its own download queue.
+   *
+   * Given a bounding box and a set fields, spawns network/io calls to fetch up to `queue_length`
+   *
+   *
+   * @param bbox
+   * @param max_ix
+   * @param queue_length
+   * @param fields
+   * @returns
+   */
+  spawnDownloads(
     bbox: Rectangle | undefined,
     max_ix: number,
     queue_length = 8,
     fields: string[] = ['x', 'y', 'ix'],
+    priority: 'high' | 'low' = 'high',
   ) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
@@ -639,56 +653,100 @@ export class Dataset {
       downloads in case tiles have slipped from view while parents were requested.
     */
 
-    const queue = this._download_queue;
+    const queue = this._transformation_fetch_queue;
 
     if (queue.size >= queue_length) {
+      this.runDownloads();
       return;
     }
 
     const scores: [number, Tile][] = [];
-
-    function callback(tile: Tile) {
-      if (!tile.hasLoadedColumn('x')) {
-        if (bbox === undefined) {
-          // Just depth.
-          scores.push([1 / tile.min_ix, tile]);
-        } else {
-          const distance = check_overlap(tile, bbox);
+    function scoreFileForDownload(tile: Tile) {
+      if (fields.every((k) => tile.hasLoadedColumn(k))) {
+        // This tile is complete ready, no action need be taken.
+        return;
+      }
+      if (bbox === undefined) {
+        // Just depth.
+        scores.push([1 / tile.min_ix, tile]);
+      } else {
+        const distance = check_overlap(tile, bbox);
+        if (distance > 0) {
           scores.push([distance, tile]);
         }
       }
     }
-
-    this.visit(callback);
-    scores.sort((a, b) => a[0] - b[0]);
-
+    this.visit(scoreFileForDownload);
+    scores.sort((a, b) => b[0] - a[0]);
     while (scores.length > 0 && queue.size < queue_length) {
-      const upnext = scores.pop();
-      if (upnext === undefined) {
-        throw new Error('Ran out of tiles unexpectedly');
-      }
-      const [distance, tile] = upnext;
+      const [distance, tile] = scores.pop();
       if ((tile.min_ix && tile.min_ix > max_ix) || distance <= 0) {
         continue;
       }
-      console.log(tile.key);
-      queue.add(tile.key);
 
-      Promise.all([
-        tile.populateManifest(),
-        ...fields.map((fieldname) => tile.get_column(fieldname)),
-      ])
-        .then(() => {
-          queue.delete(tile.key);
-        })
-        .catch((error) => {
-          console.warn('Error on', tile.key);
-          queue.delete(tile.key);
-          throw error;
-        });
+      const item: {
+        func: () => Promise<void>;
+        status: TransformationStatus;
+        priority: 'high' | 'low';
+      } = {
+        func: () => undefined,
+        priority: priority,
+        status: 'queued',
+      };
+      const downloadCall = async () =>
+        tile
+          .require_columns(fields)
+          .catch((error) => {
+            console.warn('Error on', tile.key);
+            item.status = 'failed';
+            throw error;
+          })
+          .then(() => {
+            item.status = 'complete';
+            return;
+          });
+      item.func = downloadCall;
+      item.priority = 'high' as const;
+      item.status = 'queued' as const;
+      this._transformation_fetch_queue.add(item);
+    }
+    if (this._transformation_fetch_queue.size > 0) {
+      // Create a ticker that will clear the queue.
+      this.runDownloads();
     }
   }
 
+  /**
+   * Flushes the transformation queue.
+   */
+  runDownloads() {
+    if (this._downloaderId !== undefined) {
+      return;
+    }
+    this._downloaderId = setInterval(() => {
+      this.flushDownloads();
+      if (this._transformation_fetch_queue.size === 0) {
+        clearInterval(this._downloaderId);
+        this._downloaderId = undefined;
+      }
+    }, 10) as unknown as number;
+  }
+
+  private flushDownloads() {
+    for (const item of this._transformation_fetch_queue) {
+      const { func, status } = item;
+      if (status === 'queued') {
+        void func();
+        item.status = 'in progress';
+      }
+      if (status === 'complete' || status === 'failed') {
+        if (item.resolve) {
+          item.resolve();
+        }
+        this._transformation_fetch_queue.delete(item);
+      }
+    }
+  }
   /**
    *
    * @param field_name the name of the column to create

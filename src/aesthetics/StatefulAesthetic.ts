@@ -1,29 +1,26 @@
 import type * as DS from '../shared';
 
-import {
-  Size,
-  Jitter_speed,
-  Jitter_radius,
-  X, Y
-} from './ScaledAesthetic';
+import { Size, Jitter_speed, Jitter_radius, X, Y } from './ScaledAesthetic';
 
 import { Filter, Foreground } from './BooleanAesthetic';
 
 import { Color } from './ColorAesthetic';
 import { Scatterplot } from '../scatterplot';
 
-type AestheticConstructor<T> = new (...args: [ 
-  encoding: DS.ChannelType | null,
-  scatterplot: Scatterplot,
-  aesthetic_map?: TextureSet,
-  id?: string
-]) => T;
+type AestheticConstructor<T> = new (
+  ...args: [
+    encoding: DS.ChannelType | null,
+    scatterplot: Scatterplot,
+    aesthetic_map?: TextureSet,
+    id?: string,
+  ]
+) => T;
 
 interface IDimensions {
   [key: string]: AestheticConstructor<ConcreteAesthetic>;
 }
 
-export const dimensions : IDimensions = {
+export const dimensions: IDimensions = {
   size: Size,
   jitter_speed: Jitter_speed,
   jitter_radius: Jitter_radius,
@@ -34,7 +31,7 @@ export const dimensions : IDimensions = {
   y: Y,
   x0: X,
   y0: Y,
-  foreground: Foreground
+  foreground: Foreground,
 } as const;
 
 export type ConcreteAesthetic =
@@ -45,23 +42,21 @@ export type ConcreteAesthetic =
   | Jitter_radius
   | Color
   | Foreground
-  | Filter
+  | Filter;
 
-export type ConcreteScaledAesthetic = 
+export type ConcreteScaledAesthetic =
   | X
   | Y
   | Size
   | Jitter_speed
   | Jitter_radius
-  | Color
-  
+  | Color;
+
 import type { Dataset } from '../Dataset';
 import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
 
-export class StatefulAesthetic<
-  T extends ConcreteAesthetic
-> {
+export class StatefulAesthetic<T extends ConcreteAesthetic> {
   /**
    * A stateful aesthetic holds the history and associated resources for an encoding
    * channel. It holds two Aesthetic objects: the current and the previous scales. These
@@ -85,7 +80,7 @@ export class StatefulAesthetic<
     regl: Regl,
     dataset: Dataset,
     aesthetic_map: TextureSet,
-    Factory: DS.Newable<T>
+    Factory: DS.Newable<T>,
   ) {
     if (aesthetic_map === undefined) {
       throw new Error('Aesthetic map is undefined.');
@@ -97,21 +92,16 @@ export class StatefulAesthetic<
     this.factory = Factory;
     this.ids = [Math.random().toString(), Math.random().toString()];
     this.states = [
-      new Factory(
-        null, 
-        this.scatterplot,
-        this.aesthetic_map,
-        this.ids[0]
-      ),
-      new Factory(
-        null, 
-        this.scatterplot,
-        this.aesthetic_map,
-        this.ids[1]
-      ),
+      new Factory(null, this.scatterplot, this.aesthetic_map, this.ids[0]),
+      new Factory(null, this.scatterplot, this.aesthetic_map, this.ids[1]),
     ] as [T, T];
   }
 
+  get neededFields(): string[] {
+    return [this.current.field, this.last.field].filter(
+      (f) => f !== null,
+    ) as string[];
+  }
   get current() {
     return this.states[0];
   }
@@ -145,7 +135,7 @@ export class StatefulAesthetic<
         encoding,
         this.scatterplot,
         this.aesthetic_map,
-        this.ids[0]
+        this.ids[0],
       );
       this.needs_transitions = true;
     }

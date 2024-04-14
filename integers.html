@@ -18,7 +18,7 @@
   <div id="deepscatter"></div>
 </body>
 <script type="module" lang="ts">
-  import { Scatterplot, Dataset, Bitmask } from './src/deepscatter';
+  import { Scatterplot, Dataset, Bitmask, dictionaryFromArrays } from './src/deepscatter';
   import {
     tableFromArrays,
     Table,
@@ -250,7 +250,7 @@
       plot.ready.then(() => {
         if (dictionaryBuilder === undefined) {
           // Curry up the numbers first to ensure we're always in the same dictionary.
-          dictionaryBuilder = plot.util.dictionaryFromArrays(numbers);
+          dictionaryBuilder = dictionaryFromArrays(numbers);
         }
         button.addEventListener('click', function () {
           plot.dataset.transformations['dictionary number coloring'] = async function (tile) {
@@ -384,30 +384,30 @@
 
 
 
-  function dictionaryFromArrays(indices, labels) {
-    const labelsArrow = vectorFromArray(labels, new Utf8());
-    let t;
-    if (indices[Symbol.toStringTag] === `Int8Array`) {
-      t = new Int8()
-    } else if (indices[Symbol.toStringTag] === `Int16Array`) {
-      t = new Int16()
-    } else if (indices[Symbol.toStringTag] === `Int32Array`) {
-      t = new Int32()
-    } else {
-      console.log(indices[Symbol.toStringTag])
-      throw new Error("values must be an array of signed integers, 32 bit or smaller.")
-    }
-    console.log({ indices }, indices.length)
-    const type = new Dictionary(labelsArrow.type, t, 0, false);
-    const returnval = makeVector({
-      type,
-      length: indices.length,
-      nullCount: 0,
-      data: indices,
-      dictionary: labelsArrow,
-    });
-    return returnval
-  }
+  // function dictionaryFromArrays(indices, labels) {
+  //   const labelsArrow = vectorFromArray(labels, new Utf8());
+  //   let t;
+  //   if (indices[Symbol.toStringTag] === `Int8Array`) {
+  //     t = new Int8()
+  //   } else if (indices[Symbol.toStringTag] === `Int16Array`) {
+  //     t = new Int16()
+  //   } else if (indices[Symbol.toStringTag] === `Int32Array`) {
+  //     t = new Int32()
+  //   } else {
+  //     console.log(indices[Symbol.toStringTag])
+  //     throw new Error("values must be an array of signed integers, 32 bit or smaller.")
+  //   }
+  //   console.log({ indices }, indices.length)
+  //   const type = new Dictionary(labelsArrow.type, t, 0, false);
+  //   const returnval = makeVector({
+  //     type,
+  //     length: indices.length,
+  //     nullCount: 0,
+  //     data: indices,
+  //     dictionary: labelsArrow,
+  //   });
+  //   return returnval
+  // }
 </script>
 
 <style>
