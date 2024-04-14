@@ -21,8 +21,8 @@ jobs:
       - run: npm version prerelease --preid=next
       - name: Commit bumped version
         run: |
-          git add package.json package-lock.json
-          git commit -m "Bump version to $(node -p "require('./package.json').version")"
+          # git add package.json package-lock.json
+          # git commit -m "Bump version to $(node -p "require('./package.json').version")"
           git push
 
       - run: npm publish --tag next
