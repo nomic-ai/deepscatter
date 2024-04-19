@@ -9,7 +9,6 @@ import wrapREGL, {
   DefaultContext,
 } from 'regl';
 import { range, sum } from 'd3-array';
-// import { contours } from 'd3-contour';
 import unpackFloat from 'glsl-read-float';
 import { Zoom } from './interaction';
 import { Renderer } from './rendering';
