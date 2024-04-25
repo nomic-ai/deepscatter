@@ -1,6 +1,6 @@
 // A Dataset manages the production and manipulation of *tiles*.
 import { Tile, Rectangle, p_in_rect } from './tile';
-import { min, max, bisectLeft, extent } from 'd3-array';
+import { max, bisectLeft, extent } from 'd3-array';
 import type * as DS from './shared';
 import {
   RecordBatch,
@@ -69,6 +69,8 @@ export class Dataset {
   public _ix_seed = 0;
   public _schema?: Schema;
   public tileProxy?: DS.TileProxy;
+  // A url prefix that will prepended before any fetch calls.
+  public readonly base_url: string;
   protected _transformation_fetch_queue: Set<{
     // The function to call that guarantees the column(s) are loaded.
     func: () => Promise<void>;
@@ -111,7 +113,7 @@ export class Dataset {
     // If no manifest is passed, we still know
     // that there is a root tile at the root key.
 
-    const defaultManifest: Partial<DS.TileManifest> = {
+    const defaultManifest: Partial<DS.TileManifest> & { key: string } = {
       key: rootKey,
       children: undefined,
       min_ix: 0,
@@ -119,7 +121,8 @@ export class Dataset {
       ...(options.tileManifest || {}),
     };
     // Must come after manifest is set.
-    this.root_tile = new Tile(defaultManifest, null, this, base_url);
+    this.base_url = base_url;
+    this.root_tile = new Tile(defaultManifest, null, this);
     const preProcessRootTile = this.root_tile.preprocessRootTileInfo();
 
     this.promise = preProcessRootTile.then(async () => {
@@ -130,6 +133,8 @@ export class Dataset {
 
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
+        if (typeof cars !== 'string')
+          throw new Error('Sidecars record is empty.');
         const parsed = JSON.parse(cars) as Record<string, string>;
         for (const [k, v] of Object.entries(parsed)) {
           this.transformations[k] = async function (tile) {
@@ -357,19 +362,19 @@ export class Dataset {
           | [Date, Date]);
       }
     }
-    return (this.extents[columnName] = extent([
-      ...new Vector(
-        this.map((d) => d)
-          .filter((d) => d.hasLoadedColumn(columnName))
-          .map((d) => d.record_batch.getChild(columnName))
-          .filter((d) => d !== null),
-      ),
-    ]));
+    const vectors: Vector[] = this.map((tile) => tile)
+      .filter((d) => d.hasLoadedColumn(columnName))
+      .map((d) => d.record_batch.getChild(columnName) as Vector<Float32>);
+    const extented = extent([...new Vector(vectors)]) as [T[1], T[1]] as
+      | [number, number]
+      | [Date, Date];
+    return (this.extents[columnName] = extented);
   }
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {
     const stack: Tile[] = [this.root_tile];
-    let current: Tile;
+    // undefined just for the check in the iterator.
+    let current: Tile | undefined;
     while ((current = stack.shift())) {
       if (
         current.hasLoadedColumn('ix') &&
@@ -462,7 +467,11 @@ export class Dataset {
     after = false,
     starting_tile: Tile | null = null,
     filter: (t: Tile) => boolean = () => true,
-    updateFunction: (tile: Tile, completed, total) => Promise<void>,
+    updateFunction: (
+      tile: Tile,
+      completed: number,
+      total: number,
+    ) => Promise<void>,
   ) {
     // Visit all children with a callback function.
     // In general recursing quadtrees isn't that fast, but
@@ -473,7 +482,7 @@ export class Dataset {
     const start = starting_tile || this.root_tile;
     await start.deriveManifestInfoFromTileMetadata();
     const total_points = JSON.parse(
-      start.record_batch.schema.metadata.get('total_points'),
+      start.record_batch.schema.metadata.get('total_points') || '1000000',
     ) as number;
 
     async function resolve(tile: Tile) {
@@ -511,14 +520,19 @@ export class Dataset {
     const tb = tableFromIPC(buffer);
     const records: Record<string, Float32Array> = {};
     for (const batch of tb.batches) {
-      const data = batch.getChild('data').data[0];
-      if (data === null) {
+      const data = batch.getChild('data')?.data[0];
+      if (data === null || data === undefined) {
         throw new Error('tiled columns must contain "data" field.');
       }
       const offsets = data.valueOffsets as Int32Array;
       const values = data.children[0] as Data<List<Float32>>;
       for (let i = 0; i < batch.data.length; i++) {
-        const tilename = batch.getChild('_tile').get(i) as string;
+        const tilename = batch.getChild('_tile')?.get(i) as string;
+        if (typeof tilename !== 'string') {
+          throw new Error(
+            'tile columns must contain a stringlike `_tile` field.',
+          );
+        }
         records[tilename] = values.values.slice(
           offsets[i],
           offsets[i + 1],
@@ -679,7 +693,7 @@ export class Dataset {
     this.visit(scoreFileForDownload);
     scores.sort((a, b) => b[0] - a[0]);
     while (scores.length > 0 && queue.size < queue_length) {
-      const [distance, tile] = scores.pop();
+      const [distance, tile] = scores.pop() as [number, Tile];
       if ((tile.min_ix && tile.min_ix > max_ix) || distance <= 0) {
         continue;
       }
@@ -689,7 +703,7 @@ export class Dataset {
         status: TransformationStatus;
         priority: 'high' | 'low';
       } = {
-        func: () => undefined,
+        func: () => Promise.resolve(undefined),
         priority: priority,
         status: 'queued',
       };
@@ -772,8 +786,8 @@ export class Dataset {
                 List<DS.SupportedArrowTypes>
               >;
               for (let i = 0; i < batch.data.length; i++) {
-                const tilename = batch.getChild('_tile').get(i) as string;
-                records[tilename] = data.get(i);
+                const tilename = batch.getChild('_tile')?.get(i) as string;
+                records[tilename] = data.get(i)!;
               }
             }
             return;
@@ -823,8 +837,8 @@ function check_overlap(tile: Tile, bbox: Rectangle): number {
   }
 
   const intersection: Rectangle = {
-    x: [max([bbox.x[0], c.x[0]]), min([bbox.x[1], c.x[1]])],
-    y: [max([bbox.y[0], c.y[0]]), min([bbox.y[1], c.y[1]])],
+    x: [maxTwo(bbox.x[0], c.x[0]), minTwo(bbox.x[1], c.x[1])],
+    y: [maxTwo(bbox.y[0], c.y[0]), minTwo(bbox.y[1], c.y[1])],
   };
   const { x, y } = intersection;
   let disqualify = 0;
@@ -854,18 +868,21 @@ export function add_or_delete_column(
 ): RecordBatch {
   const tb: Record<string, Data> = {};
 
-  for (const field of batch?.schema.fields || []) {
-    if (field.name === field_name) {
-      if (data === null) {
-        // Then it's dropped.
-        continue;
-      } else {
-        return batch;
+  if (batch !== undefined) {
+    for (const field of batch.schema.fields || []) {
+      if (field.name === field_name) {
+        if (data === null) {
+          // Then it's dropped.
+          continue;
+        } else {
+          return batch;
+        }
       }
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const current = batch.getChild(field.name) as Vector;
+      const coldata = current.data[0] as Data;
+      tb[field.name] = coldata;
     }
-    const current = batch.getChild(field.name);
-    const coldata = current.data[0] as Data;
-    tb[field.name] = coldata;
   }
   if (data === undefined) {
     throw new Error('Must pass data to bind_column');
@@ -894,7 +911,7 @@ export function add_or_delete_column(
       if (newval.dictionary) {
         const dicto = newval as Data<Dictionary<Utf8, Int8 | Int16 | Int32>>;
         const existingKeys = batch?.schema.dictionaries.keys() || [];
-        const dictionary_id = max([0, ...existingKeys]) + 1;
+        const dictionary_id = (max([0, ...existingKeys]) as number) + 1;
         const newv = makeVector({
           data: dicto.values, // indexes into the dictionary
           dictionary: dicto.dictionary as Vector<Utf8>, // keys
@@ -1005,49 +1022,10 @@ function supplement_identifiers(
   return updatedFloatArray;
 }
 
-// class AsyncQueue<T> {
-//   private promises: Promise<T>[] = [];
-
-//   constructor(promises: Promise<T>[] = []) {
-//     this.promises.concat(promises);
-//   }
-
-//   add(promise: Promise<T>): void {
-//     // Add a promise onto the queue.
-//     this.promises.push(promise);
-//   }
-
-//   private removeFromArray(item: Promise<T>): void {
-//     const index = this.promises.indexOf(item);
-//     if (index > -1) {
-//       this.promises.splice(index, 1);
-//     }
-//   }
-
-//   async apop(): Promise<T> {
-//     /**
-//      * Pop the first promise to resolve off the queue.
-//      */
-//     if (this.promises.length === 0) {
-//       throw new Error('No promises to race');
-//     }
-
-//     return new Promise((resolve, reject) => {
-//       this.promises.forEach((promise) => {
-//         promise
-//           .then((value) => {
-//             this.removeFromArray(promise);
-//             resolve(value);
-//           })
-//           .catch((error) => {
-//             this.removeFromArray(promise);
-//             reject(error);
-//           });
-//       });
-//     });
-//   }
-
-//   get length(): number {
-//     return this.promises.length;
-//   }
-// }
+// Redefining for type safety.
+function maxTwo(a: number, b: number) {
+  return a > b ? a : b;
+}
+function minTwo(a: number, b: number) {
+  return a > b ? b : a;
+}
