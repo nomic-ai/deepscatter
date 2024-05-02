@@ -1,4 +1,4 @@
-import { Dataset, DataSelection } from '../dist/deepscatter.js';
+import { Dataset, DataSelection, Bitmask } from '../dist/deepscatter.js';
 import { Table, vectorFromArray, Utf8 } from 'apache-arrow';
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
@@ -59,6 +59,21 @@ test('Test composition of selections', async () => {
     ) < 0.01,
     'sixes are 4x as big as twos over threes',
   );
+
+  // test null selections work.
+  const emptySelection = new DataSelection(dataset, {
+    name: 'empty',
+    tileFunction: async (t) => new Bitmask(t.record_batch.numRows).to_arrow(),
+  });
+
+  const selectNothing = new DataSelection(dataset, {
+    name: 'nothing and something is nothing',
+    composition: ['AND', selectThree, emptySelection],
+  });
+
+  await selectNothing.applyToAllLoadedTiles();
+  const v = selectNothing.get();
+  console.log(v);
 });
 
 test.run();

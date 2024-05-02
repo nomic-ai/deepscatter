@@ -70,3 +70,76 @@ export function createIntegerDataset() {
   const table = createTable(num_batches);
   return Dataset.fromArrowTable(table);
 }
+
+const memo = {};
+
+function buildDeepManifest(
+  startingKey = '0/0/0',
+  depth = 8,
+  // The probability of each child existing.
+  prob = 0.89,
+  // prob * decay is the probability of each grandchild existing.
+  decay = 0.89,
+  pointsPerManifest = 100,
+  extent = { x: [-1, 1], y: [-1, 1] },
+  startingIx = 0,
+) {
+  const [z, x, y] = startingKey.split('/').map(parseInt);
+
+  const children = [];
+  const splits = {
+    x: [extent.x[0], (extent.x[0] + extent.x[1]) / 2, extent.x[1]],
+    y: [extent.y[0], (extent.y[0] + extent.y[1]) / 2, extent.y[1]],
+  };
+
+  function tilesPerLevel(z, prob, decay = undefined) {
+    if (z === 0) {
+      return 1;
+    }
+    if (z == 1) {
+      return 4 * prob + 1;
+    }
+    const key = `${z}-${prob}-${decay}`;
+    if (memo[key]) return memo[key];
+    if (decay == undefined) {
+      decay = prob;
+    }
+    memo[key] = 4 * tilesPerLevel(z - 1, prob) * prob ** z;
+    return memo[key];
+  }
+
+  function tilesThroughLevel(z, prob) {
+    let v = 0;
+    for (let i = 0; i <= z; i += 1) {
+      v += tilesPerLevel(i, prob);
+    }
+    return v;
+  }
+
+  // .89 produces about 18K tiles, which is a lot--could hold a trillion points under ideal circumstances
+
+  for (let x_ of [0, 1]) {
+    for (let y_ of [0, 1]) {
+      if (Math.random() < prob && depth > 0) {
+        const child = buildDeepManifest(
+          `${z + 1}/${2 * x + x_}/${2 * y + y_}`,
+          depth - 1,
+          prob * decay,
+          decay,
+          pointsPerManifest,
+          {
+            x: [splits.x[x_], splits.x[x_ + 1]],
+            y: [splits.y[y_], splits.y[y_ + 1]],
+          },
+          startingIx,
+        );
+        children.push(child);
+      }
+    }
+  }
+  return {
+    key,
+    nPoints: pointsPerManifest,
+    children,
+  };
+}
