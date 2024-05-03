@@ -75,14 +75,20 @@ export class Tile {
   url: string;
   //public child_locations: string[] = [];
 
+  /**
+   *
+   * @param key Either the string identifier of the tile,
+   * OR a `TileManifest` object including an identifier.   *
+   * @param parent The parent tile -- used to navigate through the tree.
+   * @param dataset The full atlas dataset of which this tile is a part.
+   */
   constructor(
-    key: string | Partial<TileManifest>,
+    key: string | (Partial<TileManifest> & { key: string }),
     parent: Tile | null,
     dataset: Dataset,
-    base_url: string,
   ) {
     // If it's just initiated with a key, build that into a minimal manifest.
-    let manifest: Partial<TileManifest>;
+    let manifest: Partial<TileManifest> & { key: string };
     if (typeof key === 'string') {
       manifest = { key };
     } else {
@@ -104,7 +110,6 @@ export class Tile {
     // Grab the next identifier off the queue. This should be async safe with the current setup, but
     // the logic might fall apart in truly parallel situations.
     this.numeric_id = tile_identifier++;
-    this.url = base_url;
 
     if (isCompleteManifest(manifest)) this.manifest = manifest;
 
@@ -290,7 +295,7 @@ export class Tile {
       throw new Error('Attempted to set an incomplete manifest.');
     }
     this._children = manifest.children.map((k: TileManifest | string) => {
-      return new Tile(k, this, this.dataset, this.url);
+      return new Tile(k, this, this.dataset);
     });
     this.highest_known_ix = manifest.max_ix;
     this._completeManifest = manifest;
@@ -402,7 +407,7 @@ export class Tile {
       return existing.batch;
     }
 
-    let url = `${this.url}/${this.key}.feather`;
+    let url = `${this.dataset.base_url}/${this.key}.feather`;
     if (suffix !== null) {
       // 3/4/3
       // suffix: 'text'
@@ -602,20 +607,25 @@ export class Tile {
     return this._children;
   }
 
+  // Asynchronously forces generation of all child
+  // tiles, and then returns them.
   async allChildren(): Promise<Array<Tile>> {
     if (this._children.length) {
       return this._children;
     }
     if (this._partialManifest?.children) {
       for (const child of this.manifest.children) {
-        const childTile = new Tile(child, this, this.dataset, this.url);
+        const childTile = new Tile(child, this, this.dataset);
         this._children.push(childTile);
       }
       return this._children;
     }
     await this.populateManifest();
+    return this._children;
   }
 
+  // Quadtree tiles can have their limits calculated based on the structure.
+  // There are cases where these may not be exact.
   get theoretical_extent(): Rectangle {
     if (this.dataset.tileStucture === 'other') {
       // Only three-length-keys are treated as quadtrees.
@@ -649,6 +659,16 @@ export function p_in_rect(p: Point, rect: Rectangle | undefined) {
   );
 }
 
+/**
+ * Returns the coordinates of a 'macrotile' for any given tile.
+ * This is an experimental feature that is not part of the public API.
+ * @deprecated
+ *
+ * @param key The key to get the macrotile of
+ * @param size The size of each macrotile, in z.
+ * @param parents The implicit parents of each macrotile. (If 2, then the macrotile 0/0/0 would contain all tiles at depth 2 and 3)
+ * @returns
+ */
 function macrotile(key: string, size = 2, parents = 2) {
   let [z, x, y] = key.split('/').map((d) => parseInt(d));
   let moves = 0;

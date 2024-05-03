@@ -352,10 +352,21 @@ highp float ix_to_random(in float ix, in float seed) {
   highp float b = 78.233;
   highp float c = 43758.5453;
   highp float dt = dot(co.xy, vec2(a, b));
-  highp float sn = mod(dt, 3.14);
+  highp float sn = mod(dt, 3.141592654);
   return fract(sin(sn) * c);
 }
 
+highp float tix_rix_to_random_seed(in float tix, in float rix) {
+  // For high numbers, taking the log avoids coincidence.
+  highp float seed2 = log(tix + 2.) + 1.;
+  vec2 co = vec2(seed2, rix);
+  highp float a = 12.9898;
+  highp float b = 78.233;
+  highp float c = 43758.5453;
+  highp float dt = dot(co.xy, vec2(a, b));
+  highp float sn = mod(dt, 3.14);
+  return fract(sin(sn) * c);
+}
 
 
 // The fill color.
@@ -374,7 +385,6 @@ vec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);
 
 // Initialized in the main loop
 // mat3 from_coord_to_gl;
-
 const float e = 1.618282;
 // I've been convinced.
 const float tau = 2. * 3.14159265359;

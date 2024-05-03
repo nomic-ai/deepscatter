@@ -42,9 +42,9 @@ export interface CompositionSelectParams extends SelectParams {
   composition: Composition;
 }
 
-function isBooleanColumnParam(params: unknown): params is BooleanColumnParams {
-  return params && params['field'] !== undefined;
-}
+// function isBooleanColumnParam(params: unknown): params is BooleanColumnParams {
+//   return params && params['field'] !== undefined;
+// }
 
 /**
 [
@@ -178,10 +178,6 @@ function isFunctionSelectParam(
 ): params is FunctionSelectParams {
   return params.tileFunction !== undefined;
 }
-
-type IdentifierOptions = {
-  plot_after?: boolean;
-};
 
 /**
  * A DataSelection is a set of data that the user is working with.
@@ -360,8 +356,8 @@ export class DataSelection {
         params.ids,
         params.idField,
       ).then(markReady);
-    } else if (isBooleanColumnParam(params)) {
-      void this.add_boolean_column(params.name, params.field).then(markReady);
+      // } else if (isBooleanColumnParam(params)) {
+      //   void this.add_boolean_column(params.name, params.field).then(markReady);
     } else if (isFunctionSelectParam(params)) {
       void this.add_function_column(params.name, params.tileFunction).then(
         markReady,
@@ -714,17 +710,15 @@ export class DataSelection {
    *
    * @param i the index of the row to get
    */
-  get(i: number | undefined): StructRowProxy {
+  get(i: number | undefined): StructRowProxy | undefined {
     if (i === undefined) {
       i = this.cursor;
     }
     if (i > this.selectionSize) {
-      throw new Error(
-        `Index ${i} out of bounds for selection of size ${this.selectionSize}`,
-      );
+      undefined;
     }
     let currentOffset = 0;
-    let relevantTile: Tile = undefined;
+    let relevantTile: Tile | undefined = undefined;
     let current_tile_ix = 0;
     for (const match_length of this.match_count) {
       if (i < currentOffset + match_length) {
@@ -735,7 +729,7 @@ export class DataSelection {
       currentOffset += match_length;
     }
     if (relevantTile === undefined) {
-      return null;
+      return undefined;
     }
     const column = relevantTile.record_batch.getChild(
       this.name,
@@ -745,7 +739,7 @@ export class DataSelection {
     for (let j = 0; j < column.length; j++) {
       if (column.get(j)) {
         if (ix_in_match === offset) {
-          return relevantTile.record_batch.get(j);
+          return relevantTile.record_batch.get(j) || undefined;
         }
         ix_in_match++;
       }
@@ -769,7 +763,7 @@ export class DataSelection {
     name: string,
     codes: string[] | bigint[] | number[],
     key_field: string,
-    options: IdentifierOptions = {},
+    // options: IdentifierOptions = {},
   ): Promise<void> {
     if (this.dataset.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
@@ -787,10 +781,6 @@ export class DataSelection {
     } else {
       console.error('Unable to match type', typeof codes[0]);
     }
-  }
-
-  async add_boolean_column(name: string, field: string): Promise<void> {
-    throw new Error('Method not implemented.');
   }
 }
 

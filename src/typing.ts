@@ -45,7 +45,7 @@ export function isCompleteManifest(
     'min_ix',
     'max_ix',
     'extent',
-  ]) {
+  ] as const) {
     if (manifest[k] === undefined) {
       return false;
     }

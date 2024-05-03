@@ -32,7 +32,8 @@ export abstract class ScaledAesthetic<
 > extends Aesthetic<ChannelType, Input, Output> {
   protected _scale:
     | ScaleContinuousNumeric<Input['domainType'], Output['rangeType']>
-    | ScaleOrdinal<Input['domainType'], Output['rangeType']>;
+    | ScaleOrdinal<Input['domainType'], Output['rangeType']>
+    | null = null;
   public default_transform: DS.Transform = 'linear';
   abstract default_range: [Output['rangeType'], Output['rangeType']];
   protected categorical; // Whether this is built on a dictionary variable.

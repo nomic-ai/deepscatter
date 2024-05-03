@@ -79,6 +79,7 @@ export class Scatterplot {
   ready: Promise<void>;
 
   public click_handler: ClickFunction;
+  public mouseover_handler: PointMouseoverFunction;
   private hooks: Record<string, Hook> = {};
   public tooltip_handler: TooltipHTML;
   public label_click_handler: LabelClick;
@@ -585,7 +586,7 @@ export class Scatterplot {
    */
 
   public dim(dimension: DS.Dimension): ConcreteAesthetic {
-    return this._renderer!.aes.dim(dimension)!.current;
+    return this._renderer.aes.dim(dimension).current;
   }
 
   set tooltip_html(func) {
@@ -595,6 +596,14 @@ export class Scatterplot {
   get tooltip_html() {
     /* PUBLIC see set tooltip_html */
     return this.tooltip_handler.f;
+  }
+
+  get mouseover_callback() {
+    return this.mouseover_handler.f;
+  }
+
+  set mouseover_callback(func) {
+    this.mouseover_handler.f = func;
   }
 
   set label_click(
@@ -959,6 +968,17 @@ class ChangeToHighlitPointFunction extends SettableFunction<
     return;
   }
 }
+
+class PointMouseoverFunction extends SettableFunction<void, StructRowProxy[]> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  default(points: StructRowProxy[], plot: Scatterplot | undefined = undefined) {
+    return;
+  }
+}
+
+/**
+ * A holder for a function that returns the HTML that should appear in a tooltip next to a point.
+ */
 
 class TooltipHTML extends SettableFunction<string> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
