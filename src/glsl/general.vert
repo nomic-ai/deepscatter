@@ -364,7 +364,7 @@ highp float tix_rix_to_random_seed(in float tix, in float rix) {
   highp float b = 78.233;
   highp float c = 43758.5453;
   highp float dt = dot(co.xy, vec2(a, b));
-  highp float sn = mod(dt, 3.14);
+  highp float sn = mod(dt, 3.141592654);
   return fract(sin(sn) * c);
 }
 

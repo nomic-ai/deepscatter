@@ -506,13 +506,11 @@ export class DataSelection {
   }
 
   public moveCursorToPoint(
-    point:
-      | StructRowProxy<{ ix: DataType<Type.Int64> }>
-      | Record<'ix', bigint | number>,
+    point: StructRowProxy<{ ix: DataType<Type.Int64> }>,
   ) {
     // The point contains a field called 'ix', which increases in each tile;
     // we use this for moving because it lets us do binary search for relevant tile.
-
+    const rowNumber = point[Symbol.for('rowIndex')] as number;
     const ix = point.ix as bigint;
     if (point.ix === undefined) {
       throw new Error(
@@ -523,22 +521,14 @@ export class DataSelection {
     let relevantTile: Tile = undefined;
     let current_tile_ix = 0;
     let positionInTile: number;
-    for (let match_length of this.match_count) {
+    for (const match_length of this.match_count) {
       const tile = this.tiles[current_tile_ix];
-      // If the tile might have the relevant ix in it, we examine it more closely.
-      if (tile.min_ix < ix && tile.max_ix > ix) {
-        const mid = bisectLeft(
-          [...tile.record_batch.getChild('ix').data[0].values],
-          point.ix as number,
-        );
-        const val = tile.record_batch.get(mid);
-        // We have to check that there's actually a match,
-        // because the binary search identifies where it *would* be.
-        if (val !== null && val.ix === ix) {
-          relevantTile = tile;
-          positionInTile = mid;
-          break;
-        }
+
+      const ixcol = tile.record_batch.getChild('ix').data[0];
+      if (ixcol[rowNumber] === ix) {
+        relevantTile = tile;
+        positionInTile = rowNumber;
+        break;
       }
       current_tile_ix += 1;
       currentOffset += match_length;
@@ -547,6 +537,7 @@ export class DataSelection {
     if (relevantTile === undefined || positionInTile === undefined) {
       return null;
     }
+
     const column = relevantTile.record_batch.getChild(
       this.name,
     ) as Vector<Bool>;
@@ -556,6 +547,7 @@ export class DataSelection {
         currentOffset += 1;
       }
     }
+
     this.cursor = currentOffset;
   }
 
