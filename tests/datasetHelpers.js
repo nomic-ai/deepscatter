@@ -1,5 +1,5 @@
 import { Table, vectorFromArray, Utf8 } from 'apache-arrow';
-import { Dataset, Bitmask } from '../dist/deepscatter.js';
+import { Deeptable, Bitmask } from '../dist/deepscatter.js';
 
 // Creates a tile transformation for factors of n.
 export function selectFunctionForFactorsOf(n) {
@@ -68,7 +68,7 @@ function createTable(n_batches) {
 export function createIntegerDataset() {
   const num_batches = 4;
   const table = createTable(num_batches);
-  return Dataset.fromArrowTable(table);
+  return Deeptable.fromArrowTable(table);
 }
 
 const memo = {};

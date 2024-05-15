@@ -19,16 +19,23 @@ Breaking changes:
 
    This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{ Dataset, Bitmask, Scatterplot, dictionaryFromArrays, LabelMaker }`. Bitmasks are efficient, useful ways to refer to update and refer to selection masks.
 
-2. Apache Arrow is now a peer dependency of deepscatter rather than
+2. Apache Arrow is now a peer dependency of
+   deepscatter rather than
    being bundled into the distribution. Most bundlers will hopefully take care of installation for you, but if you are writing raw HTML code,
    it will be necessary to include and re-export it. In general that will look like this.
+
    ```
    import * as Arrow from 'apache-arrow';
    export { Arrow };
    ```
+
 3. The distinction between `QuadTile` and `ArrowTile`
    has been eliminated in favor of `Tile`, and with it the need to supply
-   generics around them through the system. Similarly, `QuadTileDataset` and `ArrowDataset` have both been removed in favor of `Dataset`.
+   generics around them through the system. Similarly, `QuadTileDataset` and `ArrowDataset` have both been removed in favor of `Deeptable`, which is a generalized
+   version of the dataset class. It has been renamed because
+   the word 'dataset' is overloaded, and 'deeptable' better
+   captures that this thing is one of the primary novel
+   objects in this library--a lazily loaded structure for operations on a collection of Arrow record batches that are arranged in a tree.
 
 4. Deepscatter no longer accepts strings as direct
    arguments to `Scatterplot.plotAPI` in places where they were previously cast to functions
@@ -39,6 +46,7 @@ Breaking changes:
 
 5. Shortcuts for passing `position` and `position0` rather
    than naming the `x` and `y` dimensions explicitly have been removed.
+
 6. Tile objects no longer have `ready` and `promise` states.
    This is because tiles
    other than the first no longer necessarily download any data at all. Code that blocked on these states should instead block on the dataset's `ready` promise; code needing to know if a particular tile has a record batch can check for the presence of `tile.record_batch`, but this no
@@ -50,15 +58,18 @@ Breaking changes:
    object (this as childLocations, min_ix, max_ix, highest_known_ix, etc.) is now located in an object called `manifest` that is used to manage children. This is designed to
    make it possible (though not yet necessary) to pre-load a single file enumerating all the tiles in the dataset.
 
-7. The syntax for expressly passing a categorical scale may change.
+7. The tools for handling a DataSelection have been moved
+   from the scatterplot class to the `deeptable` class. This is because the selection is a property of the dataset, not the plot, and can be instantiated without the plot
+   being drawn.
+
+8. 2. Datasets where underlying data is boolean using API encoding channels `filter`, `filter2`, and `foreground` no longer handle the data with `op` commands: instead, true is true and false is false.
 
 ## Fundamental design changes
 
 1. Previously `Aesthetic` objects were stateful;
-   they are now stateless, with all necessary state held in the pair of `StatefulAesthetic` that defines them. This allows for tighter binding and type safety with d3 scales; it should
-2. The preferred tile input type has changed.
-   (There will be associated changes to the quadfeather package as well). Although for the sake of back-compatibility the special keys `x`, `y`, and `ix` will still work, deepscatter now falls back to those as defaults, preferring to find them wrapped in a struct field called `_deepscatter`.
-3. Datasets where underlying data is boolean are no longer passed to filters with `op` commands: instead, true is true and false is false.
+   they are now stateless, with all necessary state held in the pair of `StatefulAesthetic` that defines them. This allows for tighter binding and type safety with d3 scales.
+
+2. Datasets where underlying data is boolean
 
 # 2.15.3
 

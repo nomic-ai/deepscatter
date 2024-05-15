@@ -98,7 +98,7 @@ export class Deeptable {
 
   public readonly tileStucture: DS.TileStructure;
   /**
-   * @param plot The plot to which this dataset belongs.
+   * @param plot The plot to which this deeptable belongs.
    **/
 
   constructor({
@@ -193,7 +193,7 @@ export class Deeptable {
   }
 
   /**
-   * Ensures that all the tiles in a dataset are downloaded that include
+   * Ensures that all the tiles in a deeptable are downloaded that include
    * datapoints of index less than or equal to max_ix.
    * @param max_ix the depth to download to.
    */
@@ -287,7 +287,7 @@ export class Deeptable {
   }
 
   /**
-   * Generate an ArrowDataset from a single Arrow table.
+   * Generate an ArrowDeeptable from a single Arrow table.
    *
    * @param table A single Arrow table
    * @param prefs The API Call to use for rendering.
@@ -301,7 +301,7 @@ export class Deeptable {
   /**
    *
    * @param name The name of the column to check for
-   * @returns True if the column exists in the dataset, false otherwise.
+   * @returns True if the column exists in the deeptable, false otherwise.
    */
   has_column(name: string) {
     return (
@@ -328,7 +328,7 @@ export class Deeptable {
    * The generic T tracks whether this reads strings from JSON and return dates,
    * or reads numbers from JSON and returns numbers
    *
-   * @param columnName A column in the dataset.
+   * @param columnName A column in the deeptable.
    * @returns A pair of numbers. Dates and bigints will be
    * converted to numbers.
    */
@@ -407,8 +407,8 @@ export class Deeptable {
   }
   /**
    * Map a function against all tiles.
-   * It is often useful simply to invoke Dataset.map(d => d) to
-   * get a list of all tiles in the dataset at any moment.
+   * It is often useful simply to invoke Deeptable.map(d => d) to
+   * get a list of all tiles in the deeptable at any moment.
    *
    * @param callback A function to apply to each tile.
    * @param after Whether to perform the function in bottom-up order
@@ -424,7 +424,7 @@ export class Deeptable {
   }
 
   /**
-   * Invoke a function on all tiles in the dataset that have been downloaded.
+   * Invoke a function on all tiles in the deeptable that have been downloaded.
    * The general architecture here is taken from the
    * d3 quadtree functions. That's why, for example, it doesn't
    * recurse.
@@ -464,7 +464,7 @@ export class Deeptable {
   }
 
   /**
-   * Invoke a function on all tiles in the dataset, downloading those that aren't 
+   * Invoke a function on all tiles in the deeptable, downloading those that aren't 
    * here yet..
    * The general architecture here is taken from the
    * d3 quadtree functions. That's why, for example, it doesn't
@@ -578,7 +578,7 @@ export class Deeptable {
    *
    * @param ids A list of ids to get, keyed to the value to set them to.
    * @param field_name The name of the new field to create
-   * @param key_field The column in the dataset to match them against.
+   * @param key_field The column in the deeptable to match them against.
    */
 
   add_label_identifiers(
@@ -676,7 +676,7 @@ export class Deeptable {
   ) {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
-      unneeded parts of the dataset. So the dataset handles its own queue for dispatching
+      unneeded parts of the deeptable. So the deeptable handles its own queue for dispatching
       downloads in case tiles have slipped from view while parents were requested.
     */
 

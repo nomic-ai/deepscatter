@@ -1,4 +1,4 @@
-import { Dataset, DataSelection, Bitmask } from '../dist/deepscatter.js';
+import { Deeptable, DataSelection, Bitmask } from '../dist/deepscatter.js';
 import { Table, vectorFromArray, Utf8 } from 'apache-arrow';
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';

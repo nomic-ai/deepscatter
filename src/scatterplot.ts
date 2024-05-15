@@ -190,6 +190,21 @@ export class Scatterplot {
   }
 
   /**
+   * Create a data selection. For back-compatability,
+   * this wraps the select_data object on a deeptable;
+   * it's recommended to use the deeptable directly.
+   *
+   * @deprecated
+   *
+   * @param params argument passed to deeptable.select_data.
+   * @returns
+   */
+  async select_data(
+    ...params: Parameters<Deeptable['select_data']>
+  ): Promise<DataSelection> {
+    return this.deeptable.select_data(...params);
+  }
+  /**
    * Creates a new selection from a set of parameters, and immediately applies it to the plot.
    * @param params A set of parameters defining a selection.
    */
@@ -807,9 +822,12 @@ export class Scatterplot {
     zoom.restart_timer(60_000);
   }
 
+  get dataset() {
+    return this.deeptable;
+  }
   get root_batch() {
     if (!this._root) {
-      throw new Error('No dataset has been loaded');
+      throw new Error('No deeptable has been loaded');
     }
     return this.deeptable.root_tile.record_batch;
   }
