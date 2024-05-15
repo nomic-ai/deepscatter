@@ -51,9 +51,10 @@ export interface TileProxy {
 }
 
 export type ScatterplotOptions = {
-  tileProxy?: TileProxy;
-  deeptable?: DataSpec;
-};
+  selector?: string | HTMLDivElement;
+  width?: number;
+  height?: number;
+} & (DataSpec | Record<string, never>);
 
 // The orientation of the deeptable. Quadtree deeptables
 // allow certain optimizations.
@@ -436,42 +437,46 @@ export type Dimension = keyof Encoding;
 
 /**
  * A DataSpec is a record that describes how to load data into the
- * scatterplot. It can be one of three things:
+ * scatterplot.
+ * It can be one of four things:
  * 1. A URL to a quadtile source.
  * 2. An Arrow Table object. (Use this with care! Minor differences in JS Apache Arrow builds
  * can cause this to fail in deeply confusing ways.)
  * 3. A Uint8Array containing a serialized Arrow Table. (This is safer than passing an Arrow Table.)
  * 4. An already-created deeptable.
+ *
+ * It can also optionally contain a TileProxy object, which is a wrapper that overwrites
+ * the http-based fetch behavior that is deepscatter's default. This provides a way to
+ * add authentication, to wrap other libraries, or to perform algorithmic manipulations.
  */
-export type DataSpec = Record<string, never> &
-  (
-    | {
-        source_url?: never;
-        arrow_table?: never;
-        arrow_buffer: Uint8Array;
-        deeptable?: never;
-      }
-    | {
-        source_url: string;
-        arrow_table?: never;
-        arrow_buffer?: never;
-        deeptable?: never;
-      }
-    // Pass an arrow table. This may
-    | {
-        source_url?: never;
-        arrow_table: Table;
-        arrow_buffer?: never;
-        deeptable?: never;
-      }
-    // Pass an already instantiated deeptable.
-    | {
-        source_url?: never;
-        arrow_table: never;
-        arrow_buffer?: never;
-        deeptable: Deeptable;
-      }
-  );
+export type DataSpec = { tileProxy?: TileProxy } & (
+  | {
+      source_url?: never;
+      arrow_table?: never;
+      arrow_buffer: Uint8Array;
+      deeptable?: never;
+    }
+  | {
+      source_url: string;
+      arrow_table?: never;
+      arrow_buffer?: never;
+      deeptable?: never;
+    }
+  // Pass an arrow table. This may
+  | {
+      source_url?: never;
+      arrow_table: Table;
+      arrow_buffer?: never;
+      deeptable?: never;
+    }
+  // Pass an already instantiated deeptable.
+  | {
+      source_url?: never;
+      arrow_table: never;
+      arrow_buffer?: never;
+      deeptable: Deeptable;
+    }
+);
 
 /**
  * A callback provided by the consumer, enabling them to hook into

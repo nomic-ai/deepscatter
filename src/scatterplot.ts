@@ -54,7 +54,7 @@ export class Scatterplot {
   public _root?: Deeptable;
   public elements?: Selection<SVGElement, unknown, Element, unknown>[];
   public secondary_renderers: Record<string, Renderer> = {};
-  public tileProxy?: DS.TileProxy;
+  // public tileProxy?: DS.TileProxy;
   public div?: Selection<BaseType | HTMLDivElement, number, BaseType, unknown>;
   public bound: boolean;
   //  d3 : Object;
@@ -88,12 +88,30 @@ export class Scatterplot {
    * inferred from the div.
    * @param height The height of the scatterplot (in pixels). If not passed will be inferred from the
    */
-  constructor(
-    selector: string | HTMLDivElement | undefined,
-    width?: number,
-    height?: number,
-    options: DS.ScatterplotOptions = {},
-  ) {
+
+  constructor(selector: string, w?: number, h?: number);
+  constructor(options: DS.ScatterplotOptions, w: never, h: never);
+
+  constructor(arg: string | DS.ScatterplotOptions, w?: number, h?: number) {
+    let options: DS.ScatterplotOptions;
+    if (typeof arg === 'string') {
+      options = {
+        width: w,
+        height: h,
+        selector: arg,
+      } as DS.ScatterplotOptions;
+    } else {
+      options = arg;
+    }
+    const {
+      selector,
+      width,
+      height,
+      source_url,
+      deeptable,
+      arrow_buffer,
+      arrow_table,
+    } = options;
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
@@ -108,12 +126,13 @@ export class Scatterplot {
     this.tooltip_handler = new TooltipHTML(this);
     this.label_click_handler = new LabelClick(this);
     this.handle_highlit_point_change = new ChangeToHighlitPointFunction(this);
-    if (options.tileProxy) {
-      this.tileProxy = options.tileProxy;
-    }
-    if (options.deeptable) {
-      void this.load_deeptable(options.deeptable);
-    }
+
+    // Attach the deeptable if a method for it was defined.
+    if (deeptable) this._root = deeptable;
+    if (source_url) void this.load_deeptable({ source_url });
+    if (arrow_buffer) void this.load_deeptable({ arrow_buffer });
+    if (arrow_table) void this.load_deeptable({ arrow_table });
+
     this.prefs = { ...default_API_call } as DS.CompletePrefs;
   }
 
@@ -346,14 +365,21 @@ export class Scatterplot {
     );
   }
 
-  async load_deeptable(params: DS.DataSpec): Promise<DS.Deeptable> {
-    if (params.source_url !== undefined) {
-      this._root = Deeptable.from_quadfeather(params.source_url, this);
-    } else if (params.arrow_table !== undefined) {
-      this._root = Deeptable.fromArrowTable(params.arrow_table, this);
-    } else if (params.arrow_buffer !== undefined) {
-      const tb = tableFromIPC(params.arrow_buffer);
+  async load_deeptable({
+    source_url,
+    arrow_table,
+    arrow_buffer,
+    deeptable,
+  }: DS.DataSpec): Promise<DS.Deeptable> {
+    if (source_url !== undefined) {
+      this._root = Deeptable.from_quadfeather(source_url, this);
+    } else if (arrow_table !== undefined) {
+      this._root = Deeptable.fromArrowTable(arrow_table, this);
+    } else if (arrow_buffer !== undefined) {
+      const tb = tableFromIPC(arrow_buffer);
       this._root = Deeptable.fromArrowTable(tb, this);
+    } else if (deeptable !== undefined) {
+      this._root = deeptable;
     } else {
       throw new Error('No source_url or arrow_table specified');
     }
