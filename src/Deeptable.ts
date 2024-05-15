@@ -273,13 +273,13 @@ export class Deeptable {
     );
   }
 
-  static from_quadfeather(url: string, plot: Scatterplot | null): Deeptable {
-    const options: Partial<DS.DeeptableCreateParams> = {};
-    if (plot.tileProxy) {
-      options['tileProxy'] = plot.tileProxy;
-    }
+  static from_quadfeather(
+    url: string,
+    plot: Scatterplot | null,
+    tileProxy: DS.TileProxy | undefined,
+  ): Deeptable {
     return new Deeptable({
-      tileProxy: plot.tileProxy ? plot.tileProxy : undefined,
+      tileProxy,
       baseUrl: url,
       rootKey: '0/0/0',
       plot,

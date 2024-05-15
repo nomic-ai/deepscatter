@@ -54,7 +54,6 @@ export class Scatterplot {
   public _root?: Deeptable;
   public elements?: Selection<SVGElement, unknown, Element, unknown>[];
   public secondary_renderers: Record<string, Renderer> = {};
-  // public tileProxy?: DS.TileProxy;
   public div?: Selection<BaseType | HTMLDivElement, number, BaseType, unknown>;
   public bound: boolean;
   //  d3 : Object;
@@ -370,9 +369,10 @@ export class Scatterplot {
     arrow_table,
     arrow_buffer,
     deeptable,
+    tileProxy,
   }: DS.DataSpec): Promise<DS.Deeptable> {
     if (source_url !== undefined) {
-      this._root = Deeptable.from_quadfeather(source_url, this);
+      this._root = Deeptable.from_quadfeather(source_url, this, tileProxy);
     } else if (arrow_table !== undefined) {
       this._root = Deeptable.fromArrowTable(arrow_table, this);
     } else if (arrow_buffer !== undefined) {
