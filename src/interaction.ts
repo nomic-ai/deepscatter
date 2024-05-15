@@ -11,7 +11,7 @@ import type { Renderer } from './rendering';
 import { ReglRenderer } from './regl_rendering';
 import { StructRowProxy } from 'apache-arrow';
 import { Rectangle } from './tile';
-import type { Dataset } from './Dataset';
+import type { Deeptable } from './Deeptable';
 import type * as DS from './shared';
 import type { Scatterplot } from './scatterplot';
 import { PositionalAesthetic } from './aesthetics/ScaledAesthetic';
@@ -34,7 +34,7 @@ export class Zoom {
   public width: number;
   public height: number;
   public renderers: Map<string, Renderer>;
-  public tileSet?: Dataset;
+  public deeptable?: Deeptable;
   public _timer?: d3.Timer;
   public _scales?: Record<string, d3.ScaleLinear<number, number>>;
   public zoomer?: d3.ZoomBehavior<Element, unknown>;
@@ -60,8 +60,8 @@ export class Zoom {
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles: Dataset) {
-    this.tileSet = tiles;
+  attach_tiles(tiles: Deeptable) {
+    this.deeptable = tiles;
     return this;
   }
 
@@ -278,14 +278,14 @@ export class Zoom {
     return this._timer;
   }
 
-  data(dataset: undefined): Dataset;
-  data(dataset: Dataset): Zoom;
+  data(deeptable: undefined): Deeptable;
+  data(deeptable: Deeptable): Zoom;
 
-  data(dataset: Dataset | undefined) {
-    if (dataset === undefined) {
-      return this.tileSet;
+  data(deeptable: Deeptable | undefined) {
+    if (deeptable === undefined) {
+      return this.deeptable;
     }
-    this.tileSet = dataset;
+    this.deeptable = deeptable;
     return this as Zoom;
   }
 
@@ -305,10 +305,10 @@ export class Zoom {
     }
 
     const { width, height } = this;
-    if (this.tileSet === undefined) {
+    if (this.deeptable === undefined) {
       throw new Error('Error--scales created before tileSet present.');
     }
-    const { extent } = this.tileSet;
+    const { extent } = this.deeptable;
     const scales: Record<string, ScaleLinear<number, number>> = {};
     if (extent === undefined) {
       throw new Error('Error--scales created before extent present.');

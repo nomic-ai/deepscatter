@@ -1,4 +1,3 @@
-// A Dataset manages the production and manipulation of *tiles*.
 import { Tile, Rectangle, p_in_rect } from './tile';
 import { max, bisectLeft, extent } from 'd3-array';
 import type * as DS from './shared';
@@ -62,11 +61,11 @@ const defaultTransformations: Record<string, Transformation> = {
 };
 
 /**
- * A Dataset manages the production and manipulation of tiles. Each plot has a
- * single dataset; the dataset handles all transformations around data through
+ * A Deeptable manages the production and manipulation of tiles. Each plot has a
+ * single deeptable; the deeptable handles all transformations around data through
  * batchwise operations.
  */
-export class Dataset {
+export class Deeptable {
   public transformations: Record<string, Transformation> =
     defaultTransformations;
   public _plot: Scatterplot | null;
@@ -113,7 +112,7 @@ export class Dataset {
     // optional with non-undefined defaults.
     rootKey = '0/0/0',
     tileStructure = 'quadtree',
-  }: DS.DatasetCreateParams) {
+  }: DS.DeeptableCreateParams) {
     this._plot = plot;
     this.tileProxy = tileProxy;
     this.tileStucture = tileStructure;
@@ -274,12 +273,12 @@ export class Dataset {
     );
   }
 
-  static from_quadfeather(url: string, plot: Scatterplot | null): Dataset {
-    const options: Partial<DS.DatasetCreateParams> = {};
+  static from_quadfeather(url: string, plot: Scatterplot | null): Deeptable {
+    const options: Partial<DS.DeeptableCreateParams> = {};
     if (plot.tileProxy) {
       options['tileProxy'] = plot.tileProxy;
     }
-    return new Dataset({
+    return new Deeptable({
       tileProxy: plot.tileProxy ? plot.tileProxy : undefined,
       baseUrl: url,
       rootKey: '0/0/0',
@@ -295,7 +294,7 @@ export class Dataset {
    * @param plot The Scatterplot to use.
    * @returns
    */
-  static fromArrowTable(table: Table, plot: Scatterplot): Dataset {
+  static fromArrowTable(table: Table, plot: Scatterplot): Deeptable {
     return wrapArrowTable(tableToIPC(table), plot);
   }
 

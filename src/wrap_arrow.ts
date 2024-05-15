@@ -9,20 +9,20 @@ import {
   Vector,
   Float,
 } from 'apache-arrow';
-import { Dataset } from './Dataset';
-import { add_or_delete_column } from './Dataset';
+import { Deeptable } from './Deeptable';
+import { add_or_delete_column } from './Deeptable';
 import type * as DS from './shared';
 import { extent } from 'd3-array';
 import { Rectangle } from './tile';
 
-// This function is used to wrap an arrow table into a deepscatter
-// dataset so that record batches can be fetched asynchronously.
+// This function is used to wrap an arrow table into a
+// deeptable so that record batches can be fetched asynchronously.
 // The point display order is the same as in the original file.
-// It is exposed primarily as Dataset.from
+// It is exposed primarily as Deeptable.from
 export function wrapArrowTable(
   tbArray: Uint8Array,
   plot: Scatterplot | null,
-): Dataset {
+): Deeptable {
   let tb = tableFromIPC(tbArray);
   let batches = tb.batches;
   if (tb.getChild('ix') === null) {
@@ -59,7 +59,7 @@ export function wrapArrowTable(
     y: extent([...(y as Iterable<number>)]),
   } as Rectangle;
 
-  return new Dataset({
+  return new Deeptable({
     baseUrl: `feather://table`,
     plot,
     tileProxy: proxy,

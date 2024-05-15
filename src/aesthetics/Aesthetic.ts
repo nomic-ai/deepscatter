@@ -79,8 +79,8 @@ export abstract class Aesthetic<
     }
   }
 
-  get dataset() {
-    return this.scatterplot.dataset;
+  get deeptable() {
+    return this.scatterplot.deeptable;
   }
 
   abstract apply(point: Datum): Output['rangeType'];
@@ -136,7 +136,7 @@ export abstract class Aesthetic<
     if (this.field === null || this.field === undefined) {
       return (this.column = null);
     }
-    return (this.column = this.dataset.root_tile.record_batch.getChild(
+    return (this.column = this.deeptable.root_tile.record_batch.getChild(
       this.field,
     ) as Vector<Input['arrowType']>);
   }

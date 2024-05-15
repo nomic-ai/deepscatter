@@ -1,4 +1,4 @@
-import { Dataset } from './Dataset';
+import { Deeptable } from './Deeptable';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
 import type * as DS from './shared.d';
@@ -267,7 +267,7 @@ export class Bitmask {
   }
 }
 export class DataSelection {
-  dataset: Dataset;
+  deeptable: Deeptable;
   plot: Scatterplot;
   // The match count is the number of matches **per tile**;
   // used to access numbers by index.
@@ -288,7 +288,7 @@ export class DataSelection {
    */
   name: string;
   /**
-   * Has the selection been applied to the dataset
+   * Has the selection been applied to the deeptable
    * (does *not* mean it has been applied to all points.)
    */
   ready: Promise<void>;
@@ -299,7 +299,7 @@ export class DataSelection {
   cursor: number = 0;
 
   /**
-   * Has the selection run on all tiles in the dataset?
+   * Has the selection run on all tiles in the deeptable?
    */
   complete: boolean = false;
 
@@ -333,16 +333,16 @@ export class DataSelection {
   private events: { [key: string]: Array<(args) => void> } = {};
 
   constructor(
-    dataset: Dataset,
+    deeptable: Deeptable,
     params:
       | IdSelectParams
       | BooleanColumnParams
       | FunctionSelectParams
       | CompositeSelectParams,
   ) {
-    this.dataset = dataset;
-    if (dataset === undefined) {
-      throw new Error("Can't create a selection without a dataset");
+    this.deeptable = deeptable;
+    if (deeptable === undefined) {
+      throw new Error("Can't create a selection without a deeptable");
     }
     this.name = params.name;
     let markReady = function () {};
@@ -394,7 +394,7 @@ export class DataSelection {
   /**
    *
    * Ensures that the selection has been evaluated on all
-   * tiles loaded in the dataset. This is useful if, for example,
+   * tiles loaded in the deeptable. This is useful if, for example,
    * your selection represents a search, and you are zoomed in on
    * one portion of the map; this will immediately execute the search
    * (subject to delays to avoid blocking the main thread) on all tiles
@@ -405,8 +405,8 @@ export class DataSelection {
 
   applyToAllLoadedTiles(): Promise<void> {
     return Promise.all(
-      this.dataset.map((tile) => {
-        // triggers creation of the dataset column as a side-effect.
+      this.deeptable.map((tile) => {
+        // triggers creation of the deeptable column as a side-effect.
         return tile.get_column(this.name);
       }),
     ).then(() => {});
@@ -414,9 +414,9 @@ export class DataSelection {
 
   /**
    *
-   * Downloads all unloaded tiles in the dataset and applies the
+   * Downloads all unloaded tiles in the deeptable and applies the
    * transformation to them. Use with care! For > 10,000,000 point
-   * datasets, if called from Europe this may cause the transatlantic fiber-optic internet backbone
+   * deeptables, if called from Europe this may cause the transatlantic fiber-optic internet backbone
    * cables to melt.
    */
 
@@ -430,7 +430,7 @@ export class DataSelection {
    * selection that is the union of the two.
    */
   union(other: DataSelection, name: string | undefined): DataSelection {
-    return new DataSelection(this.dataset, {
+    return new DataSelection(this.deeptable, {
       name: name || this.name + ' union ' + other.name,
       composition: ['OR', this, other],
     });
@@ -444,7 +444,7 @@ export class DataSelection {
    * disjunctive normal form constructor.
    */
   intersection(other: DataSelection, name: string | undefined): DataSelection {
-    return new DataSelection(this.dataset, {
+    return new DataSelection(this.deeptable, {
       name: name || this.name + ' intersection ' + other.name,
       composition: ['AND', this, other],
     });
@@ -604,7 +604,7 @@ export class DataSelection {
       }
       return mask.to_arrow();
     };
-    const selection = new DataSelection(this.dataset, {
+    const selection = new DataSelection(this.deeptable, {
       name: newName,
       tileFunction,
     });
@@ -636,20 +636,20 @@ export class DataSelection {
   }
   /**
    *
-   * @param name the name for the column to assign in the dataset.
+   * @param name the name for the column to assign in the deeptable.
    * @param tileFunction The transformation to apply
    */
   async add_function_column(
     name: string,
     tileFunction: DS.BoolTransformation,
   ): Promise<void> {
-    if (this.dataset.has_column(name)) {
+    if (this.deeptable.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
     }
-    this.dataset.transformations[name] =
+    this.deeptable.transformations[name] =
       this.wrapWithSelectionMetadata(tileFunction);
     // Await the application to the root tile, which may be necessary
-    await this.dataset.root_tile.apply_transformation(name);
+    await this.deeptable.root_tile.apply_transformation(name);
   }
 
   /**
@@ -686,10 +686,10 @@ export class DataSelection {
 
   /**
    * The total number of points in the set. At present, always a light wrapper around
-   * the total number of points in the dataset.
+   * the total number of points in the deeptable.
    */
   get totalSetSize() {
-    return this.dataset.highest_known_ix;
+    return this.deeptable.highest_known_ix;
   }
 
   /**
@@ -757,19 +757,19 @@ export class DataSelection {
     key_field: string,
     // options: IdentifierOptions = {},
   ): Promise<void> {
-    if (this.dataset.has_column(name)) {
+    if (this.deeptable.has_column(name)) {
       throw new Error(`Column ${name} already exists, can't create`);
     }
     if (typeof codes[0] === 'string') {
       const matcher = stringmatcher(key_field, codes as string[]);
-      this.dataset.transformations[name] =
+      this.deeptable.transformations[name] =
         this.wrapWithSelectionMetadata(matcher);
-      await this.dataset.root_tile.apply_transformation(name);
+      await this.deeptable.root_tile.apply_transformation(name);
     } else if (typeof codes[0] === 'bigint') {
       const matcher = bigintmatcher(key_field, codes as bigint[]);
-      this.dataset.transformations[name] =
+      this.deeptable.transformations[name] =
         this.wrapWithSelectionMetadata(matcher);
-      await this.dataset.root_tile.apply_transformation(name);
+      await this.deeptable.root_tile.apply_transformation(name);
     } else {
       console.error('Unable to match type', typeof codes[0]);
     }
@@ -807,7 +807,7 @@ function bigintmatcher(field: string, matches: bigint[]) {
  * more to work with.)
  *
  *
- * @param field The column in the deepscatter dataset to search in
+ * @param field The column in the deepscatter deeptable to search in
  * @param matches A list of strings to match in that column
  * @returns
  */

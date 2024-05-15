@@ -47,7 +47,7 @@ export class LabelMaker extends Renderer {
   ) {
     super(
       scatterplot.div!.node() as HTMLDivElement,
-      scatterplot.dataset,
+      scatterplot.deeptable,
       scatterplot,
     );
     this.options = options;

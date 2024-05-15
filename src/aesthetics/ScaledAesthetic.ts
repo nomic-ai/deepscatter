@@ -111,7 +111,7 @@ export abstract class ScaledAesthetic<
 
     const bands = scaleBand()
       .domain(vals)
-      .range(this.dataset.extent.x)
+      .range(this.deeptable.extent.x)
       .padding(0.1)
       .round(true)
       .align(0.5);
@@ -230,7 +230,7 @@ export abstract class ScaledAesthetic<
       return [1, 1];
     }
 
-    const domain = this.dataset.domain(this.field);
+    const domain = this.deeptable.domain(this.field);
     return domain;
   }
 
@@ -250,7 +250,7 @@ export abstract class ScaledAesthetic<
         Input['domainType'],
       ];
     } else {
-      return this.scatterplot.dataset.domain(this.field);
+      return this.scatterplot.deeptable.domain(this.field);
     }
   }
 
@@ -322,8 +322,12 @@ export abstract class PositionalAesthetic<
     return this.default_range;
   }
   get default_range(): [number, number] {
-    if (this.dataset.extent && this.axis && this.dataset.extent[this.axis]) {
-      return this.dataset.extent[this.axis];
+    if (
+      this.deeptable.extent &&
+      this.axis &&
+      this.deeptable.extent[this.axis]
+    ) {
+      return this.deeptable.extent[this.axis];
     }
     return [-1, 1];
   }

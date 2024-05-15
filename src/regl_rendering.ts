@@ -23,7 +23,7 @@ import { rgb } from 'd3-color';
 import type * as DS from './shared';
 import type { Tile } from './tile';
 import REGL from 'regl';
-import { Dataset } from './Dataset';
+import { Deeptable } from './Deeptable';
 import {
   ConcreteScaledAesthetic,
   dimensions,
@@ -52,7 +52,7 @@ export class ReglRenderer extends Renderer {
   public buffer_size = 1024 * 1024 * 64; // Use GPU memory in blocks of 64 MB buffers by default.
   private _buffers: MultipurposeBufferSet;
   public _initializations: Promise<void>;
-  public dataset: Dataset;
+  public deeptable: Deeptable;
   public _zoom?: Zoom;
   public most_recent_restart?: number;
   public _default_webgl_scale?: number[];
@@ -72,7 +72,7 @@ export class ReglRenderer extends Renderer {
 
   constructor(
     selector: string | Node,
-    tileSet: Dataset,
+    tileSet: Deeptable,
     scatterplot: Scatterplot,
   ) {
     super(selector, tileSet, scatterplot);
@@ -91,7 +91,7 @@ export class ReglRenderer extends Renderer {
       ],
       canvas: c,
     });
-    this.dataset = tileSet;
+    this.deeptable = tileSet;
 
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
 
@@ -101,7 +101,7 @@ export class ReglRenderer extends Renderer {
     // Not the right way, for sure.
     this._initializations = Promise.all([
       // some things that need to be initialized before the renderer is loaded.
-      this.dataset.promise.then(() => {
+      this.deeptable.promise.then(() => {
         this.remake_renderer();
         this._webgl_scale_history = [
           this.default_webgl_scale,
@@ -119,12 +119,12 @@ export class ReglRenderer extends Renderer {
     return this._buffers;
   }
 
-  data(dataset: Dataset) {
-    if (dataset === undefined) {
+  data(deeptable: Deeptable) {
+    if (deeptable === undefined) {
       // throw
-      return this.dataset;
+      return this.deeptable;
     }
-    this.dataset = dataset;
+    this.deeptable = deeptable;
     return this;
   }
 
@@ -261,12 +261,12 @@ export class ReglRenderer extends Renderer {
    * Actions that run on a single animation tick.
    */
   tick() {
-    const { prefs, dataset, props } = this;
+    const { prefs, deeptable, props } = this;
     this.tick_num = this.tick_num || 0;
     this.tick_num++;
     // Set a download call in motion.
     if (this._use_scale_to_download_tiles) {
-      dataset.spawnDownloads(
+      deeptable.spawnDownloads(
         this.zoom.current_corners(),
         this.props.max_ix,
         5,
@@ -275,7 +275,7 @@ export class ReglRenderer extends Renderer {
       );
     } else {
       // console.warn("No good rules here yet.")
-      dataset.spawnDownloads(
+      deeptable.spawnDownloads(
         undefined,
         prefs.max_points,
         5,
@@ -1139,14 +1139,14 @@ export class TileBufferManager {
     type ColumnType = Vector<Dictionary<Utf8> | Float | Bool | Int | Timestamp>;
 
     if (!tile.hasLoadedColumn(key)) {
-      if (tile.dataset.transformations[key] !== undefined) {
+      if (tile.deeptable.transformations[key] !== undefined) {
         throw new Error(
           'Attempted to create buffer data on an unloaded transformation',
         );
       } else {
         let col_names = [
           ...tile.record_batch.schema.fields.map((d) => d.name),
-          ...Object.keys(tile.dataset.transformations),
+          ...Object.keys(tile.deeptable.transformations),
         ];
         if (!key.startsWith('_')) {
           // Don't warn internal columns unless the user is in internal-column land.

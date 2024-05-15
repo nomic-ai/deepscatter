@@ -2,7 +2,7 @@
 import type { Regl, Texture2D } from 'regl';
 import { dimensions } from './StatefulAesthetic';
 import type { Scatterplot } from '../scatterplot';
-import type { Dataset } from '../Dataset';
+import type { Deeptable } from '../Deeptable';
 import { StatefulAesthetic } from './StatefulAesthetic';
 import type { Encoding } from '../shared';
 import type * as DS from '../shared';
@@ -19,7 +19,7 @@ type StateList<T> = {
 };
 
 export class AestheticSet {
-  public tileSet: Dataset;
+  public tileSet: Deeptable;
   public scatterplot: Scatterplot;
   public regl: Regl;
   public encoding: Encoding = {};
@@ -31,7 +31,7 @@ export class AestheticSet {
   } = {
     jitter_method: { current: 'None', last: 'None' },
   };
-  constructor(scatterplot: Scatterplot, regl: Regl, tileSet: Dataset) {
+  constructor(scatterplot: Scatterplot, regl: Regl, tileSet: Deeptable) {
     this.scatterplot = scatterplot;
     this.regl = regl;
     this.tileSet = tileSet;

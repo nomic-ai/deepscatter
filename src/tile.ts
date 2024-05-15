@@ -5,8 +5,8 @@ import {
   StructRowProxy,
   Schema,
 } from 'apache-arrow';
-import { add_or_delete_column } from './Dataset';
-import type { Dataset } from './Dataset';
+import { add_or_delete_column } from './Deeptable';
+import type { Deeptable } from './Deeptable';
 type MinMax = [number, number];
 
 export type Rectangle = {
@@ -40,7 +40,7 @@ export type RecordBatchCache =
 let tile_identifier = 0;
 
 /**
- * A Tile is a collection of points in the dataset that are grouped together:
+ * A Tile is a collection of points in the deeptable that are grouped together:
  * it represents the basic unit of operation for most batched operations in
  * deepscatter including network packets, GPU calculations,
  * transformations on data, and render calls. It corresponds to a record batch
@@ -57,7 +57,7 @@ export class Tile {
   parent: Tile | null;
   private _children: Array<Tile> = [];
   public _highest_known_ix?: number;
-  public dataset: Dataset;
+  public deeptable: Deeptable;
   public _transformations: Record<string, Promise<ArrowBuildable>> = {};
   public _deriveManifestFromTileMetadata?: Promise<TileManifest>;
   //private _promiseOfChildren? = Promise<void>;
@@ -79,12 +79,12 @@ export class Tile {
    * @param key Either the string identifier of the tile,
    * OR a `TileManifest` object including an identifier.   *
    * @param parent The parent tile -- used to navigate through the tree.
-   * @param dataset The full atlas dataset of which this tile is a part.
+   * @param deeptable The full atlas deeptable of which this tile is a part.
    */
   constructor(
     key: string | (Partial<TileManifest> & { key: string }),
     parent: Tile | null,
-    dataset: Dataset,
+    deeptable: Deeptable,
   ) {
     // If it's just initiated with a key, build that into a minimal manifest.
     let manifest: Partial<TileManifest> & { key: string };
@@ -101,10 +101,10 @@ export class Tile {
     //   manifest.max_ix = manifest.min_ix + 1e5;
     // }
     this.parent = parent;
-    this.dataset = dataset;
+    this.deeptable = deeptable;
 
-    if (dataset === undefined) {
-      throw new Error('No dataset provided');
+    if (deeptable === undefined) {
+      throw new Error('No deeptable provided');
     }
     // Grab the next identifier off the queue. This should be async safe with the current setup, but
     // the logic might fall apart in truly parallel situations.
@@ -127,7 +127,7 @@ export class Tile {
     if (existing) {
       return existing;
     }
-    if (this.dataset.transformations[colname]) {
+    if (this.deeptable.transformations[colname]) {
       await this.apply_transformation(colname);
       const vector = this.record_batch.getChild(colname);
       if (vector === null) {
@@ -157,7 +157,7 @@ export class Tile {
     if (this.transformation_holder[name] !== undefined) {
       return this.transformation_holder[name];
     }
-    const transform = this.dataset.transformations[name];
+    const transform = this.deeptable.transformations[name];
     if (transform === undefined) {
       throw new Error(`Transformation ${name} is not defined`);
     }
@@ -298,7 +298,7 @@ export class Tile {
       throw new Error('Attempted to set an incomplete manifest.');
     }
     this._children = manifest.children.map((k: TileManifest | string) => {
-      return new Tile(k, this, this.dataset);
+      return new Tile(k, this, this.deeptable);
     });
     this.highest_known_ix = manifest.max_ix;
     this._completeManifest = manifest;
@@ -410,7 +410,7 @@ export class Tile {
       return existing.batch;
     }
 
-    let url = `${this.dataset.base_url}/${this.key}.feather`;
+    let url = `${this.deeptable.base_url}/${this.key}.feather`;
     if (suffix !== null) {
       // 3/4/3
       // suffix: 'text'
@@ -420,12 +420,12 @@ export class Tile {
 
     let bufferPromise: Promise<ArrayBuffer>;
 
-    if (this.dataset.tileProxy !== undefined) {
+    if (this.deeptable.tileProxy !== undefined) {
       const endpoint = new URL(url).pathname;
 
       // This method apiCall is crafted to match the
       // ts-nomic package, but can accept other authentication.
-      bufferPromise = this.dataset.tileProxy
+      bufferPromise = this.deeptable.tileProxy
         .apiCall(endpoint, 'GET', null, null, { octetStreamAsUint8: true })
         .then((d) => d.buffer as ArrayBuffer);
     } else {
@@ -493,11 +493,11 @@ export class Tile {
       // For every column in the root tile,
       // define a transformation for other children that says
       // 'load the main batch and pull out this column'.
-      const { dataset } = this;
+      const { deeptable } = this;
 
       for (const field of batch.schema.fields) {
-        if (!dataset.transformations[field.name]) {
-          dataset.transformations[field.name] = async (tile: Tile) => {
+        if (!deeptable.transformations[field.name]) {
+          deeptable.transformations[field.name] = async (tile: Tile) => {
             const batch = await tile.get_arrow(null);
             const vector = batch.getChild(field.name);
             if (vector === null) {
@@ -531,11 +531,11 @@ export class Tile {
         // For every column in the root tile,
         // define a transformation for other children that says
         // 'load the main batch and pull out this column'.
-        const { dataset } = this;
+        const { deeptable } = this;
 
         for (const field of batch.schema.fields) {
-          if (!dataset.transformations[field.name]) {
-            dataset.transformations[field.name] = async (tile: Tile) => {
+          if (!deeptable.transformations[field.name]) {
+            deeptable.transformations[field.name] = async (tile: Tile) => {
               const batch = await tile.get_arrow(null);
               const vector = batch.getChild(field.name);
               if (vector === null) {
@@ -629,7 +629,7 @@ export class Tile {
     }
     if (this._partialManifest?.children) {
       for (const child of this.manifest.children) {
-        const childTile = new Tile(child, this, this.dataset);
+        const childTile = new Tile(child, this, this.deeptable);
         this._children.push(childTile);
       }
       return this._children;
@@ -641,11 +641,11 @@ export class Tile {
   // Quadtree tiles can have their limits calculated based on the structure.
   // There are cases where these may not be exact.
   get theoretical_extent(): Rectangle {
-    if (this.dataset.tileStucture === 'other') {
+    if (this.deeptable.tileStucture === 'other') {
       // Only three-length-keys are treated as quadtrees.
-      return this.dataset.extent;
+      return this.deeptable.extent;
     }
-    const base = this.dataset.extent;
+    const base = this.deeptable.extent;
     const [z, x, y] = this.key.split('/').map((d) => parseInt(d));
 
     const x_step = base.x[1] - base.x[0];

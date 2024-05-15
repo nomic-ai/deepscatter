@@ -4,7 +4,7 @@ import merge from 'lodash.merge';
 import { Zoom } from './interaction';
 import { neededFieldsToPlot, ReglRenderer } from './regl_rendering';
 import { tableFromIPC, type StructRowProxy } from 'apache-arrow';
-import { Dataset } from './Dataset';
+import { Deeptable } from './Deeptable';
 import type { FeatureCollection } from 'geojson';
 import { LabelMaker } from './label_rendering';
 import { Renderer } from './rendering';
@@ -43,14 +43,6 @@ const base_elements = [
 // after each plotAPI update.
 type Hook = () => void;
 
-// interface AdditionalProps {
-//   Bitmask: typeof Bitmask;
-//   Dataset: typeof Dataset;
-//   QuadtileDataset: typeof Dataset;
-//   DataSelection: typeof DataSelection;
-//   wrapArrow?: (t: Table) => Dataset;
-// }
-
 /**
  * The core type of the module is a single scatterplot that manages
  * all data and renderering.
@@ -59,7 +51,7 @@ export class Scatterplot {
   public _renderer?: ReglRenderer;
   public width: number;
   public height: number;
-  public _root?: Dataset;
+  public _root?: Deeptable;
   public elements?: Selection<SVGElement, unknown, Element, unknown>[];
   public secondary_renderers: Record<string, Renderer> = {};
   public tileProxy?: DS.TileProxy;
@@ -119,8 +111,8 @@ export class Scatterplot {
     if (options.tileProxy) {
       this.tileProxy = options.tileProxy;
     }
-    if (options.dataset) {
-      void this.load_dataset(options.dataset);
+    if (options.deeptable) {
+      void this.load_deeptable(options.deeptable);
     }
     this.prefs = { ...default_API_call } as DS.CompletePrefs;
   }
@@ -205,7 +197,7 @@ export class Scatterplot {
     params: IdSelectParams | BooleanColumnParams | FunctionSelectParams,
     duration = this.prefs.duration,
   ): Promise<DataSelection> {
-    const selection = await this.dataset.select_data(params);
+    const selection = await this.deeptable.select_data(params);
     if (selection === null) {
       throw new Error(`Invalid selection: ${JSON.stringify(params)}`);
     }
@@ -245,7 +237,7 @@ export class Scatterplot {
       true_codes = codes;
     }
 
-    this.dataset.add_label_identifiers(true_codes, name, key_field);
+    this.deeptable.add_label_identifiers(true_codes, name, key_field);
   }
 
   async add_labels_from_url(
@@ -257,7 +249,7 @@ export class Scatterplot {
   ): Promise<void> {
     await this.ready;
 
-    await this.dataset.promise;
+    await this.deeptable.promise;
     return fetch(url)
       .then(async (data) => {
         const features = await (data.json() as Promise<FeatureCollection>);
@@ -274,7 +266,7 @@ export class Scatterplot {
    * @param features A geojson feature collection containing point labels
    * @param name A unique key to associate with this labelset. Labels can be enabled or disabled using this key.
    * @param label_key The text field in which the labels are stored in the geojson object.
-   * @param size_key A field in the dataset to associate with the *size* of the labels.
+   * @param size_key A field in the deeptable to associate with the *size* of the labels.
    * @param label_options Additional custom passed to the labeller.
    *
    * Usage:
@@ -306,9 +298,9 @@ export class Scatterplot {
   /**
    * An alias to avoid using the underscored method directly.
    */
-  get dataset() {
+  get deeptable() {
     if (this._root === undefined) {
-      throw new Error('No dataset has been loaded');
+      throw new Error('No deeptable has been loaded');
     }
     return this._root;
   }
@@ -339,14 +331,14 @@ export class Scatterplot {
     );
   }
 
-  async load_dataset(params: DS.DataSpec): Promise<DS.Dataset> {
+  async load_deeptable(params: DS.DataSpec): Promise<DS.Deeptable> {
     if (params.source_url !== undefined) {
-      this._root = Dataset.from_quadfeather(params.source_url, this);
+      this._root = Deeptable.from_quadfeather(params.source_url, this);
     } else if (params.arrow_table !== undefined) {
-      this._root = Dataset.fromArrowTable(params.arrow_table, this);
+      this._root = Deeptable.fromArrowTable(params.arrow_table, this);
     } else if (params.arrow_buffer !== undefined) {
       const tb = tableFromIPC(params.arrow_buffer);
-      this._root = Dataset.fromArrowTable(tb, this);
+      this._root = Deeptable.fromArrowTable(tb, this);
     } else {
       throw new Error('No source_url or arrow_table specified');
     }
@@ -357,18 +349,18 @@ export class Scatterplot {
   async reinitialize() {
     const { prefs } = this;
 
-    await this.dataset.ready;
+    await this.deeptable.ready;
     console.log('HERE');
-    await this.dataset.root_tile.get_column('x');
+    await this.deeptable.root_tile.get_column('x');
     console.log('HERE 2');
 
     this._renderer = new ReglRenderer(
       '#container-for-webgl-canvas',
-      this.dataset,
+      this.deeptable,
       this,
     );
     this._zoom = new Zoom('#deepscatter-svg', this.prefs, this);
-    this._zoom.attach_tiles(this.dataset);
+    this._zoom.attach_tiles(this.deeptable);
     this._zoom.attach_renderer('regl', this._renderer);
     this._zoom.initialize_zoom();
 
@@ -389,7 +381,7 @@ export class Scatterplot {
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
     void this._renderer.initialize();
-    void this.dataset.promise.then(() => this.mark_ready());
+    void this.deeptable.promise.then(() => this.mark_ready());
     return this.ready;
   }
 
@@ -441,7 +433,7 @@ export class Scatterplot {
     ctx.clearRect(0, 0, 10_000, 10_000);
     const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = '#888888';
-    const tiles = this.dataset.map((t) => t);
+    const tiles = this.deeptable.map((t) => t);
     for (const i of range(20)) {
       setTimeout(() => {
         for (const tile of tiles) {
@@ -647,7 +639,7 @@ export class Scatterplot {
       if (this._renderer) {
         const promises: Promise<void>[] = [];
         const sine_qua_non: Promise<void>[] = [
-          this.dataset.root_tile.require_columns(needed_keys),
+          this.deeptable.root_tile.require_columns(needed_keys),
         ];
 
         // Immediately
@@ -732,13 +724,13 @@ export class Scatterplot {
           'The initial API call specify exactly one of source_url, arrow_table, or arrow_buffer',
         );
       }
-      await this.load_dataset(dataSpec);
+      await this.load_deeptable(dataSpec);
     }
 
     if (prefs.transformations) {
       for (const [k, func] of Object.entries(prefs.transformations)) {
-        if (!this.dataset.transformations[k]) {
-          this.dataset.register_transformation(k, func);
+        if (!this.deeptable.transformations[k]) {
+          this.deeptable.register_transformation(k, func);
         }
       }
     }
@@ -819,7 +811,7 @@ export class Scatterplot {
     if (!this._root) {
       throw new Error('No dataset has been loaded');
     }
-    return this.dataset.root_tile.record_batch;
+    return this.deeptable.root_tile.record_batch;
   }
 
   /**
@@ -848,7 +840,7 @@ export class Scatterplot {
 
   sample_points(n = 10): Record<string, number | string>[] {
     const vals: Record<string, number | string>[] = [];
-    for (const p of this.dataset.points(this.zoom.current_corners())) {
+    for (const p of this.deeptable.points(this.zoom.current_corners())) {
       vals.push({ ...p });
       if (vals.length >= n * 3) {
         break;

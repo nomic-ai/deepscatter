@@ -52,7 +52,7 @@ export type ConcreteScaledAesthetic =
   | Jitter_radius
   | Color;
 
-import type { Dataset } from '../Dataset';
+import type { Deeptable } from '../Deeptable';
 import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
 
@@ -67,7 +67,7 @@ export class StatefulAesthetic<T extends ConcreteAesthetic> {
    * channel in a scatterplot has exactly on StatefulAesthetic that persists for the lifetime of the Plot.
    */
   public states: [T, T];
-  public dataset: Dataset;
+  public deeptable: Deeptable;
   public regl: Regl;
   public scatterplot: Scatterplot;
   public needs_transitions = false;
@@ -78,7 +78,7 @@ export class StatefulAesthetic<T extends ConcreteAesthetic> {
   constructor(
     scatterplot: Scatterplot,
     regl: Regl,
-    dataset: Dataset,
+    deeptable: Deeptable,
     aesthetic_map: TextureSet,
     Factory: DS.Newable<T>,
   ) {
@@ -87,7 +87,7 @@ export class StatefulAesthetic<T extends ConcreteAesthetic> {
     }
     this.scatterplot = scatterplot;
     this.regl = regl;
-    this.dataset = dataset;
+    this.deeptable = deeptable;
     this.aesthetic_map = aesthetic_map;
     this.factory = Factory;
     this.ids = [Math.random().toString(), Math.random().toString()];

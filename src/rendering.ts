@@ -7,7 +7,7 @@ import type { Tile } from './tile';
 import type { Zoom } from './interaction';
 import type { AestheticSet } from './aesthetics/AestheticSet';
 import { timer, Timer } from 'd3-timer';
-import { Dataset } from './Dataset';
+import { Deeptable } from './Deeptable';
 import type * as DS from './shared.d';
 import { Table } from 'apache-arrow';
 import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
@@ -126,7 +126,7 @@ export class Renderer {
   public scatterplot: Scatterplot;
   public holder: d3.Selection<Element, unknown, BaseType, unknown>;
   public canvas: HTMLCanvasElement;
-  public dataset: Dataset;
+  public deeptable: Deeptable;
   public width: number;
   public height: number;
   // The renderer handles periodic dispatches of calls
@@ -137,7 +137,7 @@ export class Renderer {
   public render_props: RenderProps = new RenderProps();
   constructor(
     selector: string | Node,
-    tileSet: Dataset,
+    tileSet: Deeptable,
     scatterplot: Scatterplot,
   ) {
     this.scatterplot = scatterplot;
@@ -145,7 +145,7 @@ export class Renderer {
     this.canvas = select(
       this.holder!.node()!.firstElementChild,
     ).node() as HTMLCanvasElement;
-    this.dataset = tileSet;
+    this.deeptable = tileSet;
     this.width = +select(this.canvas).attr('width');
     this.height = +select(this.canvas).attr('height');
     this.deferred_functions = [];
@@ -206,7 +206,7 @@ export class Renderer {
     const pixel_area = (width * height) / pixelRatio;
     const total_intended_points = min([
       max_ix,
-      this.dataset.highest_known_ix || 1e10,
+      this.deeptable.highest_known_ix || 1e10,
     ]) as number;
 
     const total_points = total_intended_points * (1 - discard_share);
@@ -242,7 +242,7 @@ export class Renderer {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
-    const { dataset: tileSet } = this;
+    const { deeptable: tileSet } = this;
     // Materialize using a tileset method.
 
     if (!this.aes) throw new Error('Aesthetic missing');

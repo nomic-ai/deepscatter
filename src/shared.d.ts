@@ -13,7 +13,7 @@ import type {
   Vector,
 } from 'apache-arrow';
 import type { Renderer } from './rendering';
-import type { Dataset } from './Dataset';
+import type { Deeptable } from './Deeptable';
 import type { ConcreteAesthetic } from './aesthetics/StatefulAesthetic';
 import type { Buffer } from 'regl';
 import type { DataSelection } from './selection';
@@ -22,7 +22,7 @@ import { ZoomTransform } from 'd3-zoom';
 import { TileBufferManager } from './regl_rendering';
 import type { Tile } from './tile';
 import type { Rectangle } from './tile';
-export type { Renderer, Dataset, ConcreteAesthetic };
+export type { Renderer, Deeptable, ConcreteAesthetic };
 
 export type BufferLocation = {
   buffer: Buffer;
@@ -52,10 +52,10 @@ export interface TileProxy {
 
 export type ScatterplotOptions = {
   tileProxy?: TileProxy;
-  dataset?: DataSpec;
+  deeptable?: DataSpec;
 };
 
-// The orientation of the dataset. Quadtree datasets
+// The orientation of the deeptable. Quadtree deeptables
 // allow certain optimizations.
 export type TileStructure = 'quadtree' | 'other';
 
@@ -70,16 +70,16 @@ export type TileManifest = {
 };
 
 /**
- * The arguments passed to new Dataset().
+ * The arguments passed to new Deeptable().
  */
-export type DatasetCreateParams = {
+export type DeeptableCreateParams = {
   // A URL for the root of the quadtree if files are not stored locally.
   // At the present time only
   // http:// and https:// urls are allowed, but other sources can be read
   // from the
   baseUrl: string;
 
-  // A Deepscatter Scatterplot object. If null, dataset operations will still be
+  // A Deepscatter Scatterplot object. If null, deeptable operations will still be
   // possible.
   plot: Scatterplot | null;
 
@@ -91,7 +91,7 @@ export type DatasetCreateParams = {
   // may be inferred.
   tileStructure?: TileStructure;
 
-  // A manifest listing all the tiles in the dataset.
+  // A manifest listing all the tiles in the deeptable.
   // Currently this must be passed as a recursive structure.
   tileManifest?: Partial<TileManifest>;
 
@@ -432,7 +432,7 @@ export type Dimension = keyof Encoding;
 // 1. A Table object.
 // 2. A URL to a Quadtile source.
 // 3. An array buffer that contains a serialized Table.
-// 4. A deepscatter Dataset.
+// 4. A created deeptable.
 
 /**
  * A DataSpec is a record that describes how to load data into the
@@ -441,7 +441,7 @@ export type Dimension = keyof Encoding;
  * 2. An Arrow Table object. (Use this with care! Minor differences in JS Apache Arrow builds
  * can cause this to fail in deeply confusing ways.)
  * 3. A Uint8Array containing a serialized Arrow Table. (This is safer than passing an Arrow Table.)
- * 4. An already-created dataset.
+ * 4. An already-created deeptable.
  */
 export type DataSpec = Record<string, never> &
   (
@@ -449,27 +449,27 @@ export type DataSpec = Record<string, never> &
         source_url?: never;
         arrow_table?: never;
         arrow_buffer: Uint8Array;
-        dataset?: never;
+        deeptable?: never;
       }
     | {
         source_url: string;
         arrow_table?: never;
         arrow_buffer?: never;
-        dataset?: never;
+        deeptable?: never;
       }
     // Pass an arrow table. This may
     | {
         source_url?: never;
         arrow_table: Table;
         arrow_buffer?: never;
-        dataset?: never;
+        deeptable?: never;
       }
-    // Pass an already instantiated dataset.
+    // Pass an already instantiated deeptable.
     | {
         source_url?: never;
         arrow_table: never;
         arrow_buffer?: never;
-        dataset: Dataset;
+        deeptable: Deeptable;
       }
   );
 
@@ -543,7 +543,7 @@ export type APICall = {
 
   // a set of functions by name from the existing data to a number.
   // These are used to transform the data, and can create new columns
-  // in your dataset.
+  // in your deeptable.
 
   transformations?: Record<string, (d: StructRowProxy) => number>;
   encoding?: Encoding;
