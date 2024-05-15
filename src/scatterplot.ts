@@ -13,7 +13,6 @@ import { isURLLabels, isLabelset } from './typing';
 import { DataSelection } from './selection';
 import type {
   BooleanColumnParams,
-  CompositeSelectParams,
   FunctionSelectParams,
   IdSelectParams,
 } from './selection';
@@ -63,7 +62,6 @@ export class Scatterplot {
   public _root?: Dataset;
   public elements?: Selection<SVGElement, unknown, Element, unknown>[];
   public secondary_renderers: Record<string, Renderer> = {};
-  public selection_history: DS.SelectionRecord[] = [];
   public tileProxy?: DS.TileProxy;
   public div?: Selection<BaseType | HTMLDivElement, number, BaseType, unknown>;
   public bound: boolean;
@@ -207,7 +205,7 @@ export class Scatterplot {
     params: IdSelectParams | BooleanColumnParams | FunctionSelectParams,
     duration = this.prefs.duration,
   ): Promise<DataSelection> {
-    const selection = await this.select_data(params);
+    const selection = await this.dataset.select_data(params);
     if (selection === null) {
       throw new Error(`Invalid selection: ${JSON.stringify(params)}`);
     }
@@ -222,46 +220,6 @@ export class Scatterplot {
         },
       },
     });
-    return selection;
-  }
-  /**
-   *
-   * @param params A set of parameters for selecting data based on ids, a boolean column, or a function.
-   * @returns A DataSelection object that can be used to extend the selection.
-   *
-   * See `select_and_plot` for a method that will select data and plot it.
-   */
-  async select_data(
-    params:
-      | IdSelectParams
-      | BooleanColumnParams
-      | FunctionSelectParams
-      | CompositeSelectParams,
-  ) {
-    if (
-      params.useNameCache &&
-      params.name &&
-      this.selection_history.length > 0
-    ) {
-      const old_version = this.selection_history.find(
-        (x) => x.name === params.name,
-      );
-      // If we have a cached version, move the cached version to the end and return it.
-      if (old_version) {
-        this.selection_history = [
-          ...this.selection_history.filter((x) => x.name !== params.name),
-          old_version,
-        ];
-        return old_version.selection;
-      }
-    }
-    const selection = new DataSelection(this.dataset, params);
-    this.selection_history.push({
-      selection,
-      name: selection.name,
-      flushed: false,
-    });
-    await selection.ready;
     return selection;
   }
 
@@ -424,7 +382,7 @@ export class Scatterplot {
       HTMLDivElement,
       HTMLCanvasElement
     >;
-    const ctx = bkgd.node()!.getContext('2d');
+    const ctx = bkgd.node().getContext('2d');
 
     if (ctx === null) throw new Error("Can't acquire canvas context");
     ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
@@ -472,16 +430,16 @@ export class Scatterplot {
      * loaded tiles. Useful for debugging and illustration.
      */
 
-    const canvas = this.elements![2].selectAll(
-      'canvas',
-    ).node() as HTMLCanvasElement;
+    const canvas = this.elements[2]
+      .selectAll('canvas')
+      .node() as HTMLCanvasElement;
 
-    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+    const ctx = canvas.getContext('2d');
 
     // as CanvasRenderingContext2D;
 
     ctx.clearRect(0, 0, 10_000, 10_000);
-    const { x_, y_ } = this._zoom!.scales();
+    const { x_, y_ } = this._zoom.scales();
     ctx.strokeStyle = '#888888';
     const tiles = this.dataset.map((t) => t);
     for (const i of range(20)) {
@@ -613,7 +571,9 @@ export class Scatterplot {
   }
 
   get label_click(): LabelClick['f'] {
-    return this.label_click_handler.f.bind(this.label_click_handler);
+    return this.label_click_handler.f.bind(
+      this.label_click_handler,
+    ) as LabelClick['f'];
   }
 
   set highlit_point_change(
@@ -787,9 +747,15 @@ export class Scatterplot {
       await this.reinitialize();
     }
 
-    const renderer = this._renderer as ReglRenderer;
-    const zoom = this._zoom as Zoom;
-    this._renderer!.render_props.apply_prefs(this.prefs);
+    const renderer = this._renderer;
+    const zoom = this._zoom;
+
+    if (renderer === undefined || zoom === undefined) {
+      throw new Error(
+        'Error: plot called on scatterplot without defined renderer.',
+      );
+    }
+    renderer.render_props.apply_prefs(this.prefs);
 
     const { width, height } = this;
     this.update_prefs(prefs);
@@ -929,25 +895,12 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
     plot: Scatterplot | undefined = undefined,
     labelset: LabelMaker | undefined = undefined,
   ) {
-    let filter: DS.LambdaChannel<string, boolean> | null;
     if (feature === null) {
       return;
     }
-    if (feature.__activated == true) {
-      filter = null;
-      feature.__activated = undefined;
-    } else {
-      feature.__activated = true;
-      const k = labelset.label_key;
-      const value = feature[k] as string;
-      filter = {
-        field: labelset.label_key,
-        lambda: (d) => d === value,
-      };
+    if (labelset === null) {
+      return;
     }
-    void this.plot.plotAPI({
-      encoding: { filter },
-    });
   }
 }
 

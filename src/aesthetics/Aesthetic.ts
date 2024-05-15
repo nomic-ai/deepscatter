@@ -29,6 +29,7 @@ export abstract class Aesthetic<
   public _texture_buffer: Float32Array | Uint8Array | null = null;
   protected abstract _func?: (d: Input['domainType']) => Output['rangeType'];
   public aesthetic_map: TextureSet;
+  // TODO strict: @ts-expect-error We know this column is set to null if it doesn't exist.
   public column: Vector<Input['arrowType']> | null = null;
 
   // cache of the d3 scale

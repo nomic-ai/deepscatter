@@ -28,6 +28,13 @@ import {
 } from 'apache-arrow';
 import { Scatterplot } from './scatterplot';
 import { wrapArrowTable } from './wrap_arrow';
+import type {
+  BooleanColumnParams,
+  CompositeSelectParams,
+  FunctionSelectParams,
+  IdSelectParams,
+} from './selection';
+import { DataSelection } from './selection';
 
 type TransformationStatus = 'queued' | 'in progress' | 'complete' | 'failed';
 
@@ -76,11 +83,13 @@ export class Dataset {
     func: () => Promise<void>;
     // The status of the transformation.
     status: TransformationStatus;
-    // The urgency of the transformation.
+    // The urgency of the transformation. This vocabulary may be extended over time.
     priority: 'high' | 'low';
     // An optional resolve function to call when the call is complete.
     resolve?: () => void;
   }> = new Set();
+  public selection_history: DS.SelectionRecord[] = [];
+
   public promise: Promise<void>;
   public root_tile: Tile;
   public manifest?: DS.TileManifest;
@@ -88,27 +97,27 @@ export class Dataset {
   private _downloaderId?: number;
   // Whether the tileset is structured as a pure quadtree.
 
-  public readonly tileStucture: DS.TileStructure = 'quadtree';
+  public readonly tileStucture: DS.TileStructure;
   /**
    * @param plot The plot to which this dataset belongs.
    **/
 
-  constructor(
-    base_url: string,
-    plot: Scatterplot | null = null,
-    options: DS.DatasetOptions = {},
-  ) {
+  constructor({
+    // Required
+    plot, // note--may be null.
+    baseUrl,
+    // optional
+    tileProxy,
+    extent,
+    tileManifest,
+    // optional with non-undefined defaults.
+    rootKey = '0/0/0',
+    tileStructure = 'quadtree',
+  }: DS.DatasetCreateParams) {
     this._plot = plot;
-    this.tileProxy = options.tileProxy;
-
-    const rootKey = options['rootKey'] || '0/0/0';
-    if (options.tileStructure) {
-      this.tileStucture = options.tileStructure;
-    }
-
-    if (options.extent) {
-      this._extent = options.extent;
-    }
+    this.tileProxy = tileProxy;
+    this.tileStucture = tileStructure;
+    this._extent = extent;
 
     // If no manifest is passed, we still know
     // that there is a root tile at the root key.
@@ -118,10 +127,10 @@ export class Dataset {
       children: undefined,
       min_ix: 0,
       max_ix: Number.MAX_SAFE_INTEGER,
-      ...(options.tileManifest || {}),
+      ...(tileManifest || {}),
     };
     // Must come after manifest is set.
-    this.base_url = base_url;
+    this.base_url = baseUrl;
     this.root_tile = new Tile(defaultManifest, null, this);
     const preProcessRootTile = this.root_tile.preprocessRootTileInfo();
 
@@ -265,12 +274,17 @@ export class Dataset {
     );
   }
 
-  static from_quadfeather(url: string, plot: Scatterplot): Dataset {
-    const options: Partial<DS.DatasetOptions> = {};
+  static from_quadfeather(url: string, plot: Scatterplot | null): Dataset {
+    const options: Partial<DS.DatasetCreateParams> = {};
     if (plot.tileProxy) {
       options['tileProxy'] = plot.tileProxy;
     }
-    return new Dataset(url, plot, options);
+    return new Dataset({
+      tileProxy: plot.tileProxy ? plot.tileProxy : undefined,
+      baseUrl: url,
+      rootKey: '0/0/0',
+      plot,
+    });
   }
 
   /**
@@ -728,6 +742,50 @@ export class Dataset {
       // Create a ticker that will clear the queue.
       this.runDownloads();
     }
+  }
+
+  /**
+   *
+   * @param params A set of parameters for selecting data based on ids, a boolean column, or a function.
+   * @returns A DataSelection object that can be used to extend the selection.
+   *
+   * See `select_and_plot` for a method that will select data and plot it.
+   */
+  async select_data(
+    params:
+      | IdSelectParams
+      | BooleanColumnParams
+      | FunctionSelectParams
+      | CompositeSelectParams,
+  ): Promise<DataSelection> {
+    if (
+      params.useNameCache &&
+      params.name &&
+      this.selection_history.length > 0
+    ) {
+      const old_version = this.selection_history.find(
+        (x) => x.name === params.name,
+      );
+      // If we have a cached version, move the cached version to the end and return it.
+      if (old_version) {
+        this.selection_history = [
+          ...this.selection_history.filter((x) => x.name !== params.name),
+          old_version,
+        ];
+        // type safety only.
+        if (old_version.selection !== null) {
+          return old_version.selection;
+        }
+      }
+    }
+    const selection = new DataSelection(this, params);
+    this.selection_history.push({
+      selection,
+      name: selection.name,
+      flushed: false,
+    });
+    await selection.ready;
+    return selection;
   }
 
   /**

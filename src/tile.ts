@@ -72,7 +72,6 @@ export class Tile {
   public numeric_id: number;
   // bindings to regl buffers holdings shadows of the RecordBatch.
   public _buffer_manager?: TileBufferManager;
-  url: string;
   //public child_locations: string[] = [];
 
   /**
@@ -130,7 +129,11 @@ export class Tile {
     }
     if (this.dataset.transformations[colname]) {
       await this.apply_transformation(colname);
-      return this.record_batch.getChild(colname);
+      const vector = this.record_batch.getChild(colname);
+      if (vector === null) {
+        throw new Error(`Column ${colname} not found after transformation`);
+      }
+      return vector;
     }
     throw new Error(`Column ${colname} not found`);
   }
@@ -465,6 +468,9 @@ export class Tile {
     if (this._completeManifest) {
       return;
     } else if (this._partialManifest.children) {
+      if (this._partialManifest.nPoints === undefined) {
+        console.warn('Something is wrong here.');
+      }
       this.manifest = {
         ...this._partialManifest,
         key: this.key,
@@ -472,7 +478,7 @@ export class Tile {
         min_ix: this.min_ix,
         max_ix: this.max_ix,
         extent: this.extent,
-        nPoints: this._partialManifest.nPoints,
+        nPoints: this._partialManifest.nPoints ?? -1,
       };
     } else {
       this.manifest = await this.deriveManifestInfoFromTileMetadata();
@@ -493,7 +499,11 @@ export class Tile {
         if (!dataset.transformations[field.name]) {
           dataset.transformations[field.name] = async (tile: Tile) => {
             const batch = await tile.get_arrow(null);
-            return batch.getChild(field.name);
+            const vector = batch.getChild(field.name);
+            if (vector === null) {
+              throw new Error(`Column ${field.name} not found`);
+            }
+            return vector;
           };
         }
       }
@@ -527,7 +537,11 @@ export class Tile {
           if (!dataset.transformations[field.name]) {
             dataset.transformations[field.name] = async (tile: Tile) => {
               const batch = await tile.get_arrow(null);
-              return batch.getChild(field.name);
+              const vector = batch.getChild(field.name);
+              if (vector === null) {
+                throw new Error(`Column ${field.name} not found`);
+              }
+              return vector;
             };
           }
         }
@@ -691,8 +705,9 @@ function macrotile_descendants(
   size = 2,
   parents = 2,
 ): Array<string> {
-  if (descendant_cache.has(macrokey)) {
-    return descendant_cache.get(macrokey);
+  const cached = descendant_cache.get(macrokey);
+  if (cached) {
+    return cached;
   }
   const parent_tiles = [[macrokey]];
   while (parent_tiles.length < parents) {

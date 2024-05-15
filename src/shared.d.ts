@@ -69,19 +69,44 @@ export type TileManifest = {
   extent: Rectangle;
 };
 
-export type DatasetOptions = {
+/**
+ * The arguments passed to new Dataset().
+ */
+export type DatasetCreateParams = {
+  // A URL for the root of the quadtree if files are not stored locally.
+  // At the present time only
+  // http:// and https:// urls are allowed, but other sources can be read
+  // from the
+  baseUrl: string;
+
+  // A Deepscatter Scatterplot object. If null, dataset operations will still be
+  // possible.
+  plot: Scatterplot | null;
+
   // A TileProxy object to handle fetching tiles.
   tileProxy?: TileProxy;
+
   // The strategy used for creating the tree of linked tiles.
   // For quadtree data (the default) additional information
   // may be inferred.
   tileStructure?: TileStructure;
+
   // A manifest listing all the tiles in the dataset.
   // Currently this must be passed as a recursive structure.
   tileManifest?: Partial<TileManifest>;
-  // The x/y extent of the data.
+
+  // A URL for an arrow file manifest. The schema for this manifest
+  // is not yet publically documented: I hope to bundle it into the
+  // python quadfeather library in the near future.
+  manifestUrl?: string;
+
+  // The x/y extent of the data. If both a tile manifest and an extent
+  // are passed, the manifest will take precedence.
   extent?: Rectangle;
-  // The key to access the root tile. If not passed, will default to 0/0/0;
+
+  // The key to access the root tile. If not passed, will default to 0/0/0.
+  // If both a manifest and a root key are passed, the root key will take
+  // precedence to facilitate faster initial loading.
   rootKey?: string;
 };
 
@@ -173,21 +198,21 @@ export type JSONValue = number | string | boolean;
 export type JSValue = number | string | boolean | Date;
 export type DomainType = null | ArrowBuildable;
 
-export type TypeBundle<ArrowType, JSONType, DomainType, RangeType, GLType> = {
-  arrowType: ArrowType;
-  jsonType: JSONType;
-  domainType: DomainType;
-  rangeType: RangeType;
-  glType: GLType;
-};
+// export type TypeBundle<ArrowType, JSONType, DomainType, RangeType, GLType> = {
+//   arrowType: ArrowType;
+//   jsonType: JSONType;
+//   domainType: DomainType;
+//   rangeType: RangeType;
+//   glType: GLType;
+// };
 
-export type StringCategorical = TypeBundle<
-  Dictionary<Utf8, SignedInt>, // arrowType
-  string, // jsonType
-  string, // domainType
-  string, // rangeType
-  number // glType
->;
+// export type StringCategorical = TypeBundle<
+//   Dictionary<Utf8, SignedInt>, // arrowType
+//   string, // jsonType
+//   string, // domainType
+//   string, // rangeType
+//   number // glType
+// >;
 
 export type NumberOut = {
   rangeType: number;
@@ -244,7 +269,7 @@ export type IsoDateString =
   | `${number}-${number}-${number}`
   | `${number}-${number}-${number}T${number}:${number}:${number}.${number}Z`;
 
-// Any valid HTML string.
+// Any valid HTML string. Hard to type check.
 export type Colorstring =
   //  | `#${number}${number}${number}${number}${number}${number}`
   string;
@@ -407,6 +432,7 @@ export type Dimension = keyof Encoding;
 // 1. A Table object.
 // 2. A URL to a Quadtile source.
 // 3. An array buffer that contains a serialized Table.
+// 4. A deepscatter Dataset.
 
 /**
  * A DataSpec is a record that describes how to load data into the
@@ -415,12 +441,36 @@ export type Dimension = keyof Encoding;
  * 2. An Arrow Table object. (Use this with care! Minor differences in JS Apache Arrow builds
  * can cause this to fail in deeply confusing ways.)
  * 3. A Uint8Array containing a serialized Arrow Table. (This is safer than passing an Arrow Table.)
+ * 4. An already-created dataset.
  */
 export type DataSpec = Record<string, never> &
   (
-    | { source_url?: never; arrow_table?: never; arrow_buffer: Uint8Array }
-    | { source_url: string; arrow_table?: never; arrow_buffer?: never }
-    | { source_url?: never; arrow_table: Table; arrow_buffer?: never }
+    | {
+        source_url?: never;
+        arrow_table?: never;
+        arrow_buffer: Uint8Array;
+        dataset?: never;
+      }
+    | {
+        source_url: string;
+        arrow_table?: never;
+        arrow_buffer?: never;
+        dataset?: never;
+      }
+    // Pass an arrow table. This may
+    | {
+        source_url?: never;
+        arrow_table: Table;
+        arrow_buffer?: never;
+        dataset?: never;
+      }
+    // Pass an already instantiated dataset.
+    | {
+        source_url?: never;
+        arrow_table: never;
+        arrow_buffer?: never;
+        dataset: Dataset;
+      }
   );
 
 /**

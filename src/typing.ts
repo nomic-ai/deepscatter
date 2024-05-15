@@ -11,19 +11,19 @@ export function isTransform(input: unknown): input is DS.Transform {
 export function isOpChannel(
   input: DS.ChannelType,
 ): input is DS.OpChannel<DS.IsoDateString | number> {
-  return input['op'] !== undefined;
+  return Object.keys(input).includes('op');
 }
 
 export function isLambdaChannel(
   input: DS.ChannelType,
 ): input is DS.LambdaChannel<DS.JSONValue, string | number | boolean> {
-  return input && input['lambda'] !== undefined;
+  return Object.keys(input).includes('lambda');
 }
 
 export function isConstantChannel(
   input: DS.ChannelType,
 ): input is DS.ConstantChannel<string | number | boolean> {
-  return input['constant'] !== undefined;
+  return Object.keys(input).includes('constant');
 }
 
 export function isURLLabels(labels: DS.Labelcall): labels is DS.URLLabels {

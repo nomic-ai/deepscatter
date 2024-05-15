@@ -21,7 +21,7 @@ import { Rectangle } from './tile';
 // It is exposed primarily as Dataset.from
 export function wrapArrowTable(
   tbArray: Uint8Array,
-  plot: Scatterplot,
+  plot: Scatterplot | null,
 ): Dataset {
   let tb = tableFromIPC(tbArray);
   let batches = tb.batches;
@@ -59,7 +59,9 @@ export function wrapArrowTable(
     y: extent([...(y as Iterable<number>)]),
   } as Rectangle;
 
-  return new Dataset(`feather://table`, plot, {
+  return new Dataset({
+    baseUrl: `feather://table`,
+    plot,
     tileProxy: proxy,
     tileStructure: 'other',
     extent: dataExtent,
