@@ -518,21 +518,12 @@ export class Tile {
 
     const manifest: Partial<TileManifest> = {};
     this._deriveManifestFromTileMetadata = this.get_arrow(null).then(
-      (batch) => {
-        if (this._batch) {
-          if (!this._batch.getChild('ix')) {
-            throw new Error("Can't overwrite _batch safely");
-          } else {
-            // pass, there isn't anything to do.
-          }
-        } else {
-          this._batch = batch;
-        }
+      async (batch) => {
         // For every column in the root tile,
         // define a transformation for other children that says
         // 'load the main batch and pull out this column'.
         const { deeptable } = this;
-
+        // Ensure there are transformations for the columns in the root tile.
         for (const field of batch.schema.fields) {
           if (!deeptable.transformations[field.name]) {
             deeptable.transformations[field.name] = async (tile: Tile) => {
@@ -562,7 +553,7 @@ export class Tile {
         }
 
         // TODO: make ix optionally parsed from metadata, not column.
-        const ixes = batch.getChild('ix');
+        const ixes = await this.get_column('ix');
 
         if (ixes === null) {
           throw 'No ix column in table';
@@ -675,7 +666,8 @@ export function p_in_rect(p: Point, rect: Rectangle | undefined) {
 
 /**
  * Returns the coordinates of a 'macrotile' for any given tile.
- * This is an experimental feature that is not part of the public API.
+ * This is an experimental feature that should not be relied on as
+ * part of the public API.
  * @deprecated
  *
  * @param key The key to get the macrotile of
