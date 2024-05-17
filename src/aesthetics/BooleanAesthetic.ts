@@ -5,23 +5,22 @@ import type { TextureSet } from './AestheticSet';
 import { isConstantChannel, isLambdaChannel, isOpChannel } from '../typing';
 
 abstract class BooleanAesthetic<
-  ChannelType extends DS.OpChannel<number | DS.IsoDateString> | DS.ConstantChannel<boolean> | DS.LambdaChannel<DS.JSValue, string | number | boolean>,
-  Input extends DS.InType
->extends Aesthetic<
-    ChannelType,
-    Input,
-    DS.BoolOut
-  > {
-  protected _func : ((d: Input['domainType']) => boolean)
+  ChannelType extends
+    | DS.OpChannel<number | DS.IsoDateString>
+    | DS.ConstantChannel<boolean>
+    | DS.LambdaChannel<DS.JSValue, string | number | boolean>,
+  Input extends DS.InType,
+> extends Aesthetic<ChannelType, Input, DS.BoolOut> {
+  protected _func: (d: Input['domainType']) => boolean;
   constructor(
     encoding: ChannelType | null,
     scatterplot: Scatterplot,
     aesthetic_map: TextureSet,
-    id: string
+    id: string,
   ) {
     super(encoding, scatterplot, aesthetic_map, id);
     if (isLambdaChannel(encoding)) {
-      this._func = encoding.lambda as ((d: Input['domainType']) => boolean);
+      this._func = encoding.lambda as (d: Input['domainType']) => boolean;
     }
   }
 
@@ -29,18 +28,23 @@ abstract class BooleanAesthetic<
     return a ? 1 : 0;
   }
 
-  convertOpDatesToNumbers(channel: DS.OpChannel<DS.IsoDateString | number>) : [number, number] {
+  convertOpDatesToNumbers(
+    channel: DS.OpChannel<DS.IsoDateString | number>,
+  ): [number, number] {
     if (typeof channel.a === 'number') {
-      return [channel.a, channel['b'] === undefined ? -1 : channel['b']] as [number, number]
+      return [channel.a, channel['b'] === undefined ? -1 : channel['b']] as [
+        number,
+        number,
+      ];
     }
-    const vals = [+new Date(channel.a), -1] as [number, number]
+    const vals = [+new Date(channel.a), -1] as [number, number];
     if (channel['b']) {
-      vals[1] = +new Date(channel['b'] as DS.IsoDateString)
+      vals[1] = +new Date(channel['b'] as DS.IsoDateString);
     }
-    return vals
+    return vals;
   }
 
-  // Operations to be applied on the GPU are referenced by passing a function 
+  // Operations to be applied on the GPU are referenced by passing a function
   // index in the first position, and the two permitted operatnds
   // in the second and third positions.
   ops_to_array(): [number, number, number] {
@@ -52,11 +56,10 @@ abstract class BooleanAesthetic<
     }
     const [a, b] = this.convertOpDatesToNumbers(input);
     if (input.op === 'within') {
-
       return [4, a, b];
     }
     if (input.op === 'between') {
-      return [4, (b - a) / 2, (b - a) / 2];
+      return [4, (b - a) / 2, (b + a) / 2];
     }
     const val = [
       // Encoding of op as number.
@@ -84,7 +87,7 @@ abstract class BooleanAesthetic<
     if (isLambdaChannel(channel)) {
       if (this._func === undefined) {
         throw new Error(
-          '_func should have been bound' + JSON.stringify(this.encoding)
+          '_func should have been bound' + JSON.stringify(this.encoding),
         );
       }
       const val = this.value_for(point);
@@ -135,10 +138,10 @@ abstract class BooleanAesthetic<
  */
 export class Foreground<
   ChannelType extends DS.BooleanChannel = DS.BooleanChannel,
-  Input extends DS.InType = DS.InType
-  > extends BooleanAesthetic<ChannelType, Input>  {
+  Input extends DS.InType = DS.InType,
+> extends BooleanAesthetic<ChannelType, Input> {
   default_constant = true;
-  default_range: [false, true] = [false, true]
+  default_range: [false, true] = [false, true];
   get active(): boolean {
     // We need to test if the foreground aesthetic is in use.
     // because otherwise it consumes two draw calls.
@@ -151,8 +154,8 @@ export class Foreground<
 
 export class Filter<
   ChannelType extends DS.BooleanChannel = DS.BooleanChannel,
-  Input extends DS.InType = DS.InType
+  Input extends DS.InType = DS.InType,
 > extends BooleanAesthetic<ChannelType, Input> {
   default_constant = true;
-  default_range: [false, true] = [false, true]
+  default_range: [false, true] = [false, true];
 }
