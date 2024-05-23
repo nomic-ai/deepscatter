@@ -30,7 +30,6 @@ export class LabelMaker extends Renderer {
   public tree: DepthTree;
   public timer?: Timer;
   public label_key?: string;
-  //  public svg: SVGElement;
   public labelgroup: SVGGElement;
   private hovered: undefined | string;
   public options: DS.LabelOptions = {};
@@ -45,11 +44,7 @@ export class LabelMaker extends Renderer {
     id_raw: string,
     options: DS.LabelOptions = {},
   ) {
-    super(
-      scatterplot.div!.node() as HTMLDivElement,
-      scatterplot.deeptable,
-      scatterplot,
-    );
+    super(scatterplot.div!.node() as HTMLDivElement, scatterplot);
     this.options = options;
     this.canvas = scatterplot
       .elements![2].selectAll('canvas')
@@ -99,8 +94,6 @@ export class LabelMaker extends Renderer {
       this.timer.stop();
     }
 
-    select(this.labelgroup).attr('display', 'inline');
-
     this.timer = timer(() => {
       this.render();
       ticks -= 1;
@@ -120,7 +113,7 @@ export class LabelMaker extends Renderer {
   stop() {
     if (this.timer) {
       this.timer.stop();
-      select(this.labelgroup).attr('display', 'none');
+      select(this.labelgroup).selectAll('rect.labelbbox').remove();
       this.ctx.clearRect(0, 0, 4096, 4096);
       this.timer = undefined;
     }
@@ -198,11 +191,16 @@ export class LabelMaker extends Renderer {
     const bboxes = select(this.labelgroup)
       .selectAll('rect.labelbbox')
       // Keyed by the coordinates.
-      .data(overlaps, (d: BBox) => String(d.minZ) + String(d.minX))
+      .data(
+        overlaps,
+        (d: BBox) =>
+          String(d.minZ) + String(d.minX) + (d.data as RawPoint).text,
+      )
       .join((enter) =>
         enter
           .append('rect')
           .attr('class', 'labellbox')
+          .attr('data-labelmaker-label', (d) => `${(d.data as RawPoint).text}`)
           .style('opacity', RECT_DEFAULT_OPACITY),
       );
 
@@ -308,7 +306,7 @@ export class LabelMaker extends Renderer {
       .attr('display', (d: P3d) => {
         return (d.data.properties.__display as string) || 'inline';
       })
-      .on('mouseover', (event, d) => {
+      .on('mouseover', (event, d: P3d) => {
         select(event.target).style('opacity', RECT_DEFAULT_OPACITY);
         this.hovered = '' + d.minZ + d.minX;
         event.stopPropagation();

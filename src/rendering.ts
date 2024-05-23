@@ -135,17 +135,12 @@ export class Renderer {
   public aes?: AestheticSet;
   public _zoom?: Zoom;
   public render_props: RenderProps = new RenderProps();
-  constructor(
-    selector: string | Node,
-    tileSet: Deeptable,
-    scatterplot: Scatterplot,
-  ) {
+  constructor(selector: string | Node, scatterplot: Scatterplot) {
     this.scatterplot = scatterplot;
     this.holder = select(selector as string);
     this.canvas = select(
       this.holder!.node()!.firstElementChild,
     ).node() as HTMLCanvasElement;
-    this.deeptable = tileSet;
     this.width = +select(this.canvas).attr('width');
     this.height = +select(this.canvas).attr('height');
     this.deferred_functions = [];
@@ -181,7 +176,7 @@ export class Renderer {
     const { aes } = this;
     const needed = new Set<string>();
     if (aes) {
-      for (const [_k, v] of Object.entries(aes.store)) {
+      for (const v of Object.values(aes.store)) {
         if (v instanceof StatefulAesthetic) {
           for (const f of v.neededFields) {
             needed.add(f);
@@ -242,7 +237,7 @@ export class Renderer {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
-    const { deeptable: tileSet } = this;
+
     // Materialize using a tileset method.
 
     if (!this.aes) throw new Error('Aesthetic missing');
@@ -255,7 +250,7 @@ export class Renderer {
       y.last.field == 'y';
 
     const all_tiles = natural_display
-      ? tileSet
+      ? this.scatterplot.deeptable
           .map((d: Tile) => d)
           .filter((tile) => {
             const visible = tile.is_visible(
@@ -264,7 +259,9 @@ export class Renderer {
             );
             return visible;
           })
-      : tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
+      : this.scatterplot.deeptable
+          .map((d) => d)
+          .filter((tile) => tile.min_ix < this.max_ix);
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
     return all_tiles;
   }

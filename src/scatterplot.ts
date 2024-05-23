@@ -391,9 +391,7 @@ export class Scatterplot {
     const { prefs } = this;
 
     await this.deeptable.ready;
-    console.log('HERE');
     await this.deeptable.root_tile.get_column('x');
-    console.log('HERE 2');
 
     this._renderer = new ReglRenderer(
       '#container-for-webgl-canvas',

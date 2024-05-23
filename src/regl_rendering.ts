@@ -75,7 +75,7 @@ export class ReglRenderer extends Renderer {
     tileSet: Deeptable,
     scatterplot: Scatterplot,
   ) {
-    super(selector, tileSet, scatterplot);
+    super(selector, scatterplot);
     const c = this.canvas;
     if (this.canvas === undefined) {
       throw new Error('No canvas found');
