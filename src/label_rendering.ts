@@ -94,8 +94,6 @@ export class LabelMaker extends Renderer {
       this.timer.stop();
     }
 
-    select(this.labelgroup).attr('display', 'inline');
-
     this.timer = timer(() => {
       this.render();
       ticks -= 1;
@@ -115,7 +113,7 @@ export class LabelMaker extends Renderer {
   stop() {
     if (this.timer) {
       this.timer.stop();
-      select(this.labelgroup).attr('display', 'none');
+      select(this.labelgroup).selectAll('rect.labelbbox').remove();
       this.ctx.clearRect(0, 0, 4096, 4096);
       this.timer = undefined;
     }
@@ -193,7 +191,11 @@ export class LabelMaker extends Renderer {
     const bboxes = select(this.labelgroup)
       .selectAll('rect.labelbbox')
       // Keyed by the coordinates.
-      .data(overlaps, (d: BBox) => String(d.minZ) + String(d.minX))
+      .data(
+        overlaps,
+        (d: BBox) =>
+          String(d.minZ) + String(d.minX) + (d.data as RawPoint).text,
+      )
       .join((enter) =>
         enter
           .append('rect')
