@@ -115,11 +115,13 @@ export class Tile {
     this._partialManifest = manifest;
   }
 
-  delete_column_if_exists(colname: string) {
+  deleteColumn(colname: string) {
     if (this._batch) {
       this._buffer_manager?.release(colname);
       this._batch = add_or_delete_column(this.record_batch, colname, null);
     }
+    // Ensure there is no cached version here.
+    this.transformation_holder[colname] = undefined;
   }
 
   async get_column(colname: string): Promise<Vector> {
@@ -174,11 +176,6 @@ export class Tile {
       },
     );
     return this.transformation_holder[name];
-  }
-
-  add_column(name: string, data: Float32Array) {
-    this._batch = add_or_delete_column(this.record_batch, name, data);
-    return this._batch;
   }
 
   /**
@@ -730,21 +727,3 @@ function quadtreeChildrenNames(tile: string) {
 
 // Deprecated, for backwards compatibility.
 export const QuadTile = Tile;
-
-[
-  {
-    space: 'organization',
-    access_role: 'owner',
-    permissions: {
-      organization_delete: true,
-      organization_members_read: true,
-      organization_members_write: true,
-      organization_metadata_read: true,
-      organization_metadata_write: true,
-      organization_api_keys_write: true,
-      organization_api_keys_read: true,
-      organization_projects_read: true,
-      organization_projects_write: true,
-    },
-  },
-];

@@ -555,7 +555,6 @@ export class Scatterplot {
   }
 
   public stop_labellers() {
-    console.log('Stopping labels');
     for (const [k, v] of Object.entries(this.secondary_renderers)) {
       // Stop any existing labels
       if (v && v['label_key'] !== undefined) {

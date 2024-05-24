@@ -104,7 +104,6 @@ class RenderProps {
     return this.targetOpacity.value;
   }
   get point_size() {
-    // console.log('GETTING POINT SIZE', this.pointSize.value);
     return this.pointSize.value;
   }
   get foreground_opacity() {
@@ -205,7 +204,7 @@ export class Renderer {
     ]) as number;
 
     const total_points = total_intended_points * (1 - discard_share);
-    //console.log({ total_points });
+
     const size_adjust = Math.exp(Math.log(k) * zoom_balance);
     const area_of_point =
       Math.PI * ((size_adjust * point_size) / pixelRatio / 2) ** 2;

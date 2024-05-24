@@ -10,7 +10,7 @@ import {
   Vector,
   makeData,
 } from 'apache-arrow';
-import { bisectLeft } from 'd3-array';
+import { bisectLeft, range } from 'd3-array';
 interface SelectParams {
   name: string;
   useNameCache?: boolean; // If true and a selection with that name already exists, use it and ignore all passed parameters. Otherwise, throw an error.
@@ -92,7 +92,6 @@ function isComposition(elems: unknown): elems is Composition {
   if (!Array.isArray(elems)) return false;
   const op = elems[0] as unknown;
   if (typeof op !== 'string') return false;
-  console.log('OP', op, elems);
   return ['AND', 'OR', 'XOR', 'NOT', 'ANY', 'ALL'].indexOf(op) == 0;
 }
 
@@ -420,8 +419,38 @@ export class DataSelection {
    * cables to melt.
    */
 
-  applyToAllTiles(): Promise<void> {
-    throw new Error('Method not implemented.');
+  async applyToAllTiles(threads = 4): Promise<void> {
+    const allTiles = [this.deeptable.root_tile];
+    const promises: (() => Promise<void>)[] = [];
+
+    // Go through the entire tree, generating promises
+    // @eslint-ignore-rule no-constant-condition
+    while (true) {
+      const t = allTiles.shift();
+      if (t === undefined) {
+        break;
+      }
+      promises.push(async () => {
+        await t.get_column(this.name);
+      });
+      for (const child of await t.allChildren()) {
+        allTiles.push(child);
+      }
+    }
+
+    // Create threads number of consumers.
+    const workers = range(threads).map(async () => {
+      while (true) {
+        const p = promises.shift();
+        if (p === undefined) {
+          break;
+        }
+        await p();
+      }
+    });
+    // Wait for them to finish
+    await Promise.all(workers);
+    return;
   }
 
   /**
@@ -665,9 +694,9 @@ export class DataSelection {
   ): DS.BoolTransformation {
     return async (tile: Tile) => {
       const array = await functionToApply(tile);
-      const batch = tile.record_batch;
+      await tile.populateManifest();
       let matches = 0;
-      for (let i = 0; i < batch.numRows; i++) {
+      for (let i = 0; i < tile.manifest.nPoints; i++) {
         if ((array['get'] && array['get'](i)) || array[i]) {
           matches++;
         }
@@ -675,7 +704,7 @@ export class DataSelection {
       this.match_count.push(matches);
       this.tiles.push(tile);
       this.selectionSize += matches;
-      this.evaluationSetSize += batch.numRows;
+      this.evaluationSetSize += tile.manifest.nPoints;
       // DANGER! Possible race condition. Although the tile loaded
       // dispatches here, it may take a millisecond or two
       // before the actual assignment has happened in the recordbatch.

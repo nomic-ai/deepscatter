@@ -66,8 +66,9 @@ const defaultTransformations: Record<string, Transformation> = {
  * batchwise operations.
  */
 export class Deeptable {
-  public transformations: Record<string, Transformation> =
-    defaultTransformations;
+  public transformations: Record<string, Transformation> = {
+    ...defaultTransformations,
+  };
   public _plot: Scatterplot | null;
   private extents: Record<string, [number, number] | [Date, Date]> = {};
   // A 3d identifier for the tile. Usually [z, x, y]
@@ -310,14 +311,17 @@ export class Deeptable {
     );
   }
 
-  delete_column_if_exists(name: string) {
-    // This is a complicated operation to actually free up memory.
-    // Clone the record batches, without this data;
-    // This function on each tile also frees up the associated GPU memory.
-    this.map((d) => d.delete_column_if_exists(name));
-
-    // There may be data bound up in the function that creates it.
-    delete this.transformations[name];
+  /**
+   * This is a complicated operation to actually free up memory.
+   * Clone the record batches, without this data;
+   * This function on each tile also frees up the associated GPU memory.
+   *
+   * It keeps the previous transformation in place, so that the data can refreshed if needed.
+   *
+   * @param name the column to delete
+   */
+  deleteColumn(name: string) {
+    this.map((d: Tile) => d.deleteColumn(name));
   }
 
   /**
@@ -911,6 +915,21 @@ function check_overlap(tile: Tile, bbox: Rectangle): number {
   return area(intersection) / area(bbox);
 }
 
+export function replace_column(
+  batch: RecordBatch | undefined,
+  field_name: string,
+  data: ArrowBuildable | null,
+) {
+  // First, delete any existing version
+
+  const emptied =
+    batch === undefined
+      ? undefined
+      : add_or_delete_column(batch, field_name, null);
+
+  // then add the new version
+  add_or_delete_column(emptied, field_name, data);
+}
 /**
  *
  * @param batch the batch to delete from.

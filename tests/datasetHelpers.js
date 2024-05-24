@@ -71,8 +71,6 @@ export function createIntegerDataset() {
   return Deeptable.fromArrowTable(table);
 }
 
-const memo = {};
-
 function buildDeepManifest(
   startingKey = '0/0/0',
   depth = 8,
@@ -84,6 +82,8 @@ function buildDeepManifest(
   extent = { x: [-1, 1], y: [-1, 1] },
   startingIx = 0,
 ) {
+  const memo = {};
+
   const [z, x, y] = startingKey.split('/').map(parseInt);
 
   const children = [];

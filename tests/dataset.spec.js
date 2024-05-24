@@ -15,6 +15,24 @@ test('Dataset can be created', async () => {
   assert.is(integers.toArray()[10], 10);
 });
 
+test('Columns can be deleted and replaced', async () => {
+  const dataset = createIntegerDataset();
+  const x = await dataset.root_tile.get_column('x');
+  assert.is(x.length, 4096);
+  const integers = await dataset.root_tile.get_column('integers');
+  assert.is(integers.toArray()[10], 10);
+
+  dataset.transformations['integers'] = async function (tile) {
+    await tile.populateManifest();
+    return new Float32Array(tile.manifest.nPoints);
+  };
+
+  dataset.deleteColumn('integers');
+
+  const newX = await dataset.root_tile.get_column('integers');
+  assert.is(newX.toArray()[10], 0);
+});
+
 test('Test composition of selections', async () => {
   const dataset = createIntegerDataset();
   await dataset.root_tile.preprocessRootTileInfo();
@@ -24,7 +42,7 @@ test('Test composition of selections', async () => {
   });
 
   await selectEvens.ready;
-  await selectEvens.applyToAllLoadedTiles();
+  await selectEvens.applyToAllTiles();
 
   const selectThree = new DataSelection(dataset, {
     name: 'threes',
@@ -37,7 +55,7 @@ test('Test composition of selections', async () => {
   });
 
   await selectSix.ready;
-  await selectSix.applyToAllLoadedTiles();
+  await selectSix.applyToAllTiles();
 
   assert.ok(
     Math.abs(

@@ -154,7 +154,6 @@ export class TextureSet {
     // value: the array to stash onto the texture.
     let offset: number;
     const { offsets } = this;
-    console.log('offset', offsets);
 
     if (offsets[id]) {
       offset = offsets[id];

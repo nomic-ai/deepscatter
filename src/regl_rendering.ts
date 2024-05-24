@@ -199,7 +199,6 @@ export class ReglRenderer extends Renderer {
         number,
       ],
     };
-    // console.log(props.alpha, 'alpha');
 
     // Clone.
     return JSON.parse(JSON.stringify(props)) as DS.GlobalDrawProps;
@@ -826,7 +825,6 @@ export class ReglRenderer extends Renderer {
         u_base_size: (_: C, { point_size }: P) => point_size,
         u_maxix: (_: C, { max_ix }: P) => max_ix,
         u_alpha: (_: C, { alpha }: P) => {
-          //console.log(alpha);
           return alpha;
         },
         u_foreground_number: (_: C, { foreground }: P) => foreground as number,
@@ -846,9 +844,6 @@ export class ReglRenderer extends Renderer {
         u_background_size: () => this.render_props.background_size,
         u_foreground_size: () => this.render_props.foreground_size,
         u_k: (_: DefaultContext, props: P) => {
-          if (Math.random() < 0.01) {
-            //console.log(props.transform.k);
-          }
           return props.transform.k;
         },
         // Allow interpolation between different coordinate systems.
@@ -874,8 +869,6 @@ export class ReglRenderer extends Renderer {
       ] as const) {
         parameters.uniforms[`u_${time[0]}${dim}_numeric`] = () => {
           const ops = d[time[1]].ops_to_array();
-          // console.log(ops, dim, time)
-          // console.log(1)
           return ops;
         };
       }
