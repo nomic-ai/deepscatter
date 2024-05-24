@@ -44,7 +44,7 @@
   },
   "homepage": "https://github.com/nomic-ai/deepscatter#readme",
   "peerDependencies": {
-    "apache-arrow": "^15.0.2"
+    "apache-arrow": ">=11.0.0 <17.0.0"
   },
   "dependencies": {
     "d3-array": "^3.2.4",
