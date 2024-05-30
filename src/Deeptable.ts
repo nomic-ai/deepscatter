@@ -197,6 +197,7 @@ export class Deeptable {
    * Ensures that all the tiles in a deeptable are downloaded that include
    * datapoints of index less than or equal to max_ix.
    * @param max_ix the depth to download to.
+   * @param suffix the table suffix.
    */
   async download_to_depth(max_ix: number, suffix: string | null = null) {
     await this.root_tile.download_to_depth(max_ix, suffix);
@@ -660,6 +661,32 @@ export class Deeptable {
   }
 
   /**
+   *
+   * @param max_ix the depth to download to.
+   * @param fields the names of the columns to fetch
+   * @param bbox Optionally a bounding box rectangle in the quadtree data space to limit
+   * the download to.
+   * @returns a promise that resolves when the download is complete.
+   */
+  downloadFieldsToDepth(
+    max_ix: number,
+    fields: string[],
+    bbox: Rectangle | undefined = undefined,
+  ): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const tick = () => {
+        const complete = this.spawnDownloads(bbox, max_ix, 8, fields);
+        if (complete) {
+          resolve();
+        } else {
+          setTimeout(tick, 10);
+        }
+      };
+      tick();
+    });
+  }
+
+  /**
    * Deepscatter manages its own download queue.
    *
    * Given a bounding box and a set fields, spawns network/io calls to fetch up to `queue_length`
@@ -669,7 +696,7 @@ export class Deeptable {
    * @param max_ix
    * @param queue_length
    * @param fields
-   * @returns
+   * @returns true if the downloads are complete, false if they are not.
    */
   spawnDownloads(
     bbox: Rectangle | undefined,
@@ -677,7 +704,7 @@ export class Deeptable {
     queue_length = 8,
     fields: string[] = ['x', 'y', 'ix'],
     priority: 'high' | 'low' = 'high',
-  ) {
+  ): boolean {
     /*
       Browsing can spawn a  *lot* of download requests that persist on
       unneeded parts of the deeptable. So the deeptable handles its own queue for dispatching
@@ -688,7 +715,7 @@ export class Deeptable {
 
     if (queue.size >= queue_length) {
       this.runDownloads();
-      return;
+      return false;
     }
 
     const scores: [number, Tile][] = [];
@@ -744,7 +771,10 @@ export class Deeptable {
     if (this._transformation_fetch_queue.size > 0) {
       // Create a ticker that will clear the queue.
       this.runDownloads();
+      return false;
     }
+    // If we make it here, there are no more tiles left to download.
+    return true;
   }
 
   /**
