@@ -1,6 +1,8 @@
 # 3.0.0
 
-3.0.0 introduces fewer major new features than some previous 2.0 releases, but it includes a number of pent-up _breaking_ changes. The underlying motivation for many of these is to allow library to now fully pass typescript compilation tests, with all the stability benefits that provides.
+# 3.0.0
+
+3.0.0 includes a number of pent-up _breaking_ changes. The underlying motivation for many of these is to allow library to now fully pass typescript compilation tests, with all the stability benefits that provides, to fully extend the concept of 'transformations' introduced in 2.9.0 to make derived data columns first-class citizens by removing the need to have the root tile present for all operations, and supporting tile manifests so that some operations can plumb the entirety of the quadtree while others are restricted only to visible points.
 
 Breaking changes:
 
@@ -17,11 +19,11 @@ Breaking changes:
    import { Scatterplot } from 'deepscatter';
    ```
 
-   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{ Dataset, Bitmask, Scatterplot, dictionaryFromArrays, LabelMaker }`. Bitmasks are efficient, useful ways to refer to update and refer to selection masks.
+   This allows the export of several useful types for advanced functions in scatterplots we've found useful at Nomic. The initial set of exported items are `{ Deeptable, Bitmask, Scatterplot, dictionaryFromArrays, LabelMaker }`. Deeptable is a renamed version of the old Dataset abstract class which is no longer generic, and has been renamed because there are lots of things in the world called `Dataset` but not many called deeptable, and it better captures the weirdness of the thing. (A deeptable is basically a tree of managers for Arrow record batches.)  Deeptable instances are now capable of being instantiated independently from scatterplots, and can run in node as well as the browser. (If you find yourself using that capability, *please* apply for a job at Nomic!) Bitmasks are efficient, useful ways to refer to update and refer to selection masks that we use internally at Nomic to handle selection functions.
 
-   Scatterplot and Dataset now default to destructuring assignments, although it is still possible to use the old function signature as well.
-
-2. Apache Arrow is now a peer dependency of
+   Scatterplot and Dataset now default to destructuring assignments in their constructors, although it is still possible to use the old function signature as well.
+   
+3. Apache Arrow is now a peer dependency of
    deepscatter rather than
    being bundled into the distribution. Most bundlers will hopefully take care of installation for you, but if you are writing raw HTML code,
    it will be necessary to include and re-export it. In general that will look like this.
@@ -31,7 +33,7 @@ Breaking changes:
    export { Arrow };
    ```
 
-3. The distinction between `QuadTile` and `ArrowTile`
+4. The distinction between `QuadTile` and `ArrowTile`
    has been eliminated in favor of `Tile`, and with it the need to supply
    generics around them through the system. Similarly, `QuadTileDataset` and `ArrowDataset` have both been removed in favor of `Deeptable`, which is a generalized
    version of the dataset class. It has been renamed because
@@ -39,17 +41,17 @@ Breaking changes:
    captures that this thing is one of the primary novel
    objects in this library--a lazily loaded structure for operations on a collection of Arrow record batches that are arranged in a tree.
 
-4. Deepscatter no longer accepts strings as direct
+5. Deepscatter no longer accepts strings as direct
    arguments to `Scatterplot.plotAPI` in places where they were previously cast to functions
    as lambdas, because linters rightfully get crazy mad about the unsafe use of `eval`. If
    you want to use deepscatter in scrollytelling
    contexts where definining functions as strings inside json is convenient (I still will do this myself in static sites) you must turn them
    into functions _before_ passing them into deepscatter.
 
-5. Shortcuts for passing `position` and `position0` rather
+6. Shortcuts for passing `position` and `position0` rather
    than naming the `x` and `y` dimensions explicitly have been removed.
 
-6. Tile objects no longer have `ready` and `promise` states.
+7. Tile objects no longer have `ready` and `promise` states.
    This is because tiles
    other than the first no longer necessarily download any data at all. Code that blocked on these states should instead block on the dataset's `ready` promise; code needing to know if a particular tile has a record batch can check for the presence of `tile.record_batch`, but this no
    long guarantees that any particular data columns (including 'x', 'y', and 'ix') are present. The purpose of this change is to allow
@@ -60,11 +62,11 @@ Breaking changes:
    object (this as childLocations, min_ix, max_ix, highest_known_ix, etc.) is now located in an object called `manifest` that is used to manage children. This is designed to
    make it possible (though not yet necessary) to pre-load a single file enumerating all the tiles in the dataset.
 
-7. The tools for handling a DataSelection have been moved
+8. The tools for handling a DataSelection have been moved
    from the scatterplot class to the `deeptable` class. This is because the selection is a property of the dataset, not the plot, and can be instantiated without the plot
    being drawn.
 
-8. 2. Datasets where underlying data is boolean using API encoding channels `filter`, `filter2`, and `foreground` no longer handle the data with `op` commands: instead, true is true and false is false.
+9. 2. Datasets where underlying data is boolean using API encoding channels `filter`, `filter2`, and `foreground` no longer handle the data with `op` commands: instead, true is true and false is false.
 
 ## Fundamental design changes
 
