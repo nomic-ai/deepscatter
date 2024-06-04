@@ -244,31 +244,6 @@ export class Tile {
       }
     } else {
       throw new Error('Sorted iteration not supported');
-      /*
-      let children = this.children.map((tile) => {
-        const f = {
-          t: tile,
-          iterator: tile.points(bounding, sorted),
-          next: undefined,
-        };
-        f.next = f.iterator.next();
-        return f;
-      });
-      children = children.filter((d) => d?.next?.value);
-      while (children.length > 0) {
-        let mindex = 0;
-        for (let i = 1; i < children.length; i++) {
-          if (children[i].next.value.ix < children[mindex].next.value.ix) {
-            mindex = i;
-          }
-        }
-        yield children[mindex].next.value;
-        children[mindex].next = children[mindex].iterator.next();
-        if (children[mindex].next.done) {
-          children = children.splice(mindex, 1);
-        }
-      }
-    */
     }
   }
 

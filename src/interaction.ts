@@ -23,6 +23,18 @@ type Annotation = {
   data: StructRowProxy;
 };
 
+// A collection of zoomed and unzoomed scales returned by the interaction component.
+export type ScaleSet = {
+  // The x scale to the screen coordinates at no zoom.
+  x: ScaleLinear<number, number>;
+  // The y scale to the screen coordinates at no zoom.
+  y: ScaleLinear<number, number>;
+  // The x scale in the translated space of the current zoom.
+  x_: ScaleLinear<number, number>;
+  // The y scale in the translated space of the current zoom.
+  y_: ScaleLinear<number, number>;
+};
+
 export class Zoom {
   public prefs: DS.APICall;
   public svg_element_selection: d3.Selection<
@@ -36,7 +48,7 @@ export class Zoom {
   public renderers: Map<string, Renderer>;
   public deeptable?: Deeptable;
   public _timer?: d3.Timer;
-  public _scales?: Record<string, d3.ScaleLinear<number, number>>;
+  public _scales?: ScaleSet;
   public zoomer?: d3.ZoomBehavior<Element, unknown>;
   public transform?: d3.ZoomTransform;
   public _start?: number;
@@ -169,7 +181,7 @@ export class Zoom {
   }
 
   set_highlit_points(data: StructRowProxy[]) {
-    const { x_, y_ } = this.scales();
+    const { x_, y_, x, y } = this.scales();
     const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
     this.scatterplot.highlit_point_change(data, this.scatterplot);
@@ -200,6 +212,7 @@ export class Zoom {
             .attr('fill', (dd) => this.scatterplot.dim('color').apply(dd))
             .attr('cx', (datum) => x_(xdim.apply(datum)))
             .attr('cy', (datum) => y_(ydim.apply(datum))),
+
         (update) =>
           update.attr('fill', (dd) => this.scatterplot.dim('color').apply(dd)),
         (exit) =>
@@ -289,7 +302,11 @@ export class Zoom {
     return this as Zoom;
   }
 
-  scales(): Record<string, ScaleLinear<number, number>> {
+  /**
+   *
+   * @returns
+   */
+  scales(): ScaleSet {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.
@@ -309,7 +326,6 @@ export class Zoom {
       throw new Error('Error--scales created before tileSet present.');
     }
     const { extent } = this.deeptable;
-    const scales: Record<string, ScaleLinear<number, number>> = {};
     if (extent === undefined) {
       throw new Error('Error--scales created before extent present.');
     }
@@ -350,17 +366,20 @@ export class Zoom {
       y_buffer_size = (height - y_target_size) / 2;
     }
 
-    scales.x = scaleLinear()
+    const x = scaleLinear()
       .domain(scale_dat.x.limits)
       .range([x_buffer_size, width - x_buffer_size]);
 
-    scales.y = scaleLinear()
+    const y = scaleLinear()
       .domain(scale_dat.y.limits)
       .range([y_buffer_size, height - y_buffer_size]);
 
-    scales.x_ = this.transform.rescaleX(scales.x);
-    scales.y_ = this.transform.rescaleY(scales.y);
-
+    const scales: ScaleSet = {
+      x,
+      y,
+      x_: this.transform.rescaleX(x),
+      y_: this.transform.rescaleY(y),
+    };
     this._scales = scales;
     return scales;
   }

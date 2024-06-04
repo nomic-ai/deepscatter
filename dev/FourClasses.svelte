@@ -4,7 +4,7 @@
   import SwitchPositions from './svelte/SwitchPositions.svelte';
   import ColorChange from './svelte/ColorChange.svelte';
   import SizeSlider from './svelte/SizeSlider.svelte';
-
+  import PositionScales from './svelte/PositionScales.svelte';
   const startSize = 2;
   const prefs = {
     source_url: '/tiles',
@@ -41,6 +41,7 @@
   <SwitchPositions {scatterplot}></SwitchPositions>
   <ColorChange {scatterplot}></ColorChange>
   <SizeSlider size={startSize} {scatterplot}></SizeSlider>
+  <PositionScales {scatterplot} />
 </div>
 
 <div id="deepscatter"></div>

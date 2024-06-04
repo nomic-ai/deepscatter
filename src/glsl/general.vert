@@ -484,6 +484,10 @@ float linstep(in vec2 range, in float x) {
   return clamp(from_left / scale_size, 0.0, 1.0);
 }
 
+
+/**
+  Given a range and a value, return the value scaled to between 0 and 1.
+*/
 float linscale(in vec2 range, in float x) {
   float scale_size = range.y - range.x;
   float from_left = x - range.x;
@@ -501,8 +505,18 @@ vec2 box_muller(in float ix, in float seed) {
 /*************** END COLOR SCALES *******************************/
 
 
+/**
+  * Clamp an attribute into a domain, with an optional log or sqrt transform.
+  * @param domain The domain to clamp into.
+  * @param transform The type of transform to apply.
+  * @param attr The value to place in the scale to transform.
+  * @param overflow_behavior
+    0 : extrapolate
+    1 : clamp
+    2 : wrap
+  * @return The transformed attribute on a range between zero and one.
+*/
 float domainify(in vec2 domain, in float transform, in float attr, in float overflow_behavior) {
-
 
   // Clamp an attribute into a domain, with an optional log or sqrt transform.
   if (transform == 2.) {
@@ -627,19 +641,16 @@ vec2 calculate_position(in vec2 position, in float x_scale_type,
     float y;
 
     if (x_scale_type < 4.0) {
-      float x_ = linscale(u_color_domain, a_color);
-      x = texture_float_lookup(x_domain, x_range,
-        x_scale_type,
-        position.x, 0. // ymap position 0 means never use a texture lookup.
-        );
+      // scaled between zero and one.
+      float scaled = domainify(x_domain, x_scale_type, position.x, 0.0);
+      x = mix(x_range.x, x_range.y, scaled);
     } else {
       x = position.x;
     }
 
     if (y_scale_type < 4.0) {
-      y = texture_float_lookup(y_domain, y_range, y_scale_type,
-        position.y, 0. // ymap position 0 means never use a texture lookup.
-        );
+      float scaled = domainify(y_domain, y_scale_type, position.y, 0.0);
+      y = mix(y_range.x, y_range.y, scaled);
     } else {
       y = position.y;
     }

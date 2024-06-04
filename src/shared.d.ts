@@ -22,6 +22,7 @@ import { ZoomTransform } from 'd3-zoom';
 import { TileBufferManager } from './regl_rendering';
 import type { Tile } from './tile';
 import type { Rectangle } from './tile';
+import { ScaleLinear } from 'd3-scale';
 export type { Renderer, Deeptable, ConcreteAesthetic };
 
 export type BufferLocation = {

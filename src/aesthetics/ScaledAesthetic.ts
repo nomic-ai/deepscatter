@@ -128,7 +128,7 @@ export abstract class ScaledAesthetic<
       TODO: integer and bool support.      
     }*/ else {
       throw new Error(
-        'Only dictionary columns can create categorical values for now scales.',
+        'Only dictionary columns can create categorical values for new scales.',
       );
     }
     return values as Input['domainType'][];
