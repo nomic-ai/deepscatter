@@ -181,7 +181,7 @@ export class Zoom {
   }
 
   set_highlit_points(data: StructRowProxy[]) {
-    const { x_, y_, x, y } = this.scales();
+    const { x_, y_ } = this.scales();
     const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
     this.scatterplot.highlit_point_change(data, this.scatterplot);
