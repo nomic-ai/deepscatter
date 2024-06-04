@@ -878,18 +878,6 @@ export class Scatterplot {
     }
     return this._zoom;
   }
-
-  sample_points(n = 10): Record<string, number | string>[] {
-    const vals: Record<string, number | string>[] = [];
-    for (const p of this.deeptable.points(this.zoom.current_corners())) {
-      vals.push({ ...p });
-      if (vals.length >= n * 3) {
-        break;
-      }
-    }
-    vals.sort((a, b) => Number(a.ix) - Number(b.ix));
-    return vals.slice(0, n);
-  }
 }
 
 /**
