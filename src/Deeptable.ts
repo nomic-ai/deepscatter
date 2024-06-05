@@ -498,18 +498,19 @@ export class Deeptable {
 
     let seen = 0;
     const start = starting_tile || this.root_tile;
-    await start.deriveManifestInfoFromTileMetadata();
+    await start.populateManifest();
     const total_points = JSON.parse(
       start.record_batch.schema.metadata.get('total_points') || '1000000',
     ) as number;
 
-    async function resolve(tile: Tile) {
-      await tile.deriveManifestInfoFromTileMetadata();
+    async function visit(tile: Tile) {
+      await tile.populateManifest();
       if (!filter(tile)) {
         return;
       }
       if (after) {
-        await Promise.all(tile.loadedChildren.map(resolve));
+        const children = await tile.allChildren();
+        await Promise.all(children.map(visit));
         await callback(tile);
         seen += tile.record_batch.numRows;
         void updateFunction(tile, seen, total_points);
@@ -517,10 +518,11 @@ export class Deeptable {
         await callback(tile);
         seen += tile.record_batch.numRows;
         void updateFunction(tile, seen, total_points);
-        await Promise.all(tile.loadedChildren.map(resolve));
+        const children = await tile.allChildren();
+        await Promise.all(children.map(visit));
       }
     }
-    await resolve(start);
+    await visit(start);
   }
 
   schema() {
