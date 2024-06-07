@@ -92,7 +92,7 @@ function isComposition(elems: unknown): elems is Composition {
   if (!Array.isArray(elems)) return false;
   const op = elems[0] as unknown;
   if (typeof op !== 'string') return false;
-  return ['AND', 'OR', 'XOR', 'NOT', 'ANY', 'ALL'].indexOf(op) == 0;
+  return ['AND', 'OR', 'XOR', 'NOT', 'ANY', 'ALL'].indexOf(op) > -1;
 }
 
 async function extractBitmask(tile: Tile, arg: CompArgs): Promise<Bitmask> {
