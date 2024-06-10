@@ -36,7 +36,7 @@ export function isLabelset(labels: DS.Labelcall): labels is DS.Labelset {
 
 // There must be a general function here huh.
 export function isCompleteManifest(
-  manifest: Partial<DS.TileManifest>,
+  manifest: Partial<DS.TileManifest> | Partial<DS.LazyTileManifest>,
 ): manifest is DS.TileManifest {
   for (const k of [
     'key',

@@ -137,9 +137,10 @@ export class Deeptable {
     this.promise = preProcessRootTile.then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
-      this.root_tile.manifest =
-        await this.root_tile.deriveManifestInfoFromTileMetadata();
-
+      if (!tileManifest) {
+        this.root_tile.manifest =
+          await this.root_tile.deriveManifestInfoFromTileMetadata();
+      }
       if (schema.metadata.has('sidecars')) {
         const cars = schema.metadata.get('sidecars');
         if (typeof cars !== 'string')

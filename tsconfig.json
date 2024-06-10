@@ -20,7 +20,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "lib": ["DOM"],
-    "noEmitOnError": false,
+    "noEmitOnError": true,
     "emitDeclarationOnly": true,
   },
   "$schema": "https://json.schemastore.org/tsconfig",

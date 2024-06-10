@@ -22,7 +22,7 @@ export type Rectangle = {
 // }
 
 import type { TileBufferManager } from './regl_rendering';
-import type { ArrowBuildable, TileManifest } from './shared';
+import type { ArrowBuildable, LazyTileManifest, TileManifest } from './shared';
 import { isCompleteManifest } from './typing';
 
 export type RecordBatchCache =
@@ -59,10 +59,10 @@ export class Tile {
   public _highest_known_ix?: number;
   public deeptable: Deeptable;
   public _transformations: Record<string, Promise<ArrowBuildable>> = {};
-  public _deriveManifestFromTileMetadata?: Promise<TileManifest>;
+  public _deriveManifestFromTileMetadata?: Promise<LazyTileManifest>;
   //private _promiseOfChildren? = Promise<void>;
-  private _partialManifest: Partial<TileManifest>;
-  private _completeManifest?: TileManifest;
+  private _partialManifest: Partial<TileManifest> | Partial<LazyTileManifest>;
+  private _manifest?: TileManifest | LazyTileManifest;
 
   // A cache of fetchCalls for downloaded arrow tables, including any table schema metadata.
   // Tables may contain more than a single column, so this prevents multiple dispatch.
@@ -82,12 +82,17 @@ export class Tile {
    * @param deeptable The full atlas deeptable of which this tile is a part.
    */
   constructor(
-    key: string | (Partial<TileManifest> & { key: string }),
+    key:
+      | string
+      | (Partial<TileManifest> & { key: string })
+      | Partial<LazyTileManifest & { key: string }>,
     parent: Tile | null,
     deeptable: Deeptable,
   ) {
     // If it's just initiated with a key, build that into a minimal manifest.
-    let manifest: Partial<TileManifest> & { key: string };
+    let manifest:
+      | (Partial<TileManifest> & { key: string })
+      | Partial<LazyTileManifest & { key: string }>;
     if (typeof key === 'string') {
       manifest = { key };
     } else {
@@ -106,12 +111,12 @@ export class Tile {
     if (deeptable === undefined) {
       throw new Error('No deeptable provided');
     }
+
     // Grab the next identifier off the queue. This should be async safe with the current setup, but
     // the logic might fall apart in truly parallel situations.
     this.numeric_id = tile_identifier++;
 
     if (isCompleteManifest(manifest)) this.manifest = manifest;
-
     this._partialManifest = manifest;
   }
 
@@ -256,14 +261,14 @@ export class Tile {
     }
   }
 
-  get manifest(): TileManifest {
-    if (!this._completeManifest)
+  get manifest(): TileManifest | LazyTileManifest {
+    if (!this._manifest)
       throw new Error('Attempted to access manifest on partially loaded tile.');
 
-    return this._completeManifest;
+    return this._manifest;
   }
 
-  set manifest(manifest: TileManifest) {
+  set manifest(manifest: TileManifest | LazyTileManifest) {
     // Setting the manifest is the thing that spawns children.
     if (!manifest.children) {
       console.error({ manifest });
@@ -273,7 +278,7 @@ export class Tile {
       return new Tile(k, this, this.deeptable);
     });
     this.highest_known_ix = manifest.max_ix;
-    this._completeManifest = manifest;
+    this._manifest = manifest;
   }
 
   set highest_known_ix(val) {
@@ -314,7 +319,7 @@ export class Tile {
   }
 
   get min_ix() {
-    if (this._completeManifest && this.manifest?.min_ix !== undefined) {
+    if (this._manifest && this.manifest?.min_ix !== undefined) {
       return this.manifest.min_ix;
     }
     if (this.parent) {
@@ -332,7 +337,7 @@ export class Tile {
   }
 
   get extent(): Rectangle {
-    if (this._completeManifest && this.manifest?.extent) {
+    if (this._manifest && this.manifest?.extent) {
       return this.manifest.extent;
     }
     return this.theoretical_extent;
@@ -437,7 +442,7 @@ export class Tile {
    * @returns void
    */
   async populateManifest(): Promise<void> {
-    if (this._completeManifest) {
+    if (this._manifest) {
       return;
     } else if (this._partialManifest.children) {
       if (this._partialManifest.nPoints === undefined) {
@@ -446,7 +451,7 @@ export class Tile {
       this.manifest = {
         ...this._partialManifest,
         key: this.key,
-        children: this._partialManifest.children,
+        children: this._partialManifest.children as string[],
         min_ix: this.min_ix,
         max_ix: this.max_ix,
         extent: this.extent,
@@ -482,13 +487,15 @@ export class Tile {
     });
   }
 
-  async deriveManifestInfoFromTileMetadata(): Promise<TileManifest> {
+  async deriveManifestInfoFromTileMetadata(): Promise<
+    TileManifest | LazyTileManifest
+  > {
     // This should only be called once per tile.
     if (this._deriveManifestFromTileMetadata !== undefined) {
       return this._deriveManifestFromTileMetadata;
     }
 
-    const manifest: Partial<TileManifest> = {};
+    const manifest: Partial<LazyTileManifest> = {};
     this._deriveManifestFromTileMetadata = this.get_arrow(null).then(
       async (batch) => {
         // For every column in the root tile,
@@ -521,7 +528,8 @@ export class Tile {
         const children = metadata.get('children');
 
         if (children) {
-          manifest.children = JSON.parse(children) as TileManifest[] | string[];
+          const stringChildren = JSON.parse(children) as string[];
+          manifest.children = stringChildren;
         }
 
         // TODO: make ix optionally parsed from metadata, not column.
@@ -548,7 +556,7 @@ export class Tile {
           max_ix: manifest.max_ix,
           extent: manifest.extent,
           nPoints: batch.numRows,
-        } as TileManifest;
+        } as const;
         return fullManifest;
       },
     );

@@ -22,7 +22,6 @@ import { ZoomTransform } from 'd3-zoom';
 import { TileBufferManager } from './regl_rendering';
 import type { Tile } from './tile';
 import type { Rectangle } from './tile';
-import { ScaleLinear } from 'd3-scale';
 export type { Renderer, Deeptable, ConcreteAesthetic };
 
 export type BufferLocation = {
@@ -61,11 +60,20 @@ export type ScatterplotOptions = {
 // allow certain optimizations.
 export type TileStructure = 'quadtree' | 'other';
 
+export type LazyTileManifest = {
+  key: string;
+  // The number of data points in that specific tile.
+  nPoints: number;
+  children: string[];
+  min_ix: number;
+  max_ix: number;
+  extent: Rectangle;
+};
 export type TileManifest = {
   key: string;
   // The number of data points in that specific tile.
   nPoints: number;
-  children: TileManifest[] | string[];
+  children: TileManifest[];
   min_ix: number;
   max_ix: number;
   extent: Rectangle;
