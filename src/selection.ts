@@ -1,3 +1,4 @@
+/* eslint-disable no-constant-condition */
 import { Deeptable } from './Deeptable';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
@@ -7,6 +8,7 @@ import {
   DataType,
   StructRowProxy,
   Type,
+  Utf8,
   Vector,
   makeData,
 } from 'apache-arrow';
@@ -81,9 +83,9 @@ export interface CompositeSelectParams extends SelectParams {
 }
 
 function isCompositeSelectParam(
-  params: Record<string, any>,
+  params: CompositeSelectParams | BooleanColumnParams | IdSelectParams,
 ): params is CompositeSelectParams {
-  return params.composition !== undefined;
+  return (params as CompositeSelectParams).composition !== undefined;
 }
 
 function isComposition(elems: unknown): elems is Composition {
@@ -99,9 +101,7 @@ async function extractBitmask(tile: Tile, arg: CompArgs): Promise<Bitmask> {
   if (isComposition(arg)) {
     return applyCompositeFunctionToTile(tile, arg);
   } else {
-    const column = tile.get_column((arg as DataSelection).name) as Promise<
-      Vector<Bool>
-    >;
+    const column = tile.get_column(arg.name) as Promise<Vector<Bool>>;
     return Bitmask.from_arrow(await column);
   }
 }
@@ -130,7 +130,7 @@ async function applyCompositeFunctionToTile(
   } else if (isPluralSelectOperator(operator)) {
     const op = args[0];
     const bitmasks = await Promise.all(
-      args.slice(1).map((arg) => extractBitmask(tile, arg)),
+      args.slice(1).map((arg: CompArgs) => extractBitmask(tile, arg)),
     );
     const accumulated = bitmasks
       .slice(1)
@@ -173,9 +173,13 @@ function isBinarySelectOperation(
 }
 
 function isFunctionSelectParam(
-  params: Record<string, any>,
+  params:
+    | CompositeSelectParams
+    | BooleanColumnParams
+    | IdSelectParams
+    | FunctionSelectParams,
 ): params is FunctionSelectParams {
-  return params.tileFunction !== undefined;
+  return (params as FunctionSelectParams).tileFunction !== undefined;
 }
 
 /**
@@ -364,7 +368,7 @@ export class DataSelection {
     } else if (isCompositeSelectParam(params)) {
       const { name, composition } = params;
       this.composition = composition;
-      this.add_function_column(name, async (tile: Tile) => {
+      void this.add_function_column(name, async (tile: Tile) => {
         const bitmask = await applyCompositeFunctionToTile(tile, composition);
         return bitmask.to_arrow();
       }).then(markReady);
@@ -377,14 +381,14 @@ export class DataSelection {
    * @param listener a function to call back. It takes
    * as an argument the `tile` that was just added.
    */
-  on(event: string, listener: (args: any) => void): void {
+  on(event: string, listener: (args: unknown) => void): void {
     if (!this.events[event]) {
       this.events[event] = [];
     }
     this.events[event].push(listener);
   }
 
-  private dispatch(event: string, args: any): void {
+  private dispatch(event: string, args: unknown): void {
     if (this.events[event]) {
       this.events[event].forEach((listener) => listener(args));
     }
@@ -513,8 +517,8 @@ export class DataSelection {
    *
    * @param fields A list of fields in the data to export.
    */
-  async export(fields: string[], format: 'json' = 'json') {
-    /*
+  // async export(fields: string[], format: 'json' = 'json') {
+  /*
     This would have benefits, but might fetch data we don't actually need.
 
     const preparation = []
@@ -525,14 +529,14 @@ export class DataSelection {
     }
     await Promise.all(preparation)
     */
-    const columns = Object.fromEntries(fields.map((field) => [field, []]));
-    for (let row of this) {
-      for (let field of fields) {
-        columns[field].push(row[field]);
-      }
-    }
-    return columns;
-  }
+  //   const columns = Object.fromEntries(fields.map((field) => [field, []]));
+  //   for (let row of this) {
+  //     for (let field of fields) {
+  //       columns[field].push(row[field]);
+  //     }
+  //   }
+  //   return columns;
+  // }
 
   public moveCursorToPoint(
     point: StructRowProxy<{ ix: DataType<Type.Int64> }>,
@@ -857,7 +861,7 @@ function stringmatcher(field: string, matches: string[]) {
       if (!node[byte]) {
         node[byte] = [];
       }
-      node = node[byte] as TrieArray;
+      node = node[byte];
     }
 
     // Mark the end of a Uint8Array with a special property
@@ -878,8 +882,8 @@ function stringmatcher(field: string, matches: string[]) {
    * The Deepscatter transformation function.
    */
   return async function (tile: Tile) {
-    const col = (await tile.get_column(field)).data[0];
-    const bytes = col.values as Uint8Array;
+    const col = ((await tile.get_column(field)) as Vector<Utf8>).data[0];
+    const bytes = col.values;
     const offsets = col.valueOffsets;
 
     // Initialize results as a Float32Array with the same
@@ -893,7 +897,7 @@ function stringmatcher(field: string, matches: string[]) {
       let node = trie;
       for (let i = 0; i < len; i++) {
         const byte = bytes[start + i];
-        node = node[byte] as TrieArray;
+        node = node[byte];
         // If the node for this byte doesn't exist, the slice doesn't exist in the trie
         if (!node) {
           return false;
