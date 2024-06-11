@@ -12,8 +12,9 @@ import {
   scaleOrdinal,
   ScaleOrdinal,
   scaleBand,
+  ScaleSequential,
 } from 'd3-scale';
-import { isConstantChannel, isTransform } from '../typing';
+import { isConstantChannel } from '../typing';
 import { Dictionary, Int32, Type, Utf8, Vector } from 'apache-arrow';
 
 export const scales = {
@@ -33,6 +34,7 @@ export abstract class ScaledAesthetic<
   protected _scale:
     | ScaleContinuousNumeric<Input['domainType'], Output['rangeType']>
     | ScaleOrdinal<Input['domainType'], Output['rangeType']>
+    | ScaleSequential<Output['rangeType']>
     | null = null;
   public default_transform: DS.Transform = 'linear';
   abstract default_range: [Output['rangeType'], Output['rangeType']];
@@ -45,58 +47,7 @@ export abstract class ScaledAesthetic<
     id: string,
   ) {
     super(encoding, scatterplot, aesthetic_map, id);
-    let scaleType: DS.Transform = this.default_transform;
-    if (
-      encoding &&
-      encoding['transform'] &&
-      isTransform(encoding['transform'])
-    ) {
-      scaleType = encoding['transform'];
-    }
-
-    this.categorical = false;
-
-    if (this.is_dictionary()) {
-      this.categorical = true;
-      this.populateCategoricalScale();
-    } else {
-      if (scaleType === 'linear') {
-        this._scale = scaleLinear() as ScaleContinuousNumeric<
-          Input['domainType'],
-          Output['rangeType']
-        >;
-      } else if (scaleType === 'sqrt') {
-        this._scale = scaleSqrt() as ScaleContinuousNumeric<
-          Input['domainType'],
-          Output['rangeType']
-        >;
-      } else if (scaleType === 'log') {
-        this._scale = scaleLog() as ScaleContinuousNumeric<
-          Input['domainType'],
-          Output['rangeType']
-        >;
-      } else if (scaleType === 'literal') {
-        this._scale = scaleIdentity() as unknown as ScaleContinuousNumeric<
-          Input['domainType'],
-          Output['rangeType']
-        >;
-      }
-      const domain = this.domain;
-      if (typeof domain[0] !== 'number') {
-        throw new Error(
-          "Domain expected to be 'number', but was" + typeof domain[0],
-        );
-      }
-      this._scale = (
-        this._scale as ScaleContinuousNumeric<
-          Input['domainType'],
-          Output['rangeType'],
-          never
-        >
-      )
-        .domain(this.domain as [number, number])
-        .range(this.range);
-    }
+    this.categorical = this.is_dictionary();
   }
 
   protected categoricalRange(): Output['rangeType'][] {
@@ -170,7 +121,9 @@ export abstract class ScaledAesthetic<
     return this.default_transform;
   }
 
-  get scale() {
+  get scale():
+    | ScaleOrdinal<Input['domainType'], Output['rangeType']>
+    | ScaleContinuousNumeric<Input['domainType'], Output['rangeType']> {
     if (this.categorical) {
       return this._scale as ScaleOrdinal<
         Input['domainType'],
@@ -254,7 +207,10 @@ export abstract class ScaledAesthetic<
     }
   }
 
-  get range(): [Output['rangeType'], Output['rangeType']] {
+  /**
+   * Returns either the inner, outer bounds OR (for color scales only) a string represented the scheme.
+   */
+  get range(): [Output['rangeType'], Output['rangeType']] | string {
     if (this.encoding && this.encoding['range']) {
       return this.encoding['range'] as [
         Output['rangeType'],
@@ -277,6 +233,48 @@ abstract class OneDAesthetic<
     id: string,
   ) {
     super(encoding, scatterplot, aesthetic_map, id);
+    const scaleType = this.transform;
+    if (this.categorical) {
+      this.populateCategoricalScale();
+    } else {
+      if (scaleType === 'linear') {
+        this._scale = scaleLinear() as ScaleContinuousNumeric<
+          Input['domainType'],
+          number
+        >;
+      } else if (scaleType === 'sqrt') {
+        this._scale = scaleSqrt() as ScaleContinuousNumeric<
+          Input['domainType'],
+          number
+        >;
+      } else if (scaleType === 'log') {
+        this._scale = scaleLog() as ScaleContinuousNumeric<
+          Input['domainType'],
+          number
+        >;
+      } else if (scaleType === 'literal') {
+        this._scale = scaleIdentity() as unknown as ScaleContinuousNumeric<
+          Input['domainType'],
+          number
+        >;
+      }
+      const domain = this.domain;
+      if (typeof domain[0] !== 'number') {
+        throw new Error(
+          "Domain expected to be 'number', but was" + typeof domain[0],
+        );
+      }
+
+      this._scale = (
+        this._scale as ScaleContinuousNumeric<
+          Input['domainType'],
+          number,
+          never
+        >
+      )
+        .domain(this.domain as [number, number])
+        .range(this.range);
+    }
   }
 
   protected _func?: (d: Input['domainType']) => number;

@@ -15,6 +15,18 @@
       },
     });
   }
+  function plotViridis() {
+    scatterplot.plotAPI({
+      encoding: {
+        color: {
+          field: 'x',
+          range: 'viridis',
+          //          range: ["red", "yellow", "pink", "purple"],
+          //          domain: ["Apple", "Banana", "Strawberry", "Mulberry"]
+        },
+      },
+    });
+  }
 </script>
 
 <select bind:value on:change={changeColor}>
@@ -22,3 +34,5 @@
     <option value={scheme}>{scheme}</option>
   {/each}
 </select>
+
+<button on:click={plotViridis}>ViridisLinear</button>
