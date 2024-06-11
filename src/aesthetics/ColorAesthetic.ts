@@ -69,6 +69,7 @@ for (const schemename of [
   'schemeSet2',
   'schemeSet3',
   'schemeTableau10',
+  'schemeObservable10',
 ] as const) {
   const colors = d3Chromatic[schemename];
 

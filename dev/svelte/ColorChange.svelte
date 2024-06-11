@@ -2,7 +2,7 @@
   export let scatterplot;
 
   let value = 'category10';
-  const schemes = ['okabe', 'category10', 'dark2', 'pastel2'];
+  const schemes = ['okabe', 'category10', 'dark2', 'pastel2', 'observable10'];
   function changeColor() {
     scatterplot.plotAPI({
       encoding: {
