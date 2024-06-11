@@ -704,7 +704,7 @@ export class Deeptable {
   spawnDownloads(
     bbox: Rectangle | undefined,
     max_ix: number,
-    queue_length = 8,
+    queue_length = 32,
     fields: string[] = ['x', 'y', 'ix'],
     priority: 'high' | 'low' = 'high',
   ): boolean {
@@ -728,8 +728,9 @@ export class Deeptable {
         return;
       }
       if (bbox === undefined) {
-        // Just depth.
-        scores.push([1 / tile.min_ix, tile]);
+        // Just depth. Using the key instead of the ix in case
+        // the manifest isn't loaded yet.
+        scores.push([1 / (+tile.key.split('/')[0] + 1), tile]);
       } else {
         const distance = check_overlap(tile, bbox);
         if (distance > 0) {
@@ -738,7 +739,7 @@ export class Deeptable {
       }
     }
     this.visit(scoreFileForDownload);
-    scores.sort((a, b) => b[0] - a[0]);
+    scores.sort((a, b) => a[0] - b[0]);
     while (scores.length > 0 && queue.size < queue_length) {
       const [distance, tile] = scores.pop() as [number, Tile];
       if ((tile.min_ix && tile.min_ix > max_ix) || distance <= 0) {
