@@ -4,6 +4,7 @@ import {
   RecordBatch,
   StructRowProxy,
   Schema,
+  vectorFromArray,
 } from 'apache-arrow';
 import { add_or_delete_column } from './Deeptable';
 import type { Deeptable } from './Deeptable';
@@ -303,6 +304,15 @@ export class Tile {
     if (this._batch) {
       return this._batch;
     }
+
+    if (this._manifest) {
+      // This helps support legacy code that may fetch the record_batch
+      // just for its number of rows.
+      return new RecordBatch({
+        __null: vectorFromArray(Array(this.manifest.nPoints)),
+      });
+    }
+
     throw new Error(
       `Attempted to access table on tile ${this.key} without table buffer.`,
     );
