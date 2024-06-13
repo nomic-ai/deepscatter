@@ -309,6 +309,7 @@ export class Tile {
       // This helps support legacy code that may fetch the record_batch
       // just for its number of rows.
       return new RecordBatch({
+        // @ts-expect-error Arrow typing doesn't match this constructor.
         __null: vectorFromArray(Array(this.manifest.nPoints)),
       });
     }
