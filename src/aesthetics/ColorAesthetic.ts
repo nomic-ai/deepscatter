@@ -11,10 +11,16 @@ import { ScaledAesthetic } from './ScaledAesthetic';
 import { Scatterplot } from '../scatterplot';
 import { TextureSet } from './AestheticSet';
 import { Datum } from './Aesthetic';
-import { ScaleOrdinal } from 'd3-scale';
+import {
+  ScaleOrdinal,
+  scaleSequentialLog,
+  scaleSequentialSqrt,
+  scaleSequential,
+} from 'd3-scale';
+import { interpolateHsl } from 'd3-interpolate';
 
 function materialize_color_interpolator(
-  interpolator: (t: number) => string
+  interpolator: (t: number) => string,
 ): Uint8Array {
   const output = new Uint8Array(4 * PALETTE_SIZE);
   arange(PALETTE_SIZE).forEach((i) => {
@@ -63,6 +69,7 @@ for (const schemename of [
   'schemeSet2',
   'schemeSet3',
   'schemeTableau10',
+  'schemeObservable10',
 ] as const) {
   const colors = d3Chromatic[schemename];
 
@@ -136,45 +143,85 @@ for (const interpolator of d3Interpolators) {
   }
 }
 
+function getSequentialScale(
+  range: string | [string, string],
+  transform: DS.Transform,
+) {
+  let interpolator: typeof d3Chromatic.interpolateViridis;
+  if (typeof range === 'string') {
+    // So we have to write `puOr`, `viridis`, etc. instead of `PuOr`, `Viridis`
+    const k = 'interpolate' + range.charAt(0).toUpperCase() + range.slice(1);
+    interpolator = d3Chromatic[k] as typeof d3Chromatic.interpolateViridis;
+    if (interpolator === undefined) {
+      throw new Error(`Unknown interpolator ${k}`);
+    }
+  } else {
+    interpolator = interpolateHsl(...range);
+  }
+  // Try it in lowercase too
+
+  if (transform === 'sqrt') {
+    return scaleSequentialSqrt(interpolator);
+  } else if (transform === 'log') {
+    return scaleSequentialLog(interpolator);
+  } else {
+    return scaleSequential(interpolator);
+  }
+}
+
 export class Color<
   ChannelType extends DS.ColorScaleChannel = DS.ColorScaleChannel,
-  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn = DS.NumberIn | DS.DateIn | DS.CategoryIn
-> extends ScaledAesthetic<
-  ChannelType,
-  Input,
-  DS.ColorOut
-> {
+  Input extends DS.NumberIn | DS.DateIn | DS.CategoryIn =
+    | DS.NumberIn
+    | DS.DateIn
+    | DS.CategoryIn,
+> extends ScaledAesthetic<ChannelType, Input, DS.ColorOut> {
   protected _func?: (d: Input['domainType']) => string;
   public _texture_buffer: Uint8Array | null = null;
   public texture_type = 'uint8';
   public default_constant = '#CC5500';
   default_transform: DS.Transform = 'linear';
 
-
-  constructor(encoding: ChannelType | null, scatterplot: Scatterplot, map: TextureSet, id:string) {
+  constructor(
+    encoding: ChannelType | null,
+    scatterplot: Scatterplot,
+    map: TextureSet,
+    id: string,
+  ) {
     super(encoding, scatterplot, map, id);
+
+    if (this.categorical) {
+      this.populateCategoricalScale();
+    } else {
+      this._scale = getSequentialScale(this.range, this.transform);
+      this._scale.domain(this.domain as [number, number] | [Date, Date]);
+    }
+
     this.encoding = encoding;
     if (encoding) {
       if (isConstantChannel(encoding)) {
-        return
+        return;
       }
       if (encoding['range']) {
         this.encode_for_textures(encoding['range']);
         this.post_to_regl_buffer();
       } else {
-        throw new Error("Unexpected color encoding -- must have range." + JSON.stringify(encoding))
+        throw new Error(
+          'Unexpected color encoding -- must have range.' +
+            JSON.stringify(encoding),
+        );
       }
     }
     if (this.scale.range().length === 0) {
-      throw new Error("Color scale has no range.")
+      throw new Error('Color scale has no range.');
     }
   }
-  
+
   get default_range(): [string, string] {
-    return ["white", "blue"];
+    return ['white', 'blue'];
   }
 
-  protected categoricalRange() : string[] {
+  protected categoricalRange(): string[] {
     if (this.encoding && this.encoding['range']) {
       if (typeof this.encoding['range'] === 'string') {
         return [...schemes[this.encoding['range']]];
@@ -192,6 +239,14 @@ export class Color<
     return color_palettes.viridis;
   }
 
+  get range(): string | [string, string] {
+    if (this.encoding && this.encoding['range']) {
+      return this.encoding['range'] as [string, string] | string;
+    } else {
+      return this.default_range;
+    }
+  }
+
   get use_map_on_regl() {
     // Always use a map for colors.
     return 1 as const;
@@ -204,79 +259,17 @@ export class Color<
     }
   }
 
-  apply(v: Datum) : string {
+  apply(v: Datum): string {
     if (this.encoding === null) {
-      return this.default_constant
+      return this.default_constant;
     }
 
     if (isConstantChannel(this.encoding)) {
-      return this.encoding.constant
+      return this.encoding.constant;
     }
-    const scale = this.scale as ScaleOrdinal<Input['domainType'], string>
-    return scale(v[this.field] as Input['domainType'])
+    const scale = this.scale as ScaleOrdinal<Input['domainType'], string>;
+    return scale(v[this.field] as Input['domainType']);
   }
-
-  // get mmscale() {
-  //   if (this._scale) {
-  //     return this._scale;
-  //   }
-
-  //   const range = this.range;
-
-  //   function capitalize(r: string) {
-  //     // TODO: this can't be right for RdBu, etc. and
-  //     // aso for ylorrd.
-  //     if (r === 'ylorrd') {
-  //       return 'YlOrRd';
-  //     }
-  //     return r.charAt(0).toUpperCase() + r.slice(1);
-  //   }
-
-  //   if (this.is_dictionary()) {
-  //     const scale = scaleOrdinal().domain(this.domain);
-  //     if (typeof range === 'string' && schemes[range]) {
-  //       const dictionary = this.arrow_column().data[0]
-  //         .dictionary as Vector<Utf8>;
-  //       if (dictionary === null) {
-  //         throw new Error('Dictionary is null');
-  //       }
-  //       const keys = dictionary.toArray() as unknown as string[];
-  //       return (this._scale = scaleOrdinal()
-  //         .range(schemes[range])
-  //         .domain(keys));
-  //     } else {
-  //       return (this._scale = scale.range(this.range));
-  //     }
-  //   }
-
-  //   // If not a dictionary, it's a different type.
-  //   if (typeof range == 'string') {
-  //     // Convert range from 'viridis' to InterpolateViridis.
-  //     const k = ('interpolate' + capitalize(range)) as keyof d3Chromatic;
-  //     const interpolator = d3Chromatic[
-  //       k
-  //     ] as typeof d3Chromatic.interpolateViridis;
-  //     if (interpolator !== undefined) {
-  //       // linear maps to nothing, but.
-  //       // scaleLinear, and scaleLog but
-  //       // scaleSequential and scaleSequentialLog.
-  //       if (this.transform === 'sqrt') {
-  //         return (this._scale = scaleSequentialPow(interpolator)
-  //           .exponent(0.5)
-  //           .domain(this.domain));
-  //       } else if (this.transform === 'log') {
-  //         return (this._scale = scaleSequentialLog(interpolator).domain(
-  //           this.domain
-  //         ));
-  //       } else {
-  //         return (this._scale = scaleSequential(interpolator).domain(
-  //           this.domain
-  //         ));
-  //       }
-  //     }
-  //   }
-  // }
-
 
   toGLType(color: string) {
     const { r, g, b } = rgb(color);
@@ -284,7 +277,6 @@ export class Color<
   }
 
   encode_for_textures(range: string | [string, string] | string[]): void {
-
     if (Array.isArray(range)) {
       const key = range.join('/');
       if (color_palettes[key]) {
@@ -298,7 +290,9 @@ export class Color<
         // We need to find the integer identifiers for each of
         // the values in the domain.
         const vec = (this.column as Vector<Dictionary<Utf8, Int32>>).data[0];
-        const data_values = (vec.dictionary as Vector<Utf8>).toArray() as unknown as Input['domainType'][];;
+        const data_values = (
+          vec.dictionary as Vector<Utf8>
+        ).toArray() as unknown as Input['domainType'][];
         const dict_values: Map<Input['domainType'], number> = new Map();
         let i = 0;
         for (const val of data_values) {
@@ -326,6 +320,8 @@ export class Color<
       this.texture_buffer.set(color_palettes[range]);
       return;
     }
-    throw new Error(`request range of ${range} for color ${this.field} unknown`);
+    throw new Error(
+      `request range of ${range} for color ${this.field} unknown`,
+    );
   }
 }
