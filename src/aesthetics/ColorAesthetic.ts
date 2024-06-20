@@ -171,7 +171,6 @@ function getSequentialScale(
   }
   // Try it in lowercase too
 
-  console.log({ interpolator, range });
   if (transform === 'sqrt') {
     return scaleSequentialSqrt(interpolator);
   } else if (transform === 'log') {
