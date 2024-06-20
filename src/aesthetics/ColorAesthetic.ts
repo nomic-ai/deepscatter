@@ -35,6 +35,7 @@ const color_palettes: Record<string, Uint8Array> = {
 };
 
 const schemes: Record<string, readonly string[]> = {};
+const interpolators: Record<string, typeof d3Chromatic.interpolateViridis> = {};
 
 function palette_from_color_strings(colors: readonly string[]): Uint8Array {
   // Fills a large Uint8Array by decomposing the colors and repeating over them.
@@ -69,7 +70,6 @@ for (const schemename of [
   'schemeSet2',
   'schemeSet3',
   'schemeTableau10',
-  'schemeObservable10',
 ] as const) {
   const colors = d3Chromatic[schemename];
 
@@ -133,15 +133,25 @@ const d3Interpolators = [
 ] as const;
 
 for (const interpolator of d3Interpolators) {
-  const name = interpolator.replace('interpolate', '').toLowerCase();
+  const nickname = interpolator.replace('interpolate', '');
+
   const v = d3Chromatic[interpolator];
+
+  // First store the d3 type for scale-building in javascript.
+  interpolators[nickname] = v;
+  interpolators[nickname.toLowerCase()] = v;
+  interpolators[nickname.toLowerCase()[0] + nickname.slice(1)] = v;
+
+  // Then store an underlying block of colors for webGL work.
   const materialized = materialize_color_interpolator(v);
-  color_palettes[name] = materialized;
-  color_palettes[name.toLowerCase()] = materialized;
-  if (name === 'rainbow') {
+  color_palettes[nickname] = materialized;
+  color_palettes[nickname.toLowerCase()] = materialized;
+  color_palettes[nickname.toLowerCase()[0] + nickname.slice(1)] = materialized;
+
+  if (nickname === 'Rainbow') {
     // Deterministic random shuffle orders
     const shuffle = shuffler(randomLcg(1));
-    color_palettes.shufbow = shuffle(color_palettes[name]);
+    color_palettes.shufbow = shuffle(color_palettes[nickname]);
   }
 }
 
@@ -152,10 +162,9 @@ function getSequentialScale(
   let interpolator: typeof d3Chromatic.interpolateViridis;
   if (typeof range === 'string') {
     // So we have to write `puOr`, `viridis`, etc. instead of `PuOr`, `Viridis`
-    const k = 'interpolate' + range.charAt(0).toUpperCase() + range.slice(1);
-    interpolator = d3Chromatic[k] as typeof d3Chromatic.interpolateViridis;
+    interpolator = interpolators[range];
     if (interpolator === undefined) {
-      throw new Error(`Unknown interpolator ${k}`);
+      throw new Error(`Unknown interpolator ${range}`);
     }
   } else {
     interpolator = interpolateHsl(...range);
