@@ -162,7 +162,7 @@ function getSequentialScale(
   let interpolator: typeof d3Chromatic.interpolateViridis;
   if (typeof range === 'string') {
     // So we have to write `puOr`, `viridis`, etc. instead of `PuOr`, `Viridis`
-    const interpolator = interpolators[range];
+    interpolator = interpolators[range];
     if (interpolator === undefined) {
       throw new Error(`Unknown interpolator ${range}`);
     }
@@ -171,6 +171,7 @@ function getSequentialScale(
   }
   // Try it in lowercase too
 
+  console.log({ interpolator, range });
   if (transform === 'sqrt') {
     return scaleSequentialSqrt(interpolator);
   } else if (transform === 'log') {
