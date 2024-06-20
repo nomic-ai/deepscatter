@@ -135,7 +135,9 @@ const d3Interpolators = [
 for (const interpolator of d3Interpolators) {
   const name = interpolator.replace('interpolate', '').toLowerCase();
   const v = d3Chromatic[interpolator];
-  color_palettes[name] = materialize_color_interpolator(v);
+  const materialized = materialize_color_interpolator(v);
+  color_palettes[name] = materialized;
+  color_palettes[name.toLowerCase()] = materialized;
   if (name === 'rainbow') {
     // Deterministic random shuffle orders
     const shuffle = shuffler(randomLcg(1));
