@@ -1,0 +1,42 @@
+name: Publish @next release to npm
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+  packages: write
+  deployments: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - name: Configure Git user
+        run: |
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
+      - run: npm version prerelease --preid=next
+      - name: Commit bumped version
+        run: |
+          # git add package.json package-lock.json
+          # git commit -m "Bump version to $(node -p "require('./package.json').version")"
+          git push
+
+      - run: npm publish --tag next
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+      - name: Deploy TSDoc to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          force_orphan: true

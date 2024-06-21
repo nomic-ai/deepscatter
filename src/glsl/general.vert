@@ -9,7 +9,6 @@ uniform vec2 u_wrap_colors_after;
 uniform float u_jitter;
 uniform float u_last_jitter;
 
-
 // Whether to plot only a single category.
 uniform float u_only_color;
 uniform float u_grid_mode;
@@ -353,10 +352,21 @@ highp float ix_to_random(in float ix, in float seed) {
   highp float b = 78.233;
   highp float c = 43758.5453;
   highp float dt = dot(co.xy, vec2(a, b));
-  highp float sn = mod(dt, 3.14);
+  highp float sn = mod(dt, 3.141592654);
   return fract(sin(sn) * c);
 }
 
+highp float tix_rix_to_random_seed(in float tix, in float rix) {
+  // For high numbers, taking the log avoids coincidence.
+  highp float seed2 = log(tix + 2.) + 1.;
+  vec2 co = vec2(seed2, rix);
+  highp float a = 12.9898;
+  highp float b = 78.233;
+  highp float c = 43758.5453;
+  highp float dt = dot(co.xy, vec2(a, b));
+  highp float sn = mod(dt, 3.141592654);
+  return fract(sin(sn) * c);
+}
 
 
 // The fill color.
@@ -375,7 +385,6 @@ vec4 discard_me = vec4(100.0, 100.0, 1.0, 1.0);
 
 // Initialized in the main loop
 // mat3 from_coord_to_gl;
-
 const float e = 1.618282;
 // I've been convinced.
 const float tau = 2. * 3.14159265359;
@@ -475,6 +484,10 @@ float linstep(in vec2 range, in float x) {
   return clamp(from_left / scale_size, 0.0, 1.0);
 }
 
+
+/**
+  Given a range and a value, return the value scaled to between 0 and 1.
+*/
 float linscale(in vec2 range, in float x) {
   float scale_size = range.y - range.x;
   float from_left = x - range.x;
@@ -492,8 +505,18 @@ vec2 box_muller(in float ix, in float seed) {
 /*************** END COLOR SCALES *******************************/
 
 
+/**
+  * Clamp an attribute into a domain, with an optional log or sqrt transform.
+  * @param domain The domain to clamp into.
+  * @param transform The type of transform to apply.
+  * @param attr The value to place in the scale to transform.
+  * @param overflow_behavior
+    0 : extrapolate
+    1 : clamp
+    2 : wrap
+  * @return The transformed attribute on a range between zero and one.
+*/
 float domainify(in vec2 domain, in float transform, in float attr, in float overflow_behavior) {
-
 
   // Clamp an attribute into a domain, with an optional log or sqrt transform.
   if (transform == 2.) {
@@ -510,7 +533,6 @@ float domainify(in vec2 domain, in float transform, in float attr, in float over
   }
   if (overflow_behavior == 2.) {
     //wrap
-
     return fract(linscale(domain, attr));
   }
   return linscale(domain, attr);
@@ -596,14 +618,16 @@ float texture_float_lookup(in vec2 domain,
     // Literal transforms aren't looked up, just returned as is.
     return attr;
   }
-  float inrange = domainify(domain, transform, attr, 1.);
+
+  float inrange = domainify(domain, transform, attr, 0.);
   if (texture_position > 0.5) {
     float y_pos = texture_position / 32. - 0.5 / 32.;
     vec4 encoded = texture2D(u_one_d_aesthetic_map, vec2(y_pos, inrange));
     return encoded.a;
-    return RGBAtoFloat(encoded); // unreachable.
   } else {
-    return mix(range.x, range.y, inrange);
+    // return 0.25;
+    // return inrange;
+    return mix(domain.x, domain.y, inrange);
   }
 }
 
@@ -617,19 +641,16 @@ vec2 calculate_position(in vec2 position, in float x_scale_type,
     float y;
 
     if (x_scale_type < 4.0) {
-      float x_ = linscale(u_color_domain, a_color);
-      x = texture_float_lookup(x_domain, x_range,
-        x_scale_type,
-        position.x, 0. // ymap position 0 means never use a texture lookup.
-        );
+      // scaled between zero and one.
+      float scaled = domainify(x_domain, x_scale_type, position.x, 0.0);
+      x = mix(x_range.x, x_range.y, scaled);
     } else {
       x = position.x;
     }
 
     if (y_scale_type < 4.0) {
-      y = texture_float_lookup(y_domain, y_range, y_scale_type,
-        position.y, 0. // ymap position 0 means never use a texture lookup.
-        );
+      float scaled = domainify(y_domain, y_scale_type, position.y, 0.0);
+      y = mix(y_range.x, y_range.y, scaled);
     } else {
       y = position.y;
     }
@@ -1259,7 +1280,8 @@ void main() {
   float size_multiplier = texture_float_lookup(
     u_size_domain,
     u_size_range,
-    u_size_transform, a_size,
+    u_size_transform,
+    a_size,
     u_size_map_position);
 
   float last_size_multiplier = texture_float_lookup(
@@ -1269,11 +1291,10 @@ void main() {
   size_multiplier = u_base_size * 
      mix(last_size_multiplier, size_multiplier, ease);
   
-  float depth_size_adjust = (1.0 - ix / (u_maxix));
-
+  // float depth_size_adjust = (1.0 - ix / (u_maxix));
 
   point_size_adjust = exp(log(u_k) * u_zoom_balance) ;// * depth_size_adjust;
-//  point_size_adjust = exp(log(u_k) * u_zoom_balance);
+
   gl_PointSize = point_size_adjust * size_multiplier;
 
   if (gl_PointSize <= 5.1) {
@@ -1343,6 +1364,7 @@ void main() {
     fill = packFloat(ix_in_tile + 1.);
   } else {
     run_color_fill(ease);
+    // fill = packFloat(ix + 1.);
   }
 
   // Are we in a mode where we need to plot foreground and background?
@@ -1385,7 +1407,6 @@ void main() {
   }
     
   point_size = gl_PointSize;
-
 /*  if (u_use_glyphset > 0. && point_size > 5.0) {
     float random_letter = floor(64. * ix_to_random(ix, 1.3));
     letter_pos = vec2(

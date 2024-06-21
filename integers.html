@@ -12,10 +12,13 @@
     <div id="foreground">FOREGROUND:</div>
     <div id="categorical">CATEGORICAL:</div>
   </div>
+  <textarea style="display:none" data-testid="API">
+  
+  </textarea>
   <div id="deepscatter"></div>
 </body>
-<script type="module">
-  import Scatterplot from './src/deepscatter';
+<script type="module" lang="ts">
+  import { Scatterplot, Deeptable, Bitmask, dictionaryFromArrays } from './src/deepscatter';
   import {
     tableFromArrays,
     Table,
@@ -28,7 +31,7 @@
     Dictionary,
     makeVector
   } from 'apache-arrow';
-  const num_batches = 1;
+  const num_batches = 4;
   window.RecordBatch = RecordBatch;
   window.vectorFromArray = vectorFromArray;
   function num_to_string(d) {
@@ -36,12 +39,14 @@
   }
   let batch_no = 0;
 
-  /* Clifford attractor frame.*/
-  function batch(n_batches) {
+  const queryString = window.location.search;
+  const urlParams = new URLSearchParams(queryString);
+  const filterMethod = urlParams.get('filter-method') || 'bitmask';
+
+  // A function to create a single batch
+  function createTable(n_batches) {
     function make_batch(start = 0, length = 65536) {
-      console.log('Making', start);
       const batch_number_here = batch_no++;
-      // make a batch of clifford generator data starting at start and of length length
 
       let x = new Float32Array(length);
       let y = new Float32Array(length);
@@ -63,8 +68,8 @@
             }
           }
         }
-        x[i - start] = x_ / 1024 / 1024;
-        y[i - start] = y_ / 1024 / 1024;
+        x[i - start] = x_;
+        y[i - start] = y_;
         integers[i - start] = i;
       }
 
@@ -80,7 +85,7 @@
       });
     }
     const batches = [];
-    const SIZE = 65536
+    const SIZE = 65536 / 4 / 4;
     for (let i = 0; i < n_batches; i++) {
       const batch = make_batch(i * SIZE, SIZE);
       batches.push(batch);
@@ -91,7 +96,7 @@
     return table;
   }
 
-  const table = batch(num_batches);
+  const table = createTable(num_batches);
   const plot = new Scatterplot('#deepscatter');
 
   function eratosthenes(n) {
@@ -140,7 +145,7 @@
       color: {
         field: 'integers',
         range: 'viridis',
-        domain: [1, 65000],
+        domain: [1, 65000 / 4],
         transform: 'log',
       },
     },
@@ -245,7 +250,7 @@
       plot.ready.then(() => {
         if (dictionaryBuilder === undefined) {
           // Curry up the numbers first to ensure we're always in the same dictionary.
-          dictionaryBuilder = plot.util.dictionaryFromArrays(numbers);
+          dictionaryBuilder = dictionaryFromArrays(numbers);
         }
         button.addEventListener('click', function () {
           plot.dataset.transformations['dictionary number coloring'] = async function (tile) {
@@ -274,30 +279,46 @@
   };
 
   function bindproductsOf(n) {
-    plot.dataset.transformations[`products of ${n}`] = function (tile) {
-      const integers = tile.record_batch.getChild('integers');
-      window.integers = integers;
-      const output = new Float32Array(integers.length);
-      for (let i = 0; i < integers.length; i += 1) {
-        let int = integers.get(i);
-        if (int % n === 0) {
-          output[i] += 1;
-          int = int / n;
+    if (filterMethod === 'float32') {
+      plot.dataset.transformations[`products of ${n}`] = function (tile) {
+        const integers = tile.record_batch.getChild('integers');
+        const output = new Float32Array(integers.length);
+        for (let i = 0; i < integers.length; i += 1) {
+          let int = integers.get(i);
+          if (int % n === 0) {
+            output[i] += 1;
+            int = int / n;
+          }
         }
+        return output;
+      };
+    } else if (filterMethod === 'bitmask') {
+      plot.dataset.transformations[`products of ${n}`] = async function (tile) {
+        const integers = tile.record_batch.getChild('integers');
+        const mask = new Bitmask(integers.length);
+        for (let i = 0; i < integers.length; i += 1) {
+          let int = integers.get(i);
+          if (int % n === 0) {
+            mask.set(i, true);
+          }
+        }
+        return mask.to_arrow();
       }
-      return output;
-    };
+    }
   }
   const done = new Set();
   function highlight(key) {
     const vals = functions[key](num_batches * 2 ** 16);
-    console.log({ vals });
     const prime_ids = vals.map((d) => d.toString());
 
-    const k2 = key.slice(0, 7) == 'stable_' ? key : '' + Math.random();
-
     if (!done.has(key)) {
-      plot.add_identifier_column(k2, prime_ids, '_id');
+      plot.select_data(
+        {
+          name: key,
+          ids: prime_ids,
+          field: '_id',          
+        }
+      )
     }
 
     if (key.slice(0, 7) == 'stable_') {
@@ -307,12 +328,12 @@
       duration: 1000,
       encoding: {
         foreground: {
-          field: k2,
+          field: key,
           op: 'eq',
           a: 1,
         },
         size: {
-          field: k2,
+          field: key,
           domain: [0, 1],
           range: [0.5, 5],
         },
@@ -326,7 +347,9 @@
       .filter((d) => d);
     console.log({ ids });
     const name = Math.random().toString(36);
-    plot.select_and_plot({ name, ids, idField: '_id' });
+    plot.select_and_plot({ name, ids, idField: '_id' }).then(selection => {
+      window.selection = selection;
+    })
   });
 
   document
@@ -360,30 +383,31 @@
     );
 
 
-  function dictionaryFromArrays(indices, labels) {
-    const labelsArrow = vectorFromArray(labels, new Utf8());
-    let t;
-    if (indices[Symbol.toStringTag] === `Int8Array`) {
-      t = new Int8()
-    } else if (indices[Symbol.toStringTag] === `Int16Array`) {
-      t = new Int16()
-    } else if (indices[Symbol.toStringTag] === `Int32Array`) {
-      t = new Int32()
-    } else {
-      console.log(indices[Symbol.toStringTag])
-      throw new Error("values must be an array of signed integers, 32 bit or smaller.")
-    }
-    console.log({ indices }, indices.length)
-    const type = new Dictionary(labelsArrow.type, t, 0, false);
-    const returnval = makeVector({
-      type,
-      length: indices.length,
-      nullCount: 0,
-      data: indices,
-      dictionary: labelsArrow,
-    });
-    return returnval
-  }
+
+  // function dictionaryFromArrays(indices, labels) {
+  //   const labelsArrow = vectorFromArray(labels, new Utf8());
+  //   let t;
+  //   if (indices[Symbol.toStringTag] === `Int8Array`) {
+  //     t = new Int8()
+  //   } else if (indices[Symbol.toStringTag] === `Int16Array`) {
+  //     t = new Int16()
+  //   } else if (indices[Symbol.toStringTag] === `Int32Array`) {
+  //     t = new Int32()
+  //   } else {
+  //     console.log(indices[Symbol.toStringTag])
+  //     throw new Error("values must be an array of signed integers, 32 bit or smaller.")
+  //   }
+  //   console.log({ indices }, indices.length)
+  //   const type = new Dictionary(labelsArrow.type, t, 0, false);
+  //   const returnval = makeVector({
+  //     type,
+  //     length: indices.length,
+  //     nullCount: 0,
+  //     data: indices,
+  //     dictionary: labelsArrow,
+  //   });
+  //   return returnval
+  // }
 </script>
 
 <style>

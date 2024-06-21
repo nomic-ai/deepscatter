@@ -8,3 +8,4 @@ playwright-report/
 dist/tiles/*
 co2.feather co2.html
 dist
+docs

@@ -2,6 +2,9 @@
   "include": [
     "src/**/*.ts"
   ],
+  "exclude": [
+    "node_modules/**/*"
+  ],
   "compilerOptions": {
     "declarationMap": true,
     "declaration": true,
@@ -9,13 +12,15 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "noUnusedLocals": true,
+    "experimentalDecorators": true,
     "sourceMap": true,
     "strict": false,
     "target": "es2020",
     "isolatedModules": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "noEmitOnError": false,
+    "lib": ["DOM"],
+    "noEmitOnError": true,
     "emitDeclarationOnly": true,
   },
   "$schema": "https://json.schemastore.org/tsconfig",

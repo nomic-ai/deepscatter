@@ -54,6 +54,7 @@
         }
       }
     ],
+    "typescript-eslint/no-unnecessary-type-assertion": "off",
     "unicorn/consistent-destructuring": "off",
     "unicorn/new-for-builtins": "off",
     "unicorn/prevent-abbreviations": "off",
