@@ -419,7 +419,6 @@ export class Scatterplot {
     ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
-    void this._renderer.initialize();
     void this.deeptable.promise.then(() => this.mark_ready());
     return this.ready;
   }

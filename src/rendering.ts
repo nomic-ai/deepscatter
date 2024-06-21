@@ -274,10 +274,4 @@ export class Renderer {
     this._zoom = zoom;
     return this;
   }
-
-  async initialize() {
-    // Asynchronously wait for the basic elements to be done.
-    // await this._initializations;
-    // this.zoom.restart_timer(500_000);
-  }
 }
