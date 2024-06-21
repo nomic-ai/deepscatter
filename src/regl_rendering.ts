@@ -99,7 +99,7 @@ export class ReglRenderer extends Renderer {
     this.initialize_textures();
 
     // Not the right way, for sure.
-    this._initializations = Promise.all([
+    this._initializations =
       // some things that need to be initialized before the renderer is loaded.
       this.deeptable.promise.then(() => {
         this.remake_renderer();
@@ -107,9 +107,7 @@ export class ReglRenderer extends Renderer {
           this.default_webgl_scale,
           this.default_webgl_scale,
         ];
-      }),
-    ]).then(() => {});
-    void this.initialize();
+      });
     this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
   }
 
@@ -625,6 +623,12 @@ export class ReglRenderer extends Renderer {
   }
 
   color_pick(x: number, y: number): null | StructRowProxy {
+    // It's possible for this to be called before the zoom state is ready, which throws
+    // against the nonexistence of the scales.
+    if (this._webgl_scale_history === undefined) {
+      return null;
+    }
+    // TODO: fix this
     if (y === 0) {
       // Not sure why, but this makes things complainy.
       // console.warn('that thing again.');
