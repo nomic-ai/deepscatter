@@ -5,6 +5,7 @@
   import ColorChange from './svelte/ColorChange.svelte';
   import SizeSlider from './svelte/SizeSlider.svelte';
   import PositionScales from './svelte/PositionScales.svelte';
+  import Legend from './svelte/Legend.svelte';
   const startSize = 2;
   const prefs = {
     source_url: '/tiles',
@@ -42,6 +43,7 @@
   <ColorChange {scatterplot}></ColorChange>
   <SizeSlider size={startSize} {scatterplot}></SizeSlider>
   <PositionScales {scatterplot} />
+  <Legend {scatterplot} />
 </div>
 
 <div id="deepscatter"></div>

@@ -98,7 +98,7 @@ export class ReglRenderer extends Renderer {
     // allocate buffers in 64 MB blocks.
     this.initialize_textures();
 
-    // Not the right way, for sure.
+    // a promise that guarantees the existence of zoom scales.
     this._initializations =
       // some things that need to be initialized before the renderer is loaded.
       this.deeptable.promise.then(() => {
@@ -176,7 +176,7 @@ export class ReglRenderer extends Renderer {
       last_webgl_scale: this._webgl_scale_history[1],
       use_scale_for_tiles: this._use_scale_to_download_tiles,
       grid_mode: 0,
-      buffer_num_to_variable: buffer_num_to_variable!,
+      buffer_num_to_variable: buffer_num_to_variable as string[],
       aes_to_buffer_num: aes_to_buffer_num!,
       variable_to_buffer_num: variable_to_buffer_num!,
       color_picker_mode: 0, // whether to draw as a color picker.
