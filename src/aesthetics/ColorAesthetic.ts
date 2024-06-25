@@ -164,7 +164,10 @@ function getSequentialScale(
     // So we have to write `puOr`, `viridis`, etc. instead of `PuOr`, `Viridis`
     interpolator = interpolators[range];
     if (interpolator === undefined) {
-      throw new Error(`Unknown interpolator ${range}`);
+      // Rather than die permanently, just complain about it and
+      // use viridis.
+      console.error(`Unknown interpolator ${range}`);
+      interpolator = d3Chromatic.interpolateViridis;
     }
   } else {
     interpolator = interpolateHsl(...range);
@@ -331,8 +334,7 @@ export class Color<
       this.texture_buffer.set(color_palettes[range]);
       return;
     }
-    throw new Error(
-      `request range of ${range} for color ${this.field} unknown`,
-    );
+    console.error(`request range of ${range} for color ${this.field} unknown`);
+    this.texture_buffer.set(color_palettes['viridis']);
   }
 }

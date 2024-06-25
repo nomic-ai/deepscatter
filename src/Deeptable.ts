@@ -34,6 +34,7 @@ import type {
   IdSelectParams,
 } from './selection';
 import { DataSelection } from './selection';
+import { parseTableFormatManifest } from './manifests';
 
 type TransformationStatus = 'queued' | 'in progress' | 'complete' | 'failed';
 
@@ -276,12 +277,23 @@ export class Deeptable {
     );
   }
 
-  static from_quadfeather(
+  static async from_quadfeather(
     url: string,
     plot: Scatterplot | null,
     tileProxy: DS.TileProxy | undefined,
-  ): Deeptable {
+  ): Promise<Deeptable> {
+    let tileManifest: DS.TileManifest | undefined = undefined;
+    await fetch(url + '/manifest.feather')
+      .then(async (data) => {
+        const m = await data.arrayBuffer();
+        const tb = tableFromIPC(m);
+        tileManifest = parseTableFormatManifest(tb);
+      })
+      .catch(() => {
+        // pass
+      });
     return new Deeptable({
+      tileManifest,
       tileProxy,
       baseUrl: url,
       rootKey: '0/0/0',

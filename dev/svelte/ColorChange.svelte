@@ -20,7 +20,7 @@
       encoding: {
         color: {
           field: 'x',
-          range: 'viridis',
+          range: 'ylorrd',
           //          range: ["red", "yellow", "pink", "purple"],
           //          domain: ["Apple", "Banana", "Strawberry", "Mulberry"]
         },

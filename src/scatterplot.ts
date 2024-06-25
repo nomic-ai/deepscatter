@@ -372,7 +372,11 @@ export class Scatterplot {
     tileProxy,
   }: DS.DataSpec): Promise<DS.Deeptable> {
     if (source_url !== undefined) {
-      this._root = Deeptable.from_quadfeather(source_url, this, tileProxy);
+      this._root = await Deeptable.from_quadfeather(
+        source_url,
+        this,
+        tileProxy,
+      );
     } else if (arrow_table !== undefined) {
       this._root = Deeptable.fromArrowTable(arrow_table, this);
     } else if (arrow_buffer !== undefined) {
@@ -419,7 +423,6 @@ export class Scatterplot {
     ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
-    void this._renderer.initialize();
     void this.deeptable.promise.then(() => this.mark_ready());
     return this.ready;
   }
