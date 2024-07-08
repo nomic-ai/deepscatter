@@ -98,8 +98,8 @@ export class ReglRenderer extends Renderer {
     // allocate buffers in 64 MB blocks.
     this.initialize_textures();
 
-    // Not the right way, for sure.
-    this._initializations = Promise.all([
+    // a promise that guarantees the existence of zoom scales.
+    this._initializations =
       // some things that need to be initialized before the renderer is loaded.
       this.deeptable.promise.then(() => {
         this.remake_renderer();
@@ -107,9 +107,7 @@ export class ReglRenderer extends Renderer {
           this.default_webgl_scale,
           this.default_webgl_scale,
         ];
-      }),
-    ]).then(() => {});
-    void this.initialize();
+      });
     this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
   }
 
@@ -178,7 +176,7 @@ export class ReglRenderer extends Renderer {
       last_webgl_scale: this._webgl_scale_history[1],
       use_scale_for_tiles: this._use_scale_to_download_tiles,
       grid_mode: 0,
-      buffer_num_to_variable: buffer_num_to_variable!,
+      buffer_num_to_variable: buffer_num_to_variable as string[],
       aes_to_buffer_num: aes_to_buffer_num!,
       variable_to_buffer_num: variable_to_buffer_num!,
       color_picker_mode: 0, // whether to draw as a color picker.
@@ -625,6 +623,12 @@ export class ReglRenderer extends Renderer {
   }
 
   color_pick(x: number, y: number): null | StructRowProxy {
+    // It's possible for this to be called before the zoom state is ready, which throws
+    // against the nonexistence of the scales.
+    if (this._webgl_scale_history === undefined) {
+      return null;
+    }
+    // TODO: fix this
     if (y === 0) {
       // Not sure why, but this makes things complainy.
       // console.warn('that thing again.');
