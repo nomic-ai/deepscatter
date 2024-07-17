@@ -99,9 +99,7 @@ async function extractBitmask(tile: Tile, arg: CompArgs): Promise<Bitmask> {
   if (isComposition(arg)) {
     return applyCompositeFunctionToTile(tile, arg);
   } else {
-    const column = tile.get_column((arg as DataSelection).name) as Promise<
-      Vector<Bool>
-    >;
+    const column = tile.get_column(arg.name) as Promise<Vector<Bool>>;
     return Bitmask.from_arrow(await column);
   }
 }
