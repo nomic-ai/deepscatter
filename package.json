@@ -19,6 +19,7 @@
   "scripts": {
     "dev": "vite --mode dev --port 3344 --host",
     "format": "prettier --write src",
+    "prepare": "npm run build",
     "build": "vite build && tsc",
     "prepublishOnly": "vite build && tsc && typedoc --skipErrorChecking src/*",
     "test": "vite build && npm run test:node",

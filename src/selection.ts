@@ -2,17 +2,16 @@
 import { Deeptable } from './Deeptable';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
+import { getTileFromRow } from './tixrixqid';
 import type * as DS from './shared.d';
 import {
   Bool,
-  DataType,
   StructRowProxy,
-  Type,
   Utf8,
   Vector,
   makeData,
 } from 'apache-arrow';
-import { bisectLeft, range } from 'd3-array';
+import { range } from 'd3-array';
 interface SelectParams {
   name: string;
   useNameCache?: boolean; // If true and a selection with that name already exists, use it and ignore all passed parameters. Otherwise, throw an error.
@@ -501,14 +500,14 @@ export class DataSelection {
     return this;
   }
 
-  async removePoints(name: string, ixes: bigint[]): Promise<DataSelection> {
-    return this.add_or_remove_points(name, ixes, 'remove');
+  async removePoints(name: string, points: StructRowProxy[]): Promise<DataSelection> {
+    return this.add_or_remove_points(name, points, 'remove');
   }
 
   // Non-editable behavior:
   // if a single point is added, will also adjust the cursor.
-  async addPoints(name: string, ixes: bigint[]): Promise<DataSelection> {
-    return this.add_or_remove_points(name, ixes, 'add');
+  async addPoints(name: string, points: StructRowProxy[]): Promise<DataSelection> {
+    return this.add_or_remove_points(name, points, 'add');
   }
 
   /**
@@ -539,36 +538,25 @@ export class DataSelection {
   // }
 
   public moveCursorToPoint(
-    point: StructRowProxy<{ ix: DataType<Type.Int64> }>,
+    point: StructRowProxy,
   ) {
     // The point contains a field called 'ix', which increases in each tile;
     // we use this for moving because it lets us do binary search for relevant tile.
     const rowNumber = point[Symbol.for('rowIndex')] as number;
-    const ix = point.ix as bigint;
-    if (point.ix === undefined) {
-      throw new Error(
-        'Unable to move cursor to point, because it has no `ix` property.',
-      );
-    }
+    const relevantTile = getTileFromRow(point, this.deeptable);
+
     let currentOffset = 0;
-    let relevantTile: Tile = undefined;
-    let current_tile_ix = 0;
     let positionInTile: number;
+
+    let current_tile_ix = 0;
     for (const match_length of this.match_count) {
       const tile = this.tiles[current_tile_ix];
-
-      const ixcol = tile.record_batch.getChild('ix').data[0];
-      if (ixcol[rowNumber] === ix) {
-        relevantTile = tile;
+      if (tile.key === relevantTile.key) {
         positionInTile = rowNumber;
         break;
       }
       current_tile_ix += 1;
       currentOffset += match_length;
-    }
-
-    if (relevantTile === undefined || positionInTile === undefined) {
-      return null;
     }
 
     const column = relevantTile.record_batch.getChild(
@@ -586,76 +574,48 @@ export class DataSelection {
 
   private async add_or_remove_points(
     newName: string,
-    ixes: bigint[],
+    points: StructRowProxy[],
     which: 'add' | 'remove',
-  ) {
-    let newCursor = 0;
-    let tileOfMatch = undefined;
+  ) : Promise<DataSelection>{
+
+    const matches : Record<string, number[]>= {};
+    for (const point of points) {
+      const t = getTileFromRow(point, this.deeptable);
+      const rowNum = point[Symbol.for('rowIndex')] as number;
+      if (!matches[t.key]) {
+        matches[t.key] = [rowNum];
+      } else {
+        matches[t.key].push(rowNum);
+      }
+    }
+
     const tileFunction = async (tile: Tile) => {
-      newCursor = -1;
       await this.ready;
 
       // First, get the current version of the tile.
       const original = (await tile.get_column(this.name)) as Vector<Bool>;
-      // Then locate the ix column and look for matches.
-      const ixcol = tile.record_batch.getChild('ix').data[0]
-        .values as BigInt64Array;
-      const mask = Bitmask.from_arrow(original);
-      for (const ix of ixes) {
-        // Since ix is ordered, we can do a fast binary search to see if the
-        // point is there--no need for a full scan.
 
-        //@ts-expect-error d3.bisect is not aware it works with bigints as well as numbers
-        const mid = bisectLeft([...ixcol], ix as unknown as number);
-        const val = tile.record_batch.get(mid);
-        // We have to check that there's actually a match,
-        // because the binary search identifies where it *would* be.
-        if (val !== null && val.ix === ix) {
-          // Copy the buffer so we don't overwrite the old one.
-          // Set the specific value.
+      // Then if there are matches.
+      if (matches[tile.key] !== undefined) {
+        const mask = Bitmask.from_arrow(original);
+        for (const rowNum  of matches[tile.key]) {
           if (which === 'add') {
-            mask.set(mid);
-            if (ixes.length === 1) {
-              tileOfMatch = tile.key;
-              // For single additions, we also move the cursor to the
-              // newly added point.
-              // First we see the number of points earlier on the current tile.
-              let offset_in_tile = 0;
-              for (let i = 0; i < mid; i++) {
-                if (mask.get(i)) {
-                  offset_in_tile += 1;
-                }
-              }
-              // Then, we count the number of matches already seen
-              newCursor = offset_in_tile;
-            }
+            mask.set(rowNum);
           } else {
-            // If deleting, we set it to zero.
-            mask.unset(mid);
-          }
+            mask.unset(rowNum);
+          } 
         }
+        return mask.to_arrow();
+      } else {
+        return original;
       }
-      return mask.to_arrow();
     };
+
     const selection = new DataSelection(this.deeptable, {
       name: newName,
       tileFunction,
     });
 
-    selection.on('tile loaded', () => {
-      // The new cursor gets moved when we encounter a singleton
-      if (newCursor >= 0) {
-        selection.cursor = newCursor;
-        for (let i = 0; i < selection.tiles.length; i++) {
-          const tile = selection.tiles[i];
-          if (tile.key === tileOfMatch) {
-            // Don't add the full number of matches here.
-            break;
-          }
-          selection.cursor += this.match_count[i];
-        }
-      }
-    });
     await selection.ready;
     for (const tile of this.tiles) {
       // This one we actually apply. We'll see if that gets to be slow.
