@@ -37,25 +37,6 @@ export interface CompositionSelectParams extends SelectParams {
   composition: Composition;
 }
 
-// function isBooleanColumnParam(params: unknown): params is BooleanColumnParams {
-//   return params && params['field'] !== undefined;
-// }
-
-/**
-[
-  "AND"
-  selection1,
-  [
-    "OR",
-    selection2,
-    [
-      "NOT",
-      selection3
-    ]
-  ]
-]
-*/
-
 type PluralOperation = 'ANY' | 'ALL' | 'NONE';
 type BinaryOperation = 'AND' | 'OR' | 'XOR';
 type UnaryOperation = 'NOT';
@@ -134,11 +115,12 @@ async function applyCompositeFunctionToTile(
           case 'ANY':
             return previousValue.or(currentValue);
           case 'NONE':
+            // Same as any for now.
             return previousValue.or(currentValue);
         }
       }, bitmasks[0]);
-    // For none, we've been secretly running an OR query;
-    // flip it.
+    // For none, we've been secretly running an ANY query;
+    // we flip it.
     if (op === 'NONE') return accumulated.not();
     return accumulated;
   }
@@ -183,15 +165,32 @@ function isFunctionSelectParam(
  * more than once a second or so.
  */
 
+/**
+ * A Bitmask is used to hold boolean filters across a single record batch.
+ * It it used internally to manage selections, and can also be useful
+ * inside user-defined transformations that return booleans in a value.
+ */
 export class Bitmask {
   public mask: Uint8Array;
   public length: number;
 
+  /**
+   *
+   * @param length The number of points in the bitmask
+   * @param mask A Uint8 array to store the boolean bits in. If not passed,
+   *             one will be initialized with all false values.
+   */
   constructor(length: number, mask?: Uint8Array) {
     this.length = length;
     this.mask = mask || new Uint8Array(Math.ceil(length / 8));
   }
 
+  /**
+   *
+   * @param vector An Boolean Arrow Vector. If the vector is composed of more
+   * than one arrow `Data`, only the first will be used.
+   * @returns
+   */
   static from_arrow(vector: Vector<Bool>): Bitmask {
     const mask = vector.data[0].values;
     // Copy to make sure we don't mess up the old mask in place
@@ -199,6 +198,10 @@ export class Bitmask {
     return new Bitmask(vector.length, new Uint8Array(mask));
   }
 
+  /**
+   *
+   * @returns This bitmask as an Arrow Vector.
+   */
   to_arrow() {
     return new Vector([
       makeData({
@@ -209,27 +212,44 @@ export class Bitmask {
     ]);
   }
 
-  // set the ith position to true
+  /**
+   * Set the ith element in the bitmask to true
+   *
+   * @param i A position in the bitmask
+   */
   set(i: number) {
     const byte = Math.floor(i / 8);
     const bit = i % 8;
     this.mask[byte] |= 1 << bit;
   }
 
-  // set the ith position to false
+  /**
+   * Set the ith element in the bitmask to false
+   *
+   * @param i A position in the bitmask
+   */
   unset(i: number) {
     const byte = Math.floor(i / 8);
     const bit = i % 8;
     this.mask[byte] = this.mask[byte] & ~(1 << bit);
   }
 
-  // Is the ith position on the mask set?
+  /**
+   * Retrieves the boolean for the ith value in the bitmask
+   *
+   * @param i A position in the bitmask
+   */
   get(i: number) {
     const byte = Math.floor(i / 8);
     const bit = i % 8;
     return ((1 << bit) & byte) > 0;
   }
 
+  /**
+   * The element-wise logical comparison of this bitmask with another one.
+   * @param other another bitmask
+   * @returns
+   */
   and(other: Bitmask) {
     const result = new Bitmask(this.length);
     for (let i = 0; i < this.mask.length; i++) {
