@@ -282,13 +282,21 @@ export class Bitmask {
     return result;
   }
 }
+
+class SelectionTile {
+  public tile: Tile;
+  // The match count is the number of matches **per tile**;
+  // used to access numbers by index.
+  public matchCount?: number;
+  public indices?: number[];
+
+  constructor(tile: Tile) {
+    this.tile = tile;
+  }
+}
 export class DataSelection {
   deeptable: Deeptable;
   plot: Scatterplot;
-  // The match count is the number of matches **per tile**;
-  // used to access numbers by index.
-
-  match_count: number[] = [];
 
   /**
    * name: The name of the selection. This will be used as the colun
@@ -329,10 +337,10 @@ export class DataSelection {
    * The total number of points that have been evaluated for the selection.
    *
    * This is supplied because deepscatter doesn't evaluate functions on tiles
-   * untile they are loaded.
+   * until they are loaded.
    */
   evaluationSetSize: number = 0;
-  tiles: Tile[] = [];
+  tiles: SelectionTile[] = [];
 
   /**
    * Optionally, a user-defined for defining.
@@ -566,15 +574,12 @@ export class DataSelection {
     let currentOffset = 0;
     let positionInTile: number;
 
-    let current_tile_ix = 0;
-    for (const match_length of this.match_count) {
-      const tile = this.tiles[current_tile_ix];
+    for (const { tile, matchCount } of this.tiles) {
       if (tile.key === relevantTile.key) {
         positionInTile = rowNumber;
         break;
       }
-      current_tile_ix += 1;
-      currentOffset += match_length;
+      currentOffset += matchCount;
     }
 
     const column = relevantTile.record_batch.getChild(
@@ -634,7 +639,7 @@ export class DataSelection {
     });
 
     await selection.ready;
-    for (const tile of this.tiles) {
+    for (const { tile } of this.tiles) {
       // This one we actually apply. We'll see if that gets to be slow.
       await tile.get_column(newName);
     }
@@ -676,15 +681,14 @@ export class DataSelection {
     return async (tile: Tile) => {
       const array = await functionToApply(tile);
       await tile.populateManifest();
-      let matches = 0;
+      let matchCount = 0;
       for (let i = 0; i < tile.manifest.nPoints; i++) {
         if ((array['get'] && array['get'](i)) || array[i]) {
-          matches++;
+          matchCount++;
         }
       }
-      this.match_count.push(matches);
-      this.tiles.push(tile);
-      this.selectionSize += matches;
+      this.tiles.push({ tile, matchCount });
+      this.selectionSize += matchCount;
       this.evaluationSetSize += tile.manifest.nPoints;
       // DANGER! Possible race condition. Although the tile loaded
       // dispatches here, it may take a millisecond or two
@@ -721,14 +725,12 @@ export class DataSelection {
     }
     let currentOffset = 0;
     let relevantTile: Tile | undefined = undefined;
-    let current_tile_ix = 0;
-    for (const match_length of this.match_count) {
-      if (i < currentOffset + match_length) {
-        relevantTile = this.tiles[current_tile_ix];
+    for (const { tile, matchCount } of this.tiles) {
+      if (i < currentOffset + matchCount) {
+        relevantTile = tile;
         break;
       }
-      current_tile_ix += 1;
-      currentOffset += match_length;
+      currentOffset += matchCount;
     }
     if (relevantTile === undefined) {
       return undefined;
@@ -751,7 +753,7 @@ export class DataSelection {
 
   // Iterate over the points in raw order.
   *[Symbol.iterator]() {
-    for (const tile of this.tiles) {
+    for (const { tile } of this.tiles) {
       const column = tile.record_batch.getChild(this.name) as Vector<Bool>;
       for (let i = 0; i < column.length; i++) {
         if (column.get(i)) {
