@@ -213,6 +213,25 @@ export class Bitmask {
   }
 
   /**
+   * Returns
+   */
+  which(): number[] {
+    const result: number[] = [];
+    for (let chunk = 0; chunk < this.length / 8; chunk++) {
+      const b = this.mask[chunk];
+      // THese are sparse, so we can usually
+      if (b !== 0) {
+        for (let bit = 0; bit < 8; bit++) {
+          if (1 << bit !== 0) {
+            result.push(chunk * 8 + bit);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
    * Set the ith element in the bitmask to true
    *
    * @param i A position in the bitmask
@@ -288,6 +307,11 @@ class SelectionTile {
   // The match count is the number of matches **per tile**;
   // used to access numbers by index.
   public matchCount?: number;
+  // An access order into the tile. If defined array of the same
+  // length as matchCount whose values are indices into the
+  // underlying tile.
+  // If not defined (which saves a great deal of memory)
+  // we just inspect the bitmask directly.
   public indices?: number[];
 
   constructor(tile: Tile) {
@@ -675,7 +699,7 @@ export class DataSelection {
    * @param functionToApply the user-defined transformation
    */
 
-  private wrapWithSelectionMetadata(
+  protected wrapWithSelectionMetadata(
     functionToApply: DS.BoolTransformation,
   ): DS.BoolTransformation {
     return async (tile: Tile) => {
@@ -897,4 +921,48 @@ function stringmatcher(field: string, matches: string[]) {
     }
     return bitmask.to_arrow(); // Return the results
   };
+}
+
+export class SortedDataSelection extends DataSelection {
+  public tiles: SelectionTile[] = [];
+  public neededFields: string[];
+  public sortOperation: (a: StructRowProxy, b: StructRowProxy) => number;
+
+  constructor(
+    deeptable: Deeptable,
+    params:
+      | IdSelectParams
+      | BooleanColumnParams
+      | FunctionSelectParams
+      | CompositeSelectParams,
+    sortOperation: (a: StructRowProxy, b: StructRowProxy) => number,
+    neededFields: string[],
+    tiles: SelectionTile[] = [],
+  ) {
+    super(deeptable, params);
+    this.tiles = tiles;
+    this.neededFields = neededFields;
+    this.sortOperation = sortOperation;
+  }
+
+  protected wrapWithSelectionMetadata(
+    functionToApply: DS.BoolTransformation,
+  ): DS.BoolTransformation {
+    const wrappedFunction = super.wrapWithSelectionMetadata(functionToApply);
+    return async (tile: Tile) => {
+      const matches = await wrappedFunction(tile);
+      const tileWeJustAdded = this.tiles[this.tiles.length - 1];
+      // Ensure that all the fields needed for the sort operation are present.
+      await Promise.all(
+        this.neededFields.map((field) =>
+          // Return null to avoid wasting memory on them.
+          tile.get_column(field).then(() => null),
+        ),
+      );
+
+      tileWeJustAdded.indices;
+    };
+  }
+
+  get(i: number | undefined) {}
 }
