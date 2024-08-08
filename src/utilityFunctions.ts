@@ -148,3 +148,8 @@ export class TupleMap<K = Object, V = Object> {
     return true;
   }
 }
+
+// finds the first set bit.
+function ffs(n: number): number {
+  return Math.log2(n & -n);
+}
