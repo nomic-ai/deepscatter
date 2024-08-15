@@ -4,7 +4,7 @@ import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
 import { getTileFromRow } from './tixrixqid';
 import type * as DS from './types';
-import { Bool, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
+import { Bool, Float, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
 import { range } from 'd3-array';
 interface SelectParams {
   name: string;
@@ -157,13 +157,7 @@ function isFunctionSelectParam(
   return (params as FunctionSelectParams).tileFunction !== undefined;
 }
 
-/**
- * A DataSelection is a set of data that the user is working with.
- * It is copied into the underlying Arrow files and available to the GPU,
- * so it should not be abused; as a rule of thumb, it's OK to create
- * these in response to user interactions but it shouldn't be done
- * more than once a second or so.
- */
+
 
 /**
  * A Bitmask is used to hold boolean filters across a single record batch.
@@ -213,9 +207,11 @@ export class Bitmask {
   }
 
   /**
-   * Returns
+   * Returns the indices of the array which are set.
+   * Use with care--on dense bitmasks, this will be 16x
+   * larger in memory than the bitmask itself.
    */
-  which(): number[] {
+  which(): Uint16Array {
     const result: number[] = [];
     for (let chunk = 0; chunk < this.length / 8; chunk++) {
       const b = this.mask[chunk];
@@ -228,7 +224,7 @@ export class Bitmask {
         }
       }
     }
-    return result;
+    return new Uint16Array(result);
   }
 
   /**
@@ -303,21 +299,75 @@ export class Bitmask {
 }
 
 class SelectionTile {
+  // The deepscatter Tile object.
   public tile: Tile;
+
   // The match count is the number of matches **per tile**;
   // used to access numbers by index.
-  public matchCount?: number;
+  public _matchCount: number;
+
   // An access order into the tile. If defined array of the same
   // length as matchCount whose values are indices into the
   // underlying tile.
   // If not defined (which saves a great deal of memory)
   // we just inspect the bitmask directly.
-  public indices?: number[];
+  public indices?: Uint16Array;
 
-  constructor(tile: Tile) {
+  // The current point in the indices at which a cursor points.
+  // Only used for sorted selections.
+  public cursor?: number = 0;
+
+  public bitmask: Vector<Bool>;
+
+  // Created with a tile and the set of matches.
+  // If building from another SelectionTile, may also pass
+  // the matchCount.
+  constructor({ tile, arrowBitmask, matchCount }:
+    { tile: Tile, arrowBitmask: Vector<Bool>, matchCount?: number }) {
     this.tile = tile;
+    this.bitmask = arrowBitmask;
+    if (matchCount !== undefined) {
+      this._matchCount = matchCount;
+    }
   }
+
+  get matchCount(): number {
+    if (this._matchCount) {
+      return this._matchCount
+    }
+    let matchCount = 0;
+    const { bitmask } = this;
+    for (const v of [...bitmask]) {
+      if (v) {
+        matchCount++;
+      }
+    }
+    this._matchCount = matchCount;
+    return this._matchCount;
+  }
+
+  setCursorBelow(x: number, field: string) {
+    if (this.indices === undefined) {
+      throw new Error("Can't operate on unsorted array")
+    }
+    const vals = await this.tile.record_batch.getChild(field) as Vector<Float>;
+
+    let i = Math.floor(this.matchCount / 2);
+    let stride = i;
+    
+
+  }
+
 }
+
+/**
+ * A DataSelection is a set of data that the user is working with.
+ * It is copied into the underlying Arrow files and available to the GPU,
+ * so it should not be abused; as a rule of thumb, it's OK to create
+ * these in response to user interactions but it shouldn't be done
+ * more than once a second or so.
+ */
+
 export class DataSelection {
   deeptable: Deeptable;
   plot: Scatterplot;
@@ -393,7 +443,7 @@ export class DataSelection {
       throw new Error("Can't create a selection without a deeptable");
     }
     this.name = params.name;
-    let markReady = function () {};
+    let markReady = function () { };
     this.ready = new Promise((resolve) => {
       markReady = resolve;
     });
@@ -457,7 +507,7 @@ export class DataSelection {
         // triggers creation of the deeptable column as a side-effect.
         return tile.get_column(this.name);
       }),
-    ).then(() => {});
+    ).then(() => { });
   }
 
   /**
@@ -527,11 +577,12 @@ export class DataSelection {
       composition: ['AND', this, other],
     });
   }
+
   /**
    * Advances the cursor (the currently selected point) by a given number of rows.
    * steps forward or backward. Wraps from the beginning to the end.
    *
-   * @param by the number of rows to move the cursor by
+   * @param by the number of rows to move the cursor by.
    *
    * @returns the selection, for chaining
    */
@@ -553,8 +604,6 @@ export class DataSelection {
     return this.add_or_remove_points(name, points, 'remove');
   }
 
-  // Non-editable behavior:
-  // if a single point is added, will also adjust the cursor.
   async addPoints(
     name: string,
     points: StructRowProxy[],
@@ -653,6 +702,8 @@ export class DataSelection {
         }
         return mask.to_arrow();
       } else {
+        // If not, we can re-use the same underlying array which should save
+        // lots of memory.
         return original;
       }
     };
@@ -705,14 +756,12 @@ export class DataSelection {
     return async (tile: Tile) => {
       const array = await functionToApply(tile);
       await tile.populateManifest();
-      let matchCount = 0;
-      for (let i = 0; i < tile.manifest.nPoints; i++) {
-        if ((array['get'] && array['get'](i)) || array[i]) {
-          matchCount++;
-        }
-      }
-      this.tiles.push({ tile, matchCount });
-      this.selectionSize += matchCount;
+      const t = new SelectionTile({
+        arrowBitmask: array,
+        tile
+      })
+      this.tiles.push(t);
+      this.selectionSize += t.matchCount;
       this.evaluationSetSize += tile.manifest.nPoints;
       // DANGER! Possible race condition. Although the tile loaded
       // dispatches here, it may take a millisecond or two
@@ -740,7 +789,7 @@ export class DataSelection {
    *
    * @param i the index of the row to get
    */
-  get(i: number | undefined): StructRowProxy | undefined {
+  get(i: number | undefined = undefined): StructRowProxy | undefined {
     if (i === undefined) {
       i = this.cursor;
     }
@@ -926,8 +975,13 @@ function stringmatcher(field: string, matches: string[]) {
 export class SortedDataSelection extends DataSelection {
   public tiles: SelectionTile[] = [];
   public neededFields: string[];
-  public sortOperation: (a: StructRowProxy, b: StructRowProxy) => number;
+  public comparisonGetter: (a: StructRowProxy) => number | Date;
+  public order: 'ascending' | 'descending';
 
+  // The current point in the selection at which we're focused.
+  public cursor: number = 0;
+  // A list of all the tiles in the selection, each with a cursor, in order.
+  private sortStack: [SelectionTile[]] = null;
   constructor(
     deeptable: Deeptable,
     params:
@@ -935,34 +989,62 @@ export class SortedDataSelection extends DataSelection {
       | BooleanColumnParams
       | FunctionSelectParams
       | CompositeSelectParams,
-    sortOperation: (a: StructRowProxy, b: StructRowProxy) => number,
+    sortOperation: (a: StructRowProxy) => number | Date,
     neededFields: string[],
     tiles: SelectionTile[] = [],
+    order: 'ascending' | 'descending' = 'ascending',
   ) {
     super(deeptable, params);
     this.tiles = tiles;
     this.neededFields = neededFields;
-    this.sortOperation = sortOperation;
+    this.comparisonGetter = sortOperation;
+    this.order = order;
+  }
+
+  private sortTilesToNthPoint(n: number) {
+    // Sort the stack in ascending order put 
+    this.sortStack.sort((a, b) => )
+    let currentVal = this.sortStack[0]
+    let numberBelowThis = 
   }
 
   protected wrapWithSelectionMetadata(
     functionToApply: DS.BoolTransformation,
   ): DS.BoolTransformation {
+    // When we wrap a filter selection,
     const wrappedFunction = super.wrapWithSelectionMetadata(functionToApply);
     return async (tile: Tile) => {
-      const matches = await wrappedFunction(tile);
       const tileWeJustAdded = this.tiles[this.tiles.length - 1];
       // Ensure that all the fields needed for the sort operation are present.
-      await Promise.all(
-        this.neededFields.map((field) =>
+      const [selection] = await Promise.all([
+        wrappedFunction(tile),
+        ...this.neededFields.map((field) =>
           // Return null to avoid wasting memory on them.
           tile.get_column(field).then(() => null),
         ),
-      );
-
-      tileWeJustAdded.indices;
+      ]);
+      const indices = Bitmask.from_arrow(selection).which();
+      tileWeJustAdded.indices = indices.sort((a, b) => {
+        return this.comparisonGetter(tile.record_batch.get(a)) >
+          this.comparisonGetter(tile.record_batch.get(b))
+          ? -1
+          : 1;
+      });
+      return selection;
     };
   }
 
-  get(i: number | undefined) {}
+  *yieldSorted(start = undefined, direction = 'up') {
+    if (start !== undefined) {
+      this.cursor = start;
+      this.sortStack = null;
+    }
+  }
+
+  // get(i: number | undefined = undefined): StructRowProxy {
+  //   // 
+  // }
+
 }
+
+

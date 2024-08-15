@@ -205,7 +205,6 @@ export type JSONValue = number | string | boolean;
 
 // The type in javascript. This lets us capture that some things become dates.
 export type JSValue = number | string | boolean | Date;
-export type DomainType = null | ArrowBuildable;
 
 // export type TypeBundle<ArrowType, JSONType, DomainType, RangeType, GLType> = {
 //   arrowType: ArrowType;

@@ -49,12 +49,13 @@ export class AestheticSet {
     return this;
   }
 
-  public dim(aesthetic: keyof typeof dimensions) {
+  public dim<T extends keyof AesMap>(aesthetic: T) {
     // Returns the stateful aesthetic corresponding to the given aesthetic.
     // Used for things like 'what color would this point be?'
 
     if (this.store[aesthetic]) {
-      return this.store[aesthetic];
+      const v = this.store[aesthetic]
+      return v;
     }
     if (!dimensions[aesthetic]) {
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
