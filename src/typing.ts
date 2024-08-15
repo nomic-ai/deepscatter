@@ -1,4 +1,4 @@
-import type * as DS from './shared.d';
+import type * as DS from './shared';
 const transforms = new Set(['linear', 'sqrt', 'log', 'literal']);
 
 export function isTransform(input: unknown): input is DS.Transform {

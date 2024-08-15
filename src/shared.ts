@@ -197,7 +197,6 @@ export type BoolTransformation = (
  * https://vega.github.io/vega-lite/docs/encoding.html
  */
 
-type SignedInt = Int8 | Int16 | Int32;
 export type WebGlValue = number | [number, number, number];
 
 // The type in JSON. This does not include Date because only
@@ -594,8 +593,8 @@ export type RowFunction<T> = (
   plot?: Scatterplot | undefined,
 ) => T;
 
-type ZoomRow = [number, number, number];
-type ZoomMatrix = [ZoomRow, ZoomRow, ZoomRow];
+// type ZoomRow = [number, number, number];
+// type ZoomMatrix = [ZoomRow, ZoomRow, ZoomRow];
 
 ///////////
 

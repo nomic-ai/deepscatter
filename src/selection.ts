@@ -3,14 +3,8 @@ import { Deeptable } from './Deeptable';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
 import { getTileFromRow } from './tixrixqid';
-import type * as DS from './shared.d';
-import {
-  Bool,
-  StructRowProxy,
-  Utf8,
-  Vector,
-  makeData,
-} from 'apache-arrow';
+import type * as DS from './shared';
+import { Bool, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
 import { range } from 'd3-array';
 interface SelectParams {
   name: string;
@@ -500,13 +494,19 @@ export class DataSelection {
     return this;
   }
 
-  async removePoints(name: string, points: StructRowProxy[]): Promise<DataSelection> {
+  async removePoints(
+    name: string,
+    points: StructRowProxy[],
+  ): Promise<DataSelection> {
     return this.add_or_remove_points(name, points, 'remove');
   }
 
   // Non-editable behavior:
   // if a single point is added, will also adjust the cursor.
-  async addPoints(name: string, points: StructRowProxy[]): Promise<DataSelection> {
+  async addPoints(
+    name: string,
+    points: StructRowProxy[],
+  ): Promise<DataSelection> {
     return this.add_or_remove_points(name, points, 'add');
   }
 
@@ -537,9 +537,7 @@ export class DataSelection {
   //   return columns;
   // }
 
-  public moveCursorToPoint(
-    point: StructRowProxy,
-  ) {
+  public moveCursorToPoint(point: StructRowProxy) {
     // The point contains a field called 'ix', which increases in each tile;
     // we use this for moving because it lets us do binary search for relevant tile.
     const rowNumber = point[Symbol.for('rowIndex')] as number;
@@ -576,9 +574,8 @@ export class DataSelection {
     newName: string,
     points: StructRowProxy[],
     which: 'add' | 'remove',
-  ) : Promise<DataSelection>{
-
-    const matches : Record<string, number[]>= {};
+  ): Promise<DataSelection> {
+    const matches: Record<string, number[]> = {};
     for (const point of points) {
       const t = getTileFromRow(point, this.deeptable);
       const rowNum = point[Symbol.for('rowIndex')] as number;
@@ -598,12 +595,12 @@ export class DataSelection {
       // Then if there are matches.
       if (matches[tile.key] !== undefined) {
         const mask = Bitmask.from_arrow(original);
-        for (const rowNum  of matches[tile.key]) {
+        for (const rowNum of matches[tile.key]) {
           if (which === 'add') {
             mask.set(rowNum);
           } else {
             mask.unset(rowNum);
-          } 
+          }
         }
         return mask.to_arrow();
       } else {

@@ -8,7 +8,7 @@ import type { Zoom } from './interaction';
 import type { AestheticSet } from './aesthetics/AestheticSet';
 import { timer, Timer } from 'd3-timer';
 import { Deeptable } from './Deeptable';
-import type * as DS from './shared.d';
+import type * as DS from './shared';
 import { Table } from 'apache-arrow';
 import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
 import { PositionalAesthetic } from './aesthetics/ScaledAesthetic';
