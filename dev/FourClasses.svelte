@@ -5,6 +5,7 @@
   import ColorChange from './svelte/ColorChange.svelte';
   import SizeSlider from './svelte/SizeSlider.svelte';
   import PositionScales from './svelte/PositionScales.svelte';
+  import SelectPoints from './svelte/SelectPoints.svelte';
   const startSize = 2;
   const prefs = {
     source_url: '/tiles',
@@ -13,6 +14,7 @@
     zoom_balance: 0.22, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
     point_size: startSize, // Default point size before application of size scaling
     background_color: '#EEEDDE',
+    duration: 100,
     encoding: {
       color: {
         field: 'class',
@@ -42,6 +44,7 @@
   <ColorChange {scatterplot}></ColorChange>
   <SizeSlider size={startSize} {scatterplot}></SizeSlider>
   <PositionScales {scatterplot} />
+  <SelectPoints {scatterplot}></SelectPoints>
 </div>
 
 <div id="deepscatter"></div>

@@ -21,7 +21,8 @@ uniform vec3 u_last_filter2_numeric; // An override for simple numeric operation
 
 uniform vec3 u_foreground_numeric; // An override for simple numeric operations.
 uniform vec3 u_last_foreground_numeric; // An override for simple numeric operations.
-
+// If we need a background render on the previous position and the current position, respectively.
+uniform vec2 u_background_draw_needed;
 
 // Transform from data space to the open window.
 uniform mat3 u_window_scale;
@@ -1241,12 +1242,13 @@ void main() {
     a_last_filter2_is_constant
   );
 
-  float foreground_status = choose_and_run_filter(
+  float current_foreground_status = choose_and_run_filter(
     u_foreground_numeric,
     a_foreground,
     u_foreground_map_position,
     a_foreground_is_constant
   );
+  
 
   float last_foreground_status = choose_and_run_filter(
     u_last_foreground_numeric,
@@ -1254,9 +1256,14 @@ void main() {
     u_last_foreground_map_position,
     a_last_foreground_is_constant
   );
-  float fg_ease = mix(last_foreground_status, foreground_status, ease);
+
+  float fg_ease = mix(last_foreground_status, current_foreground_status, ease);
+
+  float foreground_status;
   if (ease < ix_to_random(ix, 1.)) {
     foreground_status = last_foreground_status;
+  } else {
+    foreground_status = current_foreground_status;
   }
 
   /*if (a_foreground_is_constant) {
@@ -1368,44 +1375,72 @@ void main() {
   }
 
   // Are we in a mode where we need to plot foreground and background?
-  if (u_foreground_number > -1.) {
+  if (u_background_draw_needed.x > 0. || u_background_draw_needed.y > 0.) {
     // In that case, throw away points from the other half of the set.
+    // This status number will change in easing animation, causing points
+    // to snap from foreground to background as they move; no getting around that.
     if (u_foreground_number != foreground_status) {
       gl_Position = discard_me;
       return;
     }
-    if (u_foreground_number == 1.) {
-      gl_PointSize *= u_foreground_size;
-      fill = vec4(fill.rgb, min(1., fill.a * u_foreground_alpha));
-    }
-    // If we're in background mode, got to change the points a bit.
-    if (u_foreground_number == 0.) { 
-      gl_PointSize *= u_background_size;
-      // Should the color piker run?
-      if (u_color_picker_mode >= 1.) {
+
+
+    // Color picking only rouns on background if background_mouseover is true.
+    if (u_color_picker_mode >= 1.) {
+      if (u_foreground_number == 0.) { 
+      // Should the color picker run?
         if (u_background_mouseover == 1.) {
           // pass--keep the colors as are.
         } else {
           gl_Position = discard_me;
           return;
         }
-      } else {
-       float alpha = min(u_alpha * u_background_rgba.a, 1.);
-        if (alpha < 1./255.) {
-          // Very light alphas must be quantized. Only show an appropriate sample.
-          float seed = ix_to_random(ix, 38.6);
-          if (alpha * 255. < seed) {
-            gl_Position = discard_me;
-            return;
-          } else {
-            alpha = 1. / 255.;
-          }
-        }
-        fill = vec4(u_background_rgba.rgb, alpha);
       }
     }
+
+    float startSize = 1.0;
+    float endSize = 1.0;
+    vec4 startColor = fill;
+    vec4 endColor = fill;
+
+    if (u_background_draw_needed.x == 1.) {
+      if (last_foreground_status < 0.5) {
+        startSize = u_background_size;
+        startColor = u_background_rgba;
+        startColor.a *= fill.a;
+      } else {
+        startSize = u_foreground_size;
+        startColor = vec4(fill.rgb, min(1., fill.a * u_foreground_alpha));
+      }
+    }
+
+    if (u_background_draw_needed.y == 1.) {
+      if (current_foreground_status > 0.5) {
+        endSize = u_foreground_size;
+        endColor = vec4(fill.rgb, min(1., fill.a * u_foreground_alpha));
+      } else {
+        endSize = u_background_size;
+        endColor = u_background_rgba;
+        endColor.a *= fill.a;
+        // endColor.rgb = vec3(0., 0., 1.);
+      }
+    }
+
+    gl_PointSize *= mix(startSize, endSize, ease);
+    fill = mix(startColor, endColor, ease);
+
+    // Very light alphas must be quantized. Only show an appropriate sample.
+    if (fill.a < 1./255.) {
+      float seed = ix_to_random(ix, 38.6);
+      if (fill.a * 255. < seed) {
+        gl_Position = discard_me;
+        return;
+      } else {
+        fill.a = 1. / 255.;
+      }
+    }
+
   }
-    
   point_size = gl_PointSize;
 /*  if (u_use_glyphset > 0. && point_size > 5.0) {
     float random_letter = floor(64. * ix_to_random(ix, 1.3));
