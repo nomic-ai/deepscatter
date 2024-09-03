@@ -4,8 +4,8 @@ import { dimensions } from './StatefulAesthetic';
 import type { Scatterplot } from '../scatterplot';
 import type { Deeptable } from '../Deeptable';
 import { StatefulAesthetic } from './StatefulAesthetic';
-import type { Encoding } from '../shared';
-import type * as DS from '../shared';
+import type { Encoding } from '../types';
+import type * as DS from '../types';
 
 type AesMap = {
   [K in keyof typeof dimensions]: StatefulAesthetic<

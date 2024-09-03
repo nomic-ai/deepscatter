@@ -1,6 +1,6 @@
 import { Tile, Rectangle, p_in_rect } from './tile';
 import { max, bisectLeft, extent } from 'd3-array';
-import type * as DS from './shared';
+import type * as DS from './types';
 import {
   RecordBatch,
   StructRowProxy,

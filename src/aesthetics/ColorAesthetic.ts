@@ -1,4 +1,4 @@
-import type * as DS from '../shared';
+import type * as DS from '../types';
 
 import { range as arange, shuffler } from 'd3-array';
 import { isConstantChannel } from '../typing';

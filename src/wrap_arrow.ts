@@ -11,7 +11,7 @@ import {
 } from 'apache-arrow';
 import { Deeptable } from './Deeptable';
 import { add_or_delete_column } from './Deeptable';
-import type * as DS from './shared';
+import type * as DS from './types';
 import { extent } from 'd3-array';
 import { Rectangle } from './tile';
 

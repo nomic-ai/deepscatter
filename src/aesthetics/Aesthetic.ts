@@ -3,7 +3,7 @@ import { isConstantChannel } from '../typing';
 import { Type, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
-import type * as DS from '../shared';
+import type * as DS from '../types';
 import { Scatterplot } from '../scatterplot';
 
 /**

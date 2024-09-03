@@ -6,7 +6,7 @@ import { Scatterplot } from './scatterplot';
 import { Timer, timer } from 'd3-timer';
 import { select } from 'd3-selection';
 import { drag } from 'd3-drag';
-import type * as DS from './shared';
+import type * as DS from './types';
 import { Color } from './aesthetics/ColorAesthetic';
 
 const handler = drag<SVGRectElement, BBox>();

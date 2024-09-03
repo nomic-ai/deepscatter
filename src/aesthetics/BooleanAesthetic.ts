@@ -1,4 +1,4 @@
-import type * as DS from '../shared';
+import type * as DS from '../types';
 import { Aesthetic, Datum } from './Aesthetic';
 import { Scatterplot } from '../scatterplot';
 import type { TextureSet } from './AestheticSet';

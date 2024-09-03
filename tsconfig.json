@@ -1,11 +1,6 @@
 {
-  "include": [
-    "src/**/*.ts",
-    "src/shared.d.ts"
-  ],
-  "exclude": [
-    "node_modules/**/*"
-  ],
+  "include": ["src/**/*.ts", "src/types.ts"],
+  "exclude": ["node_modules/**/*"],
   "compilerOptions": {
     "declarationMap": true,
     "declaration": true,
@@ -22,7 +17,7 @@
     "rootDir": "./src",
     "lib": ["DOM"],
     "noEmitOnError": true,
-    "emitDeclarationOnly": true,
+    "emitDeclarationOnly": true
   },
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Recommended"
