@@ -147,6 +147,9 @@ export class ReglRenderer extends Renderer {
     const transform: ZoomTransform = this.zoom
       .transform as unknown as ZoomTransform;
     const colorScales = this.aes.dim('color') as StatefulAesthetic<Color>;
+    const foreground = this.aes.dim(
+      'foreground',
+    ) as StatefulAesthetic<Foreground>;
     const [currentColor, lastColor] = [
       colorScales.current,
       colorScales.last,
@@ -173,6 +176,10 @@ export class ReglRenderer extends Renderer {
       // string_index: 0,
       prefs: JSON.parse(JSON.stringify(prefs)) as DS.APICall,
       wrap_colors_after,
+      background_draw_needed: [
+        foreground.last.active,
+        foreground.current.active,
+      ] as [boolean, boolean],
       start_time: this.most_recent_restart,
       webgl_scale: this._webgl_scale_history[0],
       last_webgl_scale: this._webgl_scale_history[1],
@@ -216,11 +223,8 @@ export class ReglRenderer extends Renderer {
     // Regl is faster if it can render a large number of draw calls together.
     const prop_list: DS.TileDrawProps[] = [];
     let call_no = 0;
-    const foreground = this.aes.dim(
-      'foreground',
-    ) as StatefulAesthetic<Foreground>;
     const needs_background_pass =
-      foreground.states[0].active || foreground.states[1].active;
+      props.background_draw_needed[0] || props.background_draw_needed[1];
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
       tile._buffer_manager =
@@ -234,21 +238,24 @@ export class ReglRenderer extends Renderer {
       const this_props = {
         manager: tile._buffer_manager,
         number: call_no++,
-        foreground: needs_background_pass ? 1 : -1,
+        foreground_draw_number: needs_background_pass ? 1 : 1,
         tile_id: tile.numeric_id,
         ...props,
       } as DS.TileDrawProps;
       prop_list.push(this_props);
       if (needs_background_pass) {
-        const background_props = { ...this_props, foreground: 0 } as const;
+        const background_props = {
+          ...this_props,
+          foreground_draw_number: 0,
+        } as const;
         prop_list.push(background_props);
       }
     }
     // Plot background first, and lower tiles before higher tiles.
     prop_list.sort((a, b) => {
       return (
-        (3 + a.foreground) * 1000 -
-        (3 + b.foreground) * 1000 +
+        (3 + a.foreground_draw_number) * 1000 -
+        (3 + b.foreground_draw_number) * 1000 +
         b.number -
         a.number
       );
@@ -827,7 +834,14 @@ export class ReglRenderer extends Renderer {
         u_alpha: (_: C, { alpha }: P) => {
           return alpha;
         },
-        u_foreground_number: (_: C, { foreground }: P) => foreground as number,
+        u_background_draw_needed: (_: C, { background_draw_needed }: P) => {
+          return [
+            background_draw_needed[0] ? 1 : 0,
+            background_draw_needed[1] ? 1 : 0,
+          ];
+        },
+        u_foreground_number: (_: C, { foreground_draw_number }: P) =>
+          foreground_draw_number as number,
         u_foreground_alpha: () => this.render_props.foreground_opacity,
         u_background_rgba: () => {
           const color = this.prefs.background_options.color;

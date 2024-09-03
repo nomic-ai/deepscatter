@@ -612,6 +612,7 @@ export type GlobalDrawProps = {
   time: number;
   update_time: number;
   relative_time: number;
+  background_draw_needed: [boolean, boolean];
   // string_index: number;
   prefs: APICall;
   wrap_colors_after: [number, number];
@@ -643,6 +644,6 @@ export type GlobalDrawProps = {
 export type TileDrawProps = GlobalDrawProps & {
   manager: TileBufferManager;
   number: number;
-  foreground: 1 | 0 | -1;
+  foreground_draw_number: 1 | 0 | -1;
   tile_id: number;
 };
