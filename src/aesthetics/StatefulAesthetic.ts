@@ -1,4 +1,4 @@
-import type * as DS from '../shared';
+import type * as DS from '../types';
 
 import { Size, Jitter_speed, Jitter_radius, X, Y } from './ScaledAesthetic';
 

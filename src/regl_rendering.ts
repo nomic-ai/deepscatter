@@ -20,7 +20,7 @@ import vertex_shader from './glsl/general.vert';
 import frag_shader from './glsl/general.frag';
 import { AestheticSet } from './aesthetics/AestheticSet';
 import { rgb } from 'd3-color';
-import type * as DS from './shared';
+import type * as DS from './types';
 import type { Tile } from './tile';
 import REGL from 'regl';
 import { Deeptable } from './Deeptable';

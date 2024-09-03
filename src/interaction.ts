@@ -12,7 +12,7 @@ import { ReglRenderer } from './regl_rendering';
 import { StructRowProxy } from 'apache-arrow';
 import { Rectangle } from './tile';
 import type { Deeptable } from './Deeptable';
-import type * as DS from './shared';
+import type * as DS from './types';
 import type { Scatterplot } from './scatterplot';
 import { PositionalAesthetic } from './aesthetics/ScaledAesthetic';
 type Annotation = {

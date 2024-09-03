@@ -16,7 +16,7 @@ import type {
   FunctionSelectParams,
   IdSelectParams,
 } from './selection';
-import type * as DS from './shared';
+import type * as DS from './types';
 
 // DOM elements that deepscatter uses.
 
