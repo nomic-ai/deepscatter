@@ -228,8 +228,6 @@ export class ReglRenderer extends Renderer {
         tile._buffer_manager || new TileBufferManager(this.regl, tile, this);
 
       if (!tile._buffer_manager.ready()) {
-        // The 'ready' call also pushes a creation request into
-        // the deferred_functions queue.
         continue;
       }
       const this_props = {
@@ -295,25 +293,6 @@ export class ReglRenderer extends Renderer {
     }
 
     const start = Date.now();
-
-    async function pop_deferred_functions(
-      deferred_functions: (() => void | Promise<void>)[],
-    ) {
-      while (Date.now() - start < 10 && deferred_functions.length > 0) {
-        // Keep popping deferred functions off the queue until we've spent 10 milliseconds doing it.
-        const current = deferred_functions.shift();
-        if (current === undefined) {
-          continue;
-        }
-        try {
-          await current();
-        } catch (error) {
-          console.warn(error, current);
-        }
-      }
-    }
-    // Run 10 ms of deferred functions.
-    void pop_deferred_functions(this.deferred_functions);
 
     try {
       this.render_all(props);
