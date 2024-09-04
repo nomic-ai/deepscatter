@@ -1422,24 +1422,26 @@ void main() {
         endSize = u_background_size;
         endColor = u_background_rgba;
         endColor.a *= fill.a;
-        // endColor.rgb = vec3(0., 0., 1.);
       }
     }
 
     gl_PointSize *= mix(startSize, endSize, ease);
-    fill = mix(startColor, endColor, ease);
-
-    // Very light alphas must be quantized. Only show an appropriate sample.
-    if (fill.a < 1./255.) {
-      float seed = ix_to_random(ix, 38.6);
-      if (fill.a * 255. < seed) {
-        gl_Position = discard_me;
-        return;
-      } else {
-        fill.a = 1. / 255.;
-      }
+    if (u_color_picker_mode < 1.) {
+      fill = mix(startColor, endColor, ease);
+      // Very light alphas must be quantized. Only show an appropriate sample.
+      // Note -- this adjustment will not happen in color picking modes,
+      // which may occasionally result in one tiny point highlighted 
+      // in favor of another point in the exact same place.
+      if (fill.a < 1./255.) {
+        float seed = ix_to_random(ix, 38.6);
+        if (fill.a * 255. < seed) {
+          gl_Position = discard_me;
+          return;
+        } else {
+          fill.a = 1. / 255.;
+        }
+      }   
     }
-
   }
   point_size = gl_PointSize;
 /*  if (u_use_glyphset > 0. && point_size > 5.0) {
