@@ -99,17 +99,14 @@ export class ReglRenderer extends Renderer {
     this.initialize_textures();
 
     // Not the right way, for sure.
-    this._initializations = Promise.all([
-      // some things that need to be initialized before the renderer is loaded.
-      this.deeptable.promise.then(() => {
-        this.remake_renderer();
-        this._webgl_scale_history = [
-          this.default_webgl_scale,
-          this.default_webgl_scale,
-        ];
-      }),
-    ]).then(() => {});
-    void this.initialize();
+    (this._initializations = this.deeptable.promise.then(() => {
+      this.remake_renderer();
+      this._webgl_scale_history = [
+        this.default_webgl_scale,
+        this.default_webgl_scale,
+      ];
+    })),
+      void this.initialize();
     this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
   }
 
@@ -264,9 +261,16 @@ export class ReglRenderer extends Renderer {
   }
 
   /**
-   * Actions that run on a single animation tick.
+   * Actions that run on every single animation tick.
    */
   tick() {
+    // Kind of hacky, but done rather than a full async rewrite. If the webgl
+    // history isn't defined, this._initializations hasn't yet resolved and
+    // we'll see errors on drawing.
+    if (this._webgl_scale_history === undefined) {
+      return;
+    }
+
     const { prefs, deeptable, props } = this;
     this.tick_num = this.tick_num || 0;
     this.tick_num++;
