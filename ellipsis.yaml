@@ -1,0 +1,17 @@
+version: 1.3
+
+about:
+  - This is a codebase for Deepscatter, a webGL based plotting library.
+
+pr_review:
+  confidence_threshold: 0.7
+  rules:
+    - "Code should be DRY (Don't Repeat Yourself)"
+    - 'Apache Arrow is the data format of choice, and avoid early loading of Arrow data is a primary goal'
+    - 'Avoid memory leaks'
+    - 'Use D3 modules for scales, axes, and other data visualization fundamentals'
+    - 'Extremely Complicated Code Needs Comments'
+    - 'Use Descriptive Variable and Constant Names'
+    - 'Follow the Single Responsibility Principle'
+    - 'The public API has some underscores in it that must remain, but new code should use camelCase.'
+    - 'This library should be high performance; operations that operate over all the data in a dataframe should generally aim to execute in under 30ms,and things that block the main thread are bad.'
