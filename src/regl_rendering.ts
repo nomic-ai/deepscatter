@@ -803,8 +803,9 @@ export class ReglRenderer extends Renderer {
         //   }
         //   return this.textures.empty_texture;
         // },
-        //@ts-expect-error Don't know about regl preps.
-        u_color_picker_mode: regl.prop('color_picker_mode'),
+
+        u_color_picker_mode: (_: Color, { color_picker_mode }: P) =>
+          color_picker_mode,
         u_position_interpolation_mode(_, props: P) {
           // 1 indicates that there should be a continuous loop between the two points.
           if (props.position_interpolation) {
