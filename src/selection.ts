@@ -885,10 +885,14 @@ export class DataSelection {
   }
 }
 
-function bigintmatcher(field: string, matches: bigint[]) {
+function bigintmatcher(
+  field: string,
+  matches: bigint[],
+  subfield: string | string[] | null = null,
+) {
   const matchings = new Set(matches);
   return async function (tile: Tile) {
-    const col = (await tile.get_column(field)).data[0];
+    const col = (await tile.get_column(field, subfield)).data[0];
     const values = col.values as bigint[];
     const bitmask = new Bitmask(tile.record_batch.numRows);
     for (let i = 0; i < tile.record_batch.numRows; i++) {
@@ -920,7 +924,11 @@ function bigintmatcher(field: string, matches: bigint[]) {
  * @param matches A list of strings to match in that column
  * @returns
  */
-function stringmatcher(field: string, matches: string[]) {
+function stringmatcher(
+  field: string,
+  matches: string[],
+  subfield: string | string[] | null = null,
+) {
   if (field === undefined) {
     throw new Error('Field must be defined');
   }
@@ -958,7 +966,8 @@ function stringmatcher(field: string, matches: string[]) {
    * The Deepscatter transformation function.
    */
   return async function (tile: Tile) {
-    const col = ((await tile.get_column(field)) as Vector<Utf8>).data[0];
+    const col = ((await tile.get_column(field, subfield)) as Vector<Utf8>)
+      .data[0];
     const bytes = col.values;
     const offsets = col.valueOffsets;
 

@@ -134,6 +134,9 @@ export class Deeptable {
     this.root_tile = new Tile(defaultManifest, null, this);
     const preProcessRootTile = this.root_tile.preprocessRootTileInfo();
 
+    // At instantiation, the deeptable isn't ready; only once this
+    // async stuff is done can the deeptable be used.
+    // TODO: Add an async static method as the preferred initialization method.
     this.promise = preProcessRootTile.then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
