@@ -9,3 +9,23 @@ dist/tiles/*
 co2.feather co2.html
 dist
 docs
+tiles
+_deepscatter_tmp
+interfaces
+modules
+temp.html
+pubmed.html
+index3.html
+variables
+build
+classes
+c02*
+co2*
+donations.html
+modules.html
+.DS_Store
+cities.parquet
+city_tiles
+test_pages
+cities.html
+assets
