@@ -30,13 +30,9 @@ import {
 } from './aesthetics/StatefulAesthetic';
 import { Scatterplot } from './scatterplot';
 import {
-  Bool,
   Data,
   Dictionary,
-  Float,
-  Int,
   StructRowProxy,
-  Timestamp,
   Type,
   Utf8,
   Vector,
@@ -45,6 +41,7 @@ import { Color } from './aesthetics/ColorAesthetic';
 import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
 import { Filter, Foreground } from './aesthetics/BooleanAesthetic';
 import { ZoomTransform } from 'd3-zoom';
+import { TupleMap } from './utilityFunctions';
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
   public regl: Regl;
@@ -67,7 +64,7 @@ export class ReglRenderer extends Renderer {
   public contour_alpha_vals?: Float32Array | Uint8Array | Uint16Array;
   public tick_num?: number;
   public reglframe?: REGL.Cancellable;
-  public _integer_buffer?: Buffer;
+  public bufferManager: BufferManager;
   //  public _renderer :  Renderer;
 
   constructor(
@@ -76,6 +73,7 @@ export class ReglRenderer extends Renderer {
     scatterplot: Scatterplot,
   ) {
     super(selector, scatterplot);
+
     const c = this.canvas;
     if (this.canvas === undefined) {
       throw new Error('No canvas found');
@@ -91,6 +89,7 @@ export class ReglRenderer extends Renderer {
       ],
       canvas: c,
     });
+
     this.deeptable = tileSet;
 
     this.aes = new AestheticSet(scatterplot, this.regl, tileSet);
@@ -108,6 +107,7 @@ export class ReglRenderer extends Renderer {
     })),
       void this.initialize();
     this._buffers = new MultipurposeBufferSet(this.regl, this.buffer_size);
+    this.bufferManager = new BufferManager(this);
   }
 
   get buffers() {
@@ -224,17 +224,21 @@ export class ReglRenderer extends Renderer {
       props.background_draw_needed[0] || props.background_draw_needed[1];
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
-      tile._buffer_manager =
-        tile._buffer_manager || new TileBufferManager(this.regl, tile, this);
-
-      if (!tile._buffer_manager.ready()) {
+      if (
+        !this.bufferManager.ready(
+          tile,
+          this.needeedFields.map((d) => [d]),
+        )
+      ) {
         continue;
       }
+
       const this_props = {
-        manager: tile._buffer_manager,
         number: call_no++,
         foreground_draw_number: needs_background_pass ? 1 : 1,
         tile_id: tile.numeric_id,
+        tile: tile,
+        count: tile.manifest.nPoints,
         ...props,
       } as DS.TileDrawProps;
       prop_list.push(this_props);
@@ -251,8 +255,8 @@ export class ReglRenderer extends Renderer {
       return (
         (3 + a.foreground_draw_number) * 1000 -
         (3 + b.foreground_draw_number) * 1000 +
-        b.number -
-        a.number
+        b.tile_id -
+        a.tile_id
       );
     });
     this._renderer(prop_list);
@@ -437,67 +441,6 @@ export class ReglRenderer extends Renderer {
     }
   }
 
-  /*
-  set_image_data(tile, ix) {
-  // Stores a *single* image onto the texture.
-    const { regl } = this;
-
-    this.initialize_sprites(tile);
-
-    //    const { sprites, image_locations } = tile._regl_elements;
-    const { current_position } = sprites;
-    if (current_position[1] > (4096 - 18 * 2)) {
-      console.error(`First spritesheet overflow on ${tile.key}`);
-      // Just move back to the beginning. Will cause all sorts of havoc.
-      sprites.current_position = [0, 0];
-      return;
-    }
-    if (!tile.table.get(ix)._jpeg) {
-
-    }
-  }
-  */
-  /*
-  spritesheet_setter(word) {
-  // Set if not there.
-    let ctx = 0;
-    if (!this.spritesheet) {
-      const offscreen = create('canvas')
-        .attr('width', 4096)
-        .attr('width', 4096)
-        .style('display', 'none');
-
-      ctx = offscreen.node().getContext('2d');
-      const font_size = 32;
-      ctx.font = `${font_size}px Times New Roman`;
-      ctx.fillStyle = 'black';
-      ctx.lookups = new Map();
-      ctx.position = [0, font_size - font_size / 4.0];
-      this.spritesheet = ctx;
-    } else {
-      ctx = this.spritesheet;
-    }
-    let [x, y] = ctx.position;
-
-    if (ctx.lookups.get(word)) {
-      return ctx.lookups.get(word);
-    }
-    const w_ = ctx.measureText(word).width;
-    if (w_ > 4096) {
-      return;
-    }
-    if ((x + w_) > 4096) {
-      x = 0;
-      y += font_size;
-    }
-    ctx.fillText(word, x, y);
-    lookups.set(word, { x, y, width: w_ });
-    // ctx.strokeRect(x, y - font_size, width, font_size)
-    x += w_;
-    ctx.position = [x, y];
-    return lookups.get(word);
-  }
-  */
   initialize_textures() {
     const { regl } = this;
     this.fbos = this.fbos || {};
@@ -599,17 +542,6 @@ export class ReglRenderer extends Renderer {
       v = sum(this.contour_vals as Uint8Array);
     });
     return v;
-  }
-
-  get integer_buffer(): wrapREGL.Buffer {
-    if (this._integer_buffer === undefined) {
-      const array = new Float32Array(2 ** 16);
-      for (let i = 0; i < 2 ** 16; i++) {
-        array[i] = i;
-      }
-      this._integer_buffer = this.regl.buffer(array);
-    }
-    return this._integer_buffer;
   }
 
   color_pick(x: number, y: number): null | StructRowProxy {
@@ -753,7 +685,7 @@ export class ReglRenderer extends Renderer {
       frag: frag_shader as string,
       vert: vertex_shader as string,
       count(_, props) {
-        return props.manager.count;
+        return props.count;
       },
       attributes: {},
       uniforms: {
@@ -873,9 +805,12 @@ export class ReglRenderer extends Renderer {
     for (const i of range(0, 16)) {
       parameters.attributes[`buffer_${i}`] = (
         _,
-        { manager, buffer_num_to_variable }: P,
+        { tile, buffer_num_to_variable }: P,
       ) => {
-        const c = manager.regl_elements.get(buffer_num_to_variable[i]);
+        if (i >= buffer_num_to_variable.length) {
+          return { constant: 0 };
+        }
+        const c = this.bufferManager.get([tile, ...buffer_num_to_variable[i]]);
         return c || { constant: 0 };
       };
     }
@@ -1024,7 +959,9 @@ export class ReglRenderer extends Renderer {
       }
     }
 
-    const buffer_num_to_variable = [...Object.keys(variable_to_buffer_num)];
+    const buffer_num_to_variable = [
+      ...Object.keys(variable_to_buffer_num).map((k) => [k]),
+    ];
     this.aes_to_buffer_num = aes_to_buffer_num;
     this.variable_to_buffer_num = variable_to_buffer_num;
     this.buffer_num_to_variable = buffer_num_to_variable;
@@ -1032,7 +969,7 @@ export class ReglRenderer extends Renderer {
 
   aes_to_buffer_num?: Record<string, number>;
   variable_to_buffer_num?: Record<string, number>;
-  buffer_num_to_variable?: string[];
+  buffer_num_to_variable?: string[][];
 
   get discard_share() {
     // If jitter is temporal, e.g., or filters are in place,
@@ -1041,8 +978,8 @@ export class ReglRenderer extends Renderer {
   }
 }
 
-export class TileBufferManager {
-  // Handle the interactions of a tile with a regl state.
+export class BufferManager {
+  // Handle the interactions of tiles with a regl state.
 
   // binds elements directly to the tile, so it's safe
   // to re-run this multiple times on the same tile.
@@ -1051,28 +988,50 @@ export class TileBufferManager {
   // but since they relate to Regl,
   // I want them in this file instead.
 
-  public tile: Tile;
-  public regl: Regl;
+  private regl: Regl;
   public renderer: ReglRenderer;
-  public regl_elements: Map<string, DS.BufferLocation | null>;
+  private bufferMap: WeakMap<ArrayBufferView, DS.BufferLocation> = new Map();
+  private arrayMap: TupleMap<string | Tile, ArrayBufferView> = new TupleMap();
+  public ixInTileBuffer: DS.BufferLocation;
+  // A list of integers. Used internally.
+  private _integer_array?: Float32Array;
+  // A buffer populated from that list.
+  private _integer_buffer?: Buffer;
 
-  constructor(regl: Regl, tile: Tile, renderer: ReglRenderer) {
-    this.tile = tile;
-    this.regl = regl;
+  constructor(renderer: ReglRenderer) {
+    this.regl = renderer.regl;
     this.renderer = renderer;
     // Reuse the same buffer for all `ix_in_tile` keys, because
     // it's just a set of integers going up.
-    this.regl_elements = new Map([
-      [
-        'ix_in_tile',
-        {
-          offset: 0,
-          stride: 4,
-          buffer: renderer.integer_buffer,
-          byte_size: 4 * 2 ** 16,
-        },
-      ],
-    ]);
+    this.ixInTileBuffer = {
+      offset: 0,
+      stride: 4,
+      buffer: this.integer_buffer,
+      byte_size: 4 * 2 ** 16,
+    };
+  }
+
+  get integer_array(): Float32Array {
+    if (this._integer_array === undefined) {
+      this._integer_array = new Float32Array(2 ** 16);
+      for (let i = 0; i < 2 ** 16; i++) {
+        this._integer_array[i] = i;
+      }
+    }
+    return this._integer_array;
+  }
+
+  get integer_buffer(): wrapREGL.Buffer {
+    if (this._integer_buffer === undefined) {
+      const array = this.integer_array;
+      this._integer_buffer = this.regl.buffer(array);
+    }
+    return this._integer_buffer;
+  }
+
+  get(k: (string | Tile)[]): DS.BufferLocation | null {
+    const a = this.bufferMap.get(this.arrayMap.get(k));
+    return a;
   }
 
   /**
@@ -1080,99 +1039,67 @@ export class TileBufferManager {
    * @param
    * @returns Is the buffer ready with all the requested aesthetics for the current plot?
    */
-  ready() {
-    const { renderer } = this;
-
+  ready(tile: Tile, needed_dimensions: Iterable<string[]>): boolean {
     // We don't allocate buffers for dimensions until they're needed.
-    // This code checks what buffers the current plot call is expecting.
-    const needed_dimensions: Set<string> = new Set();
-    for (const v of Object.values(renderer.aes.store)) {
-      for (const aesthetic of v.states) {
-        if (aesthetic.field) {
-          needed_dimensions.add(aesthetic.field);
-        }
-      }
-    }
-    for (const key of ['ix', 'ix_in_tile', ...needed_dimensions]) {
-      const current = this.regl_elements.get(key);
+
+    for (const key of [['ix'], ['ix_in_tile'], ...needed_dimensions]) {
+      const current = this.get([tile, ...key]);
       if (current === null || current === undefined) {
-        if (this.tile.hasLoadedColumn(key)) {
-          this.create_regl_buffer(key);
+        if (tile.hasLoadedColumn(key[0])) {
+          this.create_regl_buffer(tile, key);
         } else {
-          return false;
+          // console.log('not ready because of', key);
+          if (key[0] === 'ix_in_tile') {
+            this.create_regl_buffer(tile, key);
+          } else {
+            return false;
+          }
         }
       }
     }
     return true;
   }
 
-  async awaitReady() {}
   /**
    *
    * @param colname the name of the column to release
    *
    * @returns Nothing, not even if the column isn't currently defined.
    */
-  release(colname: string): void {
-    const current = this.regl_elements.get(colname);
+  release(tile: Tile, colname: string[]): void {
+    const current = this.get([tile, ...colname]);
     if (current) {
       this.renderer.buffers.free_block(current);
     }
   }
-  get count() {
-    return this.tile.record_batch.numRows;
-  }
 
-  create_buffer_data(key: string): Float32Array {
-    const { tile } = this;
-    type ColumnType = Vector<Dictionary<Utf8> | Float | Bool | Int | Timestamp>;
-
-    if (!tile.hasLoadedColumn(key)) {
-      if (tile.deeptable.transformations[key] !== undefined) {
-        throw new Error(
-          'Attempted to create buffer data on an unloaded transformation',
-        );
-      } else {
-        let col_names = [
-          ...tile.record_batch.schema.fields.map((d) => d.name),
-          ...Object.keys(tile.deeptable.transformations),
-        ];
-        if (!key.startsWith('_')) {
-          // Don't warn internal columns unless the user is in internal-column land.
-          col_names = col_names.filter((d) => !d.startsWith('_'));
-        }
-        throw new Error(
-          `Requested ${key} but table only has columns ["${col_names.join(
-            '", "',
-          )}]"`,
-        );
-      }
-    }
-
-    const column = tile.record_batch.getChild(key) as ColumnType;
-
-    if (column.data.length !== 1) {
-      throw new Error(
-        `Column ${key} has ${column.data.length} buffers, not 1.`,
-      );
-    }
-
-    if (!column.type || !column.type.typeId) {
-      throw new Error(`Column ${key} has no type.`);
-    }
+  /**
+   *
+   * @param tile the tile to use
+   * @param key the (nested?) key in the dataset. This must be already populated
+   * when this function is run.
+   * @returns A Float32-converted version of the data in the column
+   * suitable to be dropped onto a webGL buffer.
+   */
+  convertToGlFormat(column: Vector<DS.SupportedArrowTypes>): Float32Array {
     // Anything that isn't a single-precision float must be coerced to one.
     if (!column.type || column.type.typeId !== Type.Float32) {
-      const buffer = new Float32Array(tile.record_batch.numRows);
+      // For numeric data, it's safe to simply return the data straight up.
+      if (column.data[0].values.constructor === Float64Array) {
+        return new Float32Array(column.data[0].values);
+      }
+
+      const buffer = new Float32Array(column.length);
       const source_buffer = column.data[0];
       if (column.type.typeId === Type.Dictionary) {
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
+        for (let i = 0; i < column.length; i++) {
           buffer[i] = (source_buffer as Data<Dictionary<Utf8>>).values[i];
         }
       } else if (column.type.typeId === Type.Bool) {
         // Booleans are unpacked using arrow fundamentals unless we see
         // a reason to do it directly with bit operations (such as the null checks)
         // being expensive.
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
+        for (let i = 0; i < column.length; i++) {
           buffer[i] = column.get(i) ? 1 : 0;
         }
       } else if (
@@ -1203,42 +1130,94 @@ export class TileBufferManager {
           throw new Error(`Unknown time type ${timetype}`);
         }
 
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
+        for (let i = 0; i < column.length; i++) {
           buffer[i] = Number(view64[i]) / divisor;
         }
       } else {
-        for (let i = 0; i < tile.record_batch.numRows; i++) {
+        for (let i = 0; i < column.length; i++) {
           buffer[i] = Number(source_buffer.values[i]);
         }
       }
       return buffer;
     }
-    // For numeric data, it's safe to simply return the data straight up.
-    if (column.data[0].values.constructor === Float64Array) {
-      return new Float32Array(column.data[0].values);
-    }
     return column.data[0].values as Float32Array;
   }
 
-  create_regl_buffer(key: string): void {
-    const { regl_elements, renderer } = this;
-    if (regl_elements.has(key)) {
+  create_regl_buffer(tile: Tile, keys: string[]): void {
+    const { renderer } = this;
+    const key = [tile, ...keys];
+    if (this.arrayMap.has(key)) {
       return;
     }
-    const data = this.create_buffer_data(key);
-    if (data.constructor !== Float32Array) {
-      console.warn(typeof data, data);
-      throw new Error('Buffer data must be a Float32Array');
+    // console.log({ keys });
+    if (keys[0] === 'ix_in_tile') {
+      this.arrayMap.set(key, this.integer_array);
+      if (!this.bufferMap.has(this.integer_array)) {
+        this.bufferMap.set(this.integer_array, this.ixInTileBuffer);
+      }
+      return;
     }
+
+    const vector = getNestedVector(tile, keys);
+    this.arrayMap.set(key, vector.data[0].values);
+
+    if (this.bufferMap.has(vector.data[0].values)) {
+      return;
+    }
+
+    const data = this.convertToGlFormat(vector);
     const item_size = 4;
     const data_length = data.length;
 
     const buffer_desc = renderer.buffers.allocate_block(data_length, item_size);
-
-    regl_elements.set(key, buffer_desc);
-
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
+
+    this.bufferMap.set(vector.data[0].values, buffer_desc);
   }
+}
+
+// TODO: Build this out in next PR.
+function getNestedVector(
+  tile: Tile,
+  key: string[],
+): Vector<DS.SupportedArrowTypes> {
+  if (!tile.hasLoadedColumn(key[0])) {
+    if (tile.deeptable.transformations[key[0]] !== undefined) {
+      throw new Error(
+        'Attempted to create buffer data on an unloaded transformation',
+      );
+    } else {
+      let col_names = [
+        ...tile.record_batch.schema.fields.map((d) => d.name),
+        ...Object.keys(tile.deeptable.transformations),
+      ];
+      if (!key[0].startsWith('_')) {
+        // Don't warn internal columns unless the user is in internal-column land.
+        col_names = col_names.filter((d) => !d.startsWith('_'));
+      }
+      throw new Error(
+        `Requested ${key} but table only has columns ["${col_names.join(
+          '", "',
+        )}]"`,
+      );
+    }
+  }
+
+  let column: Vector<DS.SupportedArrowTypes> = tile.record_batch.getChild(
+    key[0],
+  );
+  for (const k of key.slice(1)) {
+    column = column.getChild(k);
+  }
+  if (column.data.length !== 1) {
+    throw new Error(`Column ${key} has ${column.data.length} buffers, not 1.`);
+  }
+
+  if (!column.type || !column.type.typeId) {
+    throw new Error(`Column ${key} has no type.`);
+  }
+
+  return column;
 }
 
 class MultipurposeBufferSet {
@@ -1310,7 +1289,6 @@ class MultipurposeBufferSet {
   allocate_block(items: number, bytes_per_item: number): DS.BufferLocation {
     // Call dibs on a block of this buffer.
     // NB size is in **bytes**
-
     const bytes_needed = items * bytes_per_item;
     let i = 0;
     for (const buffer_loc of this.freed_buffers) {
@@ -1320,12 +1298,13 @@ class MultipurposeBufferSet {
       if (buffer_loc.byte_size === bytes_needed) {
         // Delete this element from the list of free buffers.
         this.freed_buffers.splice(i, 1);
-        return {
+        const v = {
           buffer: buffer_loc.buffer,
           offset: buffer_loc.offset,
           stride: bytes_per_item,
           byte_size: bytes_needed,
         };
+        return v;
       }
       i += 1;
     }
@@ -1342,7 +1321,9 @@ class MultipurposeBufferSet {
       offset: this.pointer,
       stride: bytes_per_item,
       byte_size: items * bytes_per_item,
-    } as DS.BufferLocation;
+    };
+
+    // add a listener for GC on the value.
     this.pointer += items * bytes_per_item;
     return value;
   }
