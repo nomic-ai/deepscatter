@@ -122,9 +122,10 @@ export abstract class Aesthetic<
       for (let i = 0; i < this.subfield.length; i++) {
         v = v[this.subfield[i]] as Input['domainType'];
       }
+      return v;
+      // Needs a default perhaps?
+      return null;
     }
-    // Needs a default perhaps?
-    return null;
   }
 
   get map_position() {
