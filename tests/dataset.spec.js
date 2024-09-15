@@ -1,4 +1,9 @@
-import { Deeptable, DataSelection, Bitmask } from '../dist/deepscatter.js';
+import {
+  Deeptable,
+  DataSelection,
+  SortedDataSelection,
+  Bitmask,
+} from '../dist/deepscatter.js';
 import { Table, vectorFromArray, Utf8 } from 'apache-arrow';
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
@@ -92,6 +97,32 @@ test('Test composition of selections', async () => {
   await selectNothing.applyToAllLoadedTiles();
   const v = selectNothing.get();
   console.log(v);
+});
+
+test('Test sorting of selections', async () => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const selectEvens = new DataSelection(dataset, {
+    name: 'twos2',
+    tileFunction: selectFunctionForFactorsOf(2),
+  });
+  await selectEvens.applyToAllTiles();
+  const sorted = await SortedDataSelection.fromSelection(
+    selectEvens,
+    ['random'],
+    ({ random }) => random,
+  );
+  await sorted.applyToAllTiles();
+  // This should be 8192.
+  const bottom = sorted.get(0);
+  assert.ok(bottom.random < 0.01);
+
+  const foo = sorted.get(sorted.selectionSize - 1);
+  assert.ok(foo.random > 0.99);
+
+  const mid = sorted.get(Math.floor(sorted.selectionSize / 2));
+  assert.ok(mid.random > 0.45);
+  assert.ok(mid.random < 0.55);
 });
 
 test.run();

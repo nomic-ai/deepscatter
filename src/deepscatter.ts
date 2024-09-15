@@ -1,5 +1,5 @@
 export { Scatterplot } from './scatterplot';
-export { Bitmask, DataSelection } from './selection';
+export { Bitmask, DataSelection, SortedDataSelection } from './selection';
 export { Deeptable } from './Deeptable';
 export { LabelMaker } from './label_rendering';
 export { dictionaryFromArrays } from './utilityFunctions';
