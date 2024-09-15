@@ -21,6 +21,8 @@ function make_batch(start = 0, length = 65536, batch_number_here = 0) {
   let integers = new Int32Array(length);
   let ix = new Uint32Array(length);
   let batch_id = new Float32Array(length).fill(batch_number_here);
+  let randoms = new Float32Array(length);
+
   for (let i = start; i < start + length; i++) {
     ix[i - start] = i;
     let x_ = 0;
@@ -39,6 +41,7 @@ function make_batch(start = 0, length = 65536, batch_number_here = 0) {
     x[i - start] = x_;
     y[i - start] = y_;
     integers[i - start] = i;
+    randoms[i - start] = Math.random();
   }
 
   function num_to_string(num) {
@@ -51,6 +54,7 @@ function make_batch(start = 0, length = 65536, batch_number_here = 0) {
     _id: vectorFromArray(vs, new Utf8()),
     integers: vectorFromArray(integers),
     batch_id: vectorFromArray(batch_id),
+    random: vectorFromArray(randoms),
   });
 }
 
