@@ -128,8 +128,6 @@ export class Renderer {
   public deeptable: Deeptable;
   public width: number;
   public height: number;
-  // The renderer handles periodic dispatches of calls
-  public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
   public aes?: AestheticSet;
   public _zoom?: Zoom;
@@ -142,7 +140,6 @@ export class Renderer {
     ).node() as HTMLCanvasElement;
     this.width = +select(this.canvas).attr('width');
     this.height = +select(this.canvas).attr('height');
-    this.deferred_functions = [];
     this._use_scale_to_download_tiles = true;
   }
 
