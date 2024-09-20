@@ -4,14 +4,7 @@ import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
 import { getTileFromRow } from './tixrixqid';
 import type * as DS from './types';
-import {
-  Bool,
-  Struct,
-  StructRowProxy,
-  Utf8,
-  Vector,
-  makeData,
-} from 'apache-arrow';
+import { Bool, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
 import { bisectLeft, bisectRight, range } from 'd3-array';
 interface SelectParams {
   name: string;

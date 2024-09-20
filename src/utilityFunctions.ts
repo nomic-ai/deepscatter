@@ -8,6 +8,7 @@ import {
   Vector,
   makeVector,
 } from 'apache-arrow';
+import { DataProps } from 'apache-arrow/data';
 
 type ArrayToArrayMap = {
   Int8Array: Int8;
@@ -70,15 +71,23 @@ function createDictionaryWithVector<T extends keyof ArrayToArrayMap>(
       'values must be an array of signed integers, 32 bit or smaller.',
     );
   }
-  const type = new Dictionary(labelsArrow.type, t, currentDictNumber++, false);
-  const returnval = makeVector({
-    type,
+  const type: Dictionary<Utf8, ArrayToArrayMap[T]> = new Dictionary(
+    labelsArrow.type,
+    t,
+    currentDictNumber++,
+    false,
+  );
+
+  // @ts-expect-error These are correct and unit tested, but
+  // the typing fails for reasons I don't understand.
+  const props: DataProps<Dictionary<Utf8, ArrayToArrayMap[T]>> = {
+    type: type,
     length: indices.length,
     nullCount: 0,
     data: indices,
     dictionary: labelsArrow,
-  });
-
+  };
+  const returnval = makeVector(props);
   return returnval;
 }
 
@@ -148,7 +157,7 @@ export class TupleMap<K = Object, V = Object> {
   }
 }
 
-// finds the first set bit.
-function ffs(n: number): number {
-  return Math.log2(n & -n);
-}
+// // finds the first set bit.
+// function ffs(n: number): number {
+//   return Math.log2(n & -n);
+// }
