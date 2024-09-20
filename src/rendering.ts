@@ -1,15 +1,17 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable no-underscore-dangle */
-import { select } from 'd3-selection';
+import { BaseType, select } from 'd3-selection';
 import { min } from 'd3-array';
-import type Scatterplot from './deepscatter';
+import type { Scatterplot } from './scatterplot';
 import type { Tile } from './tile';
-import type Zoom from './interaction';
-import type { AestheticSet } from './AestheticSet';
+import type { Zoom } from './interaction';
+import type { AestheticSet } from './aesthetics/AestheticSet';
 import { timer, Timer } from 'd3-timer';
-import { Dataset } from './Dataset';
-import type * as DS from './shared.d'
+import { Deeptable } from './Deeptable';
+import type * as DS from './types';
 import { Table } from 'apache-arrow';
-import { X } from './Aesthetic';
+import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
+import { PositionalAesthetic } from './aesthetics/ScaledAesthetic';
 class PlotSetting {
   start: number;
   value: number;
@@ -18,7 +20,7 @@ class PlotSetting {
   transform: 'geometric' | 'arithmetic' = 'arithmetic';
   constructor(
     start: number,
-    transform: 'geometric' | 'arithmetic' = 'arithmetic' as const
+    transform: 'geometric' | 'arithmetic' = 'arithmetic' as const,
   ) {
     this.transform = transform;
     this.start = start;
@@ -86,11 +88,11 @@ class RenderProps {
     this.pointSize.update(prefs.point_size, duration);
     this.foregroundOpacity.update(
       prefs.background_options.opacity[1],
-      duration
+      duration,
     );
     this.backgroundOpacity.update(
       prefs.background_options.opacity[0],
-      duration
+      duration,
     );
     this.foregroundSize.update(prefs.background_options.size[1], duration);
     this.backgroundSize.update(prefs.background_options.size[0], duration);
@@ -118,32 +120,26 @@ class RenderProps {
   }
 }
 
-export class Renderer<TileType extends Tile> {
+export class Renderer {
   // A renderer handles drawing to a display element.
-  public scatterplot: Scatterplot<TileType>;
-  public holder: d3.Selection<any, any, any, any>;
+  public scatterplot: Scatterplot;
+  public holder: d3.Selection<Element, unknown, BaseType, unknown>;
   public canvas: HTMLCanvasElement;
-  public dataset: Dataset<TileType>;
+  public deeptable: Deeptable;
   public width: number;
   public height: number;
+  // The renderer handles periodic dispatches of calls
   public deferred_functions: Array<() => Promise<void> | void>;
   public _use_scale_to_download_tiles = true;
-  public zoom?: Zoom<TileType>;
-  public aes?: AestheticSet<TileType>;
-  public _zoom?: Zoom<TileType>;
-  public _initializations: Promise<void>[] = [];
+  public aes?: AestheticSet;
+  public _zoom?: Zoom;
   public render_props: RenderProps = new RenderProps();
-  constructor(
-    selector: string,
-    tileSet: Dataset<TileType>,
-    scatterplot: Scatterplot<TileType>
-  ) {
+  constructor(selector: string | Node, scatterplot: Scatterplot) {
     this.scatterplot = scatterplot;
-    this.holder = select(selector);
+    this.holder = select(selector as string);
     this.canvas = select(
-      this.holder.node().firstElementChild
+      this.holder!.node()!.firstElementChild,
     ).node() as HTMLCanvasElement;
-    this.dataset = tileSet;
     this.width = +select(this.canvas).attr('width');
     this.height = +select(this.canvas).attr('height');
     this.deferred_functions = [];
@@ -161,7 +157,10 @@ export class Renderer<TileType extends Tile> {
    * instead of for a whole table.
    */
   get prefs() {
-    const p = { ...this.scatterplot.prefs } as DS.CompletePrefs & {arrow_table?: Table, arrow_buffer?: Uint8Array };
+    const p = { ...this.scatterplot.prefs } as DS.CompletePrefs & {
+      arrow_table?: Table;
+      arrow_buffer?: Uint8Array;
+    };
     // Delete the arrow stuff b/c serializing it is crazy expensive.
     p.arrow_table = undefined;
     p.arrow_buffer = undefined;
@@ -170,6 +169,21 @@ export class Renderer<TileType extends Tile> {
 
   get alpha() {
     return this.render_props.alpha;
+  }
+
+  get needeedFields(): string[] {
+    const { aes } = this;
+    const needed = new Set<string>();
+    if (aes) {
+      for (const v of Object.values(aes.store)) {
+        if (v instanceof StatefulAesthetic) {
+          for (const f of v.neededFields) {
+            needed.add(f);
+          }
+        }
+      }
+    }
+    return [...needed, 'ix'];
   }
 
   get optimal_alpha() {
@@ -181,13 +195,13 @@ export class Renderer<TileType extends Tile> {
     const k = this.zoom?.transform?.k ?? 1;
     const target_share = alpha / 100;
     const fraction_of_total_visible = 1 / k ** 2;
-    const pixelRatio = window.devicePixelRatio || 1;
+    const pixelRatio = window?.devicePixelRatio || 1;
 
     const pixel_area = (width * height) / pixelRatio;
     const total_intended_points = min([
       max_ix,
-      (this.dataset.highest_known_ix) || 1e10,
-    ]);
+      this.deeptable.highest_known_ix || 1e10,
+    ]) as number;
 
     const total_points = total_intended_points * (1 - discard_share);
 
@@ -211,44 +225,53 @@ export class Renderer<TileType extends Tile> {
     const { prefs } = this;
     const { max_points } = this.render_props;
     if (!this._use_scale_to_download_tiles) {
-      return max_points;
+      return max_points + 1;
     }
-    const { k } = this.zoom.transform;
+    const k = this.zoom.transform!.k;
     const point_size_adjust = Math.exp(Math.log(k) * prefs.zoom_balance);
-    return (max_points * k * k) / point_size_adjust / point_size_adjust;
+    return (max_points * k * k) / point_size_adjust / point_size_adjust + 0.5;
   }
 
-  visible_tiles(): Array<TileType> {
+  visible_tiles(): Array<Tile> {
     // yield the currently visible tiles based on the zoom state
     // and a maximum index passed manually.
     const { max_ix } = this;
-    const { dataset: tileSet } = this;
+
     // Materialize using a tileset method.
 
-    const x = this.aes.dim('x') as X;
+    if (!this.aes) throw new Error('Aesthetic missing');
+    const x = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
+    const y = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
     const natural_display =
-      this.aes.dim('x').current.field == 'x' &&
-      this.aes.dim('y').current.field == 'y' &&
-      this.aes.dim('x').last.field == 'x' &&
-      this.aes.dim('y').last.field == 'y';
+      x.current.field == 'x' &&
+      y.current.field == 'y' &&
+      x.last.field == 'x' &&
+      y.last.field == 'y';
 
     const all_tiles = natural_display
-      ? tileSet
-          .map((d: TileType) => d)
+      ? this.scatterplot.deeptable
+          .map((d: Tile) => d)
           .filter((tile) => {
             const visible = tile.is_visible(
               max_ix,
-              this.zoom.current_corners()
+              this.zoom.current_corners(),
             );
             return visible;
           })
-      : tileSet.map((d) => d).filter((tile) => tile.min_ix < this.max_ix);
+      : this.scatterplot.deeptable
+          .map((d) => d)
+          .filter((tile) => tile.min_ix < this.max_ix);
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
     return all_tiles;
   }
 
+  get zoom(): Zoom {
+    if (this._zoom === undefined) throw new Error('Zoom state not yet bound');
+    return this._zoom as Zoom;
+  }
+
   bind_zoom(zoom: Zoom) {
-    this.zoom = zoom;
+    this._zoom = zoom;
     return this;
   }
 
