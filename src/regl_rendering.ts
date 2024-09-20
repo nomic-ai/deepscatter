@@ -292,8 +292,6 @@ export class ReglRenderer extends Renderer {
       );
     }
 
-    const start = Date.now();
-
     try {
       this.render_all(props);
     } catch (error) {
