@@ -2,7 +2,7 @@ name: Publish @next release to npm
 on:
   push:
     branches:
-      - dev
+      - main
 
 permissions:
   contents: write
