@@ -1,0 +1,12 @@
+[project]
+name = "deepscatter"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "quadfeather",
+]
+
+[tool.uv.sources]
+quadfeather = { git = "https://github.com/bmschmidt/quadfeather" }
