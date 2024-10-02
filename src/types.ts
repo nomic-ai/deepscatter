@@ -19,11 +19,17 @@ import type { Buffer } from 'regl';
 import type { DataSelection } from './selection';
 import { Scatterplot } from './scatterplot';
 import { ZoomTransform } from 'd3-zoom';
-import { TileBufferManager } from './regl_rendering';
 import type { Tile } from './tile';
 import type { Rectangle } from './tile';
 export type { Renderer, Deeptable, ConcreteAesthetic };
 
+/**
+ * A struct that holds a buffer and information about where the GPU
+ * can find data on it.
+ *
+ * Note that the byte_size is *for the buffer*, and that individual elements
+ * may take views of it less than the byte_size.
+ */
 export type BufferLocation = {
   buffer: Buffer;
   offset: number;
@@ -619,7 +625,7 @@ export type GlobalDrawProps = {
   last_webgl_scale: number[];
   use_scale_for_tiles: boolean;
   grid_mode: 1 | 0;
-  buffer_num_to_variable: string[];
+  buffer_num_to_variable: string[][];
   aes_to_buffer_num: Record<string, number>;
   variable_to_buffer_num: Record<string, number>;
   color_picker_mode: 0 | 1 | 2 | 3;
@@ -640,8 +646,9 @@ export type GlobalDrawProps = {
 
 // Props that are needed to draw a single tile.
 export type TileDrawProps = GlobalDrawProps & {
-  manager: TileBufferManager;
   number: number;
   foreground_draw_number: 1 | 0 | -1;
+  tile: Tile;
+  count: number;
   tile_id: number;
 };

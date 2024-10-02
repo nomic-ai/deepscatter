@@ -22,7 +22,6 @@ export type Rectangle = {
 //   keys?: Array<any>;
 // }
 
-import type { TileBufferManager } from './regl_rendering';
 import type { ArrowBuildable, LazyTileManifest, TileManifest } from './types';
 import { isCompleteManifest } from './typing';
 
@@ -71,8 +70,6 @@ export class Tile {
 
   private arrowFetchCalls: Map<string | null, RecordBatchCache> = new Map();
   public numeric_id: number;
-  // bindings to regl buffers holdings shadows of the RecordBatch.
-  public _buffer_manager?: TileBufferManager;
   //public child_locations: string[] = [];
 
   /**
@@ -123,7 +120,8 @@ export class Tile {
 
   deleteColumn(colname: string) {
     if (this._batch) {
-      this._buffer_manager?.release(colname);
+      console.warn('Deleting column from tile doesnt free GPU memory');
+      // this._buffer_manager?.release(colname);
       this._batch = add_or_delete_column(this.record_batch, colname, null);
     }
     // Ensure there is no cached version here.

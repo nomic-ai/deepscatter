@@ -817,8 +817,8 @@ export class DataSelection {
     if (i === undefined) {
       i = this.cursor;
     }
-    if (i > this.selectionSize) {
-      undefined;
+    if (i >= this.selectionSize) {
+      throw new Error('Selection out of bounds');
     }
     let currentOffset = 0;
     let relevantTile: Tile | undefined = undefined;

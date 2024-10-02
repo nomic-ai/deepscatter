@@ -389,10 +389,8 @@ export class Scatterplot {
 
   async reinitialize() {
     const { prefs } = this;
-
     await this.deeptable.ready;
     await this.deeptable.root_tile.get_column('x');
-
     this._renderer = new ReglRenderer(
       '#container-for-webgl-canvas',
       this.deeptable,
@@ -404,7 +402,6 @@ export class Scatterplot {
     this._zoom.initialize_zoom();
 
     // Needs the zoom built as well.
-
     const bkgd = select('#container-for-canvas-2d-background').select(
       'canvas',
     ) as Selection<
@@ -634,6 +631,7 @@ export class Scatterplot {
       return;
     }
     await this.plot_queue;
+
     if (prefs) {
       await this.start_transformations(prefs);
     }
@@ -672,43 +670,16 @@ export class Scatterplot {
       if (!prefs.encoding) {
         resolve();
       }
-      const starttime = Date.now();
-
       if (this._renderer) {
-        const promises: Promise<void>[] = [];
-        const sine_qua_non: Promise<void>[] = [
-          this.deeptable.root_tile.require_columns(needed_keys),
-        ];
-
-        // Immediately
-        for (const tile of this._renderer.visible_tiles()) {
-          // Allow unready tiles to stay unready; who know's what's going on there.
-          const manager = tile._buffer_manager;
-          if (manager !== undefined && manager.ready()) {
-            for (const key of needed_keys) {
-              if (tile.hasLoadedColumn(key)) {
-                manager.create_regl_buffer(key);
-              }
-            }
-          }
+        this.deeptable.root_tile.require_columns(needed_keys);
+        // Immediately start loading what we can onto the GPUs, too.
+        for (const tile of this.renderer.visible_tiles()) {
+          this._renderer.bufferManager.ready(
+            tile,
+            [...needed_keys].map((k) => [k]),
+          );
         }
-        if (promises.length === 0) {
-          resolve();
-        } else {
-          // It's important to get at least the first promise done,
-          // because it's used to determine some details about state.
-          void Promise.all(sine_qua_non).then(() => {
-            const endtime = Date.now();
-            const elapsed = endtime - starttime;
-            if (elapsed < delay) {
-              setTimeout(() => {
-                resolve();
-              }, delay - elapsed);
-            } else {
-              resolve();
-            }
-          });
-        }
+        resolve();
       } else {
         resolve();
       }
@@ -772,11 +743,9 @@ export class Scatterplot {
         }
       }
     }
-
-    if (this._zoom === undefined) {
+    if (this._zoom === undefined || this._renderer === undefined) {
       await this.reinitialize();
     }
-
     const renderer = this._renderer;
     const zoom = this._zoom;
 
