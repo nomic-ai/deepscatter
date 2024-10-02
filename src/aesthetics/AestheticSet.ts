@@ -6,6 +6,7 @@ import type { Deeptable } from '../Deeptable';
 import { StatefulAesthetic } from './StatefulAesthetic';
 import type { Encoding } from '../types';
 import type * as DS from '../types';
+import { TupleSet } from '../utilityFunctions';
 
 type AesMap = {
   [K in keyof typeof dimensions]: StatefulAesthetic<
@@ -83,6 +84,12 @@ export class AestheticSet {
     }
   }
 
+  _neededFields: TupleSet<string> = new TupleSet();
+
+  get neededFields(): string[][] {
+    return [...this._neededFields.values()];
+  }
+
   apply_encoding(encoding: Encoding) {
     if (
       encoding['jitter_radius'] &&
@@ -105,6 +112,17 @@ export class AestheticSet {
     this.interpret_position(encoding);
     for (const k in dimensions) {
       this.dim(k).update(encoding[k] as DS.ChannelType | null);
+    }
+
+    // Update the needed fields.
+    this._neededFields.clear();
+
+    for (const v of Object.values(this.store)) {
+      if (v instanceof StatefulAesthetic) {
+        for (const f of v.neededFields) {
+          this._neededFields.add(f);
+        }
+      }
     }
 
     // Apply settings that are not full-on aesthetics.

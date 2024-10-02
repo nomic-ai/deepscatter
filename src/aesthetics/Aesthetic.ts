@@ -1,10 +1,11 @@
 import type { TextureSet } from './AestheticSet';
 import { isConstantChannel } from '../typing';
-import { Type, Vector } from 'apache-arrow';
+import { Struct, Type, Vector } from 'apache-arrow';
 import { StructRowProxy } from 'apache-arrow/row/struct';
 import { isNumber } from 'lodash';
 import type * as DS from '../types';
 import { Scatterplot } from '../scatterplot';
+import { Some } from '../utilityFunctions';
 
 /**
  * An Aesthetic bundles all operations in mapping from user dataspace to webGL based aesthetics.
@@ -26,6 +27,7 @@ export abstract class Aesthetic<
   public abstract default_range: [Output['rangeType'], Output['rangeType']];
   public scatterplot: Scatterplot;
   public field: string | null = null;
+  public subfield: string[] = [];
   public _texture_buffer: Float32Array | Uint8Array | null = null;
   protected abstract _func?: (d: Input['domainType']) => Output['rangeType'];
   public aesthetic_map: TextureSet;
@@ -76,7 +78,23 @@ export abstract class Aesthetic<
       this.field = null;
     } else {
       this.field = encoding.field;
+      if (encoding.subfield) {
+        this.subfield = Array.isArray(encoding.subfield)
+          ? encoding.subfield
+          : [encoding.subfield];
+      }
     }
+  }
+
+  /**
+   * Returns the keys that are used to access the data in the record batch,
+   * including with any nesting.
+   */
+  get columnKeys(): null | Some<string> {
+    if (this.field === null) {
+      return null;
+    }
+    return [this.field, ...this.subfield] as Some<string>;
   }
 
   get deeptable() {
@@ -100,10 +118,14 @@ export abstract class Aesthetic<
 
   value_for(point: Datum): Input['domainType'] | null {
     if (this.field && point[this.field]) {
-      return point[this.field] as Input['domainType'];
+      let v = point[this.field] as Input['domainType'];
+      for (let i = 0; i < this.subfield.length; i++) {
+        v = v[this.subfield[i]] as Input['domainType'];
+      }
+      return v;
+      // Needs a default perhaps?
+      return null;
     }
-    // Needs a default perhaps?
-    return null;
   }
 
   get map_position() {
@@ -136,9 +158,17 @@ export abstract class Aesthetic<
     if (this.field === null || this.field === undefined) {
       return (this.column = null);
     }
-    return (this.column = this.deeptable.root_tile.record_batch.getChild(
-      this.field,
-    ) as Vector<Input['arrowType']>);
+    let output: Vector<Input['arrowType']> | Vector<Struct> | null = null;
+    for (const f of [this.field, ...this.subfield]) {
+      if (output === null) {
+        output = this.deeptable.root_tile.record_batch.getChild(f) as Vector<
+          Input['arrowType']
+        >;
+      } else {
+        output = (output as Vector<Struct>).getChild(f) as Vector<Struct>;
+      }
+    }
+    return (this.column = output as Vector<Input['arrowType']>);
   }
 
   is_dictionary(): boolean {

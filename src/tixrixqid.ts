@@ -1,4 +1,11 @@
-import type { Bool, Data, Field, Struct, StructRowProxy, Vector } from 'apache-arrow';
+import type {
+  Bool,
+  Data,
+  Field,
+  Struct,
+  StructRowProxy,
+  Vector,
+} from 'apache-arrow';
 
 import type { Tile } from './deepscatter';
 import { Bitmask, DataSelection, Deeptable } from './deepscatter';
@@ -102,7 +109,7 @@ export function tixToZxy(tix: Tix): [number, number, number] {
  */
 export function getQidFromRow(
   row: StructRowProxy,
-  dataset: Deeptable
+  dataset: Deeptable,
 ): [number, number] {
   const tile = getTileFromRow(row, dataset);
   const rix = row[Symbol.for('rowIndex')] as number;
@@ -110,7 +117,6 @@ export function getQidFromRow(
 }
 
 export function getTileFromRow(row: StructRowProxy, dataset: Deeptable): Tile {
-
   const parent = row[Symbol.for('parent')] as Data<Struct>;
   const parentsColumns = parent.children;
 
@@ -119,8 +125,8 @@ export function getTileFromRow(row: StructRowProxy, dataset: Deeptable): Tile {
   // need to find the tile that matches the most columns, not assume
   // that every column matches exactly.
   let best_match: [Tile | null, number] = [null, 0];
-  const parentNames : [string, Data][] = parent.type.children.map(
-    (d: Field, i: number) => [d.name, parentsColumns[i]]
+  const parentNames: [string, Data][] = parent.type.children.map(
+    (d: Field, i: number) => [d.name, parentsColumns[i]],
   );
 
   dataset.map((t: Tile) => {
@@ -144,7 +150,7 @@ export function getTileFromRow(row: StructRowProxy, dataset: Deeptable): Tile {
   });
   if (best_match[0] === undefined) {
     throw new Error(
-      'No tiles found for this row.' + JSON.stringify({ ...row })
+      'No tiles found for this row.' + JSON.stringify({ ...row }),
     );
   }
   return best_match[0];
