@@ -21,6 +21,7 @@ import { Scatterplot } from './scatterplot';
 import { ZoomTransform } from 'd3-zoom';
 import type { Tile } from './tile';
 import type { Rectangle } from './tile';
+import { TupleMap } from './utilityFunctions';
 export type { Renderer, Deeptable, ConcreteAesthetic };
 
 /**
@@ -294,6 +295,8 @@ export type NumericScaleChannel<
 > = {
   /** The name of a column in the data table to be encoded. */
   field: string;
+  // If field is a struct, subfield indicates which child to extract.
+  subfield?: string | string[];
   /**
    * A transformation to apply on the field.
    * 'literal' maps in the implied dataspace set by 'x', 'y', while
@@ -312,6 +315,8 @@ export type LambdaChannel<
 > = {
   lambda?: (v: DomainType) => RangeType;
   field: string;
+  // If field is a struct, subfield indicates which child to extract.
+  subfield?: string | string[];
 };
 
 /**
@@ -342,6 +347,8 @@ type TwoArgumentOp<JSONType extends number | IsoDateString> = {
 
 export type OpChannel<JSONType extends number | IsoDateString> = {
   field: string;
+  // If field is a struct, subfield indicates which child to extract.
+  subfield?: string | string[];
 } & (OneArgumentOp<JSONType> | TwoArgumentOp<JSONType>);
 
 export type ConstantChannel<T extends boolean | number | string> = {
@@ -376,12 +383,16 @@ export type ChannelType =
 
 export type CategoricalColorScale = {
   field: string;
+  // If field is a struct, subfield indicates which child to extract.
+  subfield?: string | string[];
   domain: string | [string, string, ...string[]];
   range: Colorname[];
 };
 
 export type LinearColorScale = {
   field: string;
+  // If field is a struct, subfield indicates which child to extract.
+  subfield?: string | string[];
   domain: [number, number]; // TODO: | [number, number, number]
   // TODO: implement some codegen for these values
   range: 'viridis' | 'magma' | 'ylorrd';
@@ -605,7 +616,7 @@ export type RowFunction<T> = (
 
 // Props that are needed for all the draws in a single tick.
 export type GlobalDrawProps = {
-  aes: { encoding: Encoding };
+  // aes: { encoding: Encoding };
   colors_as_grid: 0 | 1;
   corners: Rectangle;
   zoom_balance: number;
@@ -627,7 +638,7 @@ export type GlobalDrawProps = {
   grid_mode: 1 | 0;
   buffer_num_to_variable: string[][];
   aes_to_buffer_num: Record<string, number>;
-  variable_to_buffer_num: Record<string, number>;
+  variable_to_buffer_num: TupleMap<string, number>;
   color_picker_mode: 0 | 1 | 2 | 3;
   zoom_matrix: [
     number,

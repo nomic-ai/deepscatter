@@ -24,6 +24,7 @@ import {
   Int32,
   Int8,
   tableToIPC,
+  Struct,
 } from 'apache-arrow';
 import { Scatterplot } from './scatterplot';
 import { wrapArrowTable } from './wrap_arrow';
@@ -34,6 +35,8 @@ import type {
   IdSelectParams,
 } from './selection';
 import { DataSelection } from './selection';
+import { Some, TupleMap } from './utilityFunctions';
+import { getNestedVector } from './regl_rendering';
 
 type TransformationStatus = 'queued' | 'in progress' | 'complete' | 'failed';
 
@@ -70,7 +73,8 @@ export class Deeptable {
     ...defaultTransformations,
   };
   public _plot: Scatterplot | null;
-  private extents: Record<string, [number, number] | [Date, Date]> = {};
+  private extents: TupleMap<string, [number, number] | [Date, Date]> =
+    new TupleMap();
   // A 3d identifier for the tile. Usually [z, x, y]
   private _extent?: Rectangle;
   public _ix_seed = 0;
@@ -134,6 +138,9 @@ export class Deeptable {
     this.root_tile = new Tile(defaultManifest, null, this);
     const preProcessRootTile = this.root_tile.preprocessRootTileInfo();
 
+    // At instantiation, the deeptable isn't ready; only once this
+    // async stuff is done can the deeptable be used.
+    // TODO: Add an async static method as the preferred initialization method.
     this.promise = preProcessRootTile.then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
@@ -346,13 +353,24 @@ export class Deeptable {
 
   domain<T extends [number, number] | [string, Date] = [number, number]>(
     columnName: string,
+    subfield?: string[],
   ): [T[1], T[1]] {
-    if (this.extents[columnName]) {
-      return this.extents[columnName];
+    const key = [columnName, ...(subfield || [])] as Some<string>;
+    if (this.extents.get(key)) {
+      return this.extents.get(key);
     }
-    const dim = this._schema?.fields.find(
-      (d) => d.name === columnName,
-    ) as Field<DS.SupportedArrowTypes>;
+
+    // First -- look at the schema metadata.
+    let dim = this._schema?.fields.find((d) => d.name === columnName);
+    for (const sub in subfield) {
+      if (dim === undefined) {
+        continue;
+      }
+      console.log({ dim });
+      dim = (dim as Field<Struct<any>>).type.children.find(
+        (d) => d.name === sub,
+      );
+    }
     if (dim !== undefined) {
       let min: T[0] | undefined = undefined;
       let max: T[0] | undefined = undefined;
@@ -375,24 +393,30 @@ export class Deeptable {
             'Date field extents in metadata must be passed as strings',
           );
         }
-        return (this.extents[columnName] = [new Date(min), new Date(max)]);
+        this.extents.set(key, [new Date(min), new Date(max)]);
+        return this.extents.get(key);
       }
       if (typeof max === 'string') {
         throw new Error('Failed to parse min-max as numbers');
       }
       if (min !== undefined) {
-        return (this.extents[columnName] = [min as T[1], max as T[1]] as
+        this.extents.set(key, [min as T[1], max as T[1]] as
           | [number, number]
           | [Date, Date]);
+        return this.extents.get(key);
       }
     }
+
     const vectors: Vector[] = this.map((tile) => tile)
       .filter((d) => d.hasLoadedColumn(columnName))
-      .map((d) => d.record_batch.getChild(columnName) as Vector<Float32>);
+      .map((d) => getNestedVector(d, [columnName, ...(subfield || [])]));
+
     const extented = extent([...new Vector(vectors)]) as [T[1], T[1]] as
       | [number, number]
       | [Date, Date];
-    return (this.extents[columnName] = extented);
+
+    this.extents.set(key, extented);
+    return this.extents.get(key);
   }
 
   *points(bbox: Rectangle | undefined, max_ix = 1e99) {

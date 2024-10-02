@@ -32,6 +32,7 @@ import { Scatterplot } from './scatterplot';
 import {
   Data,
   Dictionary,
+  Struct,
   StructRowProxy,
   Type,
   Utf8,
@@ -41,7 +42,7 @@ import { Color } from './aesthetics/ColorAesthetic';
 import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
 import { Filter, Foreground } from './aesthetics/BooleanAesthetic';
 import { ZoomTransform } from 'd3-zoom';
-import { TupleMap } from './utilityFunctions';
+import { Some, TupleMap, TupleSet } from './utilityFunctions';
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
   public regl: Regl;
@@ -65,6 +66,11 @@ export class ReglRenderer extends Renderer {
   public tick_num?: number;
   public reglframe?: REGL.Cancellable;
   public bufferManager: BufferManager;
+
+  private aes_to_buffer_num?: Record<string, number>;
+  private variable_to_buffer_num?: TupleMap<string, number>;
+  private buffer_num_to_variable?: string[][];
+
   //  public _renderer :  Renderer;
 
   constructor(
@@ -159,7 +165,7 @@ export class ReglRenderer extends Renderer {
     ] as [number, number];
     const props: DS.GlobalDrawProps = {
       // Copy the aesthetic as a string.
-      aes: { encoding: this.aes.encoding },
+      // aes: { encoding: this.aes.encoding },
       colors_as_grid: 0,
       corners: this.zoom.current_corners(),
       zoom_balance: prefs.zoom_balance,
@@ -224,12 +230,7 @@ export class ReglRenderer extends Renderer {
       props.background_draw_needed[0] || props.background_draw_needed[1];
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
-      if (
-        !this.bufferManager.ready(
-          tile,
-          this.needeedFields.map((d) => [d]),
-        )
-      ) {
+      if (!this.bufferManager.ready(tile, this.aes.neededFields)) {
         continue;
       }
 
@@ -259,6 +260,7 @@ export class ReglRenderer extends Renderer {
         a.tile_id
       );
     });
+    // console.log({ prop_list });
     this._renderer(prop_list);
   }
 
@@ -282,7 +284,7 @@ export class ReglRenderer extends Renderer {
         this.zoom.current_corners(),
         this.props.max_ix,
         5,
-        this.needeedFields,
+        this.aes.neededFields.map((x) => x[0]),
         'high',
       );
     } else {
@@ -291,7 +293,7 @@ export class ReglRenderer extends Renderer {
         undefined,
         prefs.max_points,
         5,
-        this.needeedFields,
+        this.aes.neededFields.map((x) => x[0]),
         'high',
       );
     }
@@ -886,7 +888,7 @@ export class ReglRenderer extends Renderer {
     type BufferSummary = {
       aesthetic: keyof typeof dimensions;
       time: time;
-      field: string;
+      field: [string, ...string[]];
     };
     const buffers: BufferSummary[] = [];
     const priorities = [
@@ -910,7 +912,10 @@ export class ReglRenderer extends Renderer {
             buffers.push({
               aesthetic,
               time,
-              field: this.aes.dim(aesthetic)[time].field,
+              field: [
+                this.aes.dim(aesthetic)[time].field,
+                ...this.aes.dim(aesthetic)[time].subfield,
+              ],
             });
           }
         } catch (error) {
@@ -935,20 +940,20 @@ export class ReglRenderer extends Renderer {
     const aes_to_buffer_num: Record<string, number> = {}; // eg 'x' => 3
 
     // Pre-allocate the 'ix' buffer and the 'ix_in_tile' buffers.
-    const variable_to_buffer_num: Record<string, number> = {
-      ix: 0,
-      ix_in_tile: 1,
-    }; // eg 'year' =>  3
+    const variable_to_buffer_num: TupleMap<string, number> = new TupleMap([
+      [['ix'], 0],
+      [['ix_in_tile'], 1],
+    ]); // eg 'year' =>  3
     let num = 1;
     for (const { aesthetic, time, field } of buffers) {
       const k = `${aesthetic}--${time}`;
-      if (variable_to_buffer_num[field] !== undefined) {
-        aes_to_buffer_num[k] = variable_to_buffer_num[field];
+      if (variable_to_buffer_num.get(field) !== undefined) {
+        aes_to_buffer_num[k] = variable_to_buffer_num.get(field);
         continue;
       }
       if (num++ < 16) {
         aes_to_buffer_num[k] = num;
-        variable_to_buffer_num[field] = num;
+        variable_to_buffer_num.set(field, num);
         continue;
       } else {
         // Don't use the last value, use the current value.
@@ -959,17 +964,11 @@ export class ReglRenderer extends Renderer {
       }
     }
 
-    const buffer_num_to_variable = [
-      ...Object.keys(variable_to_buffer_num).map((k) => [k]),
-    ];
+    const buffer_num_to_variable = [...variable_to_buffer_num.keys()];
     this.aes_to_buffer_num = aes_to_buffer_num;
     this.variable_to_buffer_num = variable_to_buffer_num;
     this.buffer_num_to_variable = buffer_num_to_variable;
   }
-
-  aes_to_buffer_num?: Record<string, number>;
-  variable_to_buffer_num?: Record<string, number>;
-  buffer_num_to_variable?: string[][];
 
   get discard_share() {
     // If jitter is temporal, e.g., or filters are in place,
@@ -1029,7 +1028,7 @@ export class BufferManager {
     return this._integer_buffer;
   }
 
-  get(k: (string | Tile)[]): DS.BufferLocation | null {
+  get(k: Some<string | Tile>): DS.BufferLocation | null {
     const a = this.bufferMap.get(this.arrayMap.get(k));
     return a;
   }
@@ -1041,17 +1040,22 @@ export class BufferManager {
    */
   ready(tile: Tile, needed_dimensions: Iterable<string[]>): boolean {
     // We don't allocate buffers for dimensions until they're needed.
+    for (const keyset of [['ix'], ['ix_in_tile'], ...needed_dimensions] as Some<
+      string[]
+    >) {
+      const current = this.get([tile, ...keyset]);
 
-    for (const key of [['ix'], ['ix_in_tile'], ...needed_dimensions]) {
-      const current = this.get([tile, ...key]);
       if (current === null || current === undefined) {
-        if (tile.hasLoadedColumn(key[0])) {
-          this.create_regl_buffer(tile, key);
+        if (tile.hasLoadedColumn(keyset[0])) {
+          this.create_regl_buffer(tile, keyset);
         } else {
-          // console.log('not ready because of', key);
-          if (key[0] === 'ix_in_tile') {
-            this.create_regl_buffer(tile, key);
+          if (keyset[0] === 'ix_in_tile') {
+            this.create_regl_buffer(tile, keyset);
           } else {
+            if (tile.readyToUse) {
+              // tile.get_column(keyset[0]);
+            } else {
+            }
             return false;
           }
         }
@@ -1145,11 +1149,10 @@ export class BufferManager {
 
   create_regl_buffer(tile: Tile, keys: string[]): void {
     const { renderer } = this;
-    const key = [tile, ...keys];
+    const key = [tile, ...keys] as Some<string | Tile>;
     if (this.arrayMap.has(key)) {
       return;
     }
-    // console.log({ keys });
     if (keys[0] === 'ix_in_tile') {
       this.arrayMap.set(key, this.integer_array);
       if (!this.bufferMap.has(this.integer_array)) {
@@ -1170,6 +1173,7 @@ export class BufferManager {
     const data_length = data.length;
 
     const buffer_desc = renderer.buffers.allocate_block(data_length, item_size);
+
     buffer_desc.buffer.subdata(data, buffer_desc.offset);
 
     this.bufferMap.set(vector.data[0].values, buffer_desc);
@@ -1177,7 +1181,7 @@ export class BufferManager {
 }
 
 // TODO: Build this out in next PR.
-function getNestedVector(
+export function getNestedVector(
   tile: Tile,
   key: string[],
 ): Vector<DS.SupportedArrowTypes> {
@@ -1203,9 +1207,8 @@ function getNestedVector(
     }
   }
 
-  let column: Vector<DS.SupportedArrowTypes> = tile.record_batch.getChild(
-    key[0],
-  );
+  let column: Vector<DS.SupportedArrowTypes> | Vector<Struct> =
+    tile.record_batch.getChild(key[0]);
   for (const k of key.slice(1)) {
     column = column.getChild(k);
   }
@@ -1216,7 +1219,17 @@ function getNestedVector(
   if (!column.type || !column.type.typeId) {
     throw new Error(`Column ${key} has no type.`);
   }
+  function assertNotStruct(
+    value: Vector<DS.SupportedArrowTypes> | Vector<Struct>,
+  ): asserts value is Vector<DS.SupportedArrowTypes> {
+    if (column.type.typeId === Type.Struct) {
+      throw new Error(
+        'Structs are not supported for buffer data on column ' + key.join('->'),
+      );
+    }
+  }
 
+  assertNotStruct(column);
   return column;
 }
 
@@ -1323,7 +1336,6 @@ class MultipurposeBufferSet {
       byte_size: items * bytes_per_item,
     };
 
-    // add a listener for GC on the value.
     this.pointer += items * bytes_per_item;
     return value;
   }
@@ -1334,16 +1346,24 @@ class MultipurposeBufferSet {
  * @param prefs The preferences object to be used.
  *
  * @returns The fields that need to be allocated in the buffers for
- * a tile to be drawn.
+ * a tile to be drawn. Returns a map of columns and any subfields in them that are needed.
  */
-export function neededFieldsToPlot(prefs: DS.CompletePrefs): Set<string> {
-  const needed_keys: Set<string> = new Set();
-  if (!prefs.encoding) {
+export function neededFieldsToPlot(
+  encoding: DS.Encoding | undefined,
+): TupleSet<string> {
+  const needed_keys = new TupleSet<string>([['ix']]);
+  if (!encoding) {
     return needed_keys;
   }
-  for (const [_, v] of Object.entries(prefs.encoding)) {
+  for (const [_, v] of Object.entries(encoding)) {
     if (v && typeof v !== 'string' && v['field'] !== undefined) {
-      needed_keys.add(v['field'] as string);
+      const needed_key: Some<string> = [v['field']];
+      if (v['subfield'] !== undefined) {
+        const subfield = v['subfield'];
+        const asArray = Array.isArray(subfield) ? [...subfield] : [subfield];
+        needed_key.push(...asArray);
+      }
+      needed_keys.add(needed_key);
     }
   }
   return needed_keys;
