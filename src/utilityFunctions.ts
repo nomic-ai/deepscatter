@@ -224,6 +224,7 @@ export class TupleSet<K = Object> {
   }
 
   get size(): number {
+    // TODO: Keep a tally at this._size
     return [...this.values()].length;
   }
 
