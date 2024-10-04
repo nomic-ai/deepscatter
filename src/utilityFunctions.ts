@@ -91,11 +91,23 @@ function createDictionaryWithVector<T extends keyof ArrayToArrayMap>(
   return returnval;
 }
 
+// An array, but with a guarantee there is at least element.
+export type Some<T> = [T, ...T[]];
+
+/**
+ * A Map that allows for tuples as keys with proper identity checks.
+ */
 export class TupleMap<K = Object, V = Object> {
   private map: Map<K, TupleMap<K, V>> = new Map();
   private value?: V;
 
-  set(keys: K[], value: V): void {
+  constructor(v: [Some<K>, V][] = []) {
+    for (const [keys, value] of v) {
+      this.set(keys, value);
+    }
+  }
+
+  set(keys: Some<K>, value: V): void {
     let currentMap: TupleMap<K, V> = this;
     for (const key of keys) {
       if (!currentMap.map.has(key)) {
@@ -106,7 +118,30 @@ export class TupleMap<K = Object, V = Object> {
     currentMap.value = value;
   }
 
-  get(keys: K[]): V | undefined {
+  *entries(): IterableIterator<[Some<K>, V]> {
+    for (const [key, map] of this.map) {
+      for (const [keys, value] of map.entries()) {
+        yield [[key, ...keys], value];
+      }
+    }
+    if (this.value !== undefined) {
+      // If this map has a value, yield it with an empty key array
+      // @ts-expect-error - the empty array gets around the type check
+      // but is OK because this only happens BELOW the first level;
+      // the first level is not allowed to have a value but I don't feel
+      // like explicitly classing the first level as a different type from
+      // the rest.
+      yield [[], this.value];
+    }
+  }
+
+  *keys(): IterableIterator<Some<K>> {
+    for (const [k] of this.entries()) {
+      yield k;
+    }
+  }
+
+  get(keys: Some<K>): V | undefined {
     let currentMap: TupleMap<K, V> = this;
     for (const key of keys) {
       currentMap = currentMap.map.get(key) as TupleMap<K, V>;
@@ -117,7 +152,7 @@ export class TupleMap<K = Object, V = Object> {
     return currentMap.value;
   }
 
-  has(keys: K[]): boolean {
+  has(keys: Some<K>): boolean {
     let currentMap: TupleMap<K, V> = this;
     for (const key of keys) {
       currentMap = currentMap.map.get(key) as TupleMap<K, V>;
@@ -128,7 +163,7 @@ export class TupleMap<K = Object, V = Object> {
     return currentMap.value !== undefined;
   }
 
-  delete(keys: K[]): boolean {
+  delete(keys: Some<K>): boolean {
     let currentMap: TupleMap<K, V> = this;
     const stack: TupleMap<K, V>[] = [];
 
@@ -157,7 +192,43 @@ export class TupleMap<K = Object, V = Object> {
   }
 }
 
-// // finds the first set bit.
-// function ffs(n: number): number {
-//   return Math.log2(n & -n);
-// }
+export class TupleSet<K = Object> {
+  private map = new TupleMap<K, boolean>();
+
+  constructor(v: Some<K>[] = []) {
+    for (const keys of v) {
+      this.add(keys);
+    }
+  }
+
+  add(keys: Some<K>): void {
+    this.map.set(keys, true);
+  }
+
+  has(keys: Some<K>): boolean {
+    return this.map.has(keys);
+  }
+
+  delete(keys: Some<K>): boolean {
+    return this.map.delete(keys);
+  }
+
+  *values(): IterableIterator<Some<K>> {
+    for (const keys of this.map.keys()) {
+      yield keys;
+    }
+  }
+
+  [Symbol.iterator](): IterableIterator<Some<K>> {
+    return this.values();
+  }
+
+  get size(): number {
+    // TODO: Keep a tally at this._size
+    return [...this.values()].length;
+  }
+
+  clear(): void {
+    this.map = new TupleMap();
+  }
+}
