@@ -64,6 +64,9 @@ export class Tile {
   private _partialManifest: Partial<TileManifest> | Partial<LazyTileManifest>;
   private _manifest?: TileManifest | LazyTileManifest;
 
+  // Does the tile have a loaded manifest and other features sufficient to plot.
+  public readyToUse = false;
+
   // A cache of fetchCalls for downloaded arrow tables, including any table schema metadata.
   // Tables may contain more than a single column, so this prevents multiple dispatch.
   //private _promiseOfChildren: Promise<Tile[]>;
@@ -134,22 +137,38 @@ export class Tile {
    *
    *
    * @param colname The name of the column to retrive.
+   * @param subfield If the column is a struct vector, the subfield to retrieve. When a string, retrieves a single
+   * subfield. When an array, treats it as a nesting order.
    * @returns An Arrow Vector of the column.
    */
-  async get_column(colname: string): Promise<Vector> {
-    const existing = this._batch?.getChild(colname);
-    if (existing) {
-      return existing;
-    }
-    if (this.deeptable.transformations[colname]) {
-      await this.apply_transformation(colname);
-      const vector = this.record_batch.getChild(colname);
-      if (vector === null) {
-        throw new Error(`Column ${colname} not found after transformation`);
+  async get_column(
+    colname: string,
+    subfield: string | string[] | null = null,
+  ): Promise<Vector> {
+    const subfields =
+      subfield === null ? [] : Array.isArray(subfield) ? subfield : [subfield];
+    let existing = this._batch?.getChild(colname);
+
+    if (!existing) {
+      if (this.deeptable.transformations[colname]) {
+        await this.apply_transformation(colname);
+        existing = this.record_batch.getChild(colname);
+        if (existing === null) {
+          throw new Error(`Column ${colname} not found after transformation`);
+        }
       }
-      return vector;
     }
-    throw new Error(`Column ${colname} not found`);
+
+    // If subfields are passed, use them.
+    for (let i = 0; i < subfields.length; i++) {
+      existing = existing.getChild(subfields[i]);
+      if (existing === null) {
+        throw new Error(
+          `Column ${colname} lacks subfield ${subfields.slice(0, i).join(' >> ')}`,
+        );
+      }
+    }
+    return existing;
   }
 
   /**
@@ -286,6 +305,7 @@ export class Tile {
     });
     this.highest_known_ix = manifest.max_ix;
     this._manifest = manifest;
+    this.readyToUse = true;
   }
 
   set highest_known_ix(val) {

@@ -55,6 +55,7 @@ export type ConcreteScaledAesthetic =
 import type { Deeptable } from '../Deeptable';
 import type { Regl } from 'regl';
 import type { TextureSet } from './AestheticSet';
+import { Some } from '../utilityFunctions';
 
 export class StatefulAesthetic<T extends ConcreteAesthetic> {
   /**
@@ -97,11 +98,12 @@ export class StatefulAesthetic<T extends ConcreteAesthetic> {
     ] as [T, T];
   }
 
-  get neededFields(): string[] {
-    return [this.current.field, this.last.field].filter(
+  get neededFields(): Some<string>[] {
+    return [this.current.columnKeys, this.last.columnKeys].filter(
       (f) => f !== null,
-    ) as string[];
+    );
   }
+
   get current() {
     return this.states[0];
   }
