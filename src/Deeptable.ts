@@ -290,14 +290,19 @@ export class Deeptable {
   }
 
   /**
-   * Generate an ArrowDeeptable from a single Arrow table.
+   * Generate a deeptable from a single Arrow table.
    *
    * @param table A single Arrow table
    * @param prefs The API Call to use for rendering.
-   * @param plot The Scatterplot to use.
+   * @param plot Optionally: the scatterplot to bind the deeptable to.
+   * If null, the deeptable can be used independently (including in node environments),
+   * or bound to a scatterplot later.
    * @returns
    */
-  static fromArrowTable(table: Table, plot: Scatterplot): Deeptable {
+  static fromArrowTable(
+    table: Table,
+    plot: Scatterplot | null = null,
+  ): Deeptable {
     return wrapArrowTable(tableToIPC(table), plot);
   }
 
