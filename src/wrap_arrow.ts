@@ -15,10 +15,16 @@ import type * as DS from './types';
 import { extent } from 'd3-array';
 import { Rectangle } from './tile';
 
-// This function is used to wrap an arrow table into a
-// deeptable so that record batches can be fetched asynchronously.
-// The point display order is the same as in the original file.
-// It is exposed primarily as Deeptable.from
+/**
+ * This function is used to wrap an arrow table into a
+ * deeptable so that record batches can be fetched asynchronously.
+ * The point display order is the same as in the original file.
+ * It is exposed primarily as Deeptable.fromArrowTable
+ * @param tbArray a Uint8 Array that deserializes to an Arrow table. incompatibility between Arrow
+ * versions makes it easier to simple force this transformation.
+ * @param plot Optionally, a Scatterplot.
+ * @returns
+ */
 export function wrapArrowTable(
   tbArray: Uint8Array,
   plot: Scatterplot | null,
