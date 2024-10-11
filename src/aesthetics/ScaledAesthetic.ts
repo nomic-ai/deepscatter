@@ -203,7 +203,7 @@ export abstract class ScaledAesthetic<
         Input['domainType'],
       ];
     } else {
-      return this.scatterplot.deeptable.domain(this.field);
+      return this.scatterplot.deeptable.domain(this.field, this.subfield);
     }
   }
 
