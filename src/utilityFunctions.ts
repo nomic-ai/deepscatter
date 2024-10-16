@@ -97,7 +97,7 @@ export type Some<T> = [T, ...T[]];
 /**
  * A Map that allows for tuples as keys with proper identity checks.
  */
-export class TupleMap<K = Object, V = Object> {
+export class TupleMap<K = object, V = object> {
   private map: Map<K, TupleMap<K, V>> = new Map();
   private value?: V;
 

@@ -366,7 +366,6 @@ export class Deeptable {
       if (dim === undefined) {
         continue;
       }
-      console.log({ dim });
       dim = (dim as Field<Struct<any>>).type.children.find(
         (d) => d.name === sub,
       );
