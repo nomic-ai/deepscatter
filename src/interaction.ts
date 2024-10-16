@@ -96,8 +96,8 @@ export class Zoom {
   }
 
   html_annotation(points: Annotation[]) {
-    const div = this.svg_element_selection.node()!.parentNode
-      .parentNode as unknown as string;
+    const div = this.svg_element_selection.node().parentNode
+      .parentNode as HTMLDivElement;
     const els = select(div)
       .selectAll('div.tooltip')
       .data(points)

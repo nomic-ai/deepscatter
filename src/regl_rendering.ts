@@ -956,6 +956,7 @@ export class ReglRenderer extends Renderer {
         variable_to_buffer_num.set(field, num);
         continue;
       } else {
+        console.log('Overflow');
         // Don't use the last value, use the current value.
         // Loses animation but otherwise plots nicely.
         // Strategy will break if more than 14 base channels are defined,
