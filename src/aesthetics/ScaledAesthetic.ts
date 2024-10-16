@@ -146,7 +146,10 @@ export abstract class ScaledAesthetic<
     if (this.field === null || isConstantChannel(this.encoding)) {
       return constant as Output['rangeType'];
     }
-    const value = point[this.field] as Input['domainType'];
+    let value = point[this.field] as Input['domainType'];
+    for (const subfield of this.subfield) {
+      value = value[subfield] as Input['domainType'];
+    }
     if (value === undefined || value === null) {
       return constant as Output['rangeType'];
     }
