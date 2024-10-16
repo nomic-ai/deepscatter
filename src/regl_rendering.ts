@@ -67,7 +67,7 @@ export class ReglRenderer extends Renderer {
   public reglframe?: REGL.Cancellable;
   public bufferManager: BufferManager;
 
-  private aes_to_buffer_num?: Record<string, number>;
+  private aes_to_buffer_num: TupleMap<string, number> = new TupleMap();
   private variable_to_buffer_num?: TupleMap<string, number>;
   private buffer_num_to_variable?: string[][];
 
@@ -188,9 +188,9 @@ export class ReglRenderer extends Renderer {
       last_webgl_scale: this._webgl_scale_history[1],
       use_scale_for_tiles: this._use_scale_to_download_tiles,
       grid_mode: 0,
-      buffer_num_to_variable: buffer_num_to_variable!,
-      aes_to_buffer_num: aes_to_buffer_num!,
-      variable_to_buffer_num: variable_to_buffer_num!,
+      buffer_num_to_variable: buffer_num_to_variable,
+      aes_to_buffer_num,
+      variable_to_buffer_num: variable_to_buffer_num,
       color_picker_mode: 0, // whether to draw as a color picker.
       position_interpolation: this.aes.position_interpolation,
       zoom_matrix: [
@@ -211,7 +211,8 @@ export class ReglRenderer extends Renderer {
     };
 
     // Clone.
-    return JSON.parse(JSON.stringify(props)) as DS.GlobalDrawProps;
+    //    return JSON.parse(JSON.stringify(props)) as DS.GlobalDrawProps;
+    return props;
   }
 
   get default_webgl_scale() {
@@ -260,7 +261,6 @@ export class ReglRenderer extends Renderer {
         a.tile_id
       );
     });
-    // console.log({ prop_list });
     this._renderer(prop_list);
   }
 
@@ -537,11 +537,11 @@ export class ReglRenderer extends Renderer {
       this.regl.clear({ color: [0, 0, 0, 0] });
       // read onto the contour vals.
       this.render_points(props);
-      this.regl.read(this.contour_vals as Uint8Array);
+      this.regl.read(this.contour_vals);
       // Could be done faster on the GPU itself.
       // But would require writing to float textures, which
       // can be hard.
-      v = sum(this.contour_vals as Uint8Array);
+      v = sum(this.contour_vals);
     });
     return v;
   }
@@ -644,14 +644,14 @@ export class ReglRenderer extends Renderer {
       this.regl.clear({ color: [0, 0, 0, 0] });
       // read onto the contour vals.
       this.render_points(props);
-      this.regl.read(this.contour_vals!);
+      this.regl.read(this.contour_vals);
     });
 
     // 3-pass blur
     this.blur(this.fbos.contour, this.fbos.ping, 3);
 
     this.fbos.contour.use(() => {
-      this.regl.read(this.contour_vals!);
+      this.regl.read(this.contour_vals);
     });
 
     let i = 0;
@@ -840,7 +840,7 @@ export class ReglRenderer extends Renderer {
           _,
           { aes_to_buffer_num }: P,
         ) => {
-          const val = aes_to_buffer_num[`${dim}--${time}`];
+          const val = aes_to_buffer_num.get([dim, time]);
           if (val === undefined) {
             return -1;
           }
@@ -884,14 +884,13 @@ export class ReglRenderer extends Renderer {
     // we run out of buffers, the previous state of the requested aesthetic will just be thrown
     // away.
 
-    type time = 'current' | 'last';
     type BufferSummary = {
-      aesthetic: keyof typeof dimensions;
-      time: time;
-      field: [string, ...string[]];
+      aesthetic: string & keyof typeof dimensions;
+      time: 'current' | 'last';
+      field: Some<string>;
     };
     const buffers: BufferSummary[] = [];
-    const priorities = [
+    const priorities: (string & keyof typeof dimensions)[] = [
       'x',
       'y',
       'color',
@@ -903,7 +902,7 @@ export class ReglRenderer extends Renderer {
       'filter',
       'filter2',
       'foreground',
-    ] as (keyof typeof dimensions)[];
+    ];
     for (const aesthetic of priorities) {
       const times = ['current', 'last'] as const;
       for (const time of times) {
@@ -937,7 +936,7 @@ export class ReglRenderer extends Renderer {
       return priorities.indexOf(a.aesthetic) - priorities.indexOf(b.aesthetic);
     });
 
-    const aes_to_buffer_num: Record<string, number> = {}; // eg 'x' => 3
+    const aes_to_buffer_num: TupleMap<string, number> = new TupleMap([]);
 
     // Pre-allocate the 'ix' buffer and the 'ix_in_tile' buffers.
     const variable_to_buffer_num: TupleMap<string, number> = new TupleMap([
@@ -946,27 +945,37 @@ export class ReglRenderer extends Renderer {
     ]); // eg 'year' =>  3
     let num = 1;
     for (const { aesthetic, time, field } of buffers) {
-      const k = `${aesthetic}--${time}`;
+      const k: Some<string> = [aesthetic, time];
+      // console.log({ field });
       if (variable_to_buffer_num.get(field) !== undefined) {
-        aes_to_buffer_num[k] = variable_to_buffer_num.get(field);
+        aes_to_buffer_num.set(k, variable_to_buffer_num.get(field));
         continue;
       }
       if (num++ < 16) {
-        aes_to_buffer_num[k] = num;
+        aes_to_buffer_num.set(k, num);
         variable_to_buffer_num.set(field, num);
         continue;
       } else {
+        console.log('Overflow');
         // Don't use the last value, use the current value.
         // Loses animation but otherwise plots nicely.
-        // Strategy will break if more than 15 base channels are defined,
+        // Strategy will break if more than 14 base channels are defined,
         // which is not currently possible.
-        aes_to_buffer_num[k] = aes_to_buffer_num[`${aesthetic}--current`];
+        aes_to_buffer_num.set(
+          [aesthetic, 'last'],
+          aes_to_buffer_num.get([aesthetic, 'current']),
+        );
       }
     }
 
-    const buffer_num_to_variable = [...variable_to_buffer_num.keys()];
+    // Store our maps on the object.
     this.aes_to_buffer_num = aes_to_buffer_num;
     this.variable_to_buffer_num = variable_to_buffer_num;
+
+    // Build up a a list of which variable is at which buffer number.
+    const buffer_num_to_variable_vs = [...variable_to_buffer_num.entries()];
+    buffer_num_to_variable_vs.sort((a, b) => a[1] - b[1]);
+    const buffer_num_to_variable = buffer_num_to_variable_vs.map((d) => d[0]);
     this.buffer_num_to_variable = buffer_num_to_variable;
   }
 
@@ -1055,6 +1064,7 @@ export class BufferManager {
             if (tile.readyToUse) {
               // tile.get_column(keyset[0]);
             } else {
+              // pass
             }
             return false;
           }
@@ -1200,7 +1210,7 @@ export function getNestedVector(
         col_names = col_names.filter((d) => !d.startsWith('_'));
       }
       throw new Error(
-        `Requested ${key} but table only has columns ["${col_names.join(
+        `Requested ${key.join('->')} but table only has columns ["${col_names.join(
           '", "',
         )}]"`,
       );
@@ -1213,11 +1223,13 @@ export function getNestedVector(
     column = column.getChild(k);
   }
   if (column.data.length !== 1) {
-    throw new Error(`Column ${key} has ${column.data.length} buffers, not 1.`);
+    throw new Error(
+      `Column ${key.join('->')} has ${column.data.length} buffers, not 1.`,
+    );
   }
 
   if (!column.type || !column.type.typeId) {
-    throw new Error(`Column ${key} has no type.`);
+    throw new Error(`Column ${key.join('->')} has no type.`);
   }
   function assertNotStruct(
     value: Vector<DS.SupportedArrowTypes> | Vector<Struct>,
@@ -1359,7 +1371,7 @@ export function neededFieldsToPlot(
     if (v && typeof v !== 'string' && v['field'] !== undefined) {
       const needed_key: Some<string> = [v['field']];
       if (v['subfield'] !== undefined) {
-        const subfield = v['subfield'];
+        const subfield: string | string[] = v['subfield'] as string | string[];
         const asArray = Array.isArray(subfield) ? [...subfield] : [subfield];
         needed_key.push(...asArray);
       }

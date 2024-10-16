@@ -637,7 +637,7 @@ export type GlobalDrawProps = {
   use_scale_for_tiles: boolean;
   grid_mode: 1 | 0;
   buffer_num_to_variable: string[][];
-  aes_to_buffer_num: Record<string, number>;
+  aes_to_buffer_num: TupleMap<string, number>;
   variable_to_buffer_num: TupleMap<string, number>;
   color_picker_mode: 0 | 1 | 2 | 3;
   zoom_matrix: [

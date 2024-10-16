@@ -477,8 +477,6 @@ export class DataSelection {
         params.ids,
         params.idField,
       ).then(markReady);
-      // } else if (isBooleanColumnParam(params)) {
-      //   void this.add_boolean_column(params.name, params.field).then(markReady);
     } else if (isFunctionSelectParam(params)) {
       void this.add_function_column(params.name, params.tileFunction).then(
         markReady,

@@ -55,7 +55,7 @@ export class AestheticSet {
     // Used for things like 'what color would this point be?'
 
     if (this.store[aesthetic]) {
-      const v = this.store[aesthetic]
+      const v = this.store[aesthetic];
       return v;
     }
     if (!dimensions[aesthetic]) {
@@ -84,7 +84,7 @@ export class AestheticSet {
     }
   }
 
-  _neededFields: TupleSet<string> = new TupleSet();
+  _neededFields: TupleSet<string> = new TupleSet<string>();
 
   get neededFields(): string[][] {
     return [...this._neededFields.values()];
@@ -117,6 +117,8 @@ export class AestheticSet {
     // Update the needed fields.
     this._neededFields.clear();
 
+    // We always need the 'ix' column
+    this._neededFields.add(['ix']);
     for (const v of Object.values(this.store)) {
       if (v instanceof StatefulAesthetic) {
         for (const f of v.neededFields) {
