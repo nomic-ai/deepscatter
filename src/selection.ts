@@ -2,10 +2,11 @@
 import { Deeptable } from './Deeptable';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
-import { getTileFromRow } from './tixrixqid';
+import { getTileFromRow, Qid } from './tixrixqid';
 import type * as DS from './types';
-import { Bool, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
+import { Bool, RecordBatch, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
 import { bisectLeft, bisectRight, range } from 'd3-array';
+import { MinHeap } from './utilityFunctions';
 interface SelectParams {
   name: string;
   useNameCache?: boolean; // If true and a selection with that name already exists, use it and ignore all passed parameters. Otherwise, throw an error.
@@ -466,7 +467,7 @@ export class DataSelection {
       throw new Error("Can't create a selection without a deeptable");
     }
     this.name = params.name;
-    let markReady = function () {};
+    let markReady = function () { };
     this.ready = new Promise((resolve) => {
       markReady = resolve;
     });
@@ -529,7 +530,7 @@ export class DataSelection {
         // triggers creation of the deeptable column as a side-effect.
         return tile.get_column(this.name);
       }),
-    ).then(() => {});
+    ).then(() => { });
   }
 
   /**
@@ -1121,12 +1122,137 @@ export class SortedDataSelection extends DataSelection {
   }
 
   // Given a point, returns cursor number that would select it in this selection
-  which(row: StructRowProxy) {}
+  which(row: StructRowProxy) { }
 
-  *yieldSorted(start = undefined, direction = 'up') {
-    if (start !== undefined) {
-      this.cursor = start;
+  // Q4b: what are these arguments?
+  async *iterator(start: number = 0, reverse: boolean = false) {
+    let iterator: TileSorter;
+    if (this.tiles.length == 0) {
+      throw new Error('No tiles in sorted selection to iterate over');
     }
+    iterator = new TileSorter(this.tiles, this.key, reverse);
+    await iterator.init();
+
+    let numToSkip = start;
+    if (reverse) {
+      numToSkip = this.selectionSize - start - 1;
+    }
+  
+    let skip = 0;
+    let result = await iterator.next();
+
+    while (!result.done && skip < numToSkip) {
+      result = await iterator.next();
+      skip++;
+    }
+
+    while (!result.done) {
+      yield result.value.row;
+      result = await iterator.next();
+    }
+  }
+}
+
+interface TileValue {
+  value: number;
+  tile: SelectionTile;
+  indices: Uint16Array;
+  values: Float64Array;
+  pointer: number;
+  recordBatch: RecordBatch;
+  qid?: Qid; // allow undefined for now
+}
+
+export type TileSorterResult = { sortValue: number; row: StructRowProxy };
+
+// Separate class for now but we can probably just move the data structures
+// over to SortedSelection
+// Time complexity per iteration: O(log m) where m is the number of tiles
+class TileSorter implements AsyncIterator<TileSorterResult> {
+  public tiles: SelectionTile[];
+  public sortKey: string;
+  public reverse: boolean;
+  private valueHeap: MinHeap<TileValue>;
+  private initialized: boolean = false;
+
+
+  constructor(tiles: SelectionTile[], sortKey: string, reverse: boolean = false) {
+    this.sortKey = sortKey;
+    let compare = (a: TileValue, b: TileValue) => a.value - b.value;
+    if (reverse) {
+      compare = (a: TileValue, b: TileValue) => b.value - a.value;
+    }
+    this.valueHeap = new MinHeap<TileValue>(compare);
+    this.tiles = tiles;
+    this.reverse = reverse;
+  }
+
+  // TODO: probably a better way of doing this
+  // Right now laods all the tiles. Maybe not good?
+  async init() {
+    // Load initial tiles
+    for (const tile of this.tiles) {
+      // Ensure the tile's manifest and necessary columns are loaded
+      await tile.tile.populateManifest();
+      await tile.tile.get_column(this.sortKey);
+
+      const sortInfo = tile.sorts[this.sortKey];
+      if (sortInfo && sortInfo.start < sortInfo.end) {
+        let pointer;
+        if (this.reverse) {
+          pointer = sortInfo.end - 1;
+        } else {
+          pointer = sortInfo.start;
+        }
+        const value = sortInfo.values[pointer];
+        const indices = sortInfo.indices;
+        const values = sortInfo.values;
+        const recordBatch = tile.tile.record_batch;
+
+        // Insert the first element from each tile into the heap
+        this.valueHeap.insert({
+          value,
+          tile,
+          pointer,
+          indices,
+          values,
+          recordBatch
+        });
+      }
+    }
+    this.initialized = true;
+  }
+
+  async next(): Promise<IteratorResult<TileSorterResult>> {
+    if (!this.initialized) {
+      throw new Error('TileSorter not initialized. Call init() before calling next()');
+    }
+  
+    if (this.valueHeap.isEmpty()) {
+      return { done: true, value: undefined };
+    }
+
+    const heapItem = this.valueHeap.extractMin()!;
+    const { value, tile, pointer, indices, values, recordBatch } = heapItem;
+    const index = indices[pointer];
+    const row = recordBatch.get(index);
+
+    let nextPointer;
+    if (this.reverse) {
+      nextPointer = pointer - 1;
+    } else {
+      nextPointer = pointer + 1
+    }
+    if (nextPointer < tile.sorts[this.sortKey].end && nextPointer >= tile.sorts[this.sortKey].start) {
+      // Insert the next element from this tile into the heap
+      const nextValue = values[nextPointer];
+      heapItem.pointer = nextPointer;
+      heapItem.value = nextValue;
+      this.valueHeap.insert(heapItem);
+    }
+
+    return { value: {sortValue: value, row}, done: false };
+
   }
 }
 

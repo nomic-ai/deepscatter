@@ -1,10 +1,8 @@
 import {
-  Deeptable,
   DataSelection,
   SortedDataSelection,
   Bitmask,
 } from '../dist/deepscatter.js';
-import { Table, vectorFromArray, Utf8 } from 'apache-arrow';
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
 import {
@@ -122,6 +120,44 @@ test('Test sorting of selections', async () => {
   const mid = sorted.get(Math.floor(sorted.selectionSize / 2));
   assert.ok(mid.random > 0.45);
   assert.ok(mid.random < 0.55);
+});
+
+
+test('Test iterated sorting of selections', async () => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const selectEvens = new DataSelection(dataset, {
+    name: 'twos2',
+    tileFunction: selectFunctionForFactorsOf(2),
+  });
+  const sortKey = 'random'
+  await selectEvens.applyToAllTiles();
+  const sorted = await SortedDataSelection.fromSelection(
+    selectEvens,
+    [sortKey],
+    ({ random }) => random,
+  );
+  await sorted.applyToAllTiles();
+
+  // Go nomral direction
+  let prevValue = Number.NEGATIVE_INFINITY;
+  for await (const row of sorted.iterator()) {
+    const currValue = row[sortKey];
+    assert.ok(currValue >= prevValue)
+    prevValue = currValue;
+  }
+
+  prevValue = Number.POSITIVE_INFINITY;
+  let count = 0;
+  // Go reverse direction with a start
+  for await (const row of sorted.iterator(5, true)) {
+    const currValue = row[sortKey];
+    assert.ok(currValue <= prevValue);
+    prevValue = currValue;
+    count ++;
+  }
+  // Since flipped direction, your start is how many elements you will iterate
+  assert.ok(count, 5);
 });
 
 test.run();
