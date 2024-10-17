@@ -2,10 +2,11 @@
 import { Deeptable } from './Deeptable';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
-import { getTileFromRow } from './tixrixqid';
+import { getTileFromRow, Qid } from './tixrixqid';
 import type * as DS from './types';
 import { Bool, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
 import { bisectLeft, bisectRight, range } from 'd3-array';
+import { MinHeap } from './utilityFunctions';
 interface SelectParams {
   name: string;
   useNameCache?: boolean; // If true and a selection with that name already exists, use it and ignore all passed parameters. Otherwise, throw an error.
@@ -466,7 +467,7 @@ export class DataSelection {
       throw new Error("Can't create a selection without a deeptable");
     }
     this.name = params.name;
-    let markReady = function () {};
+    let markReady = function () { };
     this.ready = new Promise((resolve) => {
       markReady = resolve;
     });
@@ -529,7 +530,7 @@ export class DataSelection {
         // triggers creation of the deeptable column as a side-effect.
         return tile.get_column(this.name);
       }),
-    ).then(() => {});
+    ).then(() => { });
   }
 
   /**
@@ -1009,6 +1010,7 @@ export class SortedDataSelection extends DataSelection {
   public comparisonGetter: (a: StructRowProxy) => number;
   public order: 'ascending' | 'descending';
   public key: string;
+  private iterator: TileSorter | null = null;
 
   constructor(
     deeptable: Deeptable,
@@ -1121,13 +1123,144 @@ export class SortedDataSelection extends DataSelection {
   }
 
   // Given a point, returns cursor number that would select it in this selection
-  which(row: StructRowProxy) {}
+  which(row: StructRowProxy) { }
 
-  *yieldSorted(start = undefined, direction = 'up') {
-    if (start !== undefined) {
-      this.cursor = start;
+  async *yieldSorted(start = undefined, direction = 'up') {
+    if (this.iterator === null) {
+      if (this.tiles.length == 0) {
+        throw new Error('No tiles in sorted selection to iterate over');
+      }
+      // q4b: is key here the sort key for the sort indices
+      this.iterator = new TileSorter(this.tiles, 256, this.key);
     }
+
+    const result = await this.iterator.next();
+    return result;
   }
+
+  resetIterator() {
+    this.iterator = null;
+  }
+}
+
+interface TileSortInfo {
+  minValue: number;
+  tile: SelectionTile;
+  initPointer: number;
+}
+
+interface TileValue {
+  value: number;
+  qid?: Qid; // allow undefined for now
+  key: string; // replace with tix / just use the qid
+}
+
+// Separate class for now but we can probably just move the data structures
+// over to SortedSelection
+class TileSorter implements AsyncIterator<number> {
+  public tiles: SelectionTile[];
+  public sortKey: string;
+  // Size of all tiles
+  // if all tiles are loaded and sorted, tileHeap is unnecessary
+  private tileHeap: MinHeap<TileSortInfo>;
+  // Size of maxTilesInHeap
+  private valueHeap: MinHeap<TileValue>;
+  // Number of tiles allowed in heap
+  private maxTilesInHeap: number;
+  private loadedTiles: Map<string, { tile: SelectionTile; pointer: number }>;
+  private initalized: boolean = false;
+
+  constructor(tiles: SelectionTile[], maxTilesInHeap: number = 256, sortKey: string) {
+    this.maxTilesInHeap = maxTilesInHeap;
+    this.loadedTiles = new Map();
+    this.sortKey = sortKey;
+
+    // Initialize tileHeap with min values (using metadata)
+    this.tileHeap = new MinHeap<TileSortInfo>((a, b) => a.minValue - b.minValue);
+    for (const tile of tiles) {
+      // Assume for now tile.getMinValue() returns the minimum value without loading the tile
+      this.tileHeap.insert({ minValue: tile.getMinValue(), tile, initPointer: 0 });
+    }
+
+    this.valueHeap = new MinHeap<TileValue>((a, b) => a.value - b.value);
+  }
+
+  // TODO: probably a better way of doing this
+  async init() {
+    // Load initial tiles
+    while (
+      this.loadedTiles.size < this.maxTilesInHeap &&
+      !this.tileHeap.isEmpty()
+    ) {
+      const { tile } = this.tileHeap.extractMin()!;
+      await this.loadTile(tile);
+    }
+
+    // Initialize valueHeap with the first element from each loaded tile
+    for (const [tileIndex, { tile, pointer }] of this.loadedTiles.entries()) {
+      const value = tile.getValueAt(pointer);
+      // Make qid null for now while figuring this out
+      this.valueHeap.insert({ value, key: tile.tile.key });
+    }
+    this.initalized = true;
+  }
+
+  async next(): Promise<number | any | undefined> {
+    if (!this.initalized) {
+      throw new Error('TileSorter not initialized. Call init() before calling next()');
+    }
+  
+    if (this.valueHeap.isEmpty()) {
+      return { done: true, value: undefined };
+    }
+
+    const { value, qid, key } = this.valueHeap.extractMin()!;
+
+    const tileData = this.loadedTiles.get(key);
+    if (tileData) {
+      tileData.pointer++; // Advance pointer
+      const tile = tileData.tile;
+
+      if (tileData.pointer < tile.tile.manifest.nPoints) {
+        const nextValue = tile.getValueAt(tileData.pointer);
+        // if next value in tile is greater than min tile value in tile heap, load next tile and 
+        // add this back
+        if (!this.tileHeap.isEmpty() && nextValue > this.tileHeap.peek().minValue) {
+          const { tile: nextTile, initPointer: pointer } = this.tileHeap.extractMin()!;
+          await this.loadTile(nextTile, pointer);
+          this.valueHeap.insert({
+            value: nextTile.getValueAt(pointer),
+            key: nextTile.tile.key,
+          });
+          this.tileHeap.insert({ minValue: nextValue, tile: tileData.tile, initPointer: tileData.pointer });
+        } else {
+          // Insert next element from this tile into the heap
+          this.valueHeap.insert({ value: nextValue, key: key });
+        }
+      } else {
+        // Tile is exhausted
+        this.loadedTiles.delete(key);
+
+        // Load the next tile if available
+        if (!this.tileHeap.isEmpty()) {
+          const { tile: nextTile, initPointer: pointer } = this.tileHeap.extractMin()!;
+          await this.loadTile(nextTile, pointer);
+          this.valueHeap.insert({
+            value: nextTile.getValueAt(pointer),
+            key: nextTile.tile.key,
+          });
+        }
+      }
+    }
+    return value;
+  }
+
+  private async loadTile(tile: SelectionTile, initPointer: number = 0): Promise<void> {
+    await tile.tile.populateManifest();
+    await tile.tile.get_column(this.sortKey);
+    this.loadedTiles.set(tile.tile.key, { tile, pointer: initPointer });
+  }
+
 }
 
 interface QuickSortTile {
