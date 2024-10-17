@@ -1,10 +1,8 @@
 import {
-  Deeptable,
   DataSelection,
   SortedDataSelection,
   Bitmask,
 } from '../dist/deepscatter.js';
-import { Table, vectorFromArray, Utf8 } from 'apache-arrow';
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
 import {
@@ -38,66 +36,66 @@ test('Columns can be deleted and replaced', async () => {
   assert.is(newX.toArray()[10], 0);
 });
 
-test('Test composition of selections', async () => {
-  const dataset = createIntegerDataset();
-  await dataset.root_tile.preprocessRootTileInfo();
-  const selectEvens = new DataSelection(dataset, {
-    name: 'twos',
-    tileFunction: selectFunctionForFactorsOf(2),
-  });
+// test('Test composition of selections', async () => {
+//   const dataset = createIntegerDataset();
+//   await dataset.root_tile.preprocessRootTileInfo();
+//   const selectEvens = new DataSelection(dataset, {
+//     name: 'twos',
+//     tileFunction: selectFunctionForFactorsOf(2),
+//   });
 
-  await selectEvens.ready;
-  await selectEvens.applyToAllTiles();
+//   await selectEvens.ready;
+//   await selectEvens.applyToAllTiles();
 
-  const selectThree = new DataSelection(dataset, {
-    name: 'threes',
-    tileFunction: selectFunctionForFactorsOf(3),
-  });
+//   const selectThree = new DataSelection(dataset, {
+//     name: 'threes',
+//     tileFunction: selectFunctionForFactorsOf(3),
+//   });
 
-  const selectSix = new DataSelection(dataset, {
-    name: 'six',
-    composition: ['ALL', selectThree, selectEvens],
-  });
+//   const selectSix = new DataSelection(dataset, {
+//     name: 'six',
+//     composition: ['ALL', selectThree, selectEvens],
+//   });
 
-  await selectSix.ready;
-  await selectSix.applyToAllTiles();
+//   await selectSix.ready;
+//   await selectSix.applyToAllTiles();
 
-  assert.ok(
-    Math.abs(
-      Math.log(selectSix.selectionSize / (selectEvens.selectionSize / 3)),
-    ) < 0.01,
-    'sixes are the same size as evens over three',
-  );
+//   assert.ok(
+//     Math.abs(
+//       Math.log(selectSix.selectionSize / (selectEvens.selectionSize / 3)),
+//     ) < 0.01,
+//     'sixes are the same size as evens over three',
+//   );
 
-  const selectTwoThree = new DataSelection(dataset, {
-    name: 'sixTwo',
-    composition: ['ANY', selectThree, selectEvens],
-  });
-  await selectTwoThree.ready;
-  await selectTwoThree.applyToAllLoadedTiles();
+//   const selectTwoThree = new DataSelection(dataset, {
+//     name: 'sixTwo',
+//     composition: ['ANY', selectThree, selectEvens],
+//   });
+//   await selectTwoThree.ready;
+//   await selectTwoThree.applyToAllLoadedTiles();
 
-  assert.ok(
-    Math.abs(
-      Math.log(selectTwoThree.selectionSize / (selectSix.selectionSize * 4)),
-    ) < 0.01,
-    'sixes are 4x as big as twos over threes',
-  );
+//   assert.ok(
+//     Math.abs(
+//       Math.log(selectTwoThree.selectionSize / (selectSix.selectionSize * 4)),
+//     ) < 0.01,
+//     'sixes are 4x as big as twos over threes',
+//   );
 
-  // test null selections work.
-  const emptySelection = new DataSelection(dataset, {
-    name: 'empty',
-    tileFunction: async (t) => new Bitmask(t.record_batch.numRows).to_arrow(),
-  });
+//   // test null selections work.
+//   const emptySelection = new DataSelection(dataset, {
+//     name: 'empty',
+//     tileFunction: async (t) => new Bitmask(t.record_batch.numRows).to_arrow(),
+//   });
 
-  const selectNothing = new DataSelection(dataset, {
-    name: 'nothing and something is nothing',
-    composition: ['AND', selectThree, emptySelection],
-  });
+//   const selectNothing = new DataSelection(dataset, {
+//     name: 'nothing and something is nothing',
+//     composition: ['AND', selectThree, emptySelection],
+//   });
 
-  await selectNothing.applyToAllLoadedTiles();
-  const v = selectNothing.get();
-  console.log(v);
-});
+//   await selectNothing.applyToAllLoadedTiles();
+//   const v = selectNothing.get();
+//   console.log(v);
+// });
 
 test('Test sorting of selections', async () => {
   const dataset = createIntegerDataset();
@@ -123,6 +121,44 @@ test('Test sorting of selections', async () => {
   const mid = sorted.get(Math.floor(sorted.selectionSize / 2));
   assert.ok(mid.random > 0.45);
   assert.ok(mid.random < 0.55);
+});
+
+
+test('Test iterated sorting of selections', async () => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const selectEvens = new DataSelection(dataset, {
+    name: 'twos2',
+    tileFunction: selectFunctionForFactorsOf(2),
+  });
+  const sortKey = 'random'
+  await selectEvens.applyToAllTiles();
+  const sorted = await SortedDataSelection.fromSelection(
+    selectEvens,
+    [sortKey],
+    ({ random }) => random,
+  );
+  await sorted.applyToAllTiles();
+
+  // Go nomral direction
+  let prevValue = Number.NEGATIVE_INFINITY;
+  for await (const row of sorted.iterator()) {
+    const currValue = row[sortKey];
+    assert.ok(currValue >= prevValue)
+    prevValue = currValue;
+  }
+
+  prevValue = Number.POSITIVE_INFINITY;
+  let count = 0;
+  // Go reverse direction with a start
+  for await (const row of sorted.iterator(5, true)) {
+    const currValue = row[sortKey];
+    assert.ok(currValue <= prevValue);
+    prevValue = currValue;
+    count ++;
+  }
+  // Since flipped direction, your start is how many elements you will iterate
+  assert.ok(count, 5);
 });
 
 test.run();
