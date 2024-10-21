@@ -4,7 +4,14 @@ import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
 import { getTileFromRow, Qid } from './tixrixqid';
 import type * as DS from './types';
-import { Bool, RecordBatch, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
+import {
+  Bool,
+  RecordBatch,
+  StructRowProxy,
+  Utf8,
+  Vector,
+  makeData,
+} from 'apache-arrow';
 import { bisectLeft, bisectRight, range } from 'd3-array';
 import { MinHeap } from './utilityFunctions';
 interface SelectParams {
@@ -375,6 +382,7 @@ class SelectionTile {
       values,
       start: 0,
       end: indices.length,
+      pointer: 0,
     };
   }
 }
@@ -467,7 +475,7 @@ export class DataSelection {
       throw new Error("Can't create a selection without a deeptable");
     }
     this.name = params.name;
-    let markReady = function () { };
+    let markReady = function () {};
     this.ready = new Promise((resolve) => {
       markReady = resolve;
     });
@@ -530,7 +538,7 @@ export class DataSelection {
         // triggers creation of the deeptable column as a side-effect.
         return tile.get_column(this.name);
       }),
-    ).then(() => { });
+    ).then(() => {});
   }
 
   /**
@@ -1082,7 +1090,7 @@ export class SortedDataSelection extends DataSelection {
 
       // Store the indices and values in the tile
 
-      let ix = this.tiles.findIndex((having) => having.tile === tile);
+      const ix = this.tiles.findIndex((having) => having.tile === tile);
       let t: SelectionTile;
       if (ix !== -1) {
         t = this.tiles[ix];
@@ -1122,137 +1130,135 @@ export class SortedDataSelection extends DataSelection {
   }
 
   // Given a point, returns cursor number that would select it in this selection
-  which(row: StructRowProxy) { }
+  // which(row: StructRowProxy) {}
+
+  // *[Symbol.iterator]() {
+  //   const iterator = await this.iterator();
+  //   for (const p of iterator) {
+  //     yield p;
+  //   }
+  // }
 
   // Q4b: what are these arguments?
-  async *iterator(start: number = 0, reverse: boolean = false) {
-    let iterator: TileSorter;
+  *iterator(start: number = 0, reverse: boolean = false) {
     if (this.tiles.length == 0) {
       throw new Error('No tiles in sorted selection to iterate over');
     }
-    iterator = new TileSorter(this.tiles, this.key, reverse);
-    await iterator.init();
+    const iterator = new TileSorter(this.tiles, this.key);
 
     let numToSkip = start;
     if (reverse) {
       numToSkip = this.selectionSize - start - 1;
     }
-  
+
     let skip = 0;
-    let result = await iterator.next();
+    let result = iterator.next();
 
     while (!result.done && skip < numToSkip) {
-      result = await iterator.next();
+      result = iterator.next();
       skip++;
     }
 
     while (!result.done) {
-      yield result.value.row;
-      result = await iterator.next();
+      yield result.value;
+      result = iterator.next();
     }
   }
 }
 
-interface TileValue {
-  value: number;
-  tile: SelectionTile;
-  indices: Uint16Array;
-  values: Float64Array;
-  pointer: number;
-  recordBatch: RecordBatch;
-  qid?: Qid; // allow undefined for now
-}
+type SortInfoWithPointer = SelectionSortInfo & { pointer: number; tile: Tile };
 
-export type TileSorterResult = { sortValue: number; row: StructRowProxy };
-
-// Separate class for now but we can probably just move the data structures
-// over to SortedSelection
+// Separate class for now which is disposable because it maintains its
+// own traversal order through the array as a pointer.
 // Time complexity per iteration: O(log m) where m is the number of tiles
-class TileSorter implements AsyncIterator<TileSorterResult> {
+class TileSorter implements Iterator<StructRowProxy> {
   public tiles: SelectionTile[];
   public sortKey: string;
   public reverse: boolean;
-  private valueHeap: MinHeap<TileValue>;
+  // TODO: Implement this as a minheap of selectionsortinfo.
+  private valueHeap: MinHeap<SortInfoWithPointer>;
   private initialized: boolean = false;
 
-
-  constructor(tiles: SelectionTile[], sortKey: string, reverse: boolean = false) {
-    this.sortKey = sortKey;
-    let compare = (a: TileValue, b: TileValue) => a.value - b.value;
+  constructor(
+    tiles: SelectionTile[],
+    // TODO @rguo123: Implement this
+    // What number in the selection to start from.
+    sortKey: string,
+    startingK: number = 0,
+    reverse: boolean = false,
+  ) {
     if (reverse) {
-      compare = (a: TileValue, b: TileValue) => b.value - a.value;
+      throw new Error('Reverse not yet implemented');
     }
-    this.valueHeap = new MinHeap<TileValue>(compare);
+    this.sortKey = sortKey;
+
+    let compare = (a: SortInfoWithPointer, b: SortInfoWithPointer) =>
+      a.values[a.pointer] - b.values[b.pointer];
+    if (reverse) {
+      compare = (a: SortInfoWithPointer, b: SortInfoWithPointer) =>
+        b.values[b.pointer] - a.values[a.pointer];
+    }
+    this.valueHeap = new MinHeap<SortInfoWithPointer>(compare);
     this.tiles = tiles;
     this.reverse = reverse;
+    this.init();
   }
 
-  // TODO: probably a better way of doing this
-  // Right now laods all the tiles. Maybe not good?
-  async init() {
+  init() {
     // Load initial tiles
     for (const tile of this.tiles) {
       // Ensure the tile's manifest and necessary columns are loaded
-      await tile.tile.populateManifest();
-      await tile.tile.get_column(this.sortKey);
+      const rawSortInfo = tile.sorts[this.sortKey];
 
-      const sortInfo = tile.sorts[this.sortKey];
-      if (sortInfo && sortInfo.start < sortInfo.end) {
-        let pointer;
+      if (rawSortInfo && rawSortInfo.start < rawSortInfo.end) {
+        let pointer: number;
         if (this.reverse) {
-          pointer = sortInfo.end - 1;
+          pointer = rawSortInfo.end - 1;
         } else {
-          pointer = sortInfo.start;
+          pointer = rawSortInfo.start;
         }
-        const value = sortInfo.values[pointer];
-        const indices = sortInfo.indices;
-        const values = sortInfo.values;
-        const recordBatch = tile.tile.record_batch;
-
-        // Insert the first element from each tile into the heap
-        this.valueHeap.insert({
-          value,
-          tile,
+        const sortInfo: SortInfoWithPointer = {
+          ...rawSortInfo,
           pointer,
-          indices,
-          values,
-          recordBatch
-        });
+          tile: tile.tile,
+        };
+        // TODO: Maybe just insert `sortInfo` and the pointer?
+        // Insert the first element from each tile into the heap
+        this.valueHeap.insert(sortInfo);
       }
     }
     this.initialized = true;
   }
 
-  async next(): Promise<IteratorResult<TileSorterResult>> {
+  next(): IteratorResult<StructRowProxy> {
     if (!this.initialized) {
-      throw new Error('TileSorter not initialized. Call init() before calling next()');
+      throw new Error(
+        'TileSorter not initialized. Call init() before calling next()',
+      );
     }
-  
+
     if (this.valueHeap.isEmpty()) {
       return { done: true, value: undefined };
     }
 
-    const heapItem = this.valueHeap.extractMin()!;
-    const { value, tile, pointer, indices, values, recordBatch } = heapItem;
+    const heapItem = this.valueHeap.extractMin();
+    const { tile, indices, pointer, end, start } = heapItem;
     const index = indices[pointer];
-    const row = recordBatch.get(index);
+    const row = tile.record_batch.get(index);
 
-    let nextPointer;
+    let nextPointer: number;
     if (this.reverse) {
       nextPointer = pointer - 1;
     } else {
-      nextPointer = pointer + 1
+      nextPointer = pointer + 1;
     }
-    if (nextPointer < tile.sorts[this.sortKey].end && nextPointer >= tile.sorts[this.sortKey].start) {
+    if (nextPointer < end && nextPointer >= start) {
       // Insert the next element from this tile into the heap
-      const nextValue = values[nextPointer];
-      heapItem.pointer = nextPointer;
-      heapItem.value = nextValue;
-      this.valueHeap.insert(heapItem);
+
+      this.valueHeap.insert({ ...heapItem, pointer: nextPointer });
     }
 
-    return { value: {sortValue: value, row}, done: false };
-
+    return { value: row, done: false };
   }
 }
 
@@ -1265,7 +1271,9 @@ function quickSelect(
   k: number,
   tiles: QuickSortTile[],
   key: string,
-): StructRowProxy | undefined {
+  // TODO: We now want this to return SortInfoWithPointer so that it
+  // can be used to queue up a TileSorter from a specific point.
+): SortInfoWithPointer[] | undefined {
   // Recalculate size based on the current tiles
   const size = tiles.reduce(
     (acc, t) => acc + (t.sorts[key].end - t.sorts[key].start),

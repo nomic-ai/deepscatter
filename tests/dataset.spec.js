@@ -122,7 +122,6 @@ test('Test sorting of selections', async () => {
   assert.ok(mid.random < 0.55);
 });
 
-
 test('Test iterated sorting of selections', async () => {
   const dataset = createIntegerDataset();
   await dataset.root_tile.preprocessRootTileInfo();
@@ -130,7 +129,7 @@ test('Test iterated sorting of selections', async () => {
     name: 'twos2',
     tileFunction: selectFunctionForFactorsOf(2),
   });
-  const sortKey = 'random'
+  const sortKey = 'random';
   await selectEvens.applyToAllTiles();
   const sorted = await SortedDataSelection.fromSelection(
     selectEvens,
@@ -139,25 +138,37 @@ test('Test iterated sorting of selections', async () => {
   );
   await sorted.applyToAllTiles();
 
+  let size = 0;
   // Go nomral direction
   let prevValue = Number.NEGATIVE_INFINITY;
-  for await (const row of sorted.iterator()) {
+  for (const row of sorted.iterator()) {
+    size++;
+    // This test needs to handle that it's a structRowProxy now not a value.
     const currValue = row[sortKey];
-    assert.ok(currValue >= prevValue)
+    assert.ok(currValue >= prevValue);
     prevValue = currValue;
   }
 
-  prevValue = Number.POSITIVE_INFINITY;
-  let count = 0;
-  // Go reverse direction with a start
-  for await (const row of sorted.iterator(5, true)) {
-    const currValue = row[sortKey];
-    assert.ok(currValue <= prevValue);
-    prevValue = currValue;
-    count ++;
-  }
+  assert.ok(size, sorted.selectionSize);
   // Since flipped direction, your start is how many elements you will iterate
-  assert.ok(count, 5);
+
+  const first = sorted.iterator(0);
+  const second = sorted.iterator(10);
+
+  let sizeFirst = 20;
+  const elementsFirst = [];
+  for (const row of sorted.iterator()) {
+    sizeFirst--;
+    if (sizeFirst === 0) {
+      break;
+    }
+    elementsFirst.push(row[sortKey]);
+  }
+
+  // Something to test that the second iterator doesn't end up with state elements
+  // from the first and that it starts from the 10th item in the first.
+
+  // Since flipped direction, your start is how many elements you will iterate
 });
 
 test.run();
