@@ -192,7 +192,7 @@ export class TupleMap<K = object, V = object> {
   }
 }
 
-export class TupleSet<K = Object> {
+export class TupleSet<K = object> {
   private map = new TupleMap<K, boolean>();
 
   constructor(v: Some<K>[] = []) {
@@ -232,7 +232,6 @@ export class TupleSet<K = Object> {
     this.map = new TupleMap();
   }
 }
-
 
 export class MinHeap<T> {
   private heap: T[] = [];
@@ -315,7 +314,8 @@ export class MinHeap<T> {
         const rightChild = this.heap[rightChildIndex];
         if (
           (swapIndex === null && this.comparator(rightChild, element) < 0) ||
-          (swapIndex !== null && this.comparator(rightChild, this.heap[swapIndex]) < 0)
+          (swapIndex !== null &&
+            this.comparator(rightChild, this.heap[swapIndex]) < 0)
         ) {
           swapIndex = rightChildIndex;
         }
