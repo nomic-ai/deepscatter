@@ -2,16 +2,9 @@
 import { Deeptable } from './Deeptable';
 import { Scatterplot } from './scatterplot';
 import { Tile } from './tile';
-import { getTileFromRow, Qid } from './tixrixqid';
+import { getTileFromRow } from './tixrixqid';
 import type * as DS from './types';
-import {
-  Bool,
-  RecordBatch,
-  StructRowProxy,
-  Utf8,
-  Vector,
-  makeData,
-} from 'apache-arrow';
+import { Bool, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
 import { bisectLeft, bisectRight, range } from 'd3-array';
 import { MinHeap } from './utilityFunctions';
 interface SelectParams {
@@ -358,11 +351,7 @@ class SelectionTile {
     return this._matchCount;
   }
 
-  addSort(
-    key: string,
-    getter: (row: StructRowProxy) => number,
-    order: 'ascending' | 'descending',
-  ) {
+  addSort(key: string, getter: (row: StructRowProxy) => number) {
     const { bitmask } = this;
     const indices = Bitmask.from_arrow(bitmask).which();
     const pairs: [number, number][] = new Array(indices.length);
@@ -370,8 +359,7 @@ class SelectionTile {
       const v = getter(this.tile.record_batch.get(indices[i]));
       pairs[i] = [v, indices[i]];
     }
-    // Sort according to the specified order
-    pairs.sort((a, b) => (order === 'ascending' ? a[0] - b[0] : b[0] - a[0]));
+    pairs.sort((a, b) => a[0] - b[0]);
     const values = new Float64Array(indices.length);
     for (let i = 0; i < indices.length; i++) {
       indices[i] = pairs[i][1];
@@ -382,7 +370,6 @@ class SelectionTile {
       values,
       start: 0,
       end: indices.length,
-      pointer: 0,
     };
   }
 }
@@ -1068,7 +1055,7 @@ export class SortedDataSelection extends DataSelection {
     const withSort = sel.tiles.map(
       async (tile: SelectionTile): Promise<SelectionTile> => {
         await Promise.all(neededFields.map((f) => tile.tile.get_column(f)));
-        tile.addSort(key, sortOperation, order);
+        tile.addSort(key, sortOperation);
         return tile;
       },
     );
@@ -1094,13 +1081,13 @@ export class SortedDataSelection extends DataSelection {
       let t: SelectionTile;
       if (ix !== -1) {
         t = this.tiles[ix];
-        t.addSort(this.key, this.comparisonGetter, this.order);
+        t.addSort(this.key, this.comparisonGetter);
       } else {
         t = new SelectionTile({
           arrowBitmask: array,
           tile,
         });
-        t.addSort(this.key, this.comparisonGetter, this.order);
+        t.addSort(this.key, this.comparisonGetter);
         this.selectionSize += t.matchCount;
         this.evaluationSetSize += tile.manifest.nPoints;
         this.tiles.push(t);
@@ -1116,149 +1103,191 @@ export class SortedDataSelection extends DataSelection {
    * This implementation uses Quickselect with a pivot selected from actual data.
    */
   get(k: number): StructRowProxy | undefined {
-    if (k < 0 || k >= this.selectionSize) {
-      console.error('Index out of bounds');
-      return undefined;
-    }
-
-    // Adjust k based on the order
-    const targetIndex =
-      this.order === 'ascending' ? k : this.selectionSize - k - 1;
-
+    const actualK = this.order === 'ascending' ? k : this.selectionSize - k - 1;
     // Implement Quickselect over the combined data
-    return quickSelect(targetIndex, this.tiles, this.key);
+    const result = quickSelect(actualK, this.tiles, this.key, true);
+    return result ? result.row : undefined;
   }
 
   // Given a point, returns cursor number that would select it in this selection
   // which(row: StructRowProxy) {}
 
-  // *[Symbol.iterator]() {
-  //   const iterator = await this.iterator();
-  //   for (const p of iterator) {
-  //     yield p;
-  //   }
-  // }
-
-  // Q4b: what are these arguments?
-  *iterator(start: number = 0, reverse: boolean = false) {
+  iterator(k: number = 0, reverse: boolean = false): TileSorter {
     if (this.tiles.length == 0) {
       throw new Error('No tiles in sorted selection to iterate over');
     }
-    const iterator = new TileSorter(this.tiles, this.key);
-
-    let numToSkip = start;
-    if (reverse) {
-      numToSkip = this.selectionSize - start - 1;
-    }
-
-    let skip = 0;
-    let result = iterator.next();
-
-    while (!result.done && skip < numToSkip) {
-      result = iterator.next();
-      skip++;
-    }
-
-    while (!result.done) {
-      yield result.value;
-      result = iterator.next();
-    }
+    const actualOrder = reverse
+      ? this.order === 'ascending'
+        ? 'descending'
+        : 'ascending'
+      : this.order;
+    return new TileSorter(this.tiles, this.key, k, actualOrder);
   }
 }
 
 type SortInfoWithPointer = SelectionSortInfo & { pointer: number; tile: Tile };
 
+type CompareFunction = (a, b) => number;
+
 // Separate class for now which is disposable because it maintains its
 // own traversal order through the array as a pointer.
 // Time complexity per iteration: O(log m) where m is the number of tiles
-class TileSorter implements Iterator<StructRowProxy> {
+export class TileSorter
+  implements Iterator<StructRowProxy>, Iterable<StructRowProxy>
+{
   public tiles: SelectionTile[];
   public sortKey: string;
-  public reverse: boolean;
-  // TODO: Implement this as a minheap of selectionsortinfo.
+  public startingK: number;
+  public order: 'ascending' | 'descending';
+  public compare: CompareFunction;
   private valueHeap: MinHeap<SortInfoWithPointer>;
-  private initialized: boolean = false;
 
   constructor(
     tiles: SelectionTile[],
-    // TODO @rguo123: Implement this
-    // What number in the selection to start from.
     sortKey: string,
     startingK: number = 0,
-    reverse: boolean = false,
+    order: 'ascending' | 'descending' = 'ascending',
   ) {
-    if (reverse) {
-      throw new Error('Reverse not yet implemented');
-    }
+    this.startingK = startingK;
     this.sortKey = sortKey;
+    this.order = order;
+    this.compare = this.getCompareFunction();
 
-    let compare = (a: SortInfoWithPointer, b: SortInfoWithPointer) =>
-      a.values[a.pointer] - b.values[b.pointer];
-    if (reverse) {
-      compare = (a: SortInfoWithPointer, b: SortInfoWithPointer) =>
-        b.values[b.pointer] - a.values[a.pointer];
-    }
-    this.valueHeap = new MinHeap<SortInfoWithPointer>(compare);
+    this.valueHeap = new MinHeap<SortInfoWithPointer>(this.compare);
     this.tiles = tiles;
-    this.reverse = reverse;
     this.init();
   }
 
-  init() {
-    // Load initial tiles
-    for (const tile of this.tiles) {
-      // Ensure the tile's manifest and necessary columns are loaded
-      const rawSortInfo = tile.sorts[this.sortKey];
+  // Needed to bake the tile id into the comparator.
+  getCompareFunction(): CompareFunction {
+    if (this.order === 'descending') {
+      return (a: SortInfoWithPointer, b: SortInfoWithPointer) => {
+        const diff = b.values[b.pointer] - a.values[a.pointer];
+        return Math.abs(diff) < Number.EPSILON ? b.tile.tix - a.tile.tix : diff;
+      };
+    } else {
+      return (a: SortInfoWithPointer, b: SortInfoWithPointer) => {
+        const diff = a.values[a.pointer] - b.values[b.pointer];
+        return Math.abs(diff) < Number.EPSILON ? a.tile.tix - b.tile.tix : diff;
+      };
+    }
+  }
 
-      if (rawSortInfo && rawSortInfo.start < rawSortInfo.end) {
-        let pointer: number;
-        if (this.reverse) {
-          pointer = rawSortInfo.end - 1;
-        } else {
-          pointer = rawSortInfo.start;
-        }
-        const sortInfo: SortInfoWithPointer = {
+  selectionSizeFromTiles() {
+    return this.tiles.reduce((acc, t) => acc + t.matchCount, 0);
+  }
+
+  initFromKHelper() {
+    const actualK =
+      this.order === 'ascending'
+        ? this.startingK
+        : this.selectionSizeFromTiles() - this.startingK - 1;
+    const { tix, sortIndex, sortValue } = quickSelect(
+      actualK,
+      this.tiles,
+      this.sortKey,
+      false,
+      this.order,
+    );
+    const sortInfos: SortInfoWithPointer[] = [];
+    // Init all pointers with binary search
+    for (const tile of this.tiles) {
+      const rawSortInfo = tile.sorts[this.sortKey];
+      // We know exactly pointer spot for the tile with k
+      if (tile.tile.tix === tix) {
+        sortInfos.push({
           ...rawSortInfo,
-          pointer,
+          pointer: sortIndex,
           tile: tile.tile,
-        };
-        // TODO: Maybe just insert `sortInfo` and the pointer?
-        // Insert the first element from each tile into the heap
+        });
+        continue;
+      }
+      // All values left of pointer are less than targetValue.
+      let pointer;
+      if (this.order === 'ascending') {
+        pointer = bisectLeft(rawSortInfo.values, sortValue);
+      } else {
+        pointer = bisectRight(rawSortInfo.values, sortValue);
+      }
+      sortInfos.push({
+        ...rawSortInfo,
+        pointer: pointer,
+        tile: tile.tile,
+      });
+    }
+
+    // Now skip the pointer past values <= kth val until we reach tile with k
+    for (const sortInfo of sortInfos) {
+      const { tile, values } = sortInfo;
+      // Found the target tile
+      if (tile.tix === tix) {
+        break;
+      }
+      // Before the target tile, skip equal values
+      while (values[sortInfo.pointer] <= sortValue) {
+        if (this.order === 'ascending') {
+          sortInfo.pointer++;
+        } else {
+          sortInfo.pointer--;
+        }
+      }
+    }
+
+    // Finally add to heap
+    for (const sortInfo of sortInfos) {
+      // Only add if we haven't reached the end of the values
+      if (sortInfo.pointer < sortInfo.values.length) {
         this.valueHeap.insert(sortInfo);
       }
     }
-    this.initialized = true;
+  }
+
+  init() {
+    // First sort the tiles to guarantee consistency
+    if (this.order === 'ascending') {
+      this.tiles.sort((a, b) => a.tile.tix - b.tile.tix);
+    } else {
+      this.tiles.sort((a, b) => b.tile.tix - a.tile.tix);
+    }
+
+    if (this.startingK > 0) {
+      this.initFromKHelper();
+    } else {
+      for (const tile of this.tiles) {
+        const rawSortInfo = tile.sorts[this.sortKey];
+
+        const sortInfo: SortInfoWithPointer = {
+          ...rawSortInfo,
+          pointer:
+            this.order === 'ascending' ? 0 : rawSortInfo.values.length - 1,
+          tile: tile.tile,
+        };
+        this.valueHeap.insert(sortInfo);
+      }
+    }
   }
 
   next(): IteratorResult<StructRowProxy> {
-    if (!this.initialized) {
-      throw new Error(
-        'TileSorter not initialized. Call init() before calling next()',
-      );
-    }
-
     if (this.valueHeap.isEmpty()) {
       return { done: true, value: undefined };
     }
 
     const heapItem = this.valueHeap.extractMin();
-    const { tile, indices, pointer, end, start } = heapItem;
+    const { tile, indices, pointer } = heapItem;
     const index = indices[pointer];
     const row = tile.record_batch.get(index);
 
-    let nextPointer: number;
-    if (this.reverse) {
-      nextPointer = pointer - 1;
-    } else {
-      nextPointer = pointer + 1;
-    }
-    if (nextPointer < end && nextPointer >= start) {
-      // Insert the next element from this tile into the heap
+    const nextPointer: number =
+      this.order === 'ascending' ? pointer + 1 : pointer - 1;
 
+    if (nextPointer < indices.length && nextPointer >= 0) {
       this.valueHeap.insert({ ...heapItem, pointer: nextPointer });
     }
-
     return { value: row, done: false };
+  }
+
+  [Symbol.iterator](): Iterator<StructRowProxy> {
+    return this;
   }
 }
 
@@ -1267,28 +1296,59 @@ interface QuickSortTile {
   sorts: Record<string, SelectionSortInfo>;
 }
 
+type QuickSelectResult = {
+  row: StructRowProxy;
+  tix: number;
+  // Needed if you want to set pointers
+  sortIndex: number;
+  sortValue: number;
+};
+
 function quickSelect(
   k: number,
   tiles: QuickSortTile[],
   key: string,
-  // TODO: We now want this to return SortInfoWithPointer so that it
-  // can be used to queue up a TileSorter from a specific point.
-): SortInfoWithPointer[] | undefined {
+  sortTiles: boolean = true, // Optional because don't need to sort on recursive calls
+  order: 'ascending' | 'descending' = 'ascending',
+): QuickSelectResult | undefined {
   // Recalculate size based on the current tiles
   const size = tiles.reduce(
     (acc, t) => acc + (t.sorts[key].end - t.sorts[key].start),
     0,
   );
 
+  if (k < 0 || k >= size) {
+    console.error('Index out of bounds');
+    return undefined;
+  }
+
+  if (size === 0) {
+    return undefined;
+  }
+
   if (size === 1) {
     for (const t of tiles) {
-      const { indices, start, end } = t.sorts[key];
+      const { indices, values, start, end } = t.sorts[key];
       if (end - start > 0) {
         const recordIndex = indices[start];
-        return t.tile.record_batch.get(recordIndex);
+        return {
+          row: t.tile.record_batch.get(recordIndex),
+          sortIndex: start,
+          sortValue: values[start],
+          tix: t.tile.tix,
+        };
       }
     }
     return undefined;
+  }
+
+  // Sort the tiles to guarantee consistency
+  if (sortTiles) {
+    tiles.sort((a, b) =>
+      order === 'ascending'
+        ? a.tile.tix - b.tile.tix
+        : -1 * (a.tile.tix - b.tile.tix),
+    );
   }
 
   // Select a random pivot from actual data
@@ -1349,13 +1409,13 @@ function quickSelect(
   }
 
   if (k < countLess) {
-    return quickSelect(k, lessTiles, key);
+    return quickSelect(k, lessTiles, key, false);
   } else if (k < countLess + countEqual) {
     const indexInEqual = k - countLess;
     return selectInEqualTiles(indexInEqual, equalTiles, key);
   } else {
     const newK = k - (countLess + countEqual);
-    return quickSelect(newK, greaterTiles, key);
+    return quickSelect(newK, greaterTiles, key, false);
   }
 }
 
@@ -1363,15 +1423,20 @@ function selectInEqualTiles(
   indexInEqual: number,
   tiles: QuickSortTile[],
   key: string,
-): StructRowProxy | undefined {
+): QuickSelectResult | undefined {
   let count = 0;
   for (const t of tiles) {
-    const { indices, start, end } = t.sorts[key];
+    const { indices, values, start, end } = t.sorts[key];
     const numValues = end - start;
     if (indexInEqual < count + numValues) {
       const idxInTile = start + (indexInEqual - count);
       const recordIndex = indices[idxInTile];
-      return t.tile.record_batch.get(recordIndex);
+      return {
+        row: t.tile.record_batch.get(recordIndex),
+        tix: t.tile.tix,
+        sortIndex: idxInTile,
+        sortValue: values[idxInTile],
+      };
     }
     count += numValues;
   }

@@ -8,6 +8,7 @@ import * as assert from 'uvu/assert';
 import {
   createIntegerDataset,
   selectFunctionForFactorsOf,
+  selectRandomRows,
 } from './datasetHelpers.js';
 
 test('Dataset can be created', async () => {
@@ -169,6 +170,75 @@ test('Test iterated sorting of selections', async () => {
   // from the first and that it starts from the 10th item in the first.
 
   // Since flipped direction, your start is how many elements you will iterate
+});
+
+test('Edge cases for iterated sorting of selections', async () => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const selectEvens = new DataSelection(dataset, {
+    name: 'twos2',
+    tileFunction: selectFunctionForFactorsOf(2),
+  });
+  let sortKey = 'random';
+  await selectEvens.applyToAllTiles();
+
+  // Go reverse direction
+  const reverseSorted = await SortedDataSelection.fromSelection(
+    selectEvens,
+    [sortKey],
+    ({ random }) => random,
+    'descending',
+  );
+
+  await reverseSorted.applyToAllTiles();
+
+  let size = 0;
+  let prevValue = Number.POSITIVE_INFINITY;
+  for (const row of reverseSorted.iterator()) {
+    size++;
+    const currValue = row[sortKey];
+    assert.ok(currValue <= prevValue);
+    prevValue = currValue;
+  }
+  assert.ok(size, reverseSorted.selectionSize);
+
+  // TODO: sandwich 01111112 edge case
+  const selectRandom = new DataSelection(dataset, {
+    name: 'randomSelect',
+    tileFunction: selectRandomRows(),
+  });
+  sortKey = 'sandwich';
+  await selectRandom.applyToAllTiles();
+
+  const randomSorted = await SortedDataSelection.fromSelection(
+    selectRandom,
+    [sortKey, 'random'],
+    ({ sandwich }) => sandwich,
+  );
+  await randomSorted.applyToAllTiles();
+
+  const randomVals = [];
+  const sandwichVals = [];
+  let count = 0;
+  for (const row of randomSorted.iterator()) {
+    count++;
+    randomVals.push(row['random']);
+    sandwichVals.push(row['sandwich']);
+  }
+  assert.equal(sandwichVals[0], 0);
+  assert.equal(sandwichVals[sandwichVals.length - 1], 2);
+
+  let index = 0;
+  for (const row of randomSorted.iterator(10)) {
+    assert.ok(
+      Math.abs(row['random'] - randomVals[index + 10]) < Number.EPSILON,
+    );
+    index++;
+  }
+
+  for (const row of randomSorted.iterator(0, true)) {
+    assert.ok(Math.abs(row['random'] - randomVals.pop()) < Number.EPSILON);
+  }
 });
 
 test.run();

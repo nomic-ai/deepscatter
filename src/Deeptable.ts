@@ -175,10 +175,6 @@ export class Deeptable {
     });
   }
 
-  get tiles(): Tile[] {
-    return this.map(d => d);
-  }
-
   get plot() {
     if (this._plot === undefined) {
       throw new Error('Plot not yet bound');
