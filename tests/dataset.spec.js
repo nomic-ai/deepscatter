@@ -1,15 +1,14 @@
 import {
-  Deeptable,
   DataSelection,
   SortedDataSelection,
   Bitmask,
 } from '../dist/deepscatter.js';
-import { Table, vectorFromArray, Utf8 } from 'apache-arrow';
 import { test } from 'uvu';
 import * as assert from 'uvu/assert';
 import {
   createIntegerDataset,
   selectFunctionForFactorsOf,
+  selectRandomRows,
 } from './datasetHelpers.js';
 
 test('Dataset can be created', async () => {
@@ -122,6 +121,157 @@ test('Test sorting of selections', async () => {
   const mid = sorted.get(Math.floor(sorted.selectionSize / 2));
   assert.ok(mid.random > 0.45);
   assert.ok(mid.random < 0.55);
+});
+
+test('Test iterated sorting of selections', async () => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const selectEvens = new DataSelection(dataset, {
+    name: 'twos2',
+    tileFunction: selectFunctionForFactorsOf(2),
+  });
+  const sortKey = 'random';
+  const sorted = await SortedDataSelection.fromSelection(
+    selectEvens,
+    [sortKey],
+    ({ random }) => random,
+  );
+  // Apply only to root tile
+  await dataset.root_tile.get_column(sorted.name);
+
+  let size = 0;
+  let prevValue = Number.NEGATIVE_INFINITY;
+  for (const row of sorted.iterator()) {
+    size++;
+    const currValue = row[sortKey];
+    assert.ok(currValue >= prevValue);
+    prevValue = currValue;
+  }
+  assert.ok(size, 2048);
+  assert.ok(size, sorted.selectionSize);
+
+  // Now load all the tiles
+  await sorted.applyToAllTiles();
+
+  size = 0;
+  prevValue = Number.NEGATIVE_INFINITY;
+  for (const row of sorted.iterator()) {
+    size++;
+    const currValue = row[sortKey];
+    assert.ok(currValue >= prevValue);
+    prevValue = currValue;
+  }
+  assert.is(size, 8192);
+  assert.is(size, sorted.selectionSize);
+
+  // Multiple iterators
+  const first = sorted.iterator(0);
+  const second = sorted.iterator(5);
+
+  const numbers = [0, 1, 2, 3, 5, 6, 7, 8, 9, 10];
+  const firstVals = numbers.map(d => first.next().value[sortKey])
+  
+  for (let i = 0; i < 5; i++) {
+    assert.ok(firstVals[5 + i] === second.next().value[sortKey]);
+  }
+});
+
+test ('Iterated sorting of empty selection', async() => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const emptySelection = new DataSelection(dataset, {
+    name: 'empty',
+    tileFunction: async (t) => new Bitmask(t.record_batch.numRows).to_arrow(),
+  });
+
+  const sorted = await SortedDataSelection.fromSelection(
+    emptySelection,
+    ['random'],
+    ({ random }) => random,
+  );
+  await sorted.applyToAllTiles();
+
+  let size = 0;
+  for (const row of sorted.iterator()) {
+    console.log(row);
+    size++;
+  }
+  assert.is(size, 0);
+  assert.is(size, sorted.selectionSize);
+
+  let thrown = false;
+  // throw index out of bounds
+  try {
+    sorted.iterator(5);
+  } catch (e) {
+    thrown = true;
+  }
+  assert.ok(thrown);
+})
+
+test('Edge cases for iterated sorting of selections', async () => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const selectEvens = new DataSelection(dataset, {
+    name: 'twos2',
+    tileFunction: selectFunctionForFactorsOf(2),
+  });
+  let sortKey = 'random';
+  await selectEvens.applyToAllTiles();
+
+  // Go reverse direction
+  const reverseSorted = await SortedDataSelection.fromSelection(
+    selectEvens,
+    [sortKey],
+    ({ random }) => random,
+    'descending',
+  );
+
+  await reverseSorted.applyToAllTiles();
+
+  let size = 0;
+  let prevValue = Number.POSITIVE_INFINITY;
+  for (const row of reverseSorted.iterator()) {
+    size++;
+    const currValue = row[sortKey];
+    assert.ok(currValue <= prevValue);
+    prevValue = currValue;
+  }
+  assert.ok(size, reverseSorted.selectionSize);
+
+  // TODO: sandwich 01111112 edge case
+  const selectRandom = new DataSelection(dataset, {
+    name: 'randomSelect',
+    tileFunction: selectRandomRows(),
+  });
+  sortKey = 'sandwich';
+  await selectRandom.applyToAllTiles();
+
+  const randomSorted = await SortedDataSelection.fromSelection(
+    selectRandom,
+    [sortKey, 'random'],
+    ({ sandwich }) => sandwich,
+  );
+  await randomSorted.applyToAllTiles();
+
+  const randomVals = [];
+  prevValue = 0;
+  for (const row of randomSorted.iterator()) {
+    randomVals.push(row['random']);
+    assert.ok(prevValue <= row['sandwich']);
+  }
+
+  let index = 0;
+  for (const row of randomSorted.iterator(10)) {
+    assert.ok(
+      Math.abs(row['random'] - randomVals[index + 10]) < Number.EPSILON,
+    );
+    index++;
+  }
+
+  for (const row of randomSorted.iterator(0, true)) {
+    assert.ok(Math.abs(row['random'] - randomVals.pop()) < Number.EPSILON);
+  }
 });
 
 test.run();

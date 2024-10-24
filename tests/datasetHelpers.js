@@ -15,6 +15,19 @@ export function selectFunctionForFactorsOf(n) {
   };
 }
 
+// Creates a tile transformation that just takes random rows
+export function selectRandomRows(p = 0.5) {
+  return async(tile) => {
+    const mask = new Bitmask(tile.record_batch.numRows);
+    for (let i = 0; i < tile.record_batch.numRows; i++) {
+      if (Math.random() < p) {
+        mask.set(i);
+      }
+    }
+    return mask.to_arrow();
+  }
+}
+
 function make_batch(start = 0, length = 65536, batch_number_here = 0) {
   let x = new Float32Array(length);
   let y = new Float32Array(length);
@@ -44,6 +57,17 @@ function make_batch(start = 0, length = 65536, batch_number_here = 0) {
     randoms[i - start] = Math.random();
   }
 
+  // Create an array that looks like 0, 1, 1, ..., 1, 2
+  // and shuffle it
+  function sandwich(n) {
+    const arr = [0, 2, ...Array(Math.max(n - 2, 1)).fill(1)];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
   function num_to_string(num) {
     return num.toString();
   }
@@ -55,6 +79,7 @@ function make_batch(start = 0, length = 65536, batch_number_here = 0) {
     integers: vectorFromArray(integers),
     batch_id: vectorFromArray(batch_id),
     random: vectorFromArray(randoms),
+    sandwich: vectorFromArray(sandwich(length)),
   });
 }
 
