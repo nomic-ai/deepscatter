@@ -131,46 +131,83 @@ test('Test iterated sorting of selections', async () => {
     tileFunction: selectFunctionForFactorsOf(2),
   });
   const sortKey = 'random';
-  await selectEvens.applyToAllTiles();
   const sorted = await SortedDataSelection.fromSelection(
     selectEvens,
     [sortKey],
     ({ random }) => random,
   );
-  await sorted.applyToAllTiles();
+  // Apply only to root tile
+  await dataset.root_tile.get_column(sorted.name);
 
   let size = 0;
-  // Go nomral direction
   let prevValue = Number.NEGATIVE_INFINITY;
   for (const row of sorted.iterator()) {
     size++;
-    // This test needs to handle that it's a structRowProxy now not a value.
     const currValue = row[sortKey];
     assert.ok(currValue >= prevValue);
     prevValue = currValue;
   }
-
+  assert.ok(size, 2048);
   assert.ok(size, sorted.selectionSize);
-  // Since flipped direction, your start is how many elements you will iterate
 
-  const first = sorted.iterator(0);
-  const second = sorted.iterator(10);
+  // Now load all the tiles
+  await sorted.applyToAllTiles();
 
-  let sizeFirst = 20;
-  const elementsFirst = [];
+  size = 0;
+  prevValue = Number.NEGATIVE_INFINITY;
   for (const row of sorted.iterator()) {
-    sizeFirst--;
-    if (sizeFirst === 0) {
-      break;
-    }
-    elementsFirst.push(row[sortKey]);
+    size++;
+    const currValue = row[sortKey];
+    assert.ok(currValue >= prevValue);
+    prevValue = currValue;
   }
+  assert.is(size, 8192);
+  assert.is(size, sorted.selectionSize);
 
-  // Something to test that the second iterator doesn't end up with state elements
-  // from the first and that it starts from the 10th item in the first.
+  // Multiple iterators
+  const first = sorted.iterator(0);
+  const second = sorted.iterator(5);
 
-  // Since flipped direction, your start is how many elements you will iterate
+  const numbers = [0, 1, 2, 3, 5, 6, 7, 8, 9, 10];
+  const firstVals = numbers.map(d => first.next().value[sortKey])
+  
+  for (let i = 0; i < 5; i++) {
+    assert.ok(firstVals[5 + i] === second.next().value[sortKey]);
+  }
 });
+
+test ('Iterated sorting of empty selection', async() => {
+  const dataset = createIntegerDataset();
+  await dataset.root_tile.preprocessRootTileInfo();
+  const emptySelection = new DataSelection(dataset, {
+    name: 'empty',
+    tileFunction: async (t) => new Bitmask(t.record_batch.numRows).to_arrow(),
+  });
+
+  const sorted = await SortedDataSelection.fromSelection(
+    emptySelection,
+    ['random'],
+    ({ random }) => random,
+  );
+  await sorted.applyToAllTiles();
+
+  let size = 0;
+  for (const row of sorted.iterator()) {
+    console.log(row);
+    size++;
+  }
+  assert.is(size, 0);
+  assert.is(size, sorted.selectionSize);
+
+  let thrown = false;
+  // throw index out of bounds
+  try {
+    sorted.iterator(5);
+  } catch (e) {
+    thrown = true;
+  }
+  assert.ok(thrown);
+})
 
 test('Edge cases for iterated sorting of selections', async () => {
   const dataset = createIntegerDataset();
@@ -218,15 +255,11 @@ test('Edge cases for iterated sorting of selections', async () => {
   await randomSorted.applyToAllTiles();
 
   const randomVals = [];
-  const sandwichVals = [];
-  let count = 0;
+  prevValue = 0;
   for (const row of randomSorted.iterator()) {
-    count++;
     randomVals.push(row['random']);
-    sandwichVals.push(row['sandwich']);
+    assert.ok(prevValue <= row['sandwich']);
   }
-  assert.equal(sandwichVals[0], 0);
-  assert.equal(sandwichVals[sandwichVals.length - 1], 2);
 
   let index = 0;
   for (const row of randomSorted.iterator(10)) {

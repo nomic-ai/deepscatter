@@ -1235,8 +1235,8 @@ export class TileSorter
 
     // Finally add to heap
     for (const sortInfo of sortInfos) {
-      // Only add if we haven't reached the end of the values
-      if (sortInfo.pointer < sortInfo.values.length) {
+      // Only add if there are indices and we haven't reached the end of the values
+      if (sortInfo.indices.length > 0 && sortInfo.pointer < sortInfo.values.length) {
         this.valueHeap.insert(sortInfo);
       }
     }
@@ -1255,7 +1255,10 @@ export class TileSorter
     } else {
       for (const tile of this.tiles) {
         const rawSortInfo = tile.sorts[this.sortKey];
-
+        // Skip tiles with empty selections
+        if (rawSortInfo.indices.length <= 0) {
+          continue
+        }
         const sortInfo: SortInfoWithPointer = {
           ...rawSortInfo,
           pointer:
@@ -1318,7 +1321,7 @@ function quickSelect(
   );
 
   if (k < 0 || k >= size) {
-    console.error('Index out of bounds');
+    throw new Error('Index out of bounds');
     return undefined;
   }
 
