@@ -93,7 +93,9 @@ export class Deeptable {
     resolve?: () => void;
   }> = new Set();
   public selection_history: DS.SelectionRecord[] = [];
-
+  // The flatTree is a representation of known tiles in the quadtree in a flat format
+  // indexed by tile index (`tix` -- see `tixRixQid`).
+  public flatTree: (Tile | undefined | null)[] = [];
   public promise: Promise<void>;
   public root_tile: Tile;
   public manifest?: DS.TileManifest;

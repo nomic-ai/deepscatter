@@ -24,6 +24,7 @@ export type Rectangle = {
 
 import type { ArrowBuildable, LazyTileManifest, TileManifest } from './types';
 import { isCompleteManifest } from './typing';
+import { tileKey_to_tix, zxyToTix } from './tixrixqid';
 
 export type RecordBatchCache =
   | {
@@ -56,6 +57,7 @@ export class Tile {
   protected _batch?: RecordBatch;
   parent: Tile | null;
   private _children: Array<Tile> = [];
+  private readonly _tix: number;
   public _highest_known_ix?: number;
   public deeptable: Deeptable;
   public _transformations: Record<string, Promise<ArrowBuildable>> = {};
@@ -100,6 +102,13 @@ export class Tile {
       manifest = key;
     }
     this.key = manifest.key;
+    const coords = this.key.split('/').map(parseInt);
+    while (coords.length < 3) {
+      coords.push(0);
+    }
+    const tix = zxyToTix(coords[0], coords[1], coords[2]);
+    this._tix = tix;
+    deeptable.flatTree[tix] = this;
     // if (manifest.min_ix === undefined) {
     //   manifest.min_ix = parent ? parent.max_ix + 1 : 0;
     // }
@@ -171,6 +180,9 @@ export class Tile {
     return existing;
   }
 
+  get tix() {
+    return this._tix;
+  }
   /**
    *
    * @param fields A list of keys to be created if they don't exist.
