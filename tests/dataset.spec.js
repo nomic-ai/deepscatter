@@ -95,8 +95,7 @@ test('Test composition of selections', async () => {
   });
 
   await selectNothing.applyToAllLoadedTiles();
-  const v = selectNothing.get();
-  console.log(v);
+  assert.is(selectNothing.selectionSize, 0);
 });
 
 test('Test sorting of selections', async () => {
