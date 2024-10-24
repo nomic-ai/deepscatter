@@ -364,7 +364,7 @@ export class Deeptable {
 
     // First -- look at the schema metadata.
     let dim = this._schema?.fields.find((d) => d.name === columnName);
-    for (const sub in subfield) {
+    for (const sub of subfield) {
       if (dim === undefined) {
         continue;
       }
