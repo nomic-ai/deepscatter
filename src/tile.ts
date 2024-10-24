@@ -102,7 +102,7 @@ export class Tile {
       manifest = key;
     }
     this.key = manifest.key;
-    const coords = this.key.split('/').map(parseInt);
+    const coords = this.key.split('/').map((value) => parseInt(value, 10));
     while (coords.length < 3) {
       coords.push(0);
     }
