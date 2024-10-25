@@ -24,7 +24,7 @@ export type Rectangle = {
 
 import type { ArrowBuildable, LazyTileManifest, TileManifest } from './types';
 import { isCompleteManifest } from './typing';
-import { tileKey_to_tix, zxyToTix } from './tixrixqid';
+import { zxyToTix } from './tixrixqid';
 
 export type RecordBatchCache =
   | {
