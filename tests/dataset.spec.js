@@ -95,6 +95,7 @@ test('Test composition of selections', async () => {
 
   await selectNothing.applyToAllLoadedTiles();
   assert.is(selectNothing.selectionSize, 0);
+  assert.is(selectNothing.get(), undefined);
 });
 
 test('Test sorting of selections', async () => {
@@ -121,6 +122,12 @@ test('Test sorting of selections', async () => {
   const mid = sorted.get(Math.floor(sorted.selectionSize / 2));
   assert.ok(mid.random > 0.45);
   assert.ok(mid.random < 0.55);
+
+  // Check negative offsets
+  const end = sorted.get(-1);
+  const end2 = sorted.get(8191);
+  assert.ok(end.random > 0.99);
+  assert.ok(end.ix === end2.ix);
 });
 
 test('Test iterated sorting of selections', async () => {
@@ -169,14 +176,14 @@ test('Test iterated sorting of selections', async () => {
   const second = sorted.iterator(5);
 
   const numbers = [0, 1, 2, 3, 5, 6, 7, 8, 9, 10];
-  const firstVals = numbers.map(d => first.next().value[sortKey])
-  
+  const firstVals = numbers.map((d) => first.next().value[sortKey]);
+
   for (let i = 0; i < 5; i++) {
     assert.ok(firstVals[5 + i] === second.next().value[sortKey]);
   }
 });
 
-test ('Iterated sorting of empty selection', async() => {
+test('Iterated sorting of empty selection', async () => {
   const dataset = createIntegerDataset();
   await dataset.root_tile.preprocessRootTileInfo();
   const emptySelection = new DataSelection(dataset, {
@@ -207,7 +214,7 @@ test ('Iterated sorting of empty selection', async() => {
     thrown = true;
   }
   assert.ok(thrown);
-})
+});
 
 test('Edge cases for iterated sorting of selections', async () => {
   const dataset = createIntegerDataset();

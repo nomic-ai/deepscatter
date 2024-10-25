@@ -805,14 +805,17 @@ export class DataSelection {
    * that contains the nth match, then iterate through the matches in that
    * tile until we find the nth match.
    *
-   * @param i the index of the row to get
+   * @param i the index of the row to get. If less than zero, will return
    */
   get(i: number | undefined = undefined): StructRowProxy | undefined {
     if (i === undefined) {
       i = this.cursor;
     }
-    if (i >= this.selectionSize) {
-      throw new Error('Selection out of bounds');
+    if (i >= this.selectionSize || i < -this.selectionSize) {
+      return undefined;
+    }
+    if (i < 0) {
+      i = this.selectionSize + i;
     }
     let currentOffset = 0;
     let relevantTile: Tile | undefined = undefined;
@@ -1103,6 +1106,15 @@ export class SortedDataSelection extends DataSelection {
    * This implementation uses Quickselect with a pivot selected from actual data.
    */
   get(k: number): StructRowProxy | undefined {
+    if (k >= this.selectionSize || k < -this.selectionSize) {
+      return undefined;
+    }
+
+    if (k < 0) {
+      k = this.selectionSize + k;
+    }
+
+    // Implement Quickselect over the combined data
     const actualK = this.order === 'ascending' ? k : this.selectionSize - k - 1;
     // Implement Quickselect over the combined data
     const result = quickSelect(actualK, this.tiles, this.key, true);
@@ -1236,7 +1248,10 @@ export class TileSorter
     // Finally add to heap
     for (const sortInfo of sortInfos) {
       // Only add if there are indices and we haven't reached the end of the values
-      if (sortInfo.indices.length > 0 && sortInfo.pointer < sortInfo.values.length) {
+      if (
+        sortInfo.indices.length > 0 &&
+        sortInfo.pointer < sortInfo.values.length
+      ) {
         this.valueHeap.insert(sortInfo);
       }
     }
@@ -1257,7 +1272,7 @@ export class TileSorter
         const rawSortInfo = tile.sorts[this.sortKey];
         // Skip tiles with empty selections
         if (rawSortInfo.indices.length <= 0) {
-          continue
+          continue;
         }
         const sortInfo: SortInfoWithPointer = {
           ...rawSortInfo,
