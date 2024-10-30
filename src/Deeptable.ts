@@ -355,7 +355,7 @@ export class Deeptable {
 
   domain<T extends [number, number] | [string, Date] = [number, number]>(
     columnName: string,
-    subfield?: string[],
+    subfield: string[] = [],
   ): [T[1], T[1]] {
     const key = [columnName, ...(subfield || [])] as Some<string>;
     if (this.extents.get(key)) {
