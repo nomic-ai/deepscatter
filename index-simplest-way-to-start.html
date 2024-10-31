@@ -12,7 +12,7 @@
 </body>
 
 <script type="module">
-  import Scatterplot from './src/deepscatter';
+  import { Scatterplot } from './src/scatterplot';
 
   const prefs = {
     source_url: '/tiles', // the output of the quadfeather tiling engine
@@ -21,7 +21,7 @@
     zoom_balance: 0.7, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
     point_size: 5, // Default point size before application of size scaling
     background_color: '#000000',
-    click_function: 'console.log(JSON.stringify(datum, undefined, 2))',
+    click_function: (datum) => console.log({ ...datum }), // Overrides default click for easy customization
 
     // encoding API based roughly on Vega Lite: https://vega.github.io/vega-lite/docs/encoding.html
     encoding: {
