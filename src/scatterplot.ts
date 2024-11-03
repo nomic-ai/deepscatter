@@ -373,7 +373,11 @@ export class Scatterplot {
     tileProxy,
   }: DS.DataSpec): Promise<DS.Deeptable> {
     if (source_url !== undefined) {
-      this._root = Deeptable.from_quadfeather(source_url, this, tileProxy);
+      this._root = await Deeptable.fromQuadfeather({
+        baseUrl: source_url,
+        plot: this,
+        tileProxy,
+      });
     } else if (arrow_table !== undefined) {
       this._root = Deeptable.fromArrowTable(arrow_table, this);
     } else if (arrow_buffer !== undefined) {

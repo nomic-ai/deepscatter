@@ -138,15 +138,57 @@ export class Deeptable {
     // Must come after manifest is set.
     this.base_url = baseUrl;
     this.root_tile = new Tile(defaultManifest, null, this);
-    const preProcessRootTile = this.root_tile.preprocessRootTileInfo();
-
     // At instantiation, the deeptable isn't ready; only once this
     // async stuff is done can the deeptable be used.
     // TODO: Add an async static method as the preferred initialization method.
-    this.promise = preProcessRootTile.then(async () => {
+    this.promise = this._makePromise(defaultManifest);
+  }
+
+  /**
+   * Loads a quadtree created by version 2.0 or great of the quadfeather package (including manifests).
+   *
+   * @param tileProxy A tileProxy to use for fetching tiles. Can be used to wrap authentication.
+   * @param baseUrl The base URL of the quadfeather data.
+   *
+   */
+  static async fromQuadfeather({
+    tileProxy,
+    baseUrl,
+    plot = null,
+  }: {
+    tileProxy?: DS.TileProxy;
+    baseUrl: string;
+    plot?: Scatterplot | null;
+  }) {
+    let manifest: DS.TileManifest;
+    if (tileProxy !== undefined) {
+      throw new Error('Not yet supported');
+    } else {
+      manifest = await loadTileManifest(baseUrl + '/manifest.feather');
+    }
+
+    const dt = new Deeptable({
+      tileProxy,
+      tileManifest: manifest,
+      baseUrl,
+      rootKey: '0/0/0',
+      plot,
+    });
+    await dt.promise;
+    return dt;
+  }
+
+  /**
+   * Internal function to ensure
+   */
+  protected _makePromise(
+    tileManifest: Partial<DS.TileManifest> & { key: string },
+  ): Promise<void> {
+    return this.root_tile.preprocessRootTileInfo().then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
-      if (!tileManifest) {
+      // TODO: Cleaner check that it's a lazy manifest
+      if (!tileManifest.max_ix) {
         this.root_tile.manifest =
           await this.root_tile.deriveManifestInfoFromTileMetadata();
       }
@@ -1188,7 +1230,7 @@ export type TileManifest = {
   extent: Rectangle;
 };
 
-export async function tileManifest(url: string) {
+export async function loadTileManifest(url: string): Promise<TileManifest> {
   const data = await fetch(url).then((d) => d.arrayBuffer());
   const tb = tableFromIPC(data);
   const rows: RowFormatManifest[] = [...tb].map(
