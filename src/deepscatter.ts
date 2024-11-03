@@ -25,5 +25,5 @@ export type {
   OpChannel,
   TileProxy,
   DeeptableCreateParams,
-  Transformation
+  Transformation,
 } from './types';
