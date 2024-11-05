@@ -1,6 +1,6 @@
 name: CI Testing
 on: pull_request
-permissions: write-all
+permissions: read-all
 
 jobs:
   lint-and-test:
