@@ -1,0 +1,51 @@
+name: CI Testing
+on: pull_request
+permissions: write-all
+
+jobs:
+  lint-and-test:
+    name: Run ESLint, TypeScript, and Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: cache node modules
+        id: cache-dep
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-lint-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.cache-dep.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Collect changed files
+        run: |
+          git diff ${{ github.event.pull_request.base.sha }} ${{ github.sha }} --diff-filter=ACM --name-only | grep -E '\.(js|jsx|ts|tsx)$' > ~/lintable_files || true
+          echo "Files to lint:"
+          cat ~/lintable_files
+
+      - name: Lint
+        run: |
+          if [ -s ~/lintable_files ]; then
+            npx eslint $(cat ~/lintable_files)
+          else
+            echo "No files to lint"
+          fi
+
+      - name: TypeScript Checker
+        run: npx tsc --emitDeclarationOnly
+
+      - name: Run Tests
+        run: npm run test
