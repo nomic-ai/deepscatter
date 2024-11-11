@@ -89,11 +89,11 @@ quadfeather --files ../some-path-to/your-data.csv --tile_size 50000 --destinatio
 npm run dev
 ```
 
-and opening `http://localhost:3345/index-simplest-way-to-start.html` in your browser.
+and opening `http://localhost:3344/index-simplest-way-to-start.html` in your browser.
 
 To edit the visualization, or to troubleshoot, look at the file `index-simplest-way-to-start.html`, where you should find a bare-bones implementation of deepscatter.
 
-Explore `index.html`, and render it at `http://localhost:3345/index.html`, for a more advanced example.
+Explore `index.html`, and render it at `http://localhost:3344/index.html`, for a more advanced example.
 
 Note: Ideally, in a future release you'll be able to create these specs in away that doesn't require coding JSON directly.
 
