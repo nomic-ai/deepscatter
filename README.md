@@ -54,11 +54,13 @@ See the [arxiv example above](https://observablehq.com/@bmschmidt/arxiv) to see 
 First, install the companion tiling library, which is written in python,
 and generate a million points of test data in tiles of 50000 apiece.
 
+Because python finally has a decent package management system that's learned from npm, you should use it!
+
 ```sh
-python3 -V # requires Python 3.9.x or 3.10.x
-python3 -m pip install git+https://github.com/bmschmidt/quadfeather
-quadfeather-test-data 1_000_000
-quadfeather --files tmp.csv --tile_size 50_000 --destination tiles
+uv init
+uv add git+https://github.com/bmschmidt/quadfeather
+uv run quadfeather-test-data 1_000_000
+uv run quadfeather --files tmp.csv --tile_size 50_000 --destination tiles
 ```
 
 Then setup this library to run. It will start a local dev server.
