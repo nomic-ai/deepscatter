@@ -780,7 +780,7 @@ export class DataSelection {
       });
       this.tiles.push(t);
       this.selectionSize += t.matchCount;
-      this.evaluationSetSize += tile.manifest.nPoints;
+      this.evaluationSetSize += tile.metadata.nPoints;
       // DANGER! Possible race condition. Although the tile loaded
       // dispatches here, it may take a millisecond or two
       // before the actual assignment has happened in the recordbatch.
@@ -1065,7 +1065,7 @@ export class SortedDataSelection extends DataSelection {
     newer.tiles = await Promise.all(withSort);
     newer.selectionSize = newer.tiles.reduce((sum, t) => sum + t.matchCount, 0);
     newer.evaluationSetSize = newer.tiles.reduce(
-      (sum, t) => sum + t.tile.manifest.nPoints,
+      (sum, t) => sum + t.tile.metadata.nPoints,
       0,
     );
     return newer;
@@ -1096,7 +1096,7 @@ export class SortedDataSelection extends DataSelection {
         });
         t.addSort(this.key, this.comparisonGetter);
         this.selectionSize += t.matchCount;
-        this.evaluationSetSize += tile.manifest.nPoints;
+        this.evaluationSetSize += tile.metadata.nPoints;
         this.tiles.push(t);
       }
 

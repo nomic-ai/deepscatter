@@ -123,8 +123,8 @@ wheels = [
 
 [[package]]
 name = "quadfeather"
-version = "1.1.2"
-source = { git = "https://github.com/bmschmidt/quadfeather#6336d068025fa38b40a0e63ecd525ab716fe8819" }
+version = "2.0.0rc1"
+source = { git = "https://github.com/bmschmidt/quadfeather#74ead803f6fa5ba9111c706ffa8cba2dedf14076" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },

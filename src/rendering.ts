@@ -223,12 +223,12 @@ export class Renderer {
 
     if (!this.aes) throw new Error('Aesthetic missing');
     const x = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
-    const y = this.aes.dim('x') as StatefulAesthetic<PositionalAesthetic>;
+    const y = this.aes.dim('y') as StatefulAesthetic<PositionalAesthetic>;
     const natural_display =
       x.current.field == 'x' &&
       y.current.field == 'y' &&
-      x.last.field == 'x' &&
-      y.last.field == 'y';
+      (x.last.field === null || x.last.field == 'x') &&
+      (y.last.field === null || y.last.field == 'y');
 
     const all_tiles = natural_display
       ? this.scatterplot.deeptable
@@ -244,6 +244,13 @@ export class Renderer {
           .map((d) => d)
           .filter((tile) => tile.min_ix < this.max_ix);
     all_tiles.sort((a, b) => a.min_ix - b.min_ix);
+    for (const tile of all_tiles) {
+      void tile.allChildren().then((d) => {
+        for (const child of d) {
+          if (!child._metadata) void child.populateManifest();
+        }
+      });
+    }
     return all_tiles;
   }
 
