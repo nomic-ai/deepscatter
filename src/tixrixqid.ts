@@ -32,7 +32,29 @@ export function zxyToTix(z: number, x: number, y: number) {
   return (4 ** z - 1) / 3 + y * 2 ** z + x;
 }
 
-function parentTix(tix: number) {
+export function tixToChildren(tix: number): [number, number, number, number] {
+  // I'm sure there's a better way to do this reusing the series
+  // itself, but this is what
+  // chat GPT spat out with some refactoring I think it's fast enough.
+
+  const [z, x, y] = tixToZxy(tix);
+  const zChild = z + 1;
+
+  const children = [
+    [zChild, x * 2, y * 2],
+    [zChild, x * 2 + 1, y * 2],
+    [zChild, x * 2, y * 2 + 1],
+    [zChild, x * 2 + 1, y * 2 + 1],
+  ] as [number, number, number][];
+  return children.map((d) => zxyToTix(d[0], d[1], d[2])) as [
+    number,
+    number,
+    number,
+    number,
+  ];
+}
+
+export function parentTix(tix: number) {
   const [z, x, y] = tixToZxy(tix);
   return zxyToTix(z - 1, Math.floor(x / 2), Math.floor(y / 2));
 }
