@@ -7,12 +7,14 @@
 
   import FourClasses from './FourClasses.svelte';
   import SinglePoint from './SinglePoint.svelte';
+  import Everyone from './Everyone.svelte';
   import LabelMaker from './submodules/LabelMaker.svelte';
 
   const modes = {
     FourClasses,
     SinglePoint,
     LabelMaker,
+    Everyone,
   };
 
   $: mode = '';

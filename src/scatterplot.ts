@@ -373,6 +373,7 @@ export class Scatterplot {
     tileProxy,
   }: DS.DataSpec): Promise<DS.Deeptable> {
     if (source_url !== undefined) {
+      console.log('Loading from source url', source_url);
       this._root = await Deeptable.fromQuadfeather({
         baseUrl: source_url,
         plot: this,
@@ -699,7 +700,7 @@ export class Scatterplot {
       }
       //
       const needed_keys = neededFieldsToPlot(prefs.encoding);
-      this.deeptable.root_tile.require_columns(
+      void this.deeptable.root_tile.require_columns(
         [...needed_keys].map((k) => k[0]),
       );
       // Immediately start loading what we can onto the GPUs, too.
@@ -908,7 +909,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
 class ClickFunction extends SettableFunction<void> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   default(datum: StructRowProxy, plot: Scatterplot | undefined = undefined) {
-    console.log({ ...datum });
     return;
   }
 }

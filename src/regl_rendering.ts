@@ -232,15 +232,15 @@ export class ReglRenderer extends Renderer {
     for (const tile of this.visible_tiles()) {
       // Do the binding operation; returns truthy if it's already done.
       if (!this.bufferManager.ready(tile, this.aes.neededFields)) {
+        // console.log('Not ready for tile', tile.tix);
         continue;
       }
-
       const this_props = {
         number: call_no++,
         foreground_draw_number: needs_background_pass ? 1 : 1,
-        tile_id: tile.numeric_id,
+        tile_id: tile.tix,
         tile: tile,
-        count: tile.manifest.nPoints,
+        count: tile.metadata.nPoints,
         ...props,
       } as DS.TileDrawProps;
       prop_list.push(this_props);
@@ -562,7 +562,7 @@ export class ReglRenderer extends Renderer {
       return null;
     }
     for (const tile of this.visible_tiles()) {
-      if (tile.numeric_id === tile_number) {
+      if (tile.tix === tile_number) {
         return tile.record_batch.get(row_number);
       }
     }
@@ -736,7 +736,9 @@ export class ReglRenderer extends Renderer {
         u_constant_last_color: () => (this.aes.dim("color").last.constant !== undefined
           ? this.aes.dim("color").last.constant
           : [-1, -1, -1]),*/
-        u_tile_id: (_: C, props: P) => props.tile_id,
+        u_tile_id: (_: C, props: P) => {
+          return props.tile_id;
+        },
         u_width: ({ viewportWidth }: C) => viewportWidth,
         u_height: ({ viewportHeight }: C) => viewportHeight,
         u_one_d_aesthetic_map: this.aes.aesthetic_map.one_d_texture,
@@ -1049,6 +1051,7 @@ export class BufferManager {
    */
   ready(tile: Tile, needed_dimensions: Iterable<string[]>): boolean {
     // We don't allocate buffers for dimensions until they're needed.
+
     for (const keyset of [['ix'], ['ix_in_tile'], ...needed_dimensions] as Some<
       string[]
     >) {
@@ -1061,13 +1064,12 @@ export class BufferManager {
           if (keyset[0] === 'ix_in_tile') {
             this.create_regl_buffer(tile, keyset);
           } else {
-            if (tile.readyToUse) {
-              // tile.get_column(keyset[0]);
-            } else {
-              // pass
-            }
             return false;
           }
+        }
+      } else {
+        if (tile.key === '0/0/0') {
+          // console.log('ready');
         }
       }
     }
