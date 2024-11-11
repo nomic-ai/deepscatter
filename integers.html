@@ -90,7 +90,6 @@
       const batch = make_batch(i * SIZE, SIZE);
       batches.push(batch);
       window.b = batch;
-      console.log(i);
     }
     const table = new Table([batches]);
     return table;
@@ -175,7 +174,6 @@
             op: 'gt',
             a: 0,
           };
-          console.log(JSON.stringify(encoding, null, 2));
           plot.plotAPI({
             encoding,
           });
