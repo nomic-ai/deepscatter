@@ -36,16 +36,9 @@ export function isLabelset(labels: DS.Labelcall): labels is DS.Labelset {
 
 // There must be a general function here huh.
 export function isCompleteManifest(
-  manifest: Partial<DS.TileManifest> | Partial<DS.LazyTileManifest>,
-): manifest is DS.TileManifest {
-  for (const k of [
-    'key',
-    'nPoints',
-    'children',
-    'min_ix',
-    'max_ix',
-    'extent',
-  ] as const) {
+  manifest: Partial<DS.TileMetadata>,
+): manifest is DS.TileMetadata {
+  for (const k of ['key', 'nPoints', 'min_ix', 'max_ix', 'extent'] as const) {
     if (manifest[k] === undefined) {
       return false;
     }
