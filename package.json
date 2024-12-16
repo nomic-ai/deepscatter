@@ -64,7 +64,8 @@
     "glsl-read-float": "^1.1.0",
     "lodash.merge": "^4.6.2",
     "rbush-3d": "^0.0.4",
-    "regl": "^2.1.0"
+    "regl": "^2.1.0",
+    "webgpu-utils": "^1.9.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.46.1",
@@ -77,6 +78,7 @@
     "@types/lodash.merge": "^4.6.9",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
     "@typescript-eslint/parser": "^7.0.2",
+    "@webgpu/types": "^0.1.51",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-formatter-summary-chart": "^0.3.0",
