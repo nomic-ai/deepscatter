@@ -32,6 +32,7 @@ export class LabelMaker extends Renderer {
   public label_key?: string;
   public labelgroup: SVGGElement;
   private hovered: undefined | string;
+  private font: string = 'verdana';
   public options: DS.LabelOptions = {};
   /**
    *
@@ -46,6 +47,11 @@ export class LabelMaker extends Renderer {
   ) {
     super(scatterplot.div!.node() as HTMLDivElement, scatterplot);
     this.options = options;
+    if (options.font) {
+      this.font = options.font;
+      // else verdana
+    }
+
     this.canvas = scatterplot
       .elements![2].selectAll('canvas')
       .node() as HTMLCanvasElement;
@@ -74,6 +80,7 @@ export class LabelMaker extends Renderer {
       0.5,
       [0.5, 1e6],
       options.margin === undefined ? 30 : options.margin,
+      this.font
     );
 
     /*    this.tree.accessor = (x, y) => {
@@ -264,7 +271,7 @@ export class LabelMaker extends Renderer {
       if (this.hovered === '' + d.minZ + d.minX) {
         emphasize += 2;
       }
-      context.font = `${datum.height * size_adjust + emphasize}pt verdana`;
+      context.font = `${datum.height * size_adjust + emphasize}pt ${this.font}`;
 
       context.shadowBlur = 12 + emphasize * 3;
       context.lineWidth = 3 + emphasize;
@@ -380,13 +387,13 @@ function getContext(): CanvasRenderingContext2D {
   return context;
 }
 
-function measure_text(d: RawPoint, pixel_ratio: number, margin: number) {
+function measure_text(d: RawPoint, pixel_ratio: number, margin: number, font: string) {
   // Uses a global context that it calls into existence for measuring;
   // using the deepscatter
   // canvas gets too confused with state information.
   const context = getContext();
   // Called for the side-effect of setting `d.aspect_ratio` on the passed item.
-  context.font = `${d.height}pt verdana`;
+  context.font = `${d.height}pt ${font}`;
   if (d.text === '') {
     return null;
   }
@@ -427,6 +434,7 @@ class DepthTree extends RBush3D {
   public pixel_ratio: number;
   public rectangle_buffer: number;
   public margin: number;
+  public font: string;
   //  public insertion_log = [];
   private _accessor: (p: Point) => [number, number] = (p) => [p.x, p.y];
 
@@ -440,12 +448,14 @@ class DepthTree extends RBush3D {
     scale_factor = 0.5,
     zoom = [0.1, 1000],
     margin = 10, // in screen pixels
+    font = 'verdana',
   ) {
     // scale factor used to determine how quickly points scale.
     // Not implemented.
     // size = exp(log(k) * scale_factor);
 
     super();
+    this.font = font;
     this.scale_factor = scale_factor;
     this.mindepth = zoom[0];
     this.maxdepth = zoom[1];
@@ -520,7 +530,7 @@ class DepthTree extends RBush3D {
     if (point['pixel_width'] === undefined) {
       measured = {
         ...point,
-        ...measure_text(point, this.pixel_ratio, this.margin),
+        ...measure_text(point, this.pixel_ratio, this.margin, this.font),
       };
     } else {
       measured = point as Point;
