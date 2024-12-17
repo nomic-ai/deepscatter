@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable no-underscore-dangle */
-import { BaseType, select } from 'd3-selection';
+import { BaseType, select, Selection } from 'd3-selection';
 import { min } from 'd3-array';
 import type { Scatterplot } from './scatterplot';
 import type { Tile } from './tile';
@@ -123,7 +123,7 @@ class RenderProps {
 export class Renderer {
   // A renderer handles drawing to a display element.
   public scatterplot: Scatterplot;
-  public holder: d3.Selection<Element, unknown, BaseType, unknown>;
+  public holder: Selection<Element, unknown, BaseType, unknown>;
   public canvas: HTMLCanvasElement;
   public deeptable: Deeptable;
   public width: number;
@@ -262,6 +262,21 @@ export class Renderer {
   bind_zoom(zoom: Zoom) {
     this._zoom = zoom;
     return this;
+  }
+
+  async wait_for_zoom_attachment() {
+    let t = 0;
+    const timeout = 2; // milliseconds.
+    while (this._zoom === undefined) {
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), timeout)
+      })
+      t += timeout
+      if (t > 1000) {
+        console.warn('after 1 second, still no zoom state; this is likely a bug');
+        t = 0;
+      }
+    }
   }
 
   async initialize() {

@@ -1,6 +1,6 @@
 {
   "include": ["src/**/*.ts", "src/types.ts"],
-  "exclude": ["node_modules/**/*"],
+  "exclude": ["node_modules"],
   "compilerOptions": {
     "declarationMap": true,
     "declaration": true,
@@ -18,7 +18,8 @@
     "lib": ["DOM"],
     "types": ["@webgpu/types"],
     "noEmitOnError": true,
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "skipLibCheck": true
   },
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Recommended"
