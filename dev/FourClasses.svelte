@@ -9,7 +9,7 @@
   const startSize = 2;
   const prefs = {
     source_url: '/newtiles',
-    max_points: 10,
+    max_points: 10000,
     alpha: 35, // Target saturation for the full page.
     zoom_balance: 0.22, // Rate at which points increase size. https://observablehq.com/@bmschmidt/zoom-strategies-for-huge-scatterplots-with-three-js
     point_size: startSize, // Default point size before application of size scaling
