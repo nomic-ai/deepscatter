@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable @typescript-eslint/unbound-method */
 
-import { select } from 'd3-selection';
+import { BaseType, select } from 'd3-selection';
 import { timer } from 'd3-timer';
 import { D3ZoomEvent, zoom, zoomIdentity } from 'd3-zoom';
 import { mean } from 'd3-array';
@@ -39,8 +39,8 @@ export class Zoom {
   public prefs: DS.APICall;
   public svg_element_selection: d3.Selection<
     d3.ContainerElement,
-    Record<string, any>,
-    any,
+    Record<string, BaseType>,
+    HTMLElement,
     any
   >;
   public width: number;
@@ -131,6 +131,7 @@ export class Zoom {
   zoom_to_bbox(corners: Rectangle, duration = 4000, buffer = 1.111) {
     // Zooms to two points.
     const scales = this.scales();
+    // eslint-disable-next-line prefer-const
     let [x0, x1] = corners.x.map(scales.x);
     const [y0, y1] = corners.y.map(scales.y);
 
