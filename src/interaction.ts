@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable @typescript-eslint/unbound-method */
 
-import { BaseType, select } from 'd3-selection';
-import { timer } from 'd3-timer';
-import { D3ZoomEvent, zoom, zoomIdentity } from 'd3-zoom';
+import { BaseType, ContainerElement, select } from 'd3-selection';
+import { Selection } from 'd3-selection';
+import { Timer, timer } from 'd3-timer';
+import { D3ZoomEvent, zoom, ZoomBehavior, zoomIdentity, ZoomTransform } from 'd3-zoom';
 import { mean } from 'd3-array';
 import { ScaleLinear, scaleLinear } from 'd3-scale';
 // import { annotation, annotationLabel } from 'd3-svg-annotation';
@@ -37,8 +39,8 @@ export type ScaleSet = {
 
 export class Zoom {
   public prefs: DS.APICall;
-  public svg_element_selection: d3.Selection<
-    d3.ContainerElement,
+  public svg_element_selection: Selection<
+    ContainerElement,
     Record<string, BaseType>,
     HTMLElement,
     any
@@ -47,10 +49,10 @@ export class Zoom {
   public height: number;
   public renderers: Map<string, Renderer>;
   public deeptable?: Deeptable;
-  public _timer?: d3.Timer;
+  public _timer?: Timer;
   public _scales?: ScaleSet;
-  public zoomer?: d3.ZoomBehavior<Element, unknown>;
-  public transform?: d3.ZoomTransform;
+  public zoomer?: ZoomBehavior<Element, unknown>;
+  public transform?: ZoomTransform;
   public _start?: number;
   public scatterplot: Scatterplot;
   private stopTimerAt?: number;
@@ -78,6 +80,7 @@ export class Zoom {
   }
 
   attach_renderer(key: string, renderer: Renderer) {
+    console.log("ATTACHING RENDERER")
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
     renderer.zoom.initialize_zoom();
@@ -92,6 +95,7 @@ export class Zoom {
       .translate(width / 2, height / 2)
       .scale(k)
       .translate(-scales.x(x), -scales.y(y));
+    //@ts-expect-error something weird
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
 
@@ -150,6 +154,7 @@ export class Zoom {
       .scale(1 / buffer / Math.max((x1 - x0) / width, (y1 - y0) / height))
       .translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
 
+    //@ts-expect-error something weird
     canvas.transition().duration(duration).call(zoomer.transform, t);
   }
 
