@@ -285,7 +285,7 @@ export class ReglRenderer extends Renderer {
       deeptable.spawnDownloads(
         this.zoom.current_corners(),
         this.props.max_ix,
-        5,
+        64,
         this.aes.neededFields.map((x) => x[0]),
         'high',
       );
@@ -294,7 +294,7 @@ export class ReglRenderer extends Renderer {
       deeptable.spawnDownloads(
         undefined,
         prefs.max_points,
-        5,
+        64,
         this.aes.neededFields.map((x) => x[0]),
         'high',
       );
@@ -1336,7 +1336,7 @@ export abstract class BufferSet<BufferType = Buffer, BufferLocationType extends 
           buffer: buffer_loc.buffer,
           offset: buffer_loc.offset,
           stride: bytes_per_item,
-          size: bytes_needed,
+          byte_size: bytes_needed,
         };
         return v;
       }

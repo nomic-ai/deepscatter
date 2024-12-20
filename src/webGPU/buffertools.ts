@@ -1,4 +1,4 @@
-import { isTypedArray, type TypedArray } from 'webgpu-utils';
+import { type TypedArray } from 'webgpu-utils';
 import { BufferSet } from '../regl_rendering';
 import { WebGPUBufferLocation } from '../types';
 import { Some, TupleMap } from '../utilityFunctions';
@@ -76,8 +76,8 @@ export class WebGPUBufferSet extends BufferSet<
     if (this.store.has(key)) {
       throw new Error(`Key ${key.join(', ')} already exists in buffer set.`);
     }
-    const size = value.byteLength;
-    const paddedSize = Math.ceil(size / 256) * 256;
+    const byte_size = value.byteLength;
+    const paddedSize = Math.ceil(byte_size / 256) * 256;
 
     const { buffer, offset } = this.allocate_block(paddedSize);
 
@@ -85,7 +85,7 @@ export class WebGPUBufferSet extends BufferSet<
     // cast it to uint32array
     const v2 = value;
     const data = new Uint32Array(v2.buffer, v2.byteOffset, v2.byteLength / 4);
-    const description = { buffer, offset, size, paddedSize };
+    const description = { buffer, offset, byte_size, paddedSize };
     await this.passThroughStagingBuffer(data, description);
     this.register(key, description);
   }
@@ -111,7 +111,7 @@ export class WebGPUBufferSet extends BufferSet<
 
 export function createSingletonBuffer(
   device: GPUDevice,
-  data: Uint32Array | Int32Array | Float32Array | ArrayBuffer,
+  data: Uint32Array | Int32Array | Float32Array | Uint8Array | ArrayBuffer,
   usage: number,
 ): GPUBuffer {
   // Creates a disposable singleton buffer.
@@ -123,11 +123,24 @@ export function createSingletonBuffer(
     mappedAtCreation: true,
   });
   const mappedRange = buffer.getMappedRange();
-  if (isTypedArray(data)) {
-    new Uint32Array(mappedRange).set(data as TypedArray);
-  } else {
-    new Uint32Array(mappedRange).set(new Uint32Array(data as ArrayBuffer));
-  }
+ 
+	  // Write the data into the buffer
+		if (data instanceof Uint32Array) {
+			new Uint32Array(mappedRange).set(data);
+		} else if (data instanceof Int32Array) {
+			new Int32Array(mappedRange).set(data);
+		} else if (data instanceof Float32Array) {
+			new Float32Array(mappedRange).set(data);
+		} else if (data instanceof Uint8Array) {
+			new Uint8Array(mappedRange).set(data);
+		} else if (data instanceof ArrayBuffer) {
+			// Treat ArrayBuffer as raw data, copy it into the mapped range
+			const view = new Uint8Array(mappedRange);
+			view.set(new Uint8Array(data));
+		} else {
+			throw new Error("Unsupported data type for buffer creation");
+		}
+	
   buffer.unmap();
   return buffer;
 }
