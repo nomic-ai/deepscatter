@@ -1,7 +1,7 @@
 import { makeShaderDataDefinitions, makeStructuredView } from 'webgpu-utils';
 import { WebGPUBufferSet, createSingletonBuffer } from './buffertools';
-import { Deeptable, Scatterplot, Tile } from '../deepscatter';
-import { Bool, Vector, vectorFromArray } from 'apache-arrow';
+import { Deeptable, Tile, Transformation } from '../deepscatter';
+import { Bool, Type, Vector, vectorFromArray } from 'apache-arrow';
 
 export class DeepGPU {
   // This is a stateful class for bundling together GPU buffers and resources.
@@ -45,6 +45,7 @@ export class DeepGPU {
 		if (this.bufferSet.store.has([field, tile.key])) {
 			return this.bufferSet.store.get([field, tile.key])
 		} else {
+			
 			const values = (await tile.get_column(field)).data[0].children[0]
 				.values as Uint8Array;
 			await this.bufferSet.set([field, tile.key], values);
@@ -74,11 +75,13 @@ export class HammingPipeline extends ReusableWebGPUPipeline {
 	public gpuState: DeepGPU;
 	public dimensionality? : number;
 	public comparisonBuffer: GPUBuffer;
-	private fieldName = '_hamming_embeddings';
+	private fieldName : string;
 	constructor(
 		gpuState: DeepGPU,
+		fieldName: string
 	) {
 		super(gpuState)
+		this.fieldName = fieldName
 	}
 
 	bindGroupLayout(device: GPUDevice) {
@@ -138,10 +141,17 @@ export class HammingPipeline extends ReusableWebGPUPipeline {
 	setComparisonArray(
 		arr: Vector<Bool>
 	) {
-		const underlying = arr.data[0].values;
+		const underlying = arr.data[0]
+		if (underlying.type.typeId !== Type.Bool) {
+			throw new Error("uhuh")
+		}
+		const bytes = underlying.values.slice(underlying.offset / 8, underlying.offset / 8 + underlying.length / 8)
+		if (bytes.length !== 768 / 8) {
+			throw new Error("WTF")
+		}
 		this.comparisonBuffer = createSingletonBuffer(
 			this.gpuState.device,
-			underlying,
+			bytes,
 			GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
 		);
 		this.dimensionality = underlying.length;
@@ -244,27 +254,18 @@ export class HammingPipeline extends ReusableWebGPUPipeline {
 	}
 }
 	
-// hide the state in a global variable.
-const dumb: DeepGPU[] = [];
 
 export async function create_hamming_transform(
-	scatterplot: Scatterplot,
-	id: string,
+	deeptable: Deeptable,
+	field: string,
 	view: Vector<Bool>,
-) {
-	if (dumb.length === 0) {
-		dumb.push(await DeepGPU.create(scatterplot.deeptable));
-	}
-	if (scatterplot.dataset.transformations[id] !== undefined) {
-		return;
-	}
+) : Promise<Transformation> {
 
-	const [gpuState] = dumb;
-	const pipeline = new HammingPipeline(gpuState);
+	const gpuState = await deeptable.deepGPU
+	const pipeline = new HammingPipeline(gpuState, field);
 	pipeline.setComparisonArray(view)
 	pipeline.prep();
-
-	scatterplot.dataset.transformations[id] = (tile) => pipeline.runOnTile(tile)
+	return (tile: Tile) => pipeline.runOnTile(tile)
 }
 
 
