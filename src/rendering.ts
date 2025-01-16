@@ -265,6 +265,7 @@ export class Renderer {
   }
 
   async wait_for_zoom_attachment() {
+      // This is a dumb workaround for a race condition.
     let t = 0;
     const timeout = 2; // milliseconds.
     while (this._zoom === undefined) {
