@@ -34859,7 +34859,60 @@ class ReglRenderer extends Renderer {
     this._default_webgl_scale = this.zoom.webgl_scale();
     return this._default_webgl_scale;
   }
+  // NEW: Render a textured background plane covering the viewport.
+  render_background(props) {
+    const { regl: regl2 } = this;
+    const bgTexture = this.get_image_texture(this.prefs.background_img_url);
+    if (this._lastBackgroundTexture === bgTexture) {
+      return;
+    }
+    this._lastBackgroundTexture = bgTexture;
+    if (!bgTexture) {
+      console.warn("Background texture not yet loaded.");
+      return;
+    }
+    regl2({
+      frag: `
+        precision mediump float;
+        varying vec2 uv;
+        uniform sampler2D bgTexture;
+        void main() {
+          gl_FragColor = texture2D(bgTexture, uv);
+        }
+      `,
+      vert: `
+        precision mediump float;
+        attribute vec2 position;
+        varying vec2 uv;
+        void main() {
+          uv = 0.5 * (position + 1.0);
+          gl_Position = vec4(position, 0, 1);
+        }
+      `,
+      attributes: {
+        position: this.fill_buffer
+      },
+      uniforms: {
+        bgTexture: () => bgTexture
+      },
+      depth: { enable: false },
+      blend: {
+        enable: true,
+        func: {
+          srcRGB: "one",
+          srcAlpha: "one",
+          dstRGB: "one minus src alpha",
+          dstAlpha: "one minus src alpha"
+        }
+      },
+      count: 3
+    })();
+    console.log("Background rendered.");
+  }
   render_points(props) {
+    if (this.prefs.background_img_url) {
+      this.render_background(props);
+    }
     const prop_list = [];
     let call_no = 0;
     const needs_background_pass = this.aes.store.foreground.states[0].active || this.aes.store.foreground.states[1].active;
@@ -35153,10 +35206,26 @@ class ReglRenderer extends Renderer {
     if (this.textures[url]) {
       return this.textures[url];
     }
+    const placeholder = regl2.texture({
+      data: new Uint8Array([255, 255, 255, 255]),
+      width: 1,
+      height: 1
+      // You can also explicitly specify format if needed:
+      // format: 'rgba',
+      // type: 'uint8'
+    });
+    this.textures[url] = placeholder;
     const image = new Image();
+    image.crossOrigin = "anonymous";
     image.src = url;
     image.addEventListener("load", () => {
-      this.textures[url] = regl2.texture(image);
+      try {
+        const loadedTexture = regl2.texture(image);
+        this.textures[url] = loadedTexture;
+        console.log("Background texture loaded.");
+      } catch (e) {
+        console.error("Error creating texture from image:", e);
+      }
     });
     return this.textures[url];
   }
@@ -39231,6 +39300,24 @@ class Scatterplot {
     }
     fix_point(data);
     this.drawContours(data);
+  }
+  async loadBackgroundImage(url) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = url;
+    await new Promise((resolve, reject) => {
+      img.onload = () => {
+        this.backgroundTexture = this.regl.texture({
+          data: img,
+          mag: "linear",
+          min: "linear",
+          wrapS: "clamp",
+          wrapT: "clamp"
+        });
+        resolve(null);
+      };
+      img.onerror = reject;
+    });
   }
 }
 Scatterplot.Bitmask = Bitmask;

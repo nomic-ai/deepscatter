@@ -367,6 +367,16 @@ class Scatterplot<T extends Tile> {
     ctx.fillStyle = prefs.background_color ?? 'rgba(133, 133, 111, .8)';
     ctx.fillRect(0, 0, window.innerWidth * 2, window.innerHeight * 2);
 
+    // // in case background_img_url is set, draw it on ctx
+    // if (prefs.background_img_url) {
+    //   const img = new Image();
+    //   img.src = prefs.background_img_url;
+    //   console.log('drawing background image');
+    //   img.onload = () => {
+    //     ctx.drawImage(img, 0, 0);
+    //   };
+    // }
+
     void this._renderer.initialize();
     void this._root.promise.then(() => this.mark_ready());
     return this.ready;

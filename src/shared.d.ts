@@ -341,6 +341,8 @@ export type APICall = {
   // The color of the screen background.
   background_color?: string;
 
+  background_img_url?: string;
+
   // 
   transformations?: Record<string, string>;
   encoding?: Encoding;

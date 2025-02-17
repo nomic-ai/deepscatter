@@ -32,6 +32,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   public _start: number;
   public most_recent_restart?: number;
   public _default_webgl_scale?: number[];
+  public _lastBackgroundTexture?: Texture2D;
   public _webgl_scale_history?: [number[], number[]];
   public _renderer?: Regl;
   public _use_scale_to_download_tiles = true;
@@ -166,7 +167,73 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     return this._default_webgl_scale;
   }
 
+  // NEW: Render a textured background plane covering the viewport.
+  render_background(props) {
+    const { regl } = this;
+    const bgTexture = this.get_image_texture(this.prefs.background_img_url);
+  
+    // If the background texture is the same as last frame, skip drawing.
+    if (this._lastBackgroundTexture === bgTexture) {
+      return;
+    }
+    this._lastBackgroundTexture = bgTexture;
+  
+    // Only draw if the texture is loaded (or use a valid placeholder)
+    if (!bgTexture) {
+      console.warn("Background texture not yet loaded.");
+      return;
+    }
+  
+    // Draw the full-screen quad using the background texture.
+    regl({
+      frag: `
+        precision mediump float;
+        varying vec2 uv;
+        uniform sampler2D bgTexture;
+        void main() {
+          gl_FragColor = texture2D(bgTexture, uv);
+        }
+      `,
+      vert: `
+        precision mediump float;
+        attribute vec2 position;
+        varying vec2 uv;
+        void main() {
+          uv = 0.5 * (position + 1.0);
+          gl_Position = vec4(position, 0, 1);
+        }
+      `,
+      attributes: {
+        position: this.fill_buffer,
+      },
+      uniforms: {
+        bgTexture: () => bgTexture,
+      },
+      depth: { enable: false },
+      blend: {
+        enable: true,
+        func: {
+          srcRGB: 'one',
+          srcAlpha: 'one',
+          dstRGB: 'one minus src alpha',
+          dstAlpha: 'one minus src alpha'
+        }
+      },
+      count: 3,
+    })();
+  
+    console.log("Background rendered.");
+  }
+  
+  
+
   render_points(props) {
+    // NEW: Render background first
+    if (this.prefs.background_img_url) {
+      this.render_background(props);
+    }
+    
+    // Then render points
     // Regl is faster if it can render a large number of draw calls together.
     const prop_list = [];
     let call_no = 0;
@@ -527,18 +594,45 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
 
   get_image_texture(url: string) {
     const { regl } = this;
+    // Ensure the textures dictionary exists.
     this.textures = this.textures || {};
+  
+    // If we already loaded the texture for this URL, return it.
     if (this.textures[url]) {
       return this.textures[url];
     }
+  
+    // Create a valid placeholder: a 1x1 white pixel.
+    // (Using a Uint8Array with RGBA values in the 0–255 range.)
+    const placeholder = regl.texture({
+      data: new Uint8Array([255, 255, 255, 255]),
+      width: 1,
+      height: 1,
+      // You can also explicitly specify format if needed:
+      // format: 'rgba',
+      // type: 'uint8'
+    });
+    // Cache the placeholder immediately.
+    this.textures[url] = placeholder;
+  
+    // Now load the actual image.
     const image = new Image();
+    image.crossOrigin = 'anonymous'; // Must be set before setting src.
     image.src = url;
-    //    this.textures[url] = this.fbos.minicounter;
     image.addEventListener('load', () => {
-      this.textures[url] = regl.texture(image);
+      try {
+        // Create a texture from the loaded image.
+        const loadedTexture = regl.texture(image);
+        // Update the cache with the loaded texture.
+        this.textures[url] = loadedTexture;
+        console.log("Background texture loaded.");
+      } catch (e) {
+        console.error("Error creating texture from image:", e);
+      }
     });
     return this.textures[url];
   }
+  
 
   /*
   plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {

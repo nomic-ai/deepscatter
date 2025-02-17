@@ -20,6 +20,7 @@ export declare class ReglRenderer<T extends Tile> extends Renderer<T> {
     _start: number;
     most_recent_restart?: number;
     _default_webgl_scale?: number[];
+    _lastBackgroundTexture?: Texture2D;
     _webgl_scale_history?: [number[], number[]];
     _renderer?: Regl;
     _use_scale_to_download_tiles: boolean;
@@ -36,6 +37,7 @@ export declare class ReglRenderer<T extends Tile> extends Renderer<T> {
     data(dataset: Dataset<T>): this | DS.Dataset<T>;
     get props(): any;
     get default_webgl_scale(): number[];
+    render_background(props: any): void;
     render_points(props: any): void;
     /**
      * Actions that run on a single animation tick.
