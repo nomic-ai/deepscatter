@@ -170,7 +170,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   // NEW: Render a textured background plane covering the viewport.
   render_background(props) {
     const { regl } = this;
-    const bgTexture = this.get_image_texture(this.prefs.background_img_url);
+    const bgTexture = this.get_image_texture(this.prefs.background_img_url, true);
 
     const panOffset = [props.transform.x, props.transform.y];
     const normalizedPanOffset = [
@@ -182,16 +182,15 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       console.warn("Background texture not yet loaded.");
       return;
     }
-    console.log("zoom_matrix:", props.zoom_matrix);
-    console.log("Position:", this.fill_buffer);
-    console.log("Pan offset:", panOffset);
-    console.log("K", props.transform.k);
-    console.log("Normalized pan offset:", normalizedPanOffset);
+    // TODO: get rid of hardcoded values and reuse existing u_zoom_matrix + maybe use
+    // converters of the coordinates to match the background image.
+
     // Always draw the background, regardless of previous state.
     regl({
       frag: `
         precision mediump float;
         varying vec2 uv;
+        // uniform float wRcp, hRcp;
         uniform sampler2D bgTexture;
         void main() {
           // Look up the texture based on uv
@@ -203,6 +202,10 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
         attribute vec2 position;
         uniform mat3 u_zoom_matrix;
         uniform vec2 u_pan_offset; // new uniform for pan offset
+        uniform float a; // aspect ratio
+        uniform float k; // zoom level
+        uniform float width;
+        uniform float height;
         varying vec2 uv;
         void main() {
           vec3 pos = vec3(position, 1.0);
@@ -212,16 +215,23 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
           // For instance, add u_pan_offset scaled by an appropriate factor.
           // vec2 offsetUV = position + u_pan_offset; // Adjust this as needed.
           // uv = mod(pos.xy * 0.00000001, 1.0);
-          uv = 0.8 * (position + 1.0) + 1.6 * u_pan_offset;
+          // uv = 0.8 * (position + 1.0) + 1.6 * u_pan_offset;
+          vec2 computedUV = 0.6 * (vec2(position.x, position.y) + 1.0 + 2.0 * u_pan_offset);
+          // Correct for stretching along Y:
+          uv = vec2(computedUV.x, computedUV.y / a);
         }
       `,
       attributes: {
-        position: [-10, -10, 10, -10, 0, 10],
+        position: [-10, -10, 20, -10, -10, 20],
       },
       uniforms: {
         bgTexture: () => bgTexture,
         u_zoom_matrix: () => props.zoom_matrix,
         u_pan_offset: () => normalizedPanOffset,
+        a: () => this.width / this.height,
+        width: () => this.width,
+        height: () => this.height,
+        k: () => props.transform.k,
       },
       depth: { enable: false },
       blend: {
@@ -235,7 +245,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       },
       count: 3,
     })();
-    console.log("Background rendered.");
+    // console.log("Background rendered.");
   }
 
   render_points(props) {
@@ -434,9 +444,6 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     }
     // Copy the points buffer to the main buffer.
 
-    console.log("render all fill_buffer", this.fill_buffer);
-    const bg = this.get_image_texture(this.prefs.background_img_url);
-
     for (const layer of [this.fbos.lines, this.fbos.points, ]) {
       regl({
         profile: true,
@@ -614,7 +621,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       });
   }
 
-  get_image_texture(url: string) {
+  get_image_texture(url: string, flipY = false) {
     const { regl } = this;
     // Ensure the textures dictionary exists.
     this.textures = this.textures || {};
@@ -630,6 +637,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       data: new Uint8Array([255, 255, 255, 255]),
       width: 1,
       height: 1,
+      flipY: flipY,
       // You can also explicitly specify format if needed:
       // format: 'rgba',
       // type: 'uint8'
@@ -644,7 +652,10 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     image.addEventListener('load', () => {
       try {
         // Create a texture from the loaded image.
-        const loadedTexture = regl.texture(image);
+        const loadedTexture = regl.texture({
+          data: image,
+          flipY: flipY,
+        });
         // Update the cache with the loaded texture.
         this.textures[url] = loadedTexture;
         console.log("Background texture loaded.");

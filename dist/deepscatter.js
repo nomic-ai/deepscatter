@@ -34862,7 +34862,7 @@ class ReglRenderer extends Renderer {
   // NEW: Render a textured background plane covering the viewport.
   render_background(props) {
     const { regl: regl2 } = this;
-    const bgTexture = this.get_image_texture(this.prefs.background_img_url);
+    const bgTexture = this.get_image_texture(this.prefs.background_img_url, true);
     const panOffset = [props.transform.x, props.transform.y];
     const normalizedPanOffset = [
       -panOffset[0] / (props.transform.k * this.width),
@@ -34872,15 +34872,11 @@ class ReglRenderer extends Renderer {
       console.warn("Background texture not yet loaded.");
       return;
     }
-    console.log("zoom_matrix:", props.zoom_matrix);
-    console.log("Position:", this.fill_buffer);
-    console.log("Pan offset:", panOffset);
-    console.log("K", props.transform.k);
-    console.log("Normalized pan offset:", normalizedPanOffset);
     regl2({
       frag: `
         precision mediump float;
         varying vec2 uv;
+        // uniform float wRcp, hRcp;
         uniform sampler2D bgTexture;
         void main() {
           // Look up the texture based on uv
@@ -34892,6 +34888,10 @@ class ReglRenderer extends Renderer {
         attribute vec2 position;
         uniform mat3 u_zoom_matrix;
         uniform vec2 u_pan_offset; // new uniform for pan offset
+        uniform float a; // aspect ratio
+        uniform float k; // zoom level
+        uniform float width;
+        uniform float height;
         varying vec2 uv;
         void main() {
           vec3 pos = vec3(position, 1.0);
@@ -34901,16 +34901,23 @@ class ReglRenderer extends Renderer {
           // For instance, add u_pan_offset scaled by an appropriate factor.
           // vec2 offsetUV = position + u_pan_offset; // Adjust this as needed.
           // uv = mod(pos.xy * 0.00000001, 1.0);
-          uv = 0.8 * (position + 1.0) + 1.6 * u_pan_offset;
+          // uv = 0.8 * (position + 1.0) + 1.6 * u_pan_offset;
+          vec2 computedUV = 0.6 * (vec2(position.x, position.y) + 1.0 + 2.0 * u_pan_offset);
+          // Correct for stretching along Y:
+          uv = vec2(computedUV.x, computedUV.y / a);
         }
       `,
       attributes: {
-        position: [-10, -10, 10, -10, 0, 10]
+        position: [-10, -10, 20, -10, -10, 20]
       },
       uniforms: {
         bgTexture: () => bgTexture,
         u_zoom_matrix: () => props.zoom_matrix,
-        u_pan_offset: () => normalizedPanOffset
+        u_pan_offset: () => normalizedPanOffset,
+        a: () => this.width / this.height,
+        width: () => this.width,
+        height: () => this.height,
+        k: () => props.transform.k
       },
       depth: { enable: false },
       blend: {
@@ -34924,7 +34931,6 @@ class ReglRenderer extends Renderer {
       },
       count: 3
     })();
-    console.log("Background rendered.");
   }
   render_points(props) {
     if (this.prefs.background_img_url) {
@@ -35063,8 +35069,6 @@ class ReglRenderer extends Renderer {
         this.scatterplot.trimap.tick("polygon");
       });
     }
-    console.log("render all fill_buffer", this.fill_buffer);
-    this.get_image_texture(this.prefs.background_img_url);
     for (const layer of [this.fbos.lines, this.fbos.points]) {
       regl2({
         profile: true,
@@ -35225,7 +35229,7 @@ class ReglRenderer extends Renderer {
       depth: false
     });
   }
-  get_image_texture(url) {
+  get_image_texture(url, flipY = false) {
     const { regl: regl2 } = this;
     this.textures = this.textures || {};
     if (this.textures[url]) {
@@ -35234,7 +35238,8 @@ class ReglRenderer extends Renderer {
     const placeholder = regl2.texture({
       data: new Uint8Array([255, 255, 255, 255]),
       width: 1,
-      height: 1
+      height: 1,
+      flipY
       // You can also explicitly specify format if needed:
       // format: 'rgba',
       // type: 'uint8'
@@ -35245,7 +35250,10 @@ class ReglRenderer extends Renderer {
     image.src = url;
     image.addEventListener("load", () => {
       try {
-        const loadedTexture = regl2.texture(image);
+        const loadedTexture = regl2.texture({
+          data: image,
+          flipY
+        });
         this.textures[url] = loadedTexture;
         console.log("Background texture loaded.");
       } catch (e) {

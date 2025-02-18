@@ -47,7 +47,7 @@ export declare class ReglRenderer<T extends Tile> extends Renderer<T> {
     blur(fbo1: Framebuffer2D, fbo2: Framebuffer2D, passes?: number): void;
     render_all(props: any): void;
     initialize_textures(): void;
-    get_image_texture(url: string): wrapREGL.Texture2D;
+    get_image_texture(url: string, flipY?: boolean): wrapREGL.Texture2D;
     n_visible(only_color?: number): any;
     get integer_buffer(): wrapREGL.Buffer;
     color_pick(x: number, y: number): null | StructRowProxy;
