@@ -34879,14 +34879,22 @@ class ReglRenderer extends Renderer {
       vert: `
         precision mediump float;
         attribute vec2 position;
+        uniform mat3 u_zoom_matrix;
         varying vec2 uv;
         void main() {
           uv = 0.5 * (position + 1.0);
-          gl_Position = vec4(position, 0, 1);
+          vec3 pos = vec3(position, 1.0);
+          pos = u_zoom_matrix * pos;
+          gl_Position = vec4(pos.xy, 0, 1);
         }
       `,
-      attributes: { position: this.fill_buffer },
-      uniforms: { bgTexture: () => bgTexture },
+      attributes: {
+        position: this.fill_buffer
+      },
+      uniforms: {
+        bgTexture: () => bgTexture,
+        u_zoom_matrix: () => props.zoom_matrix
+      },
       depth: { enable: false },
       blend: {
         enable: true,
