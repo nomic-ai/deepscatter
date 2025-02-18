@@ -34863,10 +34863,6 @@ class ReglRenderer extends Renderer {
   render_background(props) {
     const { regl: regl2 } = this;
     const bgTexture = this.get_image_texture(this.prefs.background_img_url);
-    if (this._lastBackgroundTexture === bgTexture) {
-      return;
-    }
-    this._lastBackgroundTexture = bgTexture;
     if (!bgTexture) {
       console.warn("Background texture not yet loaded.");
       return;
@@ -34889,12 +34885,8 @@ class ReglRenderer extends Renderer {
           gl_Position = vec4(position, 0, 1);
         }
       `,
-      attributes: {
-        position: this.fill_buffer
-      },
-      uniforms: {
-        bgTexture: () => bgTexture
-      },
+      attributes: { position: this.fill_buffer },
+      uniforms: { bgTexture: () => bgTexture },
       depth: { enable: false },
       blend: {
         enable: true,
@@ -39300,24 +39292,6 @@ class Scatterplot {
     }
     fix_point(data);
     this.drawContours(data);
-  }
-  async loadBackgroundImage(url) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = url;
-    await new Promise((resolve, reject) => {
-      img.onload = () => {
-        this.backgroundTexture = this.regl.texture({
-          data: img,
-          mag: "linear",
-          min: "linear",
-          wrapS: "clamp",
-          wrapT: "clamp"
-        });
-        resolve(null);
-      };
-      img.onerror = reject;
-    });
   }
 }
 Scatterplot.Bitmask = Bitmask;

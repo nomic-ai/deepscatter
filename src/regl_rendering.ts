@@ -172,19 +172,12 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     const { regl } = this;
     const bgTexture = this.get_image_texture(this.prefs.background_img_url);
   
-    // If the background texture is the same as last frame, skip drawing.
-    if (this._lastBackgroundTexture === bgTexture) {
-      return;
-    }
-    this._lastBackgroundTexture = bgTexture;
-  
-    // Only draw if the texture is loaded (or use a valid placeholder)
     if (!bgTexture) {
       console.warn("Background texture not yet loaded.");
       return;
     }
   
-    // Draw the full-screen quad using the background texture.
+    // Always draw the background, regardless of previous state.
     regl({
       frag: `
         precision mediump float;
@@ -203,12 +196,8 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
           gl_Position = vec4(position, 0, 1);
         }
       `,
-      attributes: {
-        position: this.fill_buffer,
-      },
-      uniforms: {
-        bgTexture: () => bgTexture,
-      },
+      attributes: { position: this.fill_buffer },
+      uniforms: { bgTexture: () => bgTexture },
       depth: { enable: false },
       blend: {
         enable: true,
@@ -221,9 +210,10 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       },
       count: 3,
     })();
-  
+    
     console.log("Background rendered.");
   }
+  
   
   
 

@@ -173,7 +173,6 @@ declare class Scatterplot<T extends Tile> {
     drawContours(contours: any, drawTo: any): void;
     sample_points(n?: number): Record<string, number | string>[];
     contours(aes: any): void;
-    loadBackgroundImage(url: string): Promise<void>;
 }
 export default Scatterplot;
 /**
