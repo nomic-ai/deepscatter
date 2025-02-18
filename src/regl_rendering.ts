@@ -174,8 +174,8 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
 
     const panOffset = [props.transform.x, props.transform.y];
     const normalizedPanOffset = [
-      panOffset[0] / this.width ,
-      panOffset[1] / this.height,
+      - panOffset[0] / (props.transform.k * this.width) ,
+      panOffset[1] / (props.transform.k *this.height),
     ];
 
     if (!bgTexture) {
@@ -212,7 +212,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
           // For instance, add u_pan_offset scaled by an appropriate factor.
           // vec2 offsetUV = position + u_pan_offset; // Adjust this as needed.
           // uv = mod(pos.xy * 0.00000001, 1.0);
-          uv = 0.9 * (position + 1.0) + u_pan_offset;
+          uv = 0.8 * (position + 1.0) + 1.6 * u_pan_offset;
         }
       `,
       attributes: {
