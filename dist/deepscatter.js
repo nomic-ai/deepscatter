@@ -34863,16 +34863,27 @@ class ReglRenderer extends Renderer {
   render_background(props) {
     const { regl: regl2 } = this;
     const bgTexture = this.get_image_texture(this.prefs.background_img_url);
+    const panOffset = [props.transform.x, props.transform.y];
+    const normalizedPanOffset = [
+      panOffset[0] / this.width,
+      panOffset[1] / this.height
+    ];
     if (!bgTexture) {
       console.warn("Background texture not yet loaded.");
       return;
     }
+    console.log("zoom_matrix:", props.zoom_matrix);
+    console.log("Position:", this.fill_buffer);
+    console.log("Pan offset:", panOffset);
+    console.log("K", props.transform.k);
+    console.log("Normalized pan offset:", normalizedPanOffset);
     regl2({
       frag: `
         precision mediump float;
         varying vec2 uv;
         uniform sampler2D bgTexture;
         void main() {
+          // Look up the texture based on uv
           gl_FragColor = texture2D(bgTexture, uv);
         }
       `,
@@ -34880,20 +34891,26 @@ class ReglRenderer extends Renderer {
         precision mediump float;
         attribute vec2 position;
         uniform mat3 u_zoom_matrix;
+        uniform vec2 u_pan_offset; // new uniform for pan offset
         varying vec2 uv;
         void main() {
-          uv = 0.5 * (position + 1.0);
           vec3 pos = vec3(position, 1.0);
           pos = u_zoom_matrix * pos;
           gl_Position = vec4(pos.xy, 0, 1);
+          // Incorporate the pan offset into UV calculation:
+          // For instance, add u_pan_offset scaled by an appropriate factor.
+          // vec2 offsetUV = position + u_pan_offset; // Adjust this as needed.
+          // uv = mod(pos.xy * 0.00000001, 1.0);
+          uv = 0.9 * (position + 1.0) + u_pan_offset;
         }
       `,
       attributes: {
-        position: this.fill_buffer
+        position: [-10, -10, 10, -10, 0, 10]
       },
       uniforms: {
         bgTexture: () => bgTexture,
-        u_zoom_matrix: () => props.zoom_matrix
+        u_zoom_matrix: () => props.zoom_matrix,
+        u_pan_offset: () => normalizedPanOffset
       },
       depth: { enable: false },
       blend: {
@@ -35046,6 +35063,8 @@ class ReglRenderer extends Renderer {
         this.scatterplot.trimap.tick("polygon");
       });
     }
+    console.log("render all fill_buffer", this.fill_buffer);
+    this.get_image_texture(this.prefs.background_img_url);
     for (const layer of [this.fbos.lines, this.fbos.points]) {
       regl2({
         profile: true,
@@ -35169,6 +35188,12 @@ class ReglRenderer extends Renderer {
       depth: false
     });
     this.fbos.points = regl2.framebuffer({
+      // type: 'half float',
+      width: this.width,
+      height: this.height,
+      depth: false
+    });
+    this.fbos.bg = regl2.framebuffer({
       // type: 'half float',
       width: this.width,
       height: this.height,

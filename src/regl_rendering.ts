@@ -171,12 +171,22 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   render_background(props) {
     const { regl } = this;
     const bgTexture = this.get_image_texture(this.prefs.background_img_url);
-  
+
+    const panOffset = [props.transform.x, props.transform.y];
+    const normalizedPanOffset = [
+      panOffset[0] / this.width ,
+      panOffset[1] / this.height,
+    ];
+
     if (!bgTexture) {
       console.warn("Background texture not yet loaded.");
       return;
     }
-  
+    console.log("zoom_matrix:", props.zoom_matrix);
+    console.log("Position:", this.fill_buffer);
+    console.log("Pan offset:", panOffset);
+    console.log("K", props.transform.k);
+    console.log("Normalized pan offset:", normalizedPanOffset);
     // Always draw the background, regardless of previous state.
     regl({
       frag: `
@@ -184,6 +194,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
         varying vec2 uv;
         uniform sampler2D bgTexture;
         void main() {
+          // Look up the texture based on uv
           gl_FragColor = texture2D(bgTexture, uv);
         }
       `,
@@ -191,20 +202,26 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
         precision mediump float;
         attribute vec2 position;
         uniform mat3 u_zoom_matrix;
+        uniform vec2 u_pan_offset; // new uniform for pan offset
         varying vec2 uv;
         void main() {
-          uv = 0.5 * (position + 1.0);
           vec3 pos = vec3(position, 1.0);
           pos = u_zoom_matrix * pos;
           gl_Position = vec4(pos.xy, 0, 1);
+          // Incorporate the pan offset into UV calculation:
+          // For instance, add u_pan_offset scaled by an appropriate factor.
+          // vec2 offsetUV = position + u_pan_offset; // Adjust this as needed.
+          // uv = mod(pos.xy * 0.00000001, 1.0);
+          uv = 0.9 * (position + 1.0) + u_pan_offset;
         }
       `,
       attributes: {
-        position: this.fill_buffer,
+        position: [-10, -10, 10, -10, 0, 10],
       },
       uniforms: {
         bgTexture: () => bgTexture,
         u_zoom_matrix: () => props.zoom_matrix,
+        u_pan_offset: () => normalizedPanOffset,
       },
       depth: { enable: false },
       blend: {
@@ -218,20 +235,15 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       },
       count: 3,
     })();
-    
-    
     console.log("Background rendered.");
   }
-  
-  
-  
 
   render_points(props) {
     // NEW: Render background first
     if (this.prefs.background_img_url) {
       this.render_background(props);
     }
-    
+
     // Then render points
     // Regl is faster if it can render a large number of draw calls together.
     const prop_list = [];
@@ -422,7 +434,10 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     }
     // Copy the points buffer to the main buffer.
 
-    for (const layer of [this.fbos.lines, this.fbos.points]) {
+    console.log("render all fill_buffer", this.fill_buffer);
+    const bg = this.get_image_texture(this.prefs.background_img_url);
+
+    for (const layer of [this.fbos.lines, this.fbos.points, ]) {
       regl({
         profile: true,
         blend: {
@@ -554,6 +569,14 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
       height: this.height,
       depth: false,
     });
+
+    this.fbos.bg = regl.framebuffer({
+      // type: 'half float',
+      width: this.width,
+      height: this.height,
+      depth: false,
+    });
+
     this.fbos.ping = regl.framebuffer({
       width: this.width,
       height: this.height,
@@ -595,12 +618,12 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     const { regl } = this;
     // Ensure the textures dictionary exists.
     this.textures = this.textures || {};
-  
+
     // If we already loaded the texture for this URL, return it.
     if (this.textures[url]) {
       return this.textures[url];
     }
-  
+
     // Create a valid placeholder: a 1x1 white pixel.
     // (Using a Uint8Array with RGBA values in the 0–255 range.)
     const placeholder = regl.texture({
@@ -613,7 +636,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     });
     // Cache the placeholder immediately.
     this.textures[url] = placeholder;
-  
+
     // Now load the actual image.
     const image = new Image();
     image.crossOrigin = 'anonymous'; // Must be set before setting src.
@@ -631,7 +654,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     });
     return this.textures[url];
   }
-  
+
 
   /*
   plot_as_grid(x_field, y_field, buffer = this.fbos.minicounter) {
@@ -1380,12 +1403,12 @@ export class TileBufferManager<T extends Tile> {
           timetype === 0
             ? 1e-3 // second
             : timetype === 1
-            ? 1 // millisecond
-            : timetype === 2
-            ? 1e3 // microsecond
-            : timetype === 3
-            ? 1e6 // nanosecond
-            : 42;
+              ? 1 // millisecond
+              : timetype === 2
+                ? 1e3 // microsecond
+                : timetype === 3
+                  ? 1e6 // nanosecond
+                  : 42;
         if (divisor === 42) {
           throw new Error(`Unknown time type ${timetype}`);
         }
