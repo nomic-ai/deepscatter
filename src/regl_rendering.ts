@@ -249,10 +249,10 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
   }
 
   render_points(props) {
-    // NEW: Render background first
-    if (this.prefs.background_img_url) {
-      this.render_background(props);
-    }
+    // Disable render tries for now.
+    // if (this.prefs.background_img_url) {
+    //   this.render_background(props);
+    // }
 
     // Then render points
     // Regl is faster if it can render a large number of draw calls together.
@@ -488,7 +488,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
     }
   }
 
-  /*
+
   set_image_data(tile, ix) {
   // Stores a *single* image onto the texture.
     const { regl } = this;
@@ -507,7 +507,7 @@ export class ReglRenderer<T extends Tile> extends Renderer<T> {
 
     }
   }
-  */
+
   /*
   spritesheet_setter(word) {
   // Set if not there.

@@ -34933,9 +34933,6 @@ class ReglRenderer extends Renderer {
     })();
   }
   render_points(props) {
-    if (this.prefs.background_img_url) {
-      this.render_background(props);
-    }
     const prop_list = [];
     let call_no = 0;
     const needs_background_pass = this.aes.store.foreground.states[0].active || this.aes.store.foreground.states[1].active;
