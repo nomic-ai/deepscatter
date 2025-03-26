@@ -68,7 +68,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.46.1",
-    "@sveltejs/vite-plugin-svelte": "^3.1.2",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@types/d3": "^7.4.3",
     "@types/d3-geo": "^3.1.0",
     "@types/d3-scale-chromatic": "^3.0.3",
@@ -92,6 +92,6 @@
     "typedoc": "^0.26.6",
     "typescript": "^5.5.4",
     "uvu": "^0.5.6",
-    "vite": "^5.4.3"
+    "vite": "^6.2.3"
   }
 }
