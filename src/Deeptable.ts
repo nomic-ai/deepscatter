@@ -145,7 +145,7 @@ export class Deeptable {
   }
 
   /**
-   * Loads a quadtree created by version 2.0 or great of the quadfeather package (including manifests).
+   * Loads a quadtree created by version 2.0 or greater of the quadfeather package (including manifests).
    *
    * @param tileProxy A tileProxy to use for fetching tiles. Can be used to wrap authentication.
    * @param baseUrl The base URL of the quadfeather data.
