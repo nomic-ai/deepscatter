@@ -4,7 +4,8 @@ export { Deeptable } from './Deeptable';
 export { LabelMaker } from './label_rendering';
 export { dictionaryFromArrays } from './utilityFunctions';
 export { Tile } from './tile';
-export { DeepGPU, create_hamming_transform, HammingPipeline, ReusableWebGPUPipeline } from './webGPU/lib'
+export { DeepGPU, ReusableWebGPUPipeline } from './webGPU/lib'
+export { create_multi_hamming_transform, HammingPipeline } from './webGPU/HammingPipeline'
 
 export type {
   APICall,
