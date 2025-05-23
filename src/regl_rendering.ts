@@ -104,8 +104,10 @@ export class ReglRenderer extends Renderer {
     this.initialize_textures();
 
     // Not the right way, for sure.
-    (this._initializations = this.deeptable.promise.then(() => {
+    (this._initializations = this.deeptable.promise.then(async () => {
       this.remake_renderer();
+      // hack--get around a potential race condition.
+      await this.wait_for_zoom_attachment();
       this._webgl_scale_history = [
         this.default_webgl_scale,
         this.default_webgl_scale,

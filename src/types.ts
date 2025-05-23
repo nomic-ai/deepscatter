@@ -498,7 +498,7 @@ export type DataSpec = { tileProxy?: TileProxy } & (
  * zoom events & recieve the zoom transform. For example, a consumer
  * might update annotations on zoom events to keep them in sync.
  */
-export type onZoomCallback = (transform: d3.ZoomTransform) => null;
+export type onZoomCallback = (transform: ZoomTransform) => null;
 
 export type Label = {
   x: number; // in data space.
