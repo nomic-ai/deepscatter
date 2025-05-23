@@ -798,6 +798,10 @@ export class DataSelection {
     return this.deeptable.highest_known_ix;
   }
 
+
+  get(i: number | undefined, returnQid: false): StructRowProxy | undefined;
+  get(i: number | undefined, returnQid: true): [number, number] | undefined;
+
   /**
    *
    * Returns the nth element in the selection. This is a bit tricky because
@@ -807,8 +811,9 @@ export class DataSelection {
    * tile until we find the nth match.
    *
    * @param i the index of the row to get. If less than zero, will return
+   * @param returnQid if true, returns a tuple of [tile index, row index] instead of the row data
    */
-  get(i: number | undefined = undefined): StructRowProxy | undefined {
+  get(i: number | undefined = undefined, returnQid: boolean = false): StructRowProxy | [number, number] | undefined {
     if (i === undefined) {
       i = this.cursor;
     }
@@ -1041,7 +1046,6 @@ export class SortedDataSelection extends DataSelection {
     sortOperation: (a: StructRowProxy) => number,
     order: 'ascending' | 'descending' = 'ascending',
     tKey: string | undefined = undefined,
-    name: string | undefined = undefined,
   ): Promise<SortedDataSelection> {
     const key = tKey || Math.random().toFixed(10).slice(2);
     const newer = new SortedDataSelection(
@@ -1068,7 +1072,7 @@ export class SortedDataSelection extends DataSelection {
     newer.tiles = await Promise.all(withSort);
     newer.selectionSize = newer.tiles.reduce((sum, t) => sum + t.matchCount, 0);
     newer.evaluationSetSize = newer.tiles.reduce(
-      (sum, t) => sum + t.tile.metadata.nPoints,
+      (sum: number, t: SelectionTile) : number => sum + t.tile.metadata.nPoints,
       0,
     );
     return newer;
@@ -1108,11 +1112,15 @@ export class SortedDataSelection extends DataSelection {
     };
   }
 
+  get(i: number | undefined, returnQid: false): StructRowProxy | undefined;
+  get(i: number | undefined, returnQid: true): [number, number] | undefined;
+
+
   /**
    * Returns the k-th element in the sorted selection.
    * This implementation uses Quickselect with a pivot selected from actual data.
    */
-  get(k: number): StructRowProxy | undefined {
+  get(k: number | undefined = undefined, returnQid: boolean = false): StructRowProxy | [number, number] | undefined {
     if (k >= this.selectionSize || k < -this.selectionSize) {
       return undefined;
     }
@@ -1125,6 +1133,9 @@ export class SortedDataSelection extends DataSelection {
     const actualK = this.order === 'ascending' ? k : this.selectionSize - k - 1;
     // Implement Quickselect over the combined data
     const result = quickSelect(actualK, this.tiles, this.key, true);
+    if (returnQid) {
+      return [result.tix, result.rix];
+    }
     return result ? result.row : undefined;
   }
 
@@ -1222,7 +1233,7 @@ export class TileSorter
         continue;
       }
       // All values left of pointer are less than targetValue.
-      let pointer;
+      let pointer : number;
       if (this.order === 'ascending') {
         pointer = bisectLeft(rawSortInfo.values, sortValue);
       } else {
@@ -1324,6 +1335,7 @@ interface QuickSortTile {
 type QuickSelectResult = {
   row: StructRowProxy;
   tix: number;
+  rix: number;
   // Needed if you want to set pointers
   sortIndex: number;
   sortValue: number;
@@ -1361,6 +1373,7 @@ function quickSelect(
           sortIndex: start,
           sortValue: values[start],
           tix: t.tile.tix,
+          rix: recordIndex,
         };
       }
     }
@@ -1459,6 +1472,7 @@ function selectInEqualTiles(
       return {
         row: t.tile.record_batch.get(recordIndex),
         tix: t.tile.tix,
+        rix: recordIndex,
         sortIndex: idxInTile,
         sortValue: values[idxInTile],
       };
