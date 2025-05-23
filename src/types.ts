@@ -11,11 +11,11 @@ import type {
   Timestamp,
   Utf8,
   Vector,
+  Type,
 } from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Deeptable } from './Deeptable';
 import type { ConcreteAesthetic } from './aesthetics/StatefulAesthetic';
-import type { Buffer } from 'regl';
 import type { DataSelection } from './selection';
 import { Scatterplot } from './scatterplot';
 import { ZoomTransform } from 'd3-zoom';
@@ -29,14 +29,19 @@ export type { Renderer, Deeptable, ConcreteAesthetic };
  * can find data on it.
  *
  * Note that the byte_size is *for the buffer*, and that individual elements
- * may take views of it less than the byte_size.
+ * may take views of it less` than the byte_size.
  */
-export type BufferLocation = {
-  buffer: Buffer;
+export interface BufferLocation<T> {
+  buffer: T;
   offset: number;
-  stride: number;
-  byte_size: number; // in bytes;
+  stride?: number;
+  byte_size?: number; // in bytes;
 };
+
+export type WebGPUBufferLocation = BufferLocation<GPUBuffer> & {
+  arrowType?: Type,
+  paddedSize: number;
+} 
 
 export type Newable<T> = { new (...args: unknown[]): T };
 export type PointFunction<T = number> = (p: StructRowProxy) => T;

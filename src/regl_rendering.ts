@@ -1000,19 +1000,24 @@ export class BufferManager {
   // but since they relate to Regl,
   // I want them in this file instead.
 
+
+  
   private regl: Regl;
   public renderer: ReglRenderer;
-  private bufferMap: WeakMap<ArrayBufferView, DS.BufferLocation> = new Map();
+  private bufferMap: WeakMap<ArrayBufferView, DS.BufferLocation<Buffer>> = new Map();
   private arrayMap: TupleMap<string | Tile, ArrayBufferView> = new TupleMap();
-  public ixInTileBuffer: DS.BufferLocation;
+  public ixInTileBuffer: DS.BufferLocation<Buffer>;
   // A list of integers. Used internally.
   private _integer_array?: Float32Array;
   // A buffer populated from that list.
   private _integer_buffer?: Buffer;
 
   constructor(renderer: ReglRenderer) {
-    this.regl = renderer.regl;
     this.renderer = renderer;
+    this.regl = renderer.regl;
+
+    console.log(this.regl)
+
     // Reuse the same buffer for all `ix_in_tile` keys, because
     // it's just a set of integers going up.
     this.ixInTileBuffer = {
@@ -1041,7 +1046,7 @@ export class BufferManager {
     return this._integer_buffer;
   }
 
-  get(k: Some<string | Tile>): DS.BufferLocation | null {
+  get(k: Some<string | Tile>): DS.BufferLocation<Buffer> | null {
     const a = this.bufferMap.get(this.arrayMap.get(k));
     return a;
   }
@@ -1249,7 +1254,7 @@ export function getNestedVector(
   return column;
 }
 
-class MultipurposeBufferSet {
+export abstract class BufferSet<BufferType = Buffer, BufferLocationType extends DS.BufferLocation<BufferType> = DS.BufferLocation<BufferType>> {
   // An abstraction creating an expandable set of buffers that can be subdivided
   // to put more than one variable on the same
   // block of memory. Reusing buffers this way can have performance benefits over allocating
@@ -1258,53 +1263,51 @@ class MultipurposeBufferSet {
   // The general purpose here is to call 'allocate_block' that releases a block of memory
   // to use in creating a new array to be passed to regl.
 
-  private regl: Regl;
-  private buffers: Buffer[];
+  protected buffers: BufferType[];
   public buffer_size: number;
-  private pointer: number; // the byte offset to start the next allocation from.
-  private freed_buffers: DS.BufferLocation[] = [];
+  protected pointer: number; // the byte offset to start the next allocation from.
+  protected freed_buffers: BufferLocationType[] = [];
   /**
    *
    * @param regl the Regl context we're using.
    * @param buffer_size The number of bytes on each strip of memory that we'll ask for.
    */
 
-  constructor(regl: Regl, buffer_size: number) {
-    this.regl = regl;
+  constructor(buffer_size: number) {
     this.buffer_size = buffer_size;
     this.buffers = [];
     // Track the ends in case we want to allocate smaller items.
     this.pointer = 0;
-    this.generate_new_buffer();
   }
 
   generate_new_buffer() {
     if (this.buffers.length && this.buffer_size - this.pointer > 128) {
       // mark any remaining space longer than 128 bytes as available.
-      this.freed_buffers.push({
-        buffer: this.buffers[0],
-        offset: this.pointer,
-        stride: 4, // meaningless here.
-        byte_size: this.buffer_size - this.pointer,
-      });
+      console.log("YOOO")
+      const leftover = this._create_leftover_buffer();
+      this.freed_buffers.push(leftover);
     }
     this.pointer = 0;
     // Adds to beginning of list.
     this.buffers.unshift(
-      this.regl.buffer({
-        type: 'float',
-        length: this.buffer_size,
-        usage: 'dynamic',
-      }),
+      this._create_buffer()
     );
   }
+
+  // We need a method to create a new instance of the buffer type.
+  abstract _create_buffer() : BufferType;
+
+  // And one to mark the leftover space on the current buffer as available
+  // so it can be re-allocated later if needed.
+  abstract _create_leftover_buffer() : BufferLocationType;
+
   /**
    * Freeing a block means just adding its space back into the list of open blocks.
    * There's no need to actually zero out the memory or anything.
    *
    * @param buff The location of the buffer we're done with.
    */
-  free_block(buff: DS.BufferLocation) {
+  free_block(buff: BufferLocationType) {
     this.freed_buffers.push(buff);
   }
 
@@ -1315,9 +1318,11 @@ class MultipurposeBufferSet {
    * @returns
    */
 
-  allocate_block(items: number, bytes_per_item: number): DS.BufferLocation {
+  allocate_block(items: number, bytes_per_item: number = 1): DS.BufferLocation<BufferType> {
     // Call dibs on a block of this buffer.
     // NB size is in **bytes**
+
+
     const bytes_needed = items * bytes_per_item;
     let i = 0;
     for (const buffer_loc of this.freed_buffers) {
@@ -1331,29 +1336,61 @@ class MultipurposeBufferSet {
           buffer: buffer_loc.buffer,
           offset: buffer_loc.offset,
           stride: bytes_per_item,
-          byte_size: bytes_needed,
+          size: bytes_needed,
         };
         return v;
       }
       i += 1;
     }
 
-    if (this.pointer + items * bytes_per_item > this.buffer_size) {
+    // If we have no buffers, or the last one is full, move to the next one.
+    if (this.buffers.length === 0 || this.pointer + items * bytes_per_item > this.buffer_size) {
       // May lead to ragged ends. Could be smarter about reallocation here,
       // too.
+      console.log("GENERATING")
       this.generate_new_buffer();
     }
 
-    const value: DS.BufferLocation = {
+    const value: DS.BufferLocation<BufferType> = {
       // First slot stores the active buffer.
       buffer: this.buffers[0],
       offset: this.pointer,
       stride: bytes_per_item,
       byte_size: items * bytes_per_item,
     };
-
+    console.log(value.byte_size)
     this.pointer += items * bytes_per_item;
     return value;
+  }
+}
+
+class MultipurposeBufferSet extends BufferSet<Buffer> {
+
+  private regl: Regl;
+  constructor(regl: Regl, buffer_size: number) {
+    console.log("USING REGL", regl)
+    super(buffer_size);
+    this.regl = regl;
+  }
+
+  _create_buffer() {
+    console.log("A")
+    const buffer = this.regl.buffer({
+      type: 'float',
+      length: this.buffer_size,
+      usage: 'dynamic',
+    });
+    console.log("C")
+    return buffer
+  }
+
+  _create_leftover_buffer() : DS.BufferLocation<Buffer> {
+    return {
+      buffer: this.buffers[0],
+      offset: this.pointer,
+      stride: 4, // meaningless here.
+      byte_size: this.buffer_size - this.pointer,
+    }
   }
 }
 
