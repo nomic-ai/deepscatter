@@ -107,7 +107,12 @@ export class TupleMap<K = object, V = object> {
     }
   }
 
+  get size(): number {
+    return this.map.size;
+  }
+
   set(keys: Some<K>, value: V): void {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let currentMap: TupleMap<K, V> = this;
     for (const key of keys) {
       if (!currentMap.map.has(key)) {
@@ -327,5 +332,27 @@ export class MinHeap<T> {
       this.heap[swapIndex] = element;
       index = swapIndex;
     }
+  }
+}
+
+
+export class FifoTupleMap<K, V> extends TupleMap<K, V> {
+  // private f: (key: K, arg: ArgT) => V;
+  max: number;
+  constructor(max: number) {
+    super();
+    this.max = max;
+  }
+
+  set(key: Some<K>, value: V) {
+    super.set(key, value);
+    if (this.size > this.max) {
+      const next = this.keys().next();
+      if (next.value) {        
+        // using 'as' here because we lose the type in the iteration.
+        this.delete(next.value as Some<K>);
+      }
+    }
+    return this;
   }
 }
