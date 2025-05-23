@@ -298,7 +298,6 @@ export class Tile {
     manifest: TileMetadata | (TileMetadata & { extent: Rectangle }),
   ) {
     // Setting the manifest is the thing that spawns children.
-    console.log(manifest.max_ix);
     this.highest_known_ix = manifest.max_ix;
     this._metadata = {
       ...manifest,
@@ -480,7 +479,6 @@ export class Tile {
     if (this._metadata) {
       return;
     }
-    console.log('Populating', this.key);
     this.metadata = await this.deriveManifestInfoFromTileMetadata();
   }
 

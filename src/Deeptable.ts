@@ -188,7 +188,7 @@ export class Deeptable {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
       // TODO: Cleaner check that it's a lazy manifest
-      if (!flatManifest[0]) {
+      if (!flatManifest[0]) { // An empty flatManifest indicates a legacy (or missing) manifest and triggers derivation of metadata.
         this.root_tile.metadata =
           await this.root_tile.deriveManifestInfoFromTileMetadata();
       }

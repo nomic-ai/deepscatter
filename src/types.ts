@@ -99,8 +99,8 @@ export type DeeptableCreateParams = {
   // may be inferred.
   tileStructure?: TileStructure;
 
-  // A manifest listing all the tiles in the deeptable.
-  // Currently this must be passed as a recursive structure.
+  // A manifest listing all the tiles in the deeptable, of the type created by
+  // quadfeather v2.0.0 or greater.
   tileManifest?: Table;
 
   // A URL for an arrow file manifest. The schema for this manifest
