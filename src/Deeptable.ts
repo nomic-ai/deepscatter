@@ -38,6 +38,7 @@ import { DataSelection } from './selection';
 import { Some, TupleMap } from './utilityFunctions';
 import { getNestedVector } from './regl_rendering';
 import { tileKey_to_tix } from './tixrixqid';
+import { DeepGPU } from './deepscatter';
 
 type TransformationStatus = 'queued' | 'in progress' | 'complete' | 'failed';
 
@@ -102,6 +103,7 @@ export class Deeptable {
   public root_tile: Tile;
   public fetcherId?: number;
   private _downloaderId?: number;
+  private _deepGPU?: Promise<DeepGPU>;
   // Whether the tileset is structured as a pure quadtree.
 
   public readonly tileStucture: DS.TileStructure;
@@ -255,6 +257,13 @@ export class Deeptable {
     await this.root_tile.download_to_depth(max_ix, suffix);
   }
 
+  get deepGPU() : Promise<DeepGPU> {
+    if (this._deepGPU !== undefined) {
+      return this._deepGPU
+    }
+    this._deepGPU = DeepGPU.create(this)
+    return this._deepGPU
+  }
   /**
    * The highest known point that deepscatter has seen so far. This is used
    * to adjust opacity size.
@@ -755,7 +764,7 @@ export class Deeptable {
   spawnDownloads(
     bbox: Rectangle | undefined,
     max_ix: number,
-    queue_length = 32,
+    queue_length = 64,
     fields: string[] = ['x', 'y', 'ix'],
     priority: 'high' | 'low' = 'high',
   ): boolean {

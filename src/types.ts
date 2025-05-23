@@ -35,7 +35,7 @@ export interface BufferLocation<T> {
   buffer: T;
   offset: number;
   stride?: number;
-  byte_size?: number; // in bytes;
+  byte_size: number; // in bytes;
 };
 
 export type WebGPUBufferLocation = BufferLocation<GPUBuffer> & {
