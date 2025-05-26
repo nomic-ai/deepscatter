@@ -6,7 +6,7 @@ import { getTileFromRow } from './tixrixqid';
 import type * as DS from './types';
 import { Bool, StructRowProxy, Utf8, Vector, makeData } from 'apache-arrow';
 import { bisectLeft, bisectRight, range } from 'd3-array';
-import { MinHeap } from './utilityFunctions';
+import { FifoTupleMap, MinHeap } from './utilityFunctions';
 interface SelectParams {
   name: string;
   useNameCache?: boolean; // If true and a selection with that name already exists, use it and ignore all passed parameters. Otherwise, throw an error.
@@ -382,6 +382,7 @@ class SelectionTile {
  * more than once a second or so.
  */
 
+const cachedWhiches = new FifoTupleMap<SelectionTile, Uint16Array>(250);
 export class DataSelection {
   deeptable: Deeptable;
   plot: Scatterplot;
@@ -818,31 +819,33 @@ export class DataSelection {
       i = this.selectionSize + i;
     }
     let currentOffset = 0;
-    let relevantTile: Tile | undefined = undefined;
-    for (const { tile, matchCount } of this.tiles) {
-      if (i < currentOffset + matchCount) {
-        relevantTile = tile;
+    let relevantTile: SelectionTile | undefined = undefined;
+    for (const selectionTile of this.tiles) {
+      if (i < currentOffset + selectionTile.matchCount) {
+        relevantTile = selectionTile;
         break;
       }
-      currentOffset += matchCount;
+      currentOffset += selectionTile.matchCount;
     }
     if (relevantTile === undefined) {
       return undefined;
     }
-    const column = relevantTile.record_batch.getChild(
-      this.name,
-    ) as Vector<Bool>;
+
     const offset = i - currentOffset;
-    let ix_in_match = 0;
-    for (let j = 0; j < column.length; j++) {
-      if (column.get(j)) {
-        if (ix_in_match === offset) {
-          return relevantTile.record_batch.get(j) || undefined;
-        }
-        ix_in_match++;
-      }
+    let cached = cachedWhiches.get([relevantTile]);
+    if (cached === undefined) {
+      const mask = Bitmask.from_arrow(relevantTile.bitmask);
+      cached = mask.which();
+      cachedWhiches.set([relevantTile], cached)
     }
-    throw new Error(`unable to locate point ${i}`);
+
+    if (offset >= cached.length) {
+      throw new Error(`unable to locate point ${i}`);
+    }
+    const tix = cached[offset];
+    
+    return relevantTile.tile.record_batch.get(tix) || undefined;
+
   }
 
   // Iterate over the points in raw order.

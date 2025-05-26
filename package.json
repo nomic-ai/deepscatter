@@ -18,6 +18,7 @@
   },
   "scripts": {
     "dev": "vite --mode dev --port 3344 --host",
+    "check": "npm run build && npm run test",
     "format": "prettier --write src",
     "prepare": "npm run build",
     "build": "vite build && tsc",
