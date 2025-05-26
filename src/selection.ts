@@ -354,10 +354,10 @@ class SelectionTile {
   addSort(key: string, getter: (row: StructRowProxy) => number) {
     const { bitmask } = this;
     const indices = Bitmask.from_arrow(bitmask).which();
-    const pairs: [number, number][] = new Array(indices.length);
+    const pairs: [number, number][] = [];
     for (let i = 0; i < indices.length; i++) {
       const v = getter(this.tile.record_batch.get(indices[i]));
-      pairs[i] = [v, indices[i]];
+      pairs.push([v, indices[i]]);
     }
     pairs.sort((a, b) => a[0] - b[0]);
     const values = new Float64Array(indices.length);
@@ -1046,7 +1046,7 @@ export class SortedDataSelection extends DataSelection {
       {
         name: Math.random().toFixed(10).slice(2),
         tileFunction: async (tile: Tile): Promise<Vector<Bool>> =>
-          tile.get_column(sel.name),
+          (await tile.get_column(sel.name)) as Vector<Bool>,
       },
       sortOperation,
       neededFields,
@@ -1064,6 +1064,10 @@ export class SortedDataSelection extends DataSelection {
     );
     newer.tiles = await Promise.all(withSort);
     newer.selectionSize = newer.tiles.reduce((sum, t) => sum + t.matchCount, 0);
+    newer.evaluationSetSize = newer.tiles.reduce(
+      (sum, t) => sum + t.tile.manifest.nPoints,
+      0,
+    );
     return newer;
   }
   // In addition to the regular things, we also need to add sort fields.
