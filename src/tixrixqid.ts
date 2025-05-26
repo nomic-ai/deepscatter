@@ -21,11 +21,9 @@ type Tix = number;
 // An Rix is a row index, which is an integer identifier for a row in a tile.
 type Rix = number;
 
-// A Rixen is a list of row indices. It must be non-empty.
-type Rixen = [Rix, ...Rix[]];
 
 // A Qid is a pair of a Tix and a Rixen. It identifies a set of rows in a tile.
-export type Qid = [Tix, Rixen];
+export type Qid = [Tix, Rix];
 export type QidArray = Qid[];
 
 export function zxyToTix(z: number, x: number, y: number) {
@@ -99,7 +97,7 @@ export async function tixToTile(tix: Tix, dataset: Deeptable): Promise<Tile> {
 export async function qidToRowProxy(qid: Qid, dataset: Deeptable) {
   const tile = await tixToTile(qid[0], dataset);
   await tile.get_column('x');
-  return tile.record_batch.get(qid[1][0]);
+  return tile.record_batch.get(qid[1]);
 }
 
 export function tileKey_to_tix(key: string) {
@@ -132,10 +130,10 @@ export function tixToZxy(tix: Tix): [number, number, number] {
 export function getQidFromRow(
   row: StructRowProxy,
   dataset: Deeptable,
-): [number, number] {
+): Qid {
   const tile = getTileFromRow(row, dataset);
   const rix = row[Symbol.for('rowIndex')] as number;
-  return [tileKey_to_tix(tile.key), rix] as [number, number];
+  return [tile.tix, rix] satisfies [number, number];
 }
 
 export function getTileFromRow(row: StructRowProxy, dataset: Deeptable): Tile {
@@ -176,37 +174,6 @@ export function getTileFromRow(row: StructRowProxy, dataset: Deeptable): Tile {
     );
   }
   return best_match[0];
-}
-
-export function getQidArrayFromRows(
-  rows: StructRowProxy[],
-  dataset: Deeptable,
-): QidArray {
-  // TODO: this is really inefficient. We should be able to do this in one pass.
-  const qids = rows.map((row) => getQidFromRow(row, dataset));
-  const mapped = new Map<number, [number, ...number[]]>();
-  for (const qid of qids) {
-    if (mapped.has(qid[0])) {
-      mapped.get(qid[0]).push(qid[1]);
-    } else {
-      mapped.set(qid[0], [qid[1]]);
-    }
-  }
-  return Array.from(mapped.entries());
-}
-
-export function selectQixOnTile(tile: Tile, qidList: QidArray) {
-  const mask = new Bitmask(tile.record_batch.numRows);
-  const [z, x, y] = tile.key.split('/').map((d) => parseInt(d));
-  const tix = zxyToTix(z, x, y);
-  const rixes = qidList
-    .filter((d) => d[0] === tix)
-    .map((d) => d[1])
-    .flat();
-  for (const rix of rixes) {
-    mask.set(rix);
-  }
-  return mask.to_arrow();
 }
 
 /**
