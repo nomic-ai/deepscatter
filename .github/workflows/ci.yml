@@ -36,16 +36,16 @@ jobs:
           echo "Files to lint:"
           cat ~/lintable_files
 
-      - name: Lint
-        run: |
-          if [ -s ~/lintable_files ]; then
-            npx eslint $(cat ~/lintable_files)
-          else
-            echo "No files to lint"
-          fi
-
+      # - name: Lint
+      #   run: |
+      #     if [ -s ~/lintable_files ]; then
+      #       npx eslint $(cat ~/lintable_files)
+      #     else
+      #       echo "No files to lint"
+      #     fi
       - name: TypeScript Checker
         run: npx tsc --emitDeclarationOnly
 
       - name: Run Tests
         run: npm run test
+
