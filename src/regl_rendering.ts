@@ -33,7 +33,6 @@ import {
   Data,
   Dictionary,
   Struct,
-  StructRowProxy,
   Type,
   Utf8,
   Vector,
@@ -43,6 +42,7 @@ import { StatefulAesthetic } from './aesthetics/StatefulAesthetic';
 import { Filter, Foreground } from './aesthetics/BooleanAesthetic';
 import { ZoomTransform } from 'd3-zoom';
 import { Some, TupleMap, TupleSet } from './utilityFunctions';
+import { Qid } from './tixrixqid';
 // eslint-disable-next-line import/prefer-default-export
 export class ReglRenderer extends Renderer {
   public regl: Regl;
@@ -546,7 +546,7 @@ export class ReglRenderer extends Renderer {
     return v;
   }
 
-  color_pick(x: number, y: number): null | StructRowProxy {
+  color_pick(x: number, y: number): null | Qid {
     if (y === 0) {
       // Not sure why, but this makes things complainy.
       // console.warn('that thing again.');
@@ -561,15 +561,7 @@ export class ReglRenderer extends Renderer {
     if (row_number === -1) {
       return null;
     }
-    for (const tile of this.visible_tiles()) {
-      if (tile.tix === tile_number) {
-        return tile.record_batch.get(row_number);
-      }
-    }
-    return null;
-    //    const p = this.tileSet.findPoint(point_as_int);
-    //    if (p.length === 0) { return; }
-    //    return p[0];
+    return [tile_number, row_number]
   }
 
   color_pick_single(

@@ -15,6 +15,7 @@ import type { Deeptable } from './Deeptable';
 import type * as DS from './types';
 import type { Scatterplot } from './scatterplot';
 import { PositionalAesthetic } from './aesthetics/ScaledAesthetic';
+import { Qid } from './tixrixqid';
 type Annotation = {
   x: number;
   y: number;
@@ -181,10 +182,12 @@ export class Zoom {
     this.zoomer = zoomer;
   }
 
-  set_highlit_points(data: StructRowProxy[]) {
+  set_highlit_points(dd: Qid[]) {
     const { x_, y_ } = this.scales();
     const xdim = this.scatterplot.dim('x') as PositionalAesthetic;
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
+    
+    const data = this.scatterplot.deeptable.getQids(dd)
     this.scatterplot.highlit_point_change(data, this.scatterplot);
 
     const annotations: Annotation[] = data.map((d) => {
@@ -224,10 +227,6 @@ export class Zoom {
       .on('click', (ev, dd) => {
         this.scatterplot.click_function(dd, this.scatterplot);
       });
-  }
-
-  set_highlit_point(point: StructRowProxy) {
-    this.set_highlit_points([point]);
   }
 
   add_mouseover() {

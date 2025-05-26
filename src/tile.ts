@@ -78,7 +78,7 @@ export class Tile {
    * @param key Either the string identifier of the tile,
    * OR a `TileManifest` object including an identifier.   *
    * @param parent The parent tile -- used to navigate through the tree.
-   * @param deeptable The full atlas deeptable of which this tile is a part.
+   * @param deeptable The full deepscatter deeptable of which this tile is a part.
    */
   constructor(key: string, parent: Tile | null, deeptable: Deeptable) {
     // If it's just initiated with a key, build that into a minimal manifest.
@@ -295,16 +295,16 @@ export class Tile {
   }
 
   set metadata(
-    manifest: TileMetadata | (TileMetadata & { extent: Rectangle }),
+    metadata: TileMetadata | (TileMetadata & { extent: Rectangle }),
   ) {
     // Setting the manifest is the thing that spawns children.
-    this.highest_known_ix = manifest.max_ix;
+    this.highest_known_ix = metadata.max_ix;
     this._metadata = {
-      ...manifest,
+      ...metadata,
       extent:
-        typeof manifest.extent === 'string'
-          ? (JSON.parse(manifest.extent) as Rectangle)
-          : manifest.extent,
+        typeof metadata.extent === 'string'
+          ? (JSON.parse(metadata.extent) as Rectangle)
+          : metadata.extent,
     };
   }
 

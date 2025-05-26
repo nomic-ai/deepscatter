@@ -8,7 +8,7 @@ import type {
 } from 'apache-arrow';
 
 import type { Tile } from './deepscatter';
-import { Bitmask, DataSelection, Deeptable } from './deepscatter';
+import { DataSelection, Deeptable } from './deepscatter';
 
 // The type below indicates that a Qid is not valid if
 // there are zero rows selected in the tile.
