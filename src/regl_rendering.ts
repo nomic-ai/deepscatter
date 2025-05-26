@@ -470,6 +470,7 @@ export class ReglRenderer extends Renderer {
       height: this.height,
       depth: false,
     });
+
     this.fbos.ping = regl.framebuffer({
       width: this.width,
       height: this.height,
@@ -505,6 +506,20 @@ export class ReglRenderer extends Renderer {
         height: 1,
         depth: false,
       });
+  }
+
+  resize(width: number, height: number): void {
+    super.resize(width, height);
+    this.resize_textures();
+  }
+
+  resize_textures() {
+    this.fbos.colorpicker?.resize(this.width, this.height);
+    this.fbos.contour?.resize(this.width, this.height);
+    this.fbos.ping?.resize(this.width, this.height);
+    this.fbos.pong?.resize(this.width, this.height);
+    this.fbos.lines?.resize(this.width, this.height);
+    this.fbos.points?.resize(this.width, this.height);
   }
 
   get_image_texture(url: string) {

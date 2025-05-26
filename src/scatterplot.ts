@@ -49,8 +49,8 @@ type Hook = () => void;
  */
 export class Scatterplot {
   public _renderer?: ReglRenderer;
-  public width: number;
-  public height: number;
+  protected _width: number;
+  protected _height: number;
   public _root?: Deeptable;
   public elements?: Selection<SVGElement, unknown, Element, unknown>[];
   public secondary_renderers: Record<string, Renderer> = {};
@@ -104,19 +104,38 @@ export class Scatterplot {
     }
     const {
       selector,
-      width,
-      height,
+      width: rawWidth,
+      height: rawHeight,
       source_url,
       deeptable,
       arrow_buffer,
       arrow_table,
     } = options;
+    let [width, height] = [rawWidth, rawHeight];
+    if (rawWidth === undefined) {
+      width = window.innerWidth;
+      height = window.innerHeight;
+
+      // Permanently bind the scatterplot to the window size.
+      window.onresize = () => {
+        this.resize(window.innerWidth, window.innerHeight);
+      };
+    }
+
+    if (selector !== undefined) {
+      this.bind(selector, width, height);
+    }
+    if (width !== undefined) {
+      this._width = width;
+    }
+    if (height !== undefined) {
+      this._height = height;
+    }
+
     this.bound = false;
     if (selector !== undefined) {
       this.bind(selector, width, height);
     }
-    this.width = width || window.innerWidth;
-    this.height = height || window.innerHeight;
     // mark_ready is called when the scatterplot can start drawing..
     this.ready = new Promise((resolve) => {
       this.mark_ready = resolve;
@@ -134,6 +153,48 @@ export class Scatterplot {
     if (arrow_table) void this.load_deeptable({ arrow_table });
 
     this.prefs = { ...default_API_call } as DS.CompletePrefs;
+  }
+
+  /**
+   * @param selector A selector for the root element of the deepscatter; must already exist.
+   * @param width Width of the plot, in pixels.
+   * @param height Height of the plot, in pixels.
+   */
+
+  public resize(width: number, height: number) {
+    // Set the dimensions of the plot.
+    this._width = width;
+    this._height = height;
+    if (this.elements === undefined) {
+      throw 'Must bind plot to DOM element before setting dimensions';
+    }
+    for (const el of this.elements) {
+      el.attr('width', this.width).attr('height', this.height);
+      el.selectAll('.deepscatter-render-canvas')
+        .attr('width', this.width)
+        .attr('height', this.height);
+    }
+    if (this._renderer !== undefined) {
+      this._zoom?.resize(this.width, this.height);
+      this._renderer.resize(this.width, this.height);
+    }
+  }
+
+  get width() {
+    return this._width;
+  }
+
+  set width(w: number) {
+    this._width = w;
+    this.resize(w, this.height);
+  }
+
+  get height() {
+    return this._height;
+  }
+  set height(h: number) {
+    this._height = h;
+    this.resize(this.width, h);
   }
 
   /**
