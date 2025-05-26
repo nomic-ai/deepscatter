@@ -699,7 +699,7 @@ export class Scatterplot {
       }
       //
       const needed_keys = neededFieldsToPlot(prefs.encoding);
-      this.deeptable.root_tile.require_columns(
+      void this.deeptable.root_tile.require_columns(
         [...needed_keys].map((k) => k[0]),
       );
       // Immediately start loading what we can onto the GPUs, too.
@@ -908,7 +908,6 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
 class ClickFunction extends SettableFunction<void> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   default(datum: StructRowProxy, plot: Scatterplot | undefined = undefined) {
-    console.log({ ...datum });
     return;
   }
 }

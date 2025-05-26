@@ -22,9 +22,8 @@ export type Rectangle = {
 //   keys?: Array<any>;
 // }
 
-import type { ArrowBuildable, LazyTileManifest, TileManifest } from './types';
-import { isCompleteManifest } from './typing';
-import { zxyToTix } from './tixrixqid';
+import type { ArrowBuildable, TileMetadata } from './types';
+import { tixToChildren, tixToZxy, zxyToTix } from './tixrixqid';
 
 export type RecordBatchCache =
   | {
@@ -36,9 +35,6 @@ export type RecordBatchCache =
       schema: Schema;
       ready: true;
     };
-
-// Keep a global index of tile numbers. These are used to identify points.
-let tile_identifier = 0;
 
 /**
  * A Tile is a collection of points in the deeptable that are grouped together:
@@ -56,25 +52,25 @@ export class Tile {
   readonly key: string; // A unique identifier for this tile.
   protected _batch?: RecordBatch;
   parent: Tile | null;
-  private _children: Array<Tile> = [];
+  private _children: Array<Tile> | null = null;
   private readonly _tix: number;
   public _highest_known_ix?: number;
   public deeptable: Deeptable;
   public _transformations: Record<string, Promise<ArrowBuildable>> = {};
-  public _deriveManifestFromTileMetadata?: Promise<LazyTileManifest>;
+  public _deriveManifestFromBatchMetadata?: Promise<TileMetadata>;
   //private _promiseOfChildren? = Promise<void>;
-  private _partialManifest: Partial<TileManifest> | Partial<LazyTileManifest>;
-  private _manifest?: TileManifest | LazyTileManifest;
-
-  // Does the tile have a loaded manifest and other features sufficient to plot.
-  public readyToUse = false;
+  public _metadata:
+    | null
+    | (Omit<TileMetadata, 'extent'> & { extent: Rectangle });
 
   // A cache of fetchCalls for downloaded arrow tables, including any table schema metadata.
   // Tables may contain more than a single column, so this prevents multiple dispatch.
   //private _promiseOfChildren: Promise<Tile[]>;
 
+  /**
+   * Tile lifecycle:
+   */
   private arrowFetchCalls: Map<string | null, RecordBatchCache> = new Map();
-  public numeric_id: number;
   //public child_locations: string[] = [];
 
   /**
@@ -84,24 +80,9 @@ export class Tile {
    * @param parent The parent tile -- used to navigate through the tree.
    * @param deeptable The full atlas deeptable of which this tile is a part.
    */
-  constructor(
-    key:
-      | string
-      | (Partial<TileManifest> & { key: string })
-      | Partial<LazyTileManifest & { key: string }>,
-    parent: Tile | null,
-    deeptable: Deeptable,
-  ) {
+  constructor(key: string, parent: Tile | null, deeptable: Deeptable) {
     // If it's just initiated with a key, build that into a minimal manifest.
-    let manifest:
-      | (Partial<TileManifest> & { key: string })
-      | Partial<LazyTileManifest & { key: string }>;
-    if (typeof key === 'string') {
-      manifest = { key };
-    } else {
-      manifest = key;
-    }
-    this.key = manifest.key;
+    this.key = key;
     const coords = this.key.split('/').map((value) => parseInt(value, 10));
     while (coords.length < 3) {
       coords.push(0);
@@ -122,12 +103,27 @@ export class Tile {
       throw new Error('No deeptable provided');
     }
 
-    // Grab the next identifier off the queue. This should be async safe with the current setup, but
-    // the logic might fall apart in truly parallel situations.
-    this.numeric_id = tile_identifier++;
+    if (deeptable.flatManifest) {
+      const row = deeptable.flatManifest[tix];
+      const metadata = {
+        key: this.key,
+        min_ix: Number(row.min_ix),
+        max_ix: Number(row.max_ix),
+        extent: JSON.parse(row.extent as string) as Rectangle,
+        nPoints: Number(row.nPoints),
+        children: [] as string[],
+      };
+      for (const child of tixToChildren(tix)) {
+        if (deeptable.flatManifest[child]) {
+          metadata.children.push(tixToZxy(child).join('/'));
+        }
+      }
 
-    if (isCompleteManifest(manifest)) this.manifest = manifest;
-    this._partialManifest = manifest;
+      this._metadata = metadata;
+      this.highest_known_ix = metadata.max_ix;
+    } else {
+      this._metadata = null;
+    }
   }
 
   deleteColumn(colname: string) {
@@ -258,66 +254,58 @@ export class Tile {
     );
   }
 
-  *points(
-    bounding: Rectangle | undefined,
-    sorted = false,
-  ): Iterable<StructRowProxy> {
-    //if (!this.is_visible(1e100, bounding)) {
-    //  return;
-    //}
-    for (const p of this) {
-      if (p_in_rect([p.x as number, p.y as number], bounding)) {
-        yield p;
-      }
+  get metadata(): Omit<TileMetadata, 'extent'> & { extent: Rectangle } {
+    if (!this._metadata) {
+      throw new Error(
+        'Attempted to access manifest on partially loaded tile ' + this.key,
+      );
     }
-    if (sorted === false) {
-      for (const child of this.loadedChildren) {
-        // TODO: fix
-        if (!child.record_batch) {
-          continue;
-        }
-        if (bounding && !child.is_visible(1e100, bounding)) {
-          continue;
-        }
-        for (const p of child.points(bounding, sorted)) {
-          if (p_in_rect([p.x as number, p.y as number], bounding)) {
-            yield p;
-          }
+    return this._metadata;
+  }
+
+  private createChildren() {
+    if (!this._metadata) {
+      throw new Error('Attempted to create children without metadata.');
+    }
+    const { metadata } = this;
+    if (!metadata.children) {
+      // Then the children may be inferred from the manifest.
+      if (!this.deeptable.flatManifest) {
+        throw new Error('Attempted to set an incomplete manifest.');
+      }
+      const { tix } = this;
+      const children: Tile[] = [];
+      for (const childTix of tixToChildren(tix)) {
+        if (this.deeptable.flatManifest[childTix]) {
+          children.push(
+            new Tile(
+              this.deeptable.flatManifest[childTix].key,
+              this,
+              this.deeptable,
+            ),
+          );
         }
       }
+      this._children = children;
     } else {
-      throw new Error('Sorted iteration not supported');
+      this._children = metadata.children.map((k: string) => {
+        return new Tile(k, this, this.deeptable);
+      });
     }
   }
 
-  forEach(callback: (p: StructRowProxy) => void) {
-    for (const p of this.points(undefined, false)) {
-      if (p === undefined) {
-        continue;
-      }
-      callback(p);
-    }
-  }
-
-  get manifest(): TileManifest | LazyTileManifest {
-    if (!this._manifest)
-      throw new Error('Attempted to access manifest on partially loaded tile.');
-
-    return this._manifest;
-  }
-
-  set manifest(manifest: TileManifest | LazyTileManifest) {
+  set metadata(
+    manifest: TileMetadata | (TileMetadata & { extent: Rectangle }),
+  ) {
     // Setting the manifest is the thing that spawns children.
-    if (!manifest.children) {
-      console.error({ manifest });
-      throw new Error('Attempted to set an incomplete manifest.');
-    }
-    this._children = manifest.children.map((k: TileManifest | string) => {
-      return new Tile(k, this, this.deeptable);
-    });
     this.highest_known_ix = manifest.max_ix;
-    this._manifest = manifest;
-    this.readyToUse = true;
+    this._metadata = {
+      ...manifest,
+      extent:
+        typeof manifest.extent === 'string'
+          ? (JSON.parse(manifest.extent) as Rectangle)
+          : manifest.extent,
+    };
   }
 
   set highest_known_ix(val) {
@@ -343,12 +331,12 @@ export class Tile {
       return this._batch;
     }
 
-    if (this._manifest) {
+    if (this._metadata) {
       // This helps support legacy code that may fetch the record_batch
       // just for its number of rows.
       return new RecordBatch({
         // @ts-expect-error Arrow typing doesn't match this constructor.
-        __null: vectorFromArray(Array(this.manifest.nPoints)),
+        __null: vectorFromArray(Array(this.metadata.nPoints)),
       });
     }
 
@@ -358,8 +346,8 @@ export class Tile {
   }
 
   get max_ix(): number {
-    if (this.manifest?.max_ix !== undefined) {
-      return this.manifest.max_ix;
+    if (this.metadata?.max_ix !== undefined) {
+      return this.metadata.max_ix;
     }
     if (this.parent) {
       return this.parent.max_ix + 1;
@@ -368,8 +356,8 @@ export class Tile {
   }
 
   get min_ix() {
-    if (this._manifest && this.manifest?.min_ix !== undefined) {
-      return this.manifest.min_ix;
+    if (this._metadata && this.metadata?.min_ix !== undefined) {
+      return this.metadata.min_ix;
     }
     if (this.parent) {
       return this.parent.max_ix + 1;
@@ -386,8 +374,8 @@ export class Tile {
   }
 
   get extent(): Rectangle {
-    if (this._manifest && this.manifest?.extent) {
-      return this.manifest.extent;
+    if (this._metadata && this.metadata?.extent) {
+      return this.metadata.extent;
     }
     return this.theoretical_extent;
   }
@@ -405,11 +393,8 @@ export class Tile {
      * Triggers many unnecessary calls: prefer
      * download instead if possible.
      */
-    if (suffix === null) {
-      await this.deriveManifestInfoFromTileMetadata();
-    } else {
-      await this.get_arrow(suffix);
-    }
+
+    await this.get_arrow(suffix);
     if (this.max_ix < max_ix) {
       await Promise.all(
         this.loadedChildren.map(
@@ -491,24 +476,10 @@ export class Tile {
    * @returns void
    */
   async populateManifest(): Promise<void> {
-    if (this._manifest) {
+    if (this._metadata) {
       return;
-    } else if (this._partialManifest.children) {
-      if (this._partialManifest.nPoints === undefined) {
-        console.warn('Something is wrong here.');
-      }
-      this.manifest = {
-        ...this._partialManifest,
-        key: this.key,
-        children: this._partialManifest.children as string[],
-        min_ix: this.min_ix,
-        max_ix: this.max_ix,
-        extent: this.extent,
-        nPoints: this._partialManifest.nPoints ?? -1,
-      };
-    } else {
-      this.manifest = await this.deriveManifestInfoFromTileMetadata();
     }
+    this.metadata = await this.deriveManifestInfoFromTileMetadata();
   }
 
   preprocessRootTileInfo(): Promise<void> {
@@ -536,16 +507,14 @@ export class Tile {
     });
   }
 
-  async deriveManifestInfoFromTileMetadata(): Promise<
-    TileManifest | LazyTileManifest
-  > {
+  async deriveManifestInfoFromTileMetadata(): Promise<TileMetadata> {
     // This should only be called once per tile.
-    if (this._deriveManifestFromTileMetadata !== undefined) {
-      return this._deriveManifestFromTileMetadata;
+    if (this._deriveManifestFromBatchMetadata !== undefined) {
+      return this._deriveManifestFromBatchMetadata;
     }
 
-    const manifest: Partial<LazyTileManifest> = {};
-    this._deriveManifestFromTileMetadata = this.get_arrow(null).then(
+    const manifest: Partial<TileMetadata> = {};
+    this._deriveManifestFromBatchMetadata = this.get_arrow(null).then(
       async (batch) => {
         // For every column in the root tile,
         // define a transformation for other children that says
@@ -569,9 +538,9 @@ export class Tile {
         const metadata = batch.schema.metadata;
         const extent = metadata.get('extent');
         if (extent) {
-          manifest.extent = JSON.parse(extent) as Rectangle;
+          manifest.extent = extent;
         } else {
-          manifest.extent = this.theoretical_extent;
+          manifest.extent = JSON.stringify(this.theoretical_extent);
         }
 
         const children = metadata.get('children');
@@ -610,7 +579,7 @@ export class Tile {
       },
     );
 
-    return this._deriveManifestFromTileMetadata;
+    return this._deriveManifestFromBatchMetadata;
   }
 
   /**
@@ -632,29 +601,17 @@ export class Tile {
   // The children that have actually been created already.
   get loadedChildren(): Array<Tile> {
     // create or return children.
-
-    // if (this._children === null) {
-    //   throw new Error(
-    //     'Attempted to access children on a tile before they were determined',
-    //   );
-    // }
-    return this._children;
+    return this._children || [];
   }
 
   // Asynchronously forces generation of all child
   // tiles, and then returns them.
   async allChildren(): Promise<Array<Tile>> {
-    if (this._children.length) {
-      return this._children;
-    }
-    if (this._partialManifest?.children) {
-      for (const child of this.manifest.children) {
-        const childTile = new Tile(child, this, this.deeptable);
-        this._children.push(childTile);
-      }
+    if (this._children) {
       return this._children;
     }
     await this.populateManifest();
+    this.createChildren();
     return this._children;
   }
 

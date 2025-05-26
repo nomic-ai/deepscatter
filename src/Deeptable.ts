@@ -1,4 +1,4 @@
-import { Tile, Rectangle, p_in_rect } from './tile';
+import { Tile, Rectangle } from './tile';
 import { max, bisectLeft, extent } from 'd3-array';
 import type * as DS from './types';
 import {
@@ -37,6 +37,7 @@ import type {
 import { DataSelection } from './selection';
 import { Some, TupleMap } from './utilityFunctions';
 import { getNestedVector } from './regl_rendering';
+import { tileKey_to_tix } from './tixrixqid';
 
 type TransformationStatus = 'queued' | 'in progress' | 'complete' | 'failed';
 
@@ -96,9 +97,9 @@ export class Deeptable {
   // The flatTree is a representation of known tiles in the quadtree in a flat format
   // indexed by tile index (`tix` -- see `tixRixQid`).
   public flatTree: (Tile | undefined | null)[] = [];
+  public flatManifest: (StructRowProxy | null | undefined)[] = [];
   public promise: Promise<void>;
   public root_tile: Tile;
-  public manifest?: DS.TileManifest;
   public fetcherId?: number;
   private _downloaderId?: number;
   // Whether the tileset is structured as a pure quadtree.
@@ -127,21 +128,21 @@ export class Deeptable {
 
     // If no manifest is passed, we still know
     // that there is a root tile at the root key.
-
-    const defaultManifest: Partial<DS.TileManifest> & { key: string } = {
-      key: rootKey,
-      children: undefined,
-      min_ix: 0,
-      max_ix: Number.MAX_SAFE_INTEGER,
-      ...(tileManifest || {}),
-    };
+    // const defaultManifest: Partial<DS.TileManifest> & { key: string } = {
+    //   key: rootKey,
+    //   children: undefined,
+    //   min_ix: 0,
+    //   max_ix: Number.MAX_SAFE_INTEGER,
+    //   ...(tileManifest || {}),
+    // };
+    this.flatManifest = tileManifest ? flatManifest(tileManifest) : [];
     // Must come after manifest is set.
     this.base_url = baseUrl;
-    this.root_tile = new Tile(defaultManifest, null, this);
+    this.root_tile = new Tile(rootKey, null, this);
     // At instantiation, the deeptable isn't ready; only once this
     // async stuff is done can the deeptable be used.
     // TODO: Add an async static method as the preferred initialization method.
-    this.promise = this._makePromise(defaultManifest);
+    this.promise = this._makePromise();
   }
 
   /**
@@ -160,7 +161,7 @@ export class Deeptable {
     baseUrl: string;
     plot?: Scatterplot | null;
   }) {
-    let manifest: DS.TileManifest;
+    let manifest: Table;
     if (tileProxy !== undefined) {
       throw new Error('Not yet supported');
     } else {
@@ -181,15 +182,14 @@ export class Deeptable {
   /**
    * Internal function to ensure
    */
-  protected _makePromise(
-    tileManifest: Partial<DS.TileManifest> & { key: string },
-  ): Promise<void> {
+  protected _makePromise(): Promise<void> {
+    const { flatManifest } = this;
     return this.root_tile.preprocessRootTileInfo().then(async () => {
       const batch = await this.root_tile.get_arrow(null);
       const schema = batch.schema;
       // TODO: Cleaner check that it's a lazy manifest
-      if (!tileManifest.max_ix) {
-        this.root_tile.manifest =
+      if (!flatManifest[0]) { // An empty flatManifest indicates a legacy (or missing) manifest and triggers derivation of metadata.
+        this.root_tile.metadata =
           await this.root_tile.deriveManifestInfoFromTileMetadata();
       }
       if (schema.metadata.has('sidecars')) {
@@ -242,7 +242,7 @@ export class Deeptable {
     if (!this.root_tile.hasLoadedColumn('x')) {
       throw new Error("Can't access extent without a root tile");
     }
-    return this.root_tile.manifest.extent;
+    return this.root_tile.metadata.extent;
   }
 
   /**
@@ -462,27 +462,6 @@ export class Deeptable {
     return this.extents.get(key);
   }
 
-  *points(bbox: Rectangle | undefined, max_ix = 1e99) {
-    const stack: Tile[] = [this.root_tile];
-    // undefined just for the check in the iterator.
-    let current: Tile | undefined;
-    while ((current = stack.shift())) {
-      if (
-        current.hasLoadedColumn('ix') &&
-        (bbox === undefined || current.is_visible(max_ix, bbox))
-      ) {
-        for (const point of current) {
-          if (
-            p_in_rect([point.x as number, point.y as number], bbox) &&
-            point.ix <= max_ix
-          ) {
-            yield point;
-          }
-        }
-        stack.push(...current.loadedChildren);
-      }
-    }
-  }
   /**
    * Map a function against all tiles.
    * It is often useful simply to invoke Deeptable.map(d => d) to
@@ -518,7 +497,6 @@ export class Deeptable {
     filter: (t: Tile) => boolean = () => true,
   ) {
     // Visit all children with a callback function.
-
     const stack: Tile[] = [this.root_tile];
     const after_stack = [];
     let current: Tile | undefined;
@@ -531,6 +509,7 @@ export class Deeptable {
       if (!filter(current)) {
         continue;
       }
+      // console.log(current.key, current.loadedChildren);
       // Only create children for downloaded tiles.
       stack.push(...current.loadedChildren);
     }
@@ -1212,76 +1191,19 @@ function minTwo(a: number, b: number) {
   return a > b ? b : a;
 }
 
-type RowFormatManifest = {
-  key: string;
-  nPoints: number;
-  min_ix: number;
-  max_ix: number;
-  extent: string; // JSON deserializes to a rectangle.
-};
-
-export type TileManifest = {
-  key: string;
-  // The number of data points in that specific tile.
-  nPoints: number;
-  children: TileManifest[];
-  min_ix: number;
-  max_ix: number;
-  extent: Rectangle;
-};
-
-export async function loadTileManifest(url: string): Promise<TileManifest> {
+export async function loadTileManifest(url: string): Promise<Table> {
   const data = await fetch(url).then((d) => d.arrayBuffer());
   const tb = tableFromIPC(data);
-  const rows: RowFormatManifest[] = [...tb].map(
-    ({ key, nPoints, min_ix, max_ix, extent }: RowFormatManifest) => {
-      return {
-        key, // string
-        nPoints: Number(nPoints), // Number because this can come in as a BigInt
-        min_ix: Number(min_ix), // BigInt -> Number cast
-        max_ix: Number(max_ix), // BigInt -> Number cast.
-        extent, // Leave as unparsed json.
-      } as const;
-    },
-  );
-  return parseManifest(rows);
+  return tb;
 }
 
-/**
- * We receive a manifest as a list of tiles, but deepscatter wants to receive a nested tree.
- * This function converts from one to the other, using the format of the quadtree to check
- * which of all possible children exist.
- *
- * @param raw The manifest as it comes in from the
- * @returns A tree-structured manifest suitable for passing to deeptable's "tileManifest" argument.
- */
-export function parseManifest(rows: RowFormatManifest[]): TileManifest {
-  const lookup = Object.fromEntries(rows.map((d) => [d.key, d]));
-
-  /**
-   * Given a row, finds its children and recursively
-   * @param input The row to insert.
-   * @returns A tree-shaped manifest.
-   */
-  function buildNetwork(input: RowFormatManifest): TileManifest {
-    const children: TileManifest[] = [];
-    const [z, x, y] = input.key.split('/').map((i) => parseInt(i));
-    for (const i of [0, 1]) {
-      for (const j of [0, 1]) {
-        const childKey = `${z + 1}/${x * 2 + i}/${y * 2 + j}`;
-        if (lookup[childKey]) {
-          const manifest = buildNetwork(lookup[childKey]);
-          children.push(manifest);
-        }
-      }
-    }
-    return {
-      ...input,
-      extent: JSON.parse(input.extent) as Rectangle,
-      children,
-    };
+export function flatManifest(
+  table: Table<Record<'key', Utf8>>,
+): (StructRowProxy | undefined | null)[] {
+  const flatTree: (StructRowProxy | undefined | null)[] = [];
+  for (const row of [...table]) {
+    const tix = tileKey_to_tix((row as StructRowProxy)['key'] as string);
+    flatTree[tix] = row as StructRowProxy;
   }
-  const networked = buildNetwork(lookup['0/0/0']);
-
-  return networked;
+  return flatTree;
 }

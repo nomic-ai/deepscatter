@@ -67,23 +67,14 @@ export type ScatterplotOptions = {
 // allow certain optimizations.
 export type TileStructure = 'quadtree' | 'other';
 
-export type LazyTileManifest = {
+export type TileMetadata = {
   key: string;
   // The number of data points in that specific tile.
   nPoints: number;
-  children: string[];
+  children?: string[]; // If children is not passed in metadata, it may be looked up on the tile.
   min_ix: number;
   max_ix: number;
-  extent: Rectangle;
-};
-export type TileManifest = {
-  key: string;
-  // The number of data points in that specific tile.
-  nPoints: number;
-  children: TileManifest[];
-  min_ix: number;
-  max_ix: number;
-  extent: Rectangle;
+  extent: string;
 };
 
 /**
@@ -108,9 +99,9 @@ export type DeeptableCreateParams = {
   // may be inferred.
   tileStructure?: TileStructure;
 
-  // A manifest listing all the tiles in the deeptable.
-  // Currently this must be passed as a recursive structure.
-  tileManifest?: Partial<TileManifest>;
+  // A manifest listing all the tiles in the deeptable, of the type created by
+  // quadfeather v2.0.0 or greater.
+  tileManifest?: Table;
 
   // A URL for an arrow file manifest. The schema for this manifest
   // is not yet publically documented: I hope to bundle it into the
