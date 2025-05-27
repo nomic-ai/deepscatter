@@ -37,7 +37,7 @@ import type {
 import { DataSelection } from './selection';
 import { Some, TupleMap } from './utilityFunctions';
 import { getNestedVector } from './regl_rendering';
-import { tileKey_to_tix } from './tixrixqid';
+import { Qid, tileKey_to_tix } from './tixrixqid';
 
 type TransformationStatus = 'queued' | 'in progress' | 'complete' | 'failed';
 
@@ -961,6 +961,25 @@ export class Deeptable {
         return array;
       }
     };
+  }
+
+  getQids(qids: Qid[]): StructRowProxy[] {
+    // For a set of tile row tuples, returns underlying
+    // structRowProxies. Note that this makes no concrete guarantee about
+    // **which** fields will be loaded in the underlying arrow arrays.
+    const matches : StructRowProxy[] = []
+    for (const [tix, rix] of qids) {
+      if (this.flatTree[tix] === undefined) {
+        // If we can't immediately find the tile, check if it's hiding
+        const tile = this.map(t => t).find(t => t.tix === tix)
+        this.flatTree[tix] = tile || null;        
+      }
+      if (this.flatTree[tix] === null) {
+        throw new Error("Missing tile index " + tix)
+      }
+      matches.push(this.flatTree[tix].record_batch.get(rix))
+    }
+    return matches
   }
 }
 

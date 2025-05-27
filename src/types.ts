@@ -11,6 +11,7 @@ import type {
   Timestamp,
   Utf8,
   Vector,
+  TypeMap,
 } from 'apache-arrow';
 import type { Renderer } from './rendering';
 import type { Deeptable } from './Deeptable';
@@ -45,6 +46,9 @@ export type PointFunction<T = number> = (p: StructRowProxy) => T;
  * A proxy class that wraps around tile get calls. Used to avoid
  * putting Nomic login logic in deepscatter while fetching
  * tiles with authentication.
+ * 
+ * An API call type must return Uint8Arrays that represent arrow 
+ * tables of the type produced by quadfeather.
  *
  */
 export interface TileProxy {
@@ -101,7 +105,7 @@ export type DeeptableCreateParams = {
 
   // A manifest listing all the tiles in the deeptable, of the type created by
   // quadfeather v2.0.0 or greater.
-  tileManifest?: Table;
+  tileManifest?: Table<{key: Utf8}>;
 
   // A URL for an arrow file manifest. The schema for this manifest
   // is not yet publically documented: I hope to bundle it into the

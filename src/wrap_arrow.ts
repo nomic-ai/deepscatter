@@ -8,12 +8,15 @@ import {
   vectorFromArray,
   Vector,
   Float,
+  tableFromArrays,
+  Utf8,
 } from 'apache-arrow';
 import { Deeptable } from './Deeptable';
 import { add_or_delete_column } from './Deeptable';
 import type * as DS from './types';
-import { extent } from 'd3-array';
+import { extent, extent, range } from 'd3-array';
 import { Rectangle } from './tile';
+import { tixToZxy } from './tixrixqid';
 
 /**
  * This function is used to wrap an arrow table into a
@@ -31,21 +34,35 @@ export function wrapArrowTable(
 ): Deeptable {
   let tb = tableFromIPC(tbArray);
   let batches = tb.batches;
+  const minIx = []
+  const maxIx = []
+  // Extents of each tile, as JSON.
+  const extents : string[] = []
   if (tb.getChild('ix') === null) {
     let rowNum = 0;
     batches = batches.map((batch) => {
       if (batch.numRows > 2 ** 16) {
         throw new Error(
-          'Arrow record batches temporarily limited to 2^16 rows.',
+          'Arrow record batches limited to 2^16 rows.',
         );
       }
       const array = new Int32Array(batch.numRows);
       for (let i = 0; i < batch.numRows; i++) {
         array[i] = rowNum++;
       }
-      return add_or_delete_column(batch, 'ix', vectorFromArray(array));
+      return add_or_delete_column(batch, 'ix', vectorFromArray(array));      
     });
     tb = new Table(batches);
+  }
+  for (const batch of batches) {
+    minIx.push(batch.get(0)['ix'])
+    maxIx.push(batch.get(batch.numRows - 1)['ix'])
+    extents.push(
+      JSON.stringify({
+        x: extent(batch.getChild('x')),
+        y: extent(batch.getChild('y'))
+      })
+    )
   }
 
   const proxy = new ArrowProxy(batches);
@@ -65,12 +82,25 @@ export function wrapArrowTable(
     y: extent([...(y as Iterable<number>)]),
   } as Rectangle;
 
+
+  const tileManifest = tableFromArrays({
+    // @ts-expect-error missing types for tableFromArrays in arrow js
+    key: vectorFromArray(range(batches.length).map(t => tixToZxy(t).join('/')), new Utf8()),
+    min_ix: minIx,
+    max_ix: maxIx,
+    nPoints: batches.map(d => d.numRows),
+    // @ts-expect-error missing types for tableFromArrays in arrow js
+    extent: vectorFromArray(extents, new Utf8())
+  })
+
   return new Deeptable({
     baseUrl: `feather://table`,
     plot,
     tileProxy: proxy,
     tileStructure: 'other',
     extent: dataExtent,
+    // @ts-expect-error missing types for tableFromArrays in arrow js
+    tileManifest
   });
 }
 

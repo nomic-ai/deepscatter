@@ -28,7 +28,7 @@ test('Columns can be deleted and replaced', async () => {
 
   dataset.transformations['integers'] = async function (tile) {
     await tile.populateManifest();
-    return new Float32Array(tile.manifest.nPoints);
+    return new Float32Array(tile.metadata.nPoints);
   };
 
   dataset.deleteColumn('integers');

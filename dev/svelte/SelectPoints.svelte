@@ -8,8 +8,8 @@
     const selection = await scatterplot.deeptable.select_data({
       name: Math.random().toFixed(8),
       tileFunction: async (tile) => {
-        const b = new Bitmask(tile.manifest.nPoints);
-        for (let i = 0; i < tile.manifest.nPoints; i++) {
+        const b = new Bitmask(tile.metadata.nPoints);
+        for (let i = 0; i < tile.metadata.nPoints; i++) {
           if (Math.random() < 0.001) {
             b.set(i);
           }
