@@ -14,7 +14,7 @@ import {
 import { Deeptable } from './Deeptable';
 import { add_or_delete_column } from './Deeptable';
 import type * as DS from './types';
-import { extent, extent, range } from 'd3-array';
+import { extent, range } from 'd3-array';
 import { Rectangle } from './tile';
 import { tixToZxy } from './tixrixqid';
 
