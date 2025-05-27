@@ -10,11 +10,13 @@ It's fast for three reasons:
    once transferred, compresses pretty well, and can be directly copied to the GPU without
    transformation in JS. This is [the way of the future.](https://benschmidt.org/post/2020-01-15/2020-01-15-webgpu/)
    We also now allow custom in-browser calculations on Arrow data.
+
 2. Most rendering is done in custom layers using WebGL, with a
    buffer management strategy handled by REGL. This means that
    there are no unnecessary abstractions around points or separate draw calls
    for different objects; a minimum number of buffers are attached for all
    needed points.
+
 3. Almost all grammar-of-graphics transforms such are handled on the GPU,
    which allows for interpolated transitions with calculations
    done in parallel.
