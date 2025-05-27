@@ -173,7 +173,7 @@ export class Zoom {
         if (event.sourceEvent) {
           (event.sourceEvent as Event).stopPropagation();
         }
-      });
+      })
 
     canvas.call(zoomer);
 
