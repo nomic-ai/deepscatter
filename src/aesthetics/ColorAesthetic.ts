@@ -163,6 +163,7 @@ function getSequentialScale(
   if (typeof range === 'string') {
     // So we have to write `puOr`, `viridis`, etc. instead of `PuOr`, `Viridis`
     interpolator = interpolators[range];
+
     if (interpolator === undefined) {
       throw new Error(`Unknown interpolator ${range}`);
     }
