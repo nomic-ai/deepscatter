@@ -22,7 +22,7 @@ type Annotation = {
   dx: number;
   dy: number;
   data: StructRowProxy;
-  qid: Qid
+  qid: Qid;
 };
 
 // A collection of zoomed and unzoomed scales returned by the interaction component.

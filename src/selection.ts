@@ -709,7 +709,12 @@ export class DataSelection {
     const mask = Bitmask.from_arrow(column);
     const which = mask.which();
 
-    const indexMatch = which.indexOf(rowNumber);
+
+const indexMatch = which.indexOf(rowNumber);
+if (indexMatch === -1) {
+  throw new Error(`Row ${rowNumber} not found in selection`);
+}
+
 
     this.cursor = currentOffset + indexMatch;
   }
