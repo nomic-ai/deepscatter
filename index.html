@@ -1,0 +1,131 @@
+<!DOCTYPE html><html class="default" lang="en"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>deepscatter</title><meta name="description" content="Documentation for deepscatter"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><div class="table-cell" id="tsd-search" data-base="."><div class="field"><label for="tsd-search-field" class="tsd-widget tsd-toolbar-icon search no-caption"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><use href="assets/icons.svg#icon-search"></use></svg></label><input type="text" id="tsd-search-field" aria-label="Search"/></div><div class="field"><div id="tsd-toolbar-links"></div></div><ul class="results"><li class="state loading">Preparing search index...</li><li class="state failure">The search index is not available</li></ul><a href="index.html" class="title">deepscatter</a></div><div class="table-cell" id="tsd-widgets"><a href="#" class="tsd-widget tsd-toolbar-icon menu no-caption" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h2>deepscatter</h2></div><div class="tsd-panel tsd-typography"><a id="md:deep-scatterplots-for-the-web" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Deep Scatterplots for the Web<a href="#md:deep-scatterplots-for-the-web" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p>This is a library for allowing interactive visualization of extremely large datasets, in browser.</p>
+<p>It's fast for three reasons:</p>
+<ol>
+<li>
+<p>All data is sent in the Apache Arrow <code>feather</code> format, in a
+custom quadtree format that makes it possible to only load
+data as needed on zoom. Feather takes no time to parse in the browser
+once transferred, compresses pretty well, and can be directly copied to the GPU without
+transformation in JS. This is <a href="https://benschmidt.org/post/2020-01-15/2020-01-15-webgpu/">the way of the future.</a>
+We also now allow custom in-browser calculations on Arrow data.</p>
+</li>
+<li>
+<p>Most rendering is done in custom layers using WebGL, with a
+buffer management strategy handled by REGL. This means that
+there are no unnecessary abstractions around points or separate draw calls
+for different objects; a minimum number of buffers are attached for all
+needed points.</p>
+</li>
+<li>
+<p>Almost all grammar-of-graphics transforms such are handled on the GPU,
+which allows for interpolated transitions with calculations
+done in parallel.</p>
+</li>
+</ol>
+<p>It also runs in completely static settings, so you can host a million-point scatterplot over something like Github Pages.</p>
+<p>Deepscatter is the underlying graphics engine for <a href="https://atlas.nomic.ai">Atlas</a>. It is provided under an NC-CC-BY-SA license for all noncommercial use.</p>
+<a id="md:examples" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Examples<a href="#md:examples" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><ul>
+<li><a href="https://atlas.nomic.ai/map/twitter">Atlas map of 5.5 million tweets</a>. (Nomic)</li>
+<li><a href="https://static.nomic.ai/pubmed.html">Narrative visualization of 20 million biomedical abstracts embedded using T-SNE.</a>. (Collaboration between Nomic and the University of Tübingen).</li>
+<li><a href="https://observablehq.com/@bmschmidt/arxiv">1 million+ documents from arxiv.com</a> rendered inside an Observable notebook. (Ben Schmidt)</li>
+<li><a href="https://all-of-us.benschmidt.org">Every person in the 2010 and 2020 US Censuses</a> displayed in an interactive svelte-kit app. (Ben Schmidt)</li>
+<li><a href="https://situating.us/explore">Newspaper Articles at the Library of Congress from the Reconstruction Era</a>. (Andromeda Yelton while in residency at the Library of Congress).</li>
+</ul>
+<a id="md:documentation" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Documentation<a href="#md:documentation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p>See <a href="https://nomic-ai.github.io/deepscatter/">the autogenerated typescript documentation</a> for a full list of methods and functions.</p>
+<a id="md:get-help" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Get help<a href="#md:get-help" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p>Github issues, even low quality ones, are welcome here.</p>
+<p>There is also a dedicated <a href="https://join.slack.com/t/deepscatter/shared_invite/zt-17kbudjhj-zVzt26zddEpSyACe2E71Fw">Deepscatter Slack</a> which you are welcome to join. Nomic maintains a <a href="https://discord.gg/4M2QFmTt2k">discord server</a> that has dedicated Deepscatter and Atlas support channels.</p>
+<p>I came into doing this stuff from a very non-technical background and welcome people to join with naive questions.</p>
+<a id="md:quick-start" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Quick start<a href="#md:quick-start" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><a id="md:importing-the-module" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Importing the module.<a href="#md:importing-the-module" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>See the <a href="https://observablehq.com/@bmschmidt/arxiv">arxiv example above</a> to see some basic examples.</p>
+<a id="md:running-locally" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Running locally.<a href="#md:running-locally" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>First, install the companion tiling library, which is written in python,
+and generate a million points of test data in tiles of 50000 apiece.</p>
+<p>Because python finally has a decent package management system that's learned from npm, you should use it!</p>
+<pre><code class="sh"><span class="hl-0">uv</span><span class="hl-1"> </span><span class="hl-2">init</span><br/><span class="hl-0">uv</span><span class="hl-1"> </span><span class="hl-2">add</span><span class="hl-1"> </span><span class="hl-2">git+https://github.com/bmschmidt/quadfeather</span><br/><span class="hl-0">uv</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">quadfeather-test-data</span><span class="hl-1"> </span><span class="hl-2">1_000_000</span><br/><span class="hl-0">uv</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">quadfeather</span><span class="hl-1"> </span><span class="hl-3">--files</span><span class="hl-1"> </span><span class="hl-2">tmp.csv</span><span class="hl-1"> </span><span class="hl-3">--tile_size</span><span class="hl-1"> </span><span class="hl-2">50_000</span><span class="hl-1"> </span><span class="hl-3">--destination</span><span class="hl-1"> </span><span class="hl-2">tiles</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Then setup this library to run. It will start a local dev server.</p>
+<pre><code class="sh"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">i</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span>
+</code><button type="button">Copy</button></pre>
+
+<p>If you go to <code>localhost:3344</code>, you should see an interactive scatterplot. To dig into what you're seeing, open <code>index.html</code>.
+(In 2021, this development site works in Chrome, not Safari or Firefox, because it uses ES6 module syntax inside the webworker. The distributed version of
+the module should work in all browsers.)</p>
+<a id="md:your-own-data" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Your own data.<a href="#md:your-own-data" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ol>
+<li>
+<p>Create a CSV, parquet, or feather file that has columns called 'x' and 'y'. (Or a feather file that has columns <code>x</code>, <code>y</code>). Any other columns (categorical information, etc.) can be included as additional columns.</p>
+</li>
+<li>
+<p>Tile it:</p>
+</li>
+</ol>
+<pre><code class="sh"><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-2">deepscatter</span><span class="hl-1"> </span><span class="hl-4"># if you&#39;re not already there</span><br/><span class="hl-0">quadfeather</span><span class="hl-1"> </span><span class="hl-3">--files</span><span class="hl-1"> </span><span class="hl-2">../some-path-to/your-data.csv</span><span class="hl-1"> </span><span class="hl-3">--tile_size</span><span class="hl-1"> </span><span class="hl-5">50000</span><span class="hl-1"> </span><span class="hl-3">--destination</span><span class="hl-1"> </span><span class="hl-2">tiles</span>
+</code><button type="button">Copy</button></pre>
+
+<ol start="3">
+<li>Assuming your dataset has an <code>x</code> and <code>y</code> column and the <code>tiles</code> folder is in the root directory of this project, you can see the data visualized by running</li>
+</ol>
+<pre><code class="sh"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">dev</span>
+</code><button type="button">Copy</button></pre>
+
+<p>and opening <code>http://localhost:3345/index-simplest-way-to-start.html</code> in your browser.</p>
+<p>To edit the visualization, or to troubleshoot, look at the file <code>index-simplest-way-to-start.html</code>, where you should find a bare-bones implementation of deepscatter.</p>
+<p>Explore <code>index.html</code>, and render it at <code>http://localhost:3345/index.html</code>, for a more advanced example.</p>
+<p>Note: Ideally, in a future release you'll be able to create these specs in away that doesn't require coding JSON directly.</p>
+<a id="md:build-the-module" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Build the module<a href="#md:build-the-module" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><pre><code class="sh"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span>
+</code><button type="button">Copy</button></pre>
+
+<p>will create an ES module at <code>dist/deepscatter.es.js</code> The mechanics of
+importing this are very slightly different than <code>index.html</code>.</p>
+<p>Note that this is an ESM module and so requires you to use <code>&lt;script type=&quot;module&quot;&gt;</code> in your code.
+Don't worry! We're allowed to
+do this now! But do be aware that this will not work on computers running very old browsers.</p>
+<p>Snippet:</p>
+<pre><code class="html"><span class="hl-6">&lt;</span><span class="hl-7">div</span><span class="hl-1"> </span><span class="hl-8">id</span><span class="hl-1">=</span><span class="hl-9">&quot;my-div&quot;</span><span class="hl-6">&gt;&lt;/</span><span class="hl-7">div</span><span class="hl-6">&gt;</span><br/><span class="hl-6">&lt;</span><span class="hl-7">script</span><span class="hl-10"> </span><span class="hl-8">type</span><span class="hl-10">=</span><span class="hl-9">&quot;module&quot;</span><span class="hl-6">&gt;</span><br/><span class="hl-10">  </span><span class="hl-11">import</span><span class="hl-10"> </span><span class="hl-12">Scatterplot</span><span class="hl-10"> </span><span class="hl-11">from</span><span class="hl-10"> </span><span class="hl-2">&#39;./dist/deepscatter.umd.js&#39;</span><span class="hl-10">;</span><br/><span class="hl-10">  </span><span class="hl-12">f</span><span class="hl-10"> </span><span class="hl-1">=</span><span class="hl-10"> </span><span class="hl-3">new</span><span class="hl-10"> </span><span class="hl-0">Scatterplot</span><span class="hl-10">(</span><span class="hl-2">&#39;#my-div&#39;</span><span class="hl-10">);</span><br/><span class="hl-6">&lt;/</span><span class="hl-7">script</span><span class="hl-6">&gt;</span>
+</code><button type="button">Copy</button></pre>
+
+<p>See <code>index_prod.html</code> for an example</p>
+<p>This is currently bundled with vite and rollup. There is/will be a further interaction layer on
+top of it, but the core plotting components are separate and should work as a standalone layer that supports
+plot requests via an API.</p>
+<a id="md:code-strategy" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Code strategy<a href="#md:code-strategy" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p>Any interaction logic that changes the API call directly does not belong in this library. The only
+interaction code here is for zooming and interacting with points.</p>
+<a id="md:future-codebase-splits" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Future codebase splits.<a href="#md:future-codebase-splits" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>The plotting components and the tiling components are logically quite separate; I may break
+the tiling strategy into a separate JS library called 'quadfeather'.</p>
+<p>Apache Arrow would still be a necessary intermediate format, but it could be generated from CSV files
+using, say, <code>arquero</code> or a WASM port of <code>DuckDB</code>.</p>
+<a id="md:api" class="tsd-anchor"></a><h1 class="tsd-anchor-link">API<a href="#md:api" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p>This is still subject to change and is not fully documented. The encoding portion of the API mimics Vega-Lite with some minor distinctions to avoid deeply-nested queries and to add animation and jitter parameters.</p>
+<pre><code class="js"><span class="hl-1">{</span><br/><span class="hl-1">   </span><span class="hl-13">encoding</span><span class="hl-1">: {</span><br/><span class="hl-1">     </span><span class="hl-2">&quot;x&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">         </span><span class="hl-2">&quot;field&quot;</span><span class="hl-12">:</span><span class="hl-1"> </span><span class="hl-2">&quot;x&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">         </span><span class="hl-2">&quot;transform&quot;</span><span class="hl-12">:</span><span class="hl-1"> </span><span class="hl-2">&quot;literal&quot;</span><br/><span class="hl-1">     },</span><br/><span class="hl-1">     </span><span class="hl-2">&quot;color&quot;</span><span class="hl-1">: {</span><br/><span class="hl-1">         </span><span class="hl-2">&quot;field&quot;</span><span class="hl-12">:</span><span class="hl-1"> </span><span class="hl-2">&quot;year&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">         </span><span class="hl-2">&quot;range&quot;</span><span class="hl-12">:</span><span class="hl-1"> </span><span class="hl-2">&quot;viridis&quot;</span><span class="hl-1">,</span><br/><span class="hl-1">         </span><span class="hl-2">&quot;domain&quot;</span><span class="hl-12">:</span><span class="hl-1"> [</span><span class="hl-5">1970</span><span class="hl-1">, </span><span class="hl-5">2020</span><span class="hl-1">]</span><br/><span class="hl-1">   }</span><br/><span class="hl-1">}</span><br/>
+</code><button type="button">Copy</button></pre>
+
+<a id="md:implemented-aesthetics" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Implemented aesthetics.<a href="#md:implemented-aesthetics" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ol>
+<li>x</li>
+<li>y</li>
+<li>size</li>
+<li>jitter_radius: size of jitter. API subject to change.</li>
+<li>jitter_speed: speed of jitter. API subject to change.</li>
+<li>color (categorical or linear: range can call color scales explicitly, or accepting any d3-color name.)</li>
+<li><code>x0</code> (for animations; transitions between x0 and x)</li>
+<li><code>y0</code> (for animations; transitions between y0 and y)</li>
+<li><code>filter</code>. (Filtering is treated as an aesthetic operation by this library.)</li>
+</ol>
+<a id="md:planned" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Planned<a href="#md:planned" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><ol>
+<li>Symbol (Mapping of categorical variables to single unicode points in a single font; probably 255 max.)</li>
+<li>Label (Full-text label)</li>
+<li>Image (Like PixPlot)</li>
+</ol>
+<a id="md:jitter" class="tsd-anchor"></a><h2 class="tsd-anchor-link">Jitter<a href="#md:jitter" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>Jitter is a little overloaded with features right now, but some are quite fun.</p>
+<p>jitter method is set on 'method' key of the 'jitter_radius' field. Possible values are:</p>
+<ol>
+<li><code>circle</code></li>
+<li><code>spiral</code></li>
+<li><code>time</code></li>
+<li><code>normal</code></li>
+</ol>
+<a id="md:principles" class="tsd-anchor"></a><h1 class="tsd-anchor-link">Principles<a href="#md:principles" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><ol>
+<li>This is a 2d library. No fake 3d.</li>
+<li>The central zoom state is handled by d3-zoom.</li>
+<li>Use the zoom state to render other layers on top of Deepscatter by hooking in (note <code>on_zoom</code> is directly set, <em>not</em> passed in via <code>prefs</code>):</li>
+</ol>
+<pre><code class="js"><span class="hl-3">const</span><span class="hl-1"> </span><span class="hl-14">scatterplot</span><span class="hl-1"> = </span><span class="hl-3">new</span><span class="hl-1"> </span><span class="hl-0">Scatterplot</span><span class="hl-1">(</span><span class="hl-2">&#39;#deepscatter&#39;</span><span class="hl-1">);</span><br/><span class="hl-12">scatterplot</span><span class="hl-1">.</span><span class="hl-0">on_zoom</span><span class="hl-1"> = (</span><span class="hl-12">transform</span><span class="hl-1">) </span><span class="hl-3">=&gt;</span><span class="hl-1"> {...}</span>
+</code><button type="button">Copy</button></pre>
+
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="assets/icons.svg#icon-chevronDown"></use></svg>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="assets/icons.svg#icon-chevronDown"></use></svg>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#md:deep-scatterplots-for-the-web"><span>Deep <wbr/>Scatterplots for the <wbr/>Web</span></a><a href="#md:examples"><span>Examples</span></a><a href="#md:documentation"><span>Documentation</span></a><a href="#md:get-help"><span>Get help</span></a><a href="#md:quick-start"><span>Quick start</span></a><ul><li><a href="#md:importing-the-module"><span>Importing the module.</span></a></li><li><a href="#md:running-locally"><span>Running locally.</span></a></li><li><a href="#md:your-own-data"><span>Your own data.</span></a></li><li><a href="#md:build-the-module"><span>Build the module</span></a></li></ul><a href="#md:code-strategy"><span>Code strategy</span></a><ul><li><a href="#md:future-codebase-splits"><span>Future codebase splits.</span></a></li></ul><a href="#md:api"><span>API</span></a><ul><li><a href="#md:implemented-aesthetics"><span>Implemented aesthetics.</span></a></li><li><a href="#md:planned"><span>Planned</span></a></li><li><a href="#md:jitter"><span>Jitter</span></a></li></ul><a href="#md:principles"><span>Principles</span></a></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="index.html" class="current"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="assets/icons.svg#icon-1"></use></svg><span>deepscatter</span></a><ul class="tsd-small-nested-navigation" id="tsd-nav-container" data-base="."><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
