@@ -68,7 +68,6 @@ export class Scatterplot {
   ready: Promise<void>;
 
   public click_handler: ClickFunction;
-  public mouseover_handler: PointMouseoverFunction;
   private hooks: Record<string, Hook> = {};
   public tooltip_handler: TooltipHTML;
   public label_click_handler: LabelClick;
@@ -582,21 +581,18 @@ export class Scatterplot {
     return this._renderer.aes.dim(dimension).current;
   }
 
-  set tooltip_html(func) {
-    this.tooltip_handler.f = func;
+  set tooltip_html(func: (d: StructRowProxy, plot: Scatterplot | undefined ) => string) {
+    const deeptable = this.deeptable;
+    this.tooltip_handler.f = function(e, plot) {
+     return func(deeptable.getQids([e])[0], plot);
+    }
   }
 
-  get tooltip_html() {
-    /* PUBLIC see set tooltip_html */
-    return this.tooltip_handler.f;
-  }
-
-  get mouseover_callback() {
-    return this.mouseover_handler.f;
-  }
-
-  set mouseover_callback(func) {
-    this.mouseover_handler.f = func;
+  set click_function(func: (d: StructRowProxy, plot: Scatterplot | undefined ) => void) {
+    const deeptable = this.deeptable;
+    this.click_handler.f = function(e, plot) {
+      func(deeptable.getQids([e])[0], plot);
+    }
   }
 
   set label_click(
@@ -612,8 +608,12 @@ export class Scatterplot {
   }
 
   set highlit_point_change(
-    func: (datum: StructRowProxy[], plot: Scatterplot) => void,
+    func: (datum: Qid[], plot: Scatterplot) => void,
   ) {
+    /**
+     * A lower-level handler for point changes. This takes Qids
+     * rather than materialized structrowproxies as arguments.
+     */
     this.handle_highlit_point_change.f = func;
   }
 
@@ -623,13 +623,7 @@ export class Scatterplot {
     );
   }
 
-  set click_function(func) {
-    this.click_handler.f = func;
-  }
-  get click_function() {
-    /* PUBLIC see set click_function */
-    return this.click_handler.f;
-  }
+
   /**
    * Plots a set of prefs, and returns a promise that resolves
    * upon the completion of the plot (not including any time for transitions).
@@ -699,15 +693,14 @@ export class Scatterplot {
       }
       //
       const needed_keys = neededFieldsToPlot(prefs.encoding);
-      void this.deeptable.root_tile.require_columns(
+      const root_call = this.deeptable.root_tile.require_columns(
         [...needed_keys].map((k) => k[0]),
       );
       // Immediately start loading what we can onto the GPUs, too.
       for (const tile of this.renderer.visible_tiles()) {
         this._renderer.bufferManager.ready(tile, needed_keys);
       }
-      // TODO: There should be a setTimeout here before the resolution
-      resolve();
+      void root_call.then(() => resolve())
     });
   }
   /**
@@ -863,7 +856,7 @@ export class Scatterplot {
 /**
  A function that can be set by a string or directly with a function
 */
-abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
+abstract class SettableFunction<FuncType, ArgType = Qid> {
   public _f: undefined | ((datum: ArgType, plot: Scatterplot) => FuncType);
   public string_rep: string;
   public plot: Scatterplot;
@@ -888,6 +881,7 @@ abstract class SettableFunction<FuncType, ArgType = StructRowProxy> {
 
 import type { GeoJsonProperties } from 'geojson';
 import { default_API_call } from './defaults';
+import type { Qid } from './tixrixqid';
 
 class LabelClick extends SettableFunction<void, GeoJsonProperties> {
   default(
@@ -905,26 +899,19 @@ class LabelClick extends SettableFunction<void, GeoJsonProperties> {
   }
 }
 
-class ClickFunction extends SettableFunction<void> {
+class ClickFunction extends SettableFunction<void, Qid> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default(datum: StructRowProxy, plot: Scatterplot | undefined = undefined) {
+  default(datum: Qid, plot: Scatterplot | undefined = undefined) {
     return;
   }
 }
 
 class ChangeToHighlitPointFunction extends SettableFunction<
   void,
-  StructRowProxy[]
+  Qid[]
 > {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default(points: StructRowProxy[], plot: Scatterplot | undefined = undefined) {
-    return;
-  }
-}
-
-class PointMouseoverFunction extends SettableFunction<void, StructRowProxy[]> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default(points: StructRowProxy[], plot: Scatterplot | undefined = undefined) {
+  default(points: Qid[], plot: Scatterplot | undefined = undefined) {
     return;
   }
 }
@@ -933,9 +920,9 @@ class PointMouseoverFunction extends SettableFunction<void, StructRowProxy[]> {
  * A holder for a function that returns the HTML that should appear in a tooltip next to a point.
  */
 
-class TooltipHTML extends SettableFunction<string> {
+class TooltipHTML extends SettableFunction<string, Qid> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  default(point: StructRowProxy, plot: Scatterplot | undefined = undefined) {
+  default(point: Qid, plot: Scatterplot | undefined = undefined) {
     // By default, this returns a
     let output = '<dl>';
     const nope: Set<string | null | number | symbol> = new Set([
@@ -945,7 +932,8 @@ class TooltipHTML extends SettableFunction<string> {
       null,
       'tile_key',
     ]);
-    for (const [k, v] of point) {
+    const row = this.plot.deeptable.getQids([point])[0];
+    for (const [k, v] of row) {
       // Don't show missing data.
       if (v === null) {
         continue;

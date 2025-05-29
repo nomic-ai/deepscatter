@@ -192,6 +192,7 @@ export class Tile {
       ),
     ]);
   }
+
   private transformation_holder: Record<string, Promise<void>> = {};
 
   async apply_transformation(name: string): Promise<void> {

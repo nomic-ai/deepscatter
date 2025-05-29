@@ -687,6 +687,38 @@ export class DataSelection {
     this.cursor = currentOffset;
   }
 
+  public moveCursorToQid(point: [number, number]) {
+    // The point contains a field called 'ix', which increases in each tile;
+    // we use this for moving because it lets us do binary search for relevant tile.
+    const rowNumber = point[1];
+    const relevantTile = this.deeptable.flatTree[point[0]];
+
+    let currentOffset = 0;
+
+    for (const { tile, matchCount } of this.tiles) {
+      if (tile.key === relevantTile.key) {
+        break;
+      }
+      currentOffset += matchCount;
+    }
+
+    const column = relevantTile.record_batch.getChild(
+      this.name,
+    ) as Vector<Bool>;
+
+    const mask = Bitmask.from_arrow(column);
+    const which = mask.which();
+
+
+const indexMatch = which.indexOf(rowNumber);
+if (indexMatch === -1) {
+  throw new Error(`Row ${rowNumber} not found in selection`);
+}
+
+
+    this.cursor = currentOffset + indexMatch;
+  }
+
   private async add_or_remove_points(
     newName: string,
     points: StructRowProxy[],
@@ -864,6 +896,8 @@ export class DataSelection {
     }
     return relevantTile.tile.record_batch.get(rix) || undefined;
   }
+
+
 
   // Iterate over the points in raw order.
   *[Symbol.iterator]() {

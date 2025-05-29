@@ -22,6 +22,7 @@ type Annotation = {
   dx: number;
   dy: number;
   data: StructRowProxy;
+  qid: Qid;
 };
 
 // A collection of zoomed and unzoomed scales returned by the interaction component.
@@ -42,6 +43,7 @@ export class Zoom {
     d3.ContainerElement,
     Record<string, BaseType>,
     HTMLElement,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     any
   >;
   public width: number;
@@ -116,13 +118,13 @@ export class Zoom {
             .style('background', 'ivory'),
         (update) =>
           update.html((d) =>
-            this.scatterplot.tooltip_html(d.data, this.scatterplot),
+            this.scatterplot.tooltip_handler.f(d.qid, this.scatterplot),
           ),
         (exit) => exit.call((e) => e.remove()),
       );
 
     els
-      .html((d) => this.scatterplot.tooltip_html(d.data, this.scatterplot))
+      .html((d) => this.scatterplot.tooltip_handler.f(d.qid, this.scatterplot))
       .style('transform', (d) => {
         const t = `translate(${+d.x + d.dx}px, ${+d.y + d.dy}px)`;
         return t;
@@ -188,15 +190,16 @@ export class Zoom {
     const ydim = this.scatterplot.dim('y') as PositionalAesthetic;
     
     const data = this.scatterplot.deeptable.getQids(dd)
-    this.scatterplot.highlit_point_change(data, this.scatterplot);
+    this.scatterplot.highlit_point_change(dd, this.scatterplot);
 
-    const annotations: Annotation[] = data.map((d) => {
+    const annotations: Annotation[] = data.map((d, i) => {
       return {
         x: x_(xdim.apply(d)),
         y: y_(ydim.apply(d)),
         data: d,
         dx: 0,
         dy: 30,
+        qid: dd[i]
       };
     });
     this.html_annotation(annotations);
@@ -204,7 +207,7 @@ export class Zoom {
     const sel = this.svg_element_selection.select('#mousepoints');
     sel
       .selectAll('circle.label')
-      .data(data, (d_: StructRowProxy) => d_.ix as number) // Unique identifier to not remove existing.
+      .data(annotations, (d_: Annotation) => d_.data.ix as number) // Unique identifier to not remove existing.
       .join(
         (enter) =>
           enter
@@ -213,19 +216,19 @@ export class Zoom {
             .attr('class', 'label')
             .attr('stroke', '#110022')
             .attr('r', 12)
-            .attr('fill', (dd) => this.scatterplot.dim('color').apply(dd))
-            .attr('cx', (datum) => x_(xdim.apply(datum)))
-            .attr('cy', (datum) => y_(ydim.apply(datum))),
+            .attr('fill', (d) => this.scatterplot.dim('color').apply(d.data))
+            .attr('cx', (d) => x_(xdim.apply(d.data)))
+            .attr('cy', (d) => y_(ydim.apply(d.data))),
 
         (update) =>
-          update.attr('fill', (dd) => this.scatterplot.dim('color').apply(dd)),
+          update.attr('fill', (d) => this.scatterplot.dim('color').apply(d.data)),
         (exit) =>
           exit.call((e) => {
             e.remove();
           }),
       )
       .on('click', (ev, dd) => {
-        this.scatterplot.click_function(dd, this.scatterplot);
+        this.scatterplot.click_handler.f(dd.qid, this.scatterplot);
       });
   }
 

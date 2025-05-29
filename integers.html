@@ -215,11 +215,7 @@
             }
           }
         }
-        console.log("YOOHOO")
-        console.log({ indices, labels })
-        const dicto = dictionaryFromArrays(indices, labels)
-        console.log({ dicto })
-        console.log(dicto.length, dicto.toArray())
+        const dicto = dictionaryFromArrays(labels, indices)
         return dicto
       }
       plot.plotAPI({
@@ -253,7 +249,6 @@
         button.addEventListener('click', function () {
           plot.dataset.transformations['dictionary number coloring'] = async function (tile) {
             const num = await tile.get_column("integers");
-            console.log({ num })
             return dictionaryBuilder(num.toArray())
           }
           plot.plotAPI({
@@ -343,7 +338,6 @@
       .getElementById('input-ids')
       .value.split(' ')
       .filter((d) => d);
-    console.log({ ids });
     const name = Math.random().toString(36);
     plot.select_and_plot({ name, ids, idField: '_id' }).then(selection => {
       window.selection = selection;
@@ -357,7 +351,6 @@
       for (let i = 0; i < 1000; i += 1) {
         ids.push(Math.floor(Math.random() * 2 ** 16).toString());
       }
-      console.log({ ids });
       const name = Math.random().toString(36);
       plot.select_and_plot({
         name,
