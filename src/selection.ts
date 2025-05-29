@@ -806,8 +806,7 @@ export class DataSelection {
      * that contains the nth match, then iterate through the matches in that
      * tile until we find the nth match.
      *
-     * @param i the index of the row to get. If less than zero, will return
-     * @param returnQid if true, returns a tuple of [tile index, row index] instead of the row data
+     * @param i the index of the row to get. If less than zero, will return the element counting from the end of the selection.
      */
   get(i: number | undefined = undefined): StructRowProxy {
     const result = this.getBase(i, false) as StructRowProxy;
