@@ -798,22 +798,34 @@ export class DataSelection {
     return this.deeptable.highest_known_ix;
   }
 
-
-  get(i: number | undefined, returnQid: false): StructRowProxy | undefined;
-  get(i: number | undefined, returnQid: true): [number, number] | undefined;
-
   /**
-   *
-   * Returns the nth element in the selection. This is a bit tricky because
-   * the selection is stored as a list of tiles, each of which has a list of
-   * matches. So we have to iterate through the tiles until we find the one
-   * that contains the nth match, then iterate through the matches in that
-   * tile until we find the nth match.
-   *
-   * @param i the index of the row to get. If less than zero, will return
-   * @param returnQid if true, returns a tuple of [tile index, row index] instead of the row data
-   */
-  get(i: number | undefined = undefined, returnQid: boolean = false): StructRowProxy | [number, number] | undefined {
+     *
+     * Returns the nth element in the selection. This is a bit tricky because
+     * the selection is stored as a list of tiles, each of which has a list of
+     * matches. So we have to iterate through the tiles until we find the one
+     * that contains the nth match, then iterate through the matches in that
+     * tile until we find the nth match.
+     *
+     * @param i the index of the row to get. If less than zero, will return
+     * @param returnQid if true, returns a tuple of [tile index, row index] instead of the row data
+     */
+  get(i: number | undefined = undefined): StructRowProxy {
+    const result = this.getBase(i, false) as StructRowProxy;
+    if (result === undefined) {
+      throw new Error(`Index ${i} out of bounds`);
+    }
+    return result;
+  }
+
+  getQid(i: number | undefined = undefined): [number, number] {
+    const result = this.getBase(i, true) as [number, number];
+    if (result === undefined) {
+      throw new Error(`Index ${i} out of bounds`);
+    }
+    return result;
+  }
+
+  protected getBase(i: number | undefined = undefined, returnQid: boolean = false): StructRowProxy | [number, number] | undefined {
     if (i === undefined) {
       i = this.cursor;
     }
@@ -847,10 +859,11 @@ export class DataSelection {
     if (offset >= cached.length) {
       throw new Error(`unable to locate point ${i}`);
     }
-    const tix = cached[offset];
-    
-    return relevantTile.tile.record_batch.get(tix) || undefined;
-
+    const rix = cached[offset];
+    if (returnQid) {
+      return [relevantTile.tile.tix, rix]
+    }
+    return relevantTile.tile.record_batch.get(rix) || undefined;
   }
 
   // Iterate over the points in raw order.
@@ -1112,15 +1125,28 @@ export class SortedDataSelection extends DataSelection {
     };
   }
 
-  get(i: number | undefined, returnQid: false): StructRowProxy | undefined;
-  get(i: number | undefined, returnQid: true): [number, number] | undefined;
 
+  get(i: number | undefined = undefined): StructRowProxy {
+    const result = this.getBase(i, false) as StructRowProxy;
+    if (result === undefined) {
+      throw new Error(`Index ${i} out of bounds`);
+    }
+    return result;
+  }
 
+  getQid(i: number | undefined = undefined): [number, number] {
+    const result = this.getBase(i, true) as [number, number];
+    if (result === undefined) {
+      throw new Error(`Index ${i} out of bounds`);
+    }
+    return result;
+  }
+  
   /**
    * Returns the k-th element in the sorted selection.
    * This implementation uses Quickselect with a pivot selected from actual data.
    */
-  get(k: number | undefined = undefined, returnQid: boolean = false): StructRowProxy | [number, number] | undefined {
+  protected getBase(k: number | undefined = undefined, returnQid: boolean = false): StructRowProxy | [number, number] | undefined {
     if (k >= this.selectionSize || k < -this.selectionSize) {
       return undefined;
     }
