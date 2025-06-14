@@ -930,7 +930,13 @@ if (indexMatch === -1) {
       this.deeptable.transformations[name] =
         this.wrapWithSelectionMetadata(matcher);
       await this.deeptable.root_tile.apply_transformation(name);
-    } else {
+    } else if (typeof codes[0] === 'number') {
+      const matcher = numbermatcher(key_field, codes as number[]);
+      this.deeptable.transformations[name] =
+        this.wrapWithSelectionMetadata(matcher);
+      await this.deeptable.root_tile.apply_transformation(name);
+    }
+    else {
       console.error('Unable to match type', typeof codes[0]);
     }
   }
@@ -945,6 +951,23 @@ function bigintmatcher(
   return async function (tile: Tile) {
     const col = (await tile.get_column(field, subfield)).data[0];
     const values = col.values as bigint[];
+    const bitmask = new Bitmask(tile.record_batch.numRows);
+    for (let i = 0; i < tile.record_batch.numRows; i++) {
+      matchings.has(values[i]) && bitmask.set(i);
+    }
+    return bitmask.to_arrow();
+  };
+}
+
+function numbermatcher(
+  field: string,
+  matches: number[],
+  subfield: string | string[] | null = null,
+) {
+  const matchings = new Set(matches);
+  return async function (tile: Tile) {
+    const col = (await tile.get_column(field, subfield)).data[0];
+    const values = col.values as number[];
     const bitmask = new Bitmask(tile.record_batch.numRows);
     for (let i = 0; i < tile.record_batch.numRows; i++) {
       matchings.has(values[i]) && bitmask.set(i);
