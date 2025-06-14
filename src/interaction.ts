@@ -46,8 +46,8 @@ export class Zoom {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     any
   >;
-  public width: number;
-  public height: number;
+  private _width: number;
+  private _height: number;
   public renderers: Map<string, Renderer>;
   public deeptable?: Deeptable;
   public _timer?: d3.Timer;
@@ -65,8 +65,8 @@ export class Zoom {
     this.prefs = prefs;
 
     this.svg_element_selection = select(selector);
-    this.width = +this.svg_element_selection.attr('width');
-    this.height = +this.svg_element_selection.attr('height');
+    this._width = plot.width;
+    this._height = plot.height;
     this.renderers = new Map();
     this.scatterplot = plot;
     // A zoom keeps track of all the renderers
@@ -75,14 +75,40 @@ export class Zoom {
     this.renderers = new Map();
   }
 
-  attach_tiles(tiles: Deeptable) {
-    this.deeptable = tiles;
+  get width() {
+    return this._width;
+  }
+
+  get height() {
+    return this._height;
+  }
+
+  public resize(width: number, height: number) {
+    const { x_, y_ } = this.scales();
+    const old_center = [
+      x_.invert(this._width / 2),
+      y_.invert(this._height / 2),
+    ];
+    // Update the extent
+    this.zoomer.extent([
+      [0, 0],
+      [width, height],
+    ]);
+    this._width = width;
+    this._height = height;
+    this.scales(true); // Force rebuild of scales.
+    this.zoom_to(this.transform.k, old_center[0], old_center[1]);
+  }
+
+  attach_tiles(deeptable: Deeptable) {
+    this.deeptable = deeptable;
     return this;
   }
 
   attach_renderer(key: string, renderer: Renderer) {
     this.renderers.set(key, renderer);
     renderer.bind_zoom(this);
+    // Should just be `this.initialize_zoom(), right?
     renderer.zoom.initialize_zoom();
     return this;
   }
@@ -178,10 +204,10 @@ export class Zoom {
       })
 
     canvas.call(zoomer);
-
     this.add_mouseover();
 
     this.zoomer = zoomer;
+    this.resize(width, height);
   }
 
   set_highlit_points(dd: Qid[]) {
@@ -294,22 +320,7 @@ export class Zoom {
     return this._timer;
   }
 
-  data(deeptable: undefined): Deeptable;
-  data(deeptable: Deeptable): Zoom;
-
-  data(deeptable: Deeptable | undefined) {
-    if (deeptable === undefined) {
-      return this.deeptable;
-    }
-    this.deeptable = deeptable;
-    return this as Zoom;
-  }
-
-  /**
-   *
-   * @returns
-   */
-  scales(): ScaleSet {
+  scales(force = false): ScaleSet {
     // General x and y scales that map from data space
     // to pixel coordinates, and also
     // rescaled ones that describe the current zoom.
@@ -318,17 +329,16 @@ export class Zoom {
 
     // equal_units: should a point of x be the same as a point of y?
 
-    if (this._scales) {
+    if (force !== true && this._scales) {
       this._scales.x_ = this.transform.rescaleX(this._scales.x);
       this._scales.y_ = this.transform.rescaleY(this._scales.y);
       return this._scales;
     }
 
     const { width, height } = this;
-    if (this.deeptable === undefined) {
-      throw new Error('Error--scales created before tileSet present.');
-    }
-    const { extent } = this.deeptable;
+
+    const extent = this.deeptable.extent;
+
     if (extent === undefined) {
       throw new Error('Error--scales created before extent present.');
     }
